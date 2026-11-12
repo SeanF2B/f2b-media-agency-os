@@ -12,7 +12,7 @@ import { PORTAL_HTML, PAUSED_HTML } from './client-portal-page';
 
 const notClient = new Map();   // email → expiry (ms). Only negative answers are cached, so pausing a login is immediate.
 const denyLog = new Map();
-const STATIC_OK = new Set(['/f2b-site-editor.js', '/f2b-home-icon.png', '/favicon.ico', '/icon.png', '/apple-icon.png']);
+const STATIC_OK = new Set(['/f2b-site-editor.js', '/f2b-site-builder.js', '/f2b-home-icon.png', '/favicon.ico', '/icon.png', '/apple-icon.png']);
 const json = (b, status = 200) => Response.json(b, { status, headers: { 'Cache-Control': 'no-store' } });
 const html = (h, status = 200) => new Response(h, { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-frame-options': 'DENY', 'referrer-policy': 'same-origin' } });
 

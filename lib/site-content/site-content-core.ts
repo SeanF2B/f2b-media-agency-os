@@ -4,6 +4,7 @@
 // (GitHub contents/git-data API on a PREVIEW branch only). No code path here can write to a live branch or a live domain.
 import { createApproval, listApprovals, decideApproval, logClientEvent } from '../client-accounts/client-users-core';
 import { parse as yamlParse, dump as yamlDump } from './yaml-lite';
+import { builderAction, isBuilderPath, BUILDER_IMAGE_DIR } from './site-builder-core';
 
 export class SiteError extends Error { constructor(status, msg, extra) { super(msg); this.status = status; this.extra = extra; } }
 const nowIso = () => new Date().toISOString();
@@ -287,6 +288,7 @@ export async function siteAction(env, clientId, req, { canWrite, actor, previewB
   const mustWrite = () => { if (!canWrite) throw new SiteError(403, 'Only an agency owner or admin can edit website content.'); };
   const mustAdmin = () => { if (!canWrite || isClient) throw new SiteError(403, 'Only F2B Media can do this.'); };
 
+  if (typeof op === 'string' && op.startsWith('builder-')) return builderAction(SiteError, env, clientId, req, { store, site, canWrite, isClient, actor, preview });
   if (op === 'overview') {
     const files = await store.list();
     const byPath = new Map(files.map(f => [f.path, f]));
@@ -352,7 +354,7 @@ export async function siteAction(env, clientId, req, { canWrite, actor, previewB
   }
   if (op === 'restore') {
     mustAdmin();
-    const path = str(req.path, 300); if (!entryForPath(schema, path)) throw new SiteError(400, 'Not an editable page.');
+    const path = str(req.path, 300); if (!entryForPath(schema, path) && !isBuilderPath(path)) throw new SiteError(400, 'Not an editable page.');
     const at = await store.revisionAt(path, req.version); const cur = await store.read(path);
     if (!at || at.content_type !== 'text') throw new SiteError(404, 'That version of the page was not found.');
     if (cur.sha === at.sha) return { unchanged: true };
@@ -361,7 +363,7 @@ export async function siteAction(env, clientId, req, { canWrite, actor, previewB
   }
   if (op === 'image') {
     mustWrite();
-    const dir = str(req.dir, 80); if (!site.imageDirs.includes(dir)) throw new SiteError(400, `Images can go to: ${site.imageDirs.join(', ')}`);
+    const dir = str(req.dir, 80); if (!site.imageDirs.includes(dir) && dir !== BUILDER_IMAGE_DIR) throw new SiteError(400, `Images can go to: ${site.imageDirs.join(', ')}`);
     const bytes = req.bytes; if (!(bytes instanceof Uint8Array) || !bytes.byteLength) throw new SiteError(400, 'No image received.');
     if (bytes.byteLength > LIMITS.imageBytes) throw new SiteError(413, `Images must be ${LIMITS.imageBytes / 1048576} MB or smaller. Export a smaller JPG/WebP (about 1600 px wide is plenty).`);
     const type = sniffImage(bytes); if (!type) throw new SiteError(415, 'Use a JPG, PNG, WebP, AVIF or GIF image.');

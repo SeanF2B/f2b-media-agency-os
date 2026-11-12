@@ -49,6 +49,8 @@ export async function handleClientSite(request, env, user, clientLogin = null) {
       if (op === 'page') return json(await siteAction(env, clientId, { op: 'read', path: url.searchParams.get('path') }, ctx));
       if (op === 'history') return json(await siteAction(env, clientId, { op: 'history', path: url.searchParams.get('path'), limit: url.searchParams.get('limit') }, ctx));
       if (op === 'approvals') return json(await siteAction(env, clientId, { op: 'approvals', status: url.searchParams.get('status') }, ctx));
+      if (op === 'builder-list') return json(await siteAction(env, clientId, { op }, ctx));
+      if (op === 'builder-read') return json(await siteAction(env, clientId, { op, slug: url.searchParams.get('slug') }, ctx));
       if (op === 'asset') {
         const p = String(url.searchParams.get('path') || '');
         if (!/^\/images\/[\w./-]{1,200}$/.test(p) || p.includes('..')) throw new SiteError(400, 'Bad image path.');
@@ -69,7 +71,7 @@ export async function handleClientSite(request, env, user, clientLogin = null) {
       return json(await siteAction(env, clientId, { op: 'image', dir: url.searchParams.get('dir'), name: url.searchParams.get('name'), bytes }, ctx));
     }
     const op = String(body.op || '');
-    if (!['save', 'undo', 'restore', 'decide'].includes(op)) throw new SiteError(400, 'Unknown action.');
+    if (!['save', 'undo', 'restore', 'decide', 'builder-save', 'builder-import'].includes(op)) throw new SiteError(400, 'Unknown action.');
     return json(await siteAction(env, clientId, { ...body, op }, ctx));
   } catch (e) {
     if (e instanceof SiteError) return json({ error: e.message, ...(e.extra || {}) }, e.status);
@@ -96,6 +98,8 @@ async function handleAsClient(request, env, cu) {
     if (op === 'page') return json(await siteAction(env, clientId, { op: 'read', path: url.searchParams.get('path') }, ctx));
     if (op === 'history') return json(await siteAction(env, clientId, { op: 'history', path: url.searchParams.get('path'), limit: url.searchParams.get('limit') }, ctx));
     if (op === 'approvals') return json(await siteAction(env, clientId, { op: 'approvals' }, ctx));
+    if (op === 'builder-list') return json(await siteAction(env, clientId, { op }, ctx));
+    if (op === 'builder-read') return json(await siteAction(env, clientId, { op, slug: url.searchParams.get('slug') }, ctx));
     if (op === 'asset') {
       const p = String(url.searchParams.get('path') || '');
       if (!/^\/images\/[\w./-]{1,200}$/.test(p) || p.includes('..')) throw new SiteError(400, 'Bad image path.');
@@ -112,6 +116,6 @@ async function handleAsClient(request, env, cu) {
     if (+(request.headers.get('content-length') || 0) > LIMITS.imageBytes) throw new SiteError(413, `Images must be ${LIMITS.imageBytes / 1048576} MB or smaller.`);
     return json(await siteAction(env, clientId, { op: 'image', dir: url.searchParams.get('dir'), name: url.searchParams.get('name'), bytes: new Uint8Array(await request.arrayBuffer()) }, ctx));
   }
-  if (body.op !== 'save') throw new SiteError(403, 'Only F2B Media can undo, restore or approve changes.');
-  return json(await siteAction(env, clientId, { ...body, op: 'save' }, ctx));
+  if (body.op !== 'save' && body.op !== 'builder-save') throw new SiteError(403, 'Only F2B Media can undo, restore or approve changes.');
+  return json(await siteAction(env, clientId, { ...body, op: body.op, allowNew: false }, ctx));
 }
