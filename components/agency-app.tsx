@@ -532,17 +532,19 @@ function AnimatedBot({ status, member }: { status: string; member: Staff }) {
   useEffect(() => {
     const move = (event: MouseEvent) => {
       const el = ref.current; if (!el) return;
-      const box = el.getBoundingClientRect(), dx = event.clientX - (box.left + box.width / 2), dy = event.clientY - (box.top + box.height / 2), len = Math.hypot(dx, dy) || 1, k = Math.min(1, len / 200);
-      el.style.setProperty("--lx", ((dx / len) * k * 2).toFixed(2) + "px"); el.style.setProperty("--ly", ((dy / len) * k * 2).toFixed(2) + "px");
-      el.style.setProperty("--tilt", ((dx / len) * k * 12).toFixed(1) + "deg");
+      const box = el.getBoundingClientRect(), dx = event.clientX - (box.left + box.width / 2), dy = event.clientY - (box.top + box.height / 2), len = Math.hypot(dx, dy) || 1, k = Math.min(1, len / 140);
+      el.style.setProperty("--lx", ((dx / len) * k * 2.4).toFixed(2) + "px"); el.style.setProperty("--ly", ((dy / len) * k * 2.4).toFixed(2) + "px");
     };
     window.addEventListener("mousemove", move, { passive: true });
     return () => window.removeEventListener("mousemove", move);
   }, []);
   const mood = status === "Done" ? "happy" : status === "Blocked" ? "panic" : status === "In progress" ? "whistle" : "confident";
   return <span ref={ref} className={`bot-live bot-${mood}`} title={`${member.name} · ${mood === "happy" ? "all done" : mood === "panic" ? "needs attention" : mood === "whistle" ? "working on it" : "ready"}`}>
-    <span className="bot-look"><StaffProfileAvatar member={member} className="task-avatar" /></span>
-    {mood === "whistle" && <span className="bot-notes"><b>♪</b><b>♫</b></span>}{mood === "panic" && <span className="bot-sweat" />}{mood === "happy" && <><span className="bot-spark">✦</span><span className="bot-smile">😊</span></>}{mood === "confident" && <span className="bot-smile">😎</span>}{mood === "panic" && <span className="bot-smile">😱</span>}{mood === "whistle" && <span className="bot-smile">😗</span>}
+    <span className="bot-body"><StaffProfileAvatar member={member} className="task-avatar" />
+      <span className="bot-eyes"><span className="bot-eye"><i /></span><span className="bot-eye"><i /></span></span>
+      <span className="bot-mouth" />
+    </span>
+    {mood === "whistle" && <span className="bot-notes"><b>♪</b><b>♫</b></span>}{mood === "panic" && <span className="bot-sweat" />}
   </span>;
 }
 function AiEyesIcon() { return <span className="ai-eyes-icon" aria-hidden="true"><span className="ai-eyes-antenna" /><span className="ai-eyes-face"><i /><i /></span></span>; }
