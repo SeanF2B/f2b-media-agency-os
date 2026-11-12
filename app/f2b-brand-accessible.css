@@ -8002,3 +8002,5 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
 .launchpad-next { opacity: .75; }
 .launchpad-full-detail { font-size: 12px; opacity: .85; margin: 0 0 8px; }
 .launchpad-row.status-ready { opacity: .8; }
+
+.card-drop-shadow-floating { margin: 0 !important; animation: none !important; }

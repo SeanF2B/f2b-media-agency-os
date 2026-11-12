@@ -63,50 +63,67 @@ export function createCardDragFx(preview: HTMLElement, source: HTMLElement, grab
     preview.style.setProperty("transform", `rotate(${degrees.toFixed(2)}deg) scale(1.03)`, "important");
   };
 
+  // The landing slot is a floating outline positioned over the gap, and the cards
+  // below it slide down with a transform. Nothing is inserted into the React-managed
+  // card list, so re-renders and different column layouts cannot break it.
+  let target: { column: HTMLElement; beforeCard: HTMLElement | null } | null = null;
+  let shifted: HTMLElement[] = [];
+
   const ensureSlot = () => {
     if (slot) return slot;
     slot = document.createElement("div");
-    slot.className = "card-drop-shadow-slot";
+    slot.className = "card-drop-shadow-slot card-drop-shadow-floating";
     slot.setAttribute("aria-hidden", "true");
-    slot.style.height = `${Math.max(48, preview.offsetHeight || source.offsetHeight)}px`;
-    // Inline fallbacks so the landing spot is always visible, whatever the stylesheet does.
-    const accent = (lastColumn && getComputedStyle(lastColumn).getPropertyValue("--stage-color").trim()) || "#3b82f6";
-    slot.style.setProperty("display", "block", "important");
-    slot.style.setProperty("box-sizing", "border-box", "important");
-    slot.style.setProperty("width", "100%", "important");
-    slot.style.setProperty("border", `2px dashed ${accent}`, "important");
-    slot.style.setProperty("border-radius", "14px", "important");
-    slot.style.setProperty("background", `color-mix(in srgb, ${accent} 16%, transparent)`, "important");
-    slot.style.setProperty("box-shadow", "inset 0 6px 18px rgba(0,0,0,.28), 0 8px 20px rgba(0,0,0,.22)", "important");
-    slot.style.setProperty("margin", "4px 0", "important");
+    document.body.appendChild(slot);
     return slot;
+  };
+
+  const clearShift = () => {
+    shifted.forEach((card) => { card.style.removeProperty("transform"); card.style.removeProperty("transition"); });
+    shifted = [];
   };
 
   const removeSlot = () => {
     slot?.remove();
     slot = null;
+    clearShift();
+    target = null;
   };
 
   const placeSlot = (clientY: number, column: HTMLElement) => {
-    const cards = Array.from(column.querySelectorAll<HTMLElement>(options.cardSelector)).filter((card) => card !== source && card !== preview && !card.classList.contains("is-dragging") && !preview.contains(card));
-    const before = cards.find((card) => {
-      const rect = card.getBoundingClientRect();
-      return clientY < rect.top + rect.height / 2;
-    });
-    const container = before?.parentElement || cards[cards.length - 1]?.parentElement || column.querySelector<HTMLElement>("[class*='cards'], [class*='list'], [class*='body']") || column;
+    const cards = Array.from(column.querySelectorAll<HTMLElement>(options.cardSelector)).filter((card) => card !== source && card !== preview && !card.classList.contains("is-dragging") && !preview.contains(card) && card.getClientRects().length > 0);
+    // Natural (un-shifted) top of each card, so the maths is stable while cards are sliding.
+    const natural = (card: HTMLElement) => {
+      const match = /translateY\((-?[\d.]+)px\)/.exec(card.style.transform || "");
+      return card.getBoundingClientRect().top - (match ? Number(match[1]) : 0);
+    };
+    const before = cards.find((card) => clientY < natural(card) + card.offsetHeight / 2) || null;
+    const slotHeight = Math.max(48, preview.offsetHeight || source.offsetHeight);
+    const gap = cards.length > 1 ? Math.max(0, natural(cards[1]) - (natural(cards[0]) + cards[0].offsetHeight)) : 10;
+    const first = cards[0];
+    const colRect = column.getBoundingClientRect();
+    const left = first ? first.getBoundingClientRect().left : colRect.left + 10;
+    const width = first ? first.getBoundingClientRect().width : Math.max(120, colRect.width - 20);
+    const last = cards[cards.length - 1];
+    const slotTop = before ? natural(before) : last ? natural(last) + last.offsetHeight + gap : colRect.top + 70;
     const element = ensureSlot();
-    const reference = before && before.parentElement === container ? before : null;
-    if (element.parentElement === container && (reference ? element.nextElementSibling === reference : element === container.lastElementChild)) return;
-    // Trello-style: neighbouring cards glide to their new places as the slot moves.
-    const before0 = new Map(cards.map((card) => [card, card.getBoundingClientRect().top] as const));
-    container.insertBefore(element, reference);
-    cards.forEach((card) => {
-      const from = before0.get(card);
-      if (from === undefined || typeof card.animate !== "function") return;
-      const delta = from - card.getBoundingClientRect().top;
-      if (Math.abs(delta) < 1) return;
-      card.animate([{ transform: `translateY(${delta}px)` }, { transform: "translateY(0)" }], { duration: 160, easing: "cubic-bezier(.2,.75,.25,1)" });
+    element.style.cssText = `position:fixed;left:${left}px;top:${slotTop - (before ? 0 : 0)}px;width:${width}px;height:${slotHeight}px;box-sizing:border-box;z-index:2147482000;pointer-events:none;transition:top 150ms ease-out;`;
+    const accent = getComputedStyle(column).getPropertyValue("--stage-color").trim() || "#3b82f6";
+    element.style.setProperty("border", `2px dashed ${accent}`, "important");
+    element.style.setProperty("border-radius", "14px", "important");
+    element.style.setProperty("background", `color-mix(in srgb, ${accent} 16%, transparent)`, "important");
+    element.style.setProperty("box-shadow", "inset 0 6px 18px rgba(0,0,0,.28), 0 8px 20px rgba(0,0,0,.22)", "important");
+    // Cards at and after the slot slide down to make room (Trello-style).
+    const index = before ? cards.indexOf(before) : cards.length;
+    const push = slotHeight + gap;
+    const nextShifted: HTMLElement[] = [];
+    cards.forEach((card, position) => {
+      if (position >= index) { card.style.setProperty("transition", "transform 150ms cubic-bezier(.2,.75,.25,1)", "important"); card.style.setProperty("transform", `translateY(${push}px)`, "important"); nextShifted.push(card); }
+      else { card.style.removeProperty("transform"); card.style.removeProperty("transition"); }
     });
+    shifted.filter((card) => !nextShifted.includes(card)).forEach((card) => { card.style.removeProperty("transform"); card.style.removeProperty("transition"); });
+    shifted = nextShifted;
+    target = { column, beforeCard: before };
   };
 
   // Trello-style: dragging near the top or bottom edge of a long column scrolls it.
@@ -150,12 +167,9 @@ export function createCardDragFx(preview: HTMLElement, source: HTMLElement, grab
       try { moveInner(clientX, clientY, column); } catch (error) { console.warn("card drag effect failed", error); showFxError(error); }
     },
     dropPlacement() {
-      const container = slot?.parentElement;
-      if (!slot || !container) return null;
-      const column = container.closest<HTMLElement>("[data-task-drop-stage],[data-crm-stage]") || container;
-      let next = slot.nextElementSibling as HTMLElement | null;
-      while (next && !next.matches(options.cardSelector)) next = next.nextElementSibling as HTMLElement | null;
-      return { column, beforeId: next ? next.dataset.opportunityId || next.id.replace(/^task-/, "") || null : null };
+      if (!target) return null;
+      const beforeCard = target.beforeCard;
+      return { column: target.column, beforeId: beforeCard ? beforeCard.dataset.opportunityId || beforeCard.id.replace(/^task-/, "") || null : null };
     },
     end() {
       window.clearTimeout(idleTimer);
