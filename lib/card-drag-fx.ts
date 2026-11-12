@@ -57,6 +57,16 @@ export function createCardDragFx(preview: HTMLElement, source: HTMLElement, grab
     slot.className = "card-drop-shadow-slot";
     slot.setAttribute("aria-hidden", "true");
     slot.style.height = `${Math.max(48, preview.offsetHeight || source.offsetHeight)}px`;
+    // Inline fallbacks so the landing spot is always visible, whatever the stylesheet does.
+    const accent = (lastColumn && getComputedStyle(lastColumn).getPropertyValue("--stage-color").trim()) || "#3b82f6";
+    slot.style.setProperty("display", "block", "important");
+    slot.style.setProperty("box-sizing", "border-box", "important");
+    slot.style.setProperty("width", "100%", "important");
+    slot.style.setProperty("border", `2px dashed ${accent}`, "important");
+    slot.style.setProperty("border-radius", "14px", "important");
+    slot.style.setProperty("background", `color-mix(in srgb, ${accent} 16%, transparent)`, "important");
+    slot.style.setProperty("box-shadow", "inset 0 6px 18px rgba(0,0,0,.28), 0 8px 20px rgba(0,0,0,.22)", "important");
+    slot.style.setProperty("margin", "4px 0", "important");
     return slot;
   };
 
@@ -67,13 +77,13 @@ export function createCardDragFx(preview: HTMLElement, source: HTMLElement, grab
 
   const placeSlot = (clientY: number, column: HTMLElement) => {
     const cards = Array.from(column.querySelectorAll<HTMLElement>(options.cardSelector)).filter((card) => card !== source && card !== preview && !card.classList.contains("is-dragging") && !preview.contains(card));
-    const container = cards[0]?.parentElement || column.querySelector<HTMLElement>("[class*='cards'], [class*='list'], [class*='body']") || column;
     const before = cards.find((card) => {
       const rect = card.getBoundingClientRect();
       return clientY < rect.top + rect.height / 2;
     });
+    const container = before?.parentElement || cards[cards.length - 1]?.parentElement || column.querySelector<HTMLElement>("[class*='cards'], [class*='list'], [class*='body']") || column;
     const element = ensureSlot();
-    const reference = before || null;
+    const reference = before && before.parentElement === container ? before : null;
     if (element.parentElement === container && (reference ? element.nextElementSibling === reference : element === container.lastElementChild)) return;
     // Trello-style: neighbouring cards glide to their new places as the slot moves.
     const before0 = new Map(cards.map((card) => [card, card.getBoundingClientRect().top] as const));
@@ -104,24 +114,28 @@ export function createCardDragFx(preview: HTMLElement, source: HTMLElement, grab
     scrollFrame = window.requestAnimationFrame(autoScroll);
   };
 
+  const moveInner = (clientX: number, clientY: number, column?: HTMLElement | null) => {
+    if (lastX !== null) {
+      const dx = clientX - lastX;
+      // Smooth the horizontal speed so the tilt eases in and out.
+      velocity = velocity * 0.6 + dx * 0.4;
+      setTilt(clamp(velocity * 1.1, -maxTilt, maxTilt));
+    }
+    lastX = clientX;
+    window.clearTimeout(idleTimer);
+    idleTimer = window.setTimeout(() => {
+      velocity = 0;
+      setTilt(0);
+    }, 110);
+    lastColumn = column || null;
+    lastY = clientY;
+    if (column) { placeSlot(clientY, column); if (!scrollFrame) scrollFrame = window.requestAnimationFrame(autoScroll); }
+    else removeSlot();
+  };
+
   return {
     move(clientX, clientY, column) {
-      if (lastX !== null) {
-        const dx = clientX - lastX;
-        // Smooth the horizontal speed so the tilt eases in and out.
-        velocity = velocity * 0.6 + dx * 0.4;
-        setTilt(clamp(velocity * 1.1, -maxTilt, maxTilt));
-      }
-      lastX = clientX;
-      window.clearTimeout(idleTimer);
-      idleTimer = window.setTimeout(() => {
-        velocity = 0;
-        setTilt(0);
-      }, 110);
-      lastColumn = column || null;
-      lastY = clientY;
-      if (column) { placeSlot(clientY, column); if (!scrollFrame) scrollFrame = window.requestAnimationFrame(autoScroll); }
-      else removeSlot();
+      try { moveInner(clientX, clientY, column); } catch (error) { console.warn("card drag effect failed", error); }
     },
     dropPlacement() {
       const container = slot?.parentElement;
