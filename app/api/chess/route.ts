@@ -22,7 +22,7 @@ function getIdentity(data: any, user: any) {
   const profile = (data.staff || []).find((s: any) => !s.isBot && (s.id === user.userId || s.email?.toLowerCase() === user.email?.toLowerCase()));
   return { id: profile?.id || user.userId, name: profile?.name || user.displayName || user.email || "Team member", avatar: profile?.avatar || "♟", profile };
 }
-function memberName(data: any, id: string) { return data.staff?.find((s: any) => s.id === id)?.name || (id === "chess-ai" ? "Connor · AI" : "Team member"); }
+function memberName(data: any, id: string) { return data.staff?.find((s: any) => s.id === id)?.name || (id === "chess-ai" ? "AI" : "Team member"); }
 function finished(chess: Chess, game: Game) {
   if (!chess.isGameOver()) return false;
   game.status = "completed"; game.endedAt = new Date().toISOString();
@@ -70,7 +70,7 @@ export async function GET() {
   const visible = games.filter((g) => g.status === "active" || g.status === "pending" || g.whiteId === identity.id || g.blackId === identity.id || g.challengerId === identity.id || g.challengedId === identity.id).map((g) => ({ ...g, ...(g.status === "active" || g.status === "pending" ? { timeControl: "inf" as const, clocks: { w: 0, b: 0 } } : {}), whiteName: memberName(data, g.whiteId), blackName: memberName(data, g.blackId) }));
   const aiAvatar = data.staff?.find((s: any) => s.id === "f2b-ai-agent")?.avatar || "🤖";
   const staff = chessStaff.filter((s: any) => !s.isBot).map((s: any) => ({ id: s.id, name: s.name, avatar: s.avatar }));
-  const leaderboardPeople = [...staff, { id: "chess-ai", name: "Connor · AI", avatar: aiAvatar }];
+  const leaderboardPeople = [...staff, { id: "chess-ai", name: "AI", avatar: aiAvatar }];
   const standings = new Map<string, { id: string; name: string; avatar?: string; wins: number; games: number }>(leaderboardPeople.map((person: any) => [person.id, { id: person.id, name: person.name, avatar: person.avatar, wins: 0, games: 0 }] as const));
   for (const game of games) {
     if (game.status !== "completed") continue;
@@ -125,7 +125,7 @@ export async function POST(request: Request) {
       const whiteId = vsAi ? (humanColor === "w" ? actor.id : "chess-ai") : color === "white" ? actor.id : color === "black" ? target : "pending";
       const blackId = vsAi ? (humanColor === "b" ? actor.id : "chess-ai") : color === "white" ? target : color === "black" ? actor.id : "pending";
       game = { id: crypto.randomUUID(), mode: vsAi ? "ai" : "staff", status: vsAi ? "active" : "pending", whiteId, blackId, challengerId: actor.id, ...(vsAi ? {} : { challengedId: target }), whiteName: !vsAi && whiteId === "pending" ? actor.name : !vsAi && blackId === "pending" ? memberName(data, target) : memberName(data, whiteId), blackName: !vsAi && blackId === "pending" ? actor.name : !vsAi && whiteId === "pending" ? memberName(data, target) : memberName(data, blackId), ...(vsAi ? { humanColor, aiDifficulty: ["easy", "medium", "hard"].includes(body.difficulty) ? body.difficulty : "medium" } : {}), timeControl: tc, clocks: { w: chessClockMs(tc), b: chessClockMs(tc) }, ...(vsAi ? { turnStartedAt: at } : {}), fen: new Chess().fen(), moves: [], createdAt: at };
-      games.unshift(game); addActivity(data, game, actor, vsAi ? "Chess game started vs Connor" : "Chess challenge sent", vsAi ? `${actor.name} started a ${tc} game · ${game.aiDifficulty} AI · ${humanColor === "w" ? "White" : "Black"}` : `${actor.name} challenged ${memberName(data, target)} · ${tc}`);
+      games.unshift(game); addActivity(data, game, actor, vsAi ? "Chess game started vs AI" : "Chess challenge sent", vsAi ? `${actor.name} started a ${tc} game · ${game.aiDifficulty} AI · ${humanColor === "w" ? "White" : "Black"}` : `${actor.name} challenged ${memberName(data, target)} · ${tc}`);
     } else {
       game = games.find((item) => item.id === body.gameId);
       if (!game) return Response.json({ error: "That game is no longer available." }, { status: 404 });
@@ -169,12 +169,12 @@ export async function POST(request: Request) {
           game.fen = chess.fen(); game.moves.push({ san: played.san, color: turn, by: actor.id, at });
           const isGameOver = finished(chess, game);
           if (!isGameOver) game.turnStartedAt = new Date().toISOString();
-          addActivity(data, game, actor, isGameOver ? "Chess game completed" : "Chess move played", `${game.whiteName} vs ${game.blackName} · ${actor.name} played ${played.san}${isGameOver ? ` · ${game.result}` : game.mode === "ai" ? " · Connor is thinking" : ""}`);
+          addActivity(data, game, actor, isGameOver ? "Chess game completed" : "Chess move played", `${game.whiteName} vs ${game.blackName} · ${actor.name} played ${played.san}${isGameOver ? ` · ${game.result}` : game.mode === "ai" ? " · AI is thinking" : ""}`);
         }
       } else if (body.action === "ai-move") {
         if (game.status !== "active" || game.mode !== "ai" || game.challengerId !== actor.id) return Response.json({ error: "This is not an active AI turn for your game." }, { status: 409 });
         const chess = new Chess(game.fen); const turn = chess.turn();
-        if (turn === game.humanColor) return Response.json({ error: "It is not Connor’s turn." }, { status: 409 });
+        if (turn === game.humanColor) return Response.json({ error: "It is not AI’s turn." }, { status: 409 });
         const aiTurnStartedAt = Date.parse(game.turnStartedAt || at);
         const waitMs = Math.max(0, aiThinkTimeMs - (Date.now() - aiTurnStartedAt));
         if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
@@ -191,7 +191,7 @@ export async function POST(request: Request) {
           game.fen = chess.fen(); game.moves.push({ san: played.san, color: turn, by: "chess-ai", at: moveAt.toISOString() });
           const isGameOver = finished(chess, game);
           if (!isGameOver) game.turnStartedAt = moveAt.toISOString();
-          addActivity(data, game, actor, isGameOver ? "Chess game completed" : "Chess AI move played", `${game.whiteName} vs ${game.blackName} · Connor · Stockfish (${game.aiDifficulty || "medium"}) played ${played.san}${isGameOver ? ` · ${game.result}` : ""}`);
+          addActivity(data, game, actor, isGameOver ? "Chess game completed" : "Chess AI move played", `${game.whiteName} vs ${game.blackName} · AI · Stockfish (${game.aiDifficulty || "medium"}) played ${played.san}${isGameOver ? ` · ${game.result}` : ""}`);
         }
       } else return Response.json({ error: "Unknown chess action." }, { status: 400 });
     }

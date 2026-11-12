@@ -403,7 +403,7 @@ export async function POST(request: Request) {
   const user = await getChatGPTUser();
   if (!user) return Response.json({ error: "Sign in to use the client assistant." }, { status: 401 });
   try {
-    const body = await request.json() as { clientId?: string; service?: string; message?: string; campaignId?: string; adsDateRange?: string; adsFrom?: string; adsTo?: string };
+    const body = await request.json() as { clientId?: string; service?: string; message?: string; campaignId?: string; adsDateRange?: string; adsFrom?: string; adsTo?: string; agentId?: string };
     const clientId = String(body.clientId || "").slice(0, 120);
     const service = String(body.service || "").slice(0, 80);
     const message = String(body.message || "").trim();
@@ -423,7 +423,8 @@ export async function POST(request: Request) {
       return Response.json({ error: "You do not have permission to use this client assistant." }, { status: 403 });
     }
     const client = (data.clients || []).find((item: any) => item.id === clientId);
-    const activeAiAgent = (data.staff || []).find((member: Staff) => member.isBot && (!Array.isArray(member.aiModeAccess) || member.aiModeAccess.includes(service)));
+    const pickedAgentId = String(body.agentId || "").slice(0, 120);
+    const activeAiAgent = (data.staff || []).find((member: Staff) => member.isBot && member.id === pickedAgentId) || (data.staff || []).find((member: Staff) => member.isBot && (!Array.isArray(member.aiModeAccess) || member.aiModeAccess.includes(service)));
     const previous = await env.DB.prepare("SELECT role, content, created_by FROM client_ai_messages WHERE client_id = ?1 AND service = ?2 ORDER BY created_at DESC LIMIT 60")
       .bind(clientId, chatScope).all<{ role: "user" | "assistant"; content: string; created_by: string | null }>();
     const humanHistory = (previous.results || []).filter((item) => !item.created_by?.startsWith("scheduled-task:"));

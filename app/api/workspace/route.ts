@@ -1,3 +1,4 @@
+import { assertDeletable, AccountError } from "@/lib/client-accounts/client-accounts-core";
 import { getChatGPTUser } from "../../chatgpt-auth";
 import { env } from "cloudflare:workers";
 import { enforceOwnerOnlyOverview, fullTeamPermissions, getMemberPermissions, type TeamPermissions } from "@/lib/access-permissions";
@@ -8,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 type Staff = { id: string; name: string; email: string; role: string; isBot?: boolean; costRate?: number; avatar?: string; permissions?: Partial<TeamPermissions>; clientAccessIds?: string[]; vaultAccessEntryIds?: string[]; aiModeAccess?: string[] };
 const botTeammates: Staff[] = [
-  { id: "f2b-ai-agent", name: "Connors", email: "", role: "AI teammate", costRate: 0, avatar: "🤖", isBot: true },
+  { id: "f2b-ai-agent", name: "AI Assistant", email: "", role: "AI teammate", costRate: 0, avatar: "🤖", isBot: true },
   { id: "f2b-audit-agent", name: "Audit Agent", email: "", role: "Audit Agent", costRate: 0, avatar: "🔎", isBot: true },
   { id: "f2b-reporting-agent", name: "Reporting Agent", email: "", role: "Reporting Agent", costRate: 0, avatar: "📊", isBot: true },
 ];
@@ -250,7 +251,7 @@ export async function PUT(request: Request) {
           aiRecommendations: preserveFeedback(task.aiRecommendations || [], prior.aiRecommendations || []),
           aiLandingPageRecommendations: preserveFeedback(task.aiLandingPageRecommendations || [], prior.aiLandingPageRecommendations || []),
         };
-        // The browser can keep an older workspace snapshot open while Connors
+        // The browser can keep an older workspace snapshot open while the AI
         // writes progress or a completed report. Never let that stale snapshot
         // roll back the AI run, its evidence, or its completion state.
         if (baseline && runtimeIsNewer) {
@@ -297,6 +298,8 @@ export async function DELETE(request: Request) {
     const clientId = String(body.clientId || "").slice(0, 120);
     const client = (current.clients || []).find((item: any) => item.id === clientId);
     if (!client) return Response.json({ error: "That client could not be found." }, { status: 404 });
+    try { await assertDeletable(env.DB!, clientId); }
+    catch (e) { if (e instanceof AccountError) return Response.json({ error: e.message }, { status: e.status }); throw e; }
     const taskIds = new Set((current.tasks || []).filter((item: any) => item.clientId === clientId).map((item: any) => item.id));
     const removedVaultEntryIds = new Set((current.vaultEntries || []).filter((item: any) => item.clientId === clientId).map((item: any) => item.id));
     const now = new Date().toISOString();

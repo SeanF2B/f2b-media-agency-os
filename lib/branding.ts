@@ -1,0 +1,103 @@
+// White-label branding (Settings > Branding): two colours and a logo, applied across the whole OS.
+import { useSyncExternalStore } from "react";
+
+export type Branding = { primary: string; secondary: string; logo: string; name: string };
+export const DEFAULT_BRANDING: Branding = { primary: "#3b82f6", secondary: "#1e3a8a", logo: "", name: "" };
+
+let state: Branding = DEFAULT_BRANDING;
+const listeners = new Set<() => void>();
+const hex = (value: unknown, fallback: string) => typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value.trim()) ? value.trim().toLowerCase() : fallback;
+
+export function normalizeBranding(raw: Partial<Branding> | undefined | null): Branding {
+  return { primary: hex(raw?.primary, DEFAULT_BRANDING.primary), secondary: hex(raw?.secondary, DEFAULT_BRANDING.secondary), logo: typeof raw?.logo === "string" && /^(data:image\/|https:\/\/|\/(?!\/))/.test(raw.logo) ? raw.logo : "", name: String(raw?.name || "").slice(0, 60) };
+}
+export function applyBranding(raw: Partial<Branding> | undefined | null) {
+  const next = normalizeBranding(raw);
+  if (next.primary === state.primary && next.secondary === state.secondary && next.logo === state.logo && next.name === state.name) return;
+  state = next;
+  if (typeof document !== "undefined") {
+    const root = document.documentElement.style;
+    { const lin2 = (v: number) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }, lumOf = (r: number, g: number, b: number) => 0.2126 * lin2(r) + 0.7152 * lin2(g) + 0.0722 * lin2(b); let q = parseInt(next.primary.slice(1), 16), pr = (q >> 16) & 255, pg = (q >> 8) & 255, pb = q & 255, guard = 0; while (1.05 / (lumOf(pr, pg, pb) + 0.05) < 4.6 && guard++ < 40) { pr = Math.round(pr * 0.93); pg = Math.round(pg * 0.93); pb = Math.round(pb * 0.93); } root.setProperty("--brand-primary", "#" + [pr, pg, pb].map((v) => v.toString(16).padStart(2, "0")).join("")); } root.setProperty("--brand-secondary", next.secondary);
+    // sidebar colour: exactly the secondary colour. Light colours get dark text instead of being darkened.
+    const n = parseInt(next.secondary.slice(1), 16), r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255, lin = (v: number) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }, L = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b), light = (L + 0.05) / 0.05 > 1.05 / (L + 0.05), k = 1;
+    root.setProperty("--sb-fg", light ? "#1c2330" : "rgba(255,255,255,.92)"); root.setProperty("--sb-fg-strong", light ? "#0f1722" : "#fff"); root.setProperty("--sb-mix", light ? "#000" : "#fff"); root.setProperty("--sb-edge", light ? "rgba(0,0,0,.14)" : "rgba(255,255,255,.22)");
+    { const q = parseInt(next.primary.slice(1), 16), f = (v: number) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }, PL = 0.2126 * f((q >> 16) & 255) + 0.7152 * f((q >> 8) & 255) + 0.0722 * f(q & 255); root.setProperty("--brand-primary-fg", "#fff"); }
+    { const lin3 = (v: number) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }, lm = (r: number, g: number, b: number) => 0.2126 * lin3(r) + 0.7152 * lin3(g) + 0.0722 * lin3(b); let sr = r, sg = g, sb2 = b, gd = 0; while (1.05 / (lm(sr, sg, sb2) + 0.05) < 4.6 && gd++ < 40) { sr = Math.round(sr * 0.92); sg = Math.round(sg * 0.92); sb2 = Math.round(sb2 * 0.92); } root.setProperty("--brand-secondary-ink", "#" + [sr, sg, sb2].map((v) => v.toString(16).padStart(2, "0")).join("")); let lr = r, lg = g, lb = b; gd = 0; while (lm(lr, lg, lb) < 0.3 && gd++ < 40) { lr = Math.min(255, Math.round(lr * 1.1 + 6)); lg = Math.min(255, Math.round(lg * 1.1 + 6)); lb = Math.min(255, Math.round(lb * 1.1 + 6)); } root.setProperty("--brand-secondary-ink-dark", "#" + [lr, lg, lb].map((v) => v.toString(16).padStart(2, "0")).join("")); }
+    root.setProperty("--brand-sidebar", "#" + [r, g, b].map((v) => Math.round(v * k).toString(16).padStart(2, "0")).join(""));
+  }
+  listeners.forEach((listener) => listener());
+}
+export const useBranding = () => useSyncExternalStore((cb) => { listeners.add(cb); return () => { listeners.delete(cb); }; }, () => state, () => DEFAULT_BRANDING);
+
+/** Resize an uploaded logo to at most 256px and return a PNG data URL (kept small so it can live in the workspace settings). */
+export async function logoFileToDataUrl(file: File): Promise<string> {
+  if (!/^image\//.test(file.type)) throw new Error("Choose an image file (PNG, JPG, SVG or WebP).");
+  if (file.size > 4 * 1024 * 1024) throw new Error("That image is over 4 MB. Choose a smaller logo.");
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => { const el = new Image(); el.onload = () => resolve(el); el.onerror = () => reject(new Error("That image could not be read.")); el.src = url; });
+    const scale = Math.min(1, 256 / Math.max(img.naturalWidth || 256, img.naturalHeight || 256));
+    const canvas = document.createElement("canvas"); canvas.width = Math.max(1, Math.round((img.naturalWidth || 256) * scale)); canvas.height = Math.max(1, Math.round((img.naturalHeight || 256) * scale));
+    canvas.getContext("2d")?.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/png");
+  } finally { URL.revokeObjectURL(url); }
+}
+
+/** Pull a primary + secondary colour out of a logo (data URL or same-origin URL). Ignores transparent, white, black and grey pixels. */
+const toHex = (r: number, g: number, b: number) => "#" + [r, g, b].map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join("");
+const colourCache = new Map<string, { primary: string; secondary: string } | null>();
+export async function extractLogoColours(src: string): Promise<{ primary: string; secondary: string } | null> {
+  if (!src || typeof document === "undefined") return null;
+  if (colourCache.has(src)) return colourCache.get(src)!;
+  try {
+    let loadSrc = src; if (!src.startsWith("data:")) { try { const res = await fetch(src, { mode: "cors" }); if (res.ok) loadSrc = URL.createObjectURL(await res.blob()); } catch { /* fall back to direct load */ } }
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => { const el = new Image(); if (!loadSrc.startsWith("data:") && !loadSrc.startsWith("blob:")) el.crossOrigin = "anonymous"; el.onload = () => resolve(el); el.onerror = () => reject(new Error("load")); el.src = loadSrc; });
+    const size = 64, canvas = document.createElement("canvas"); canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true }); if (!ctx) return null;
+    const scale = Math.min(size / (img.naturalWidth || size), size / (img.naturalHeight || size));
+    ctx.drawImage(img, 0, 0, Math.max(1, Math.round((img.naturalWidth || size) * scale)), Math.max(1, Math.round((img.naturalHeight || size) * scale)));
+    const data = ctx.getImageData(0, 0, size, size).data;
+    const px = (x: number, y: number) => { const k = (y * size + x) * 4; return { r: data[k], g: data[k + 1], b: data[k + 2], a: data[k + 3] }; };
+    // 1) the logo's own background: the most common opaque colour around the edge of the artwork
+    const edge = new Map<number, { c: number; r: number; g: number; b: number }>(); let opaqueEdge = 0, edgeTotal = 0;
+    for (let t = 0; t < size; t++) for (const [x, y] of [[t, 0], [t, size - 1], [0, t], [size - 1, t]] as const) {
+      const p = px(x, y); edgeTotal++; if (p.a < 200) continue; opaqueEdge++;
+      const key = ((p.r >> 4) << 8) | ((p.g >> 4) << 4) | (p.b >> 4), e = edge.get(key) || { c: 0, r: 0, g: 0, b: 0 }; e.c++; e.r += p.r; e.g += p.g; e.b += p.b; edge.set(key, e);
+    }
+    const topEdge = [...edge.values()].sort((a, b) => b.c - a.c)[0];
+    const bg = topEdge && opaqueEdge > edgeTotal * 0.5 && topEdge.c > opaqueEdge * 0.35 ? { r: topEdge.r / topEdge.c, g: topEdge.g / topEdge.c, b: topEdge.b / topEdge.c } : null;
+    const bgLight = bg ? (0.299 * bg.r + 0.587 * bg.g + 0.114 * bg.b) / 255 : 1;
+    const dist = (p: { r: number; g: number; b: number }, q: { r: number; g: number; b: number }) => Math.hypot(p.r - q.r, p.g - q.g, p.b - q.b);
+    // 2) accent colours: vivid, not white/black/grey, and not the background
+    const bins = new Map<number, { n: number; c: number; r: number; g: number; b: number }>();
+    for (let i = 0; i < data.length; i += 4) {
+      const a = data[i + 3]; if (a < 200) continue;
+      const r = data[i], g = data[i + 1], b = data[i + 2], max = Math.max(r, g, b), min = Math.min(r, g, b), sat = max === 0 ? 0 : (max - min) / max;
+      if (max > 242 && min > 225) continue; if (max < 40) continue; if (sat < 0.22) continue;
+      if (bg && dist({ r, g, b }, bg) < 60) continue;
+      const key = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4), bin = bins.get(key) || { n: 0, c: 0, r: 0, g: 0, b: 0 };
+      bin.c += 1; bin.n += 1 + sat; bin.r += r; bin.g += g; bin.b += b; bins.set(key, bin);
+    }
+    const ranked = [...bins.values()].sort((x, y) => y.n - x.n).map((v) => ({ n: v.n, r: v.r / v.c, g: v.g / v.c, b: v.b / v.c }));
+    let result: { primary: string; secondary: string } | null = null;
+    if (bg && ranked.length) {
+      // dark/coloured logo background -> sidebar (secondary); the logo's accent -> buttons (primary)
+      result = { primary: toHex(ranked[0].r, ranked[0].g, ranked[0].b), secondary: toHex(bg.r, bg.g, bg.b) };
+    } else if (ranked.length) {
+      const first = ranked[0], other = ranked.find((c) => dist(c, first) > 90);
+      result = { primary: toHex(first.r, first.g, first.b), secondary: other ? toHex(other.r, other.g, other.b) : toHex(first.r * 0.55, first.g * 0.55, first.b * 0.55) };
+    } else if (bg && bgLight >= 0.75) {
+      result = { primary: DEFAULT_BRANDING.primary, secondary: toHex(bg.r, bg.g, bg.b) };
+    } else if (bg) {
+      result = { primary: toHex(bg.r * 1.6 + 40, bg.g * 1.6 + 40, bg.b * 1.6 + 40), secondary: toHex(bg.r, bg.g, bg.b) };
+    }
+    if (!result) {
+      // last resort: the most common opaque colour in the image becomes the sidebar
+      const all = new Map<number, { c: number; r: number; g: number; b: number }>();
+      for (let i = 0; i < data.length; i += 4) { if (data[i + 3] < 200) continue; const key = ((data[i] >> 4) << 8) | ((data[i + 1] >> 4) << 4) | (data[i + 2] >> 4), e = all.get(key) || { c: 0, r: 0, g: 0, b: 0 }; e.c++; e.r += data[i]; e.g += data[i + 1]; e.b += data[i + 2]; all.set(key, e); }
+      const top = [...all.values()].sort((a, b) => b.c - a.c)[0];
+      if (top) result = { primary: DEFAULT_BRANDING.primary, secondary: toHex(top.r / top.c, top.g / top.c, top.b / top.c) };
+    }
+    colourCache.set(src, result); return result;
+  } catch (e) { (globalThis as any).__lastErr = String(e); colourCache.set(src, null); return null; }
+}

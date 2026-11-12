@@ -49,7 +49,7 @@ export function getAiTaskStage(task: AiTaskVisibilityRecord): AiTaskStage {
   if (task.aiRunState === "running" || task.aiStartNowRequestedAt || (task.aiApprovals || []).some((item) => item.status === "applying")) return "doing";
   const pendingApprovals = (task.aiApprovals || []).filter((item) => item.status === "pending");
   if (pendingApprovals.some((item) => isDecisionReady(item, task.checklist || []))) return "approvals";
-  // A proposal without its linked evidence is still Connors' work to finish,
+  // A proposal without its linked evidence is still the AI’s work to finish,
   // not a decision the owner can act on. Keep it in Pending until it is ready.
   if (pendingApprovals.length) return "pending";
   if (task.aiRunState === "scheduled") return "scheduled";

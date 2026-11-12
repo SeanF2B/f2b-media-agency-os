@@ -1,3 +1,4 @@
+import { crmScopeFrom } from "@/lib/client-accounts/client-accounts-api";
 import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "../../chatgpt-auth";
 
@@ -7,7 +8,7 @@ const stages = ["New lead", "Contacted", "Qualified", "Appointment booked", "Pro
 type StageCategory = "open" | "won" | "lost";
 type WorkspaceData = { ownerId?: string; clients?: Array<{ id: string; name: string; company?: string; logo?: string; contact?: string; email?: string; phone?: string }>; staff?: Array<{ id: string; name: string; avatar?: string; email?: string; role?: string; isBot?: boolean }> };
 type PipelineRow = { id: string; name: string; description: string; stage_id: string | null; stage_name: string | null; stage_position: number | null; stage_category: StageCategory | null };
-type PipelineView = { id: string; name: string; description: string; stages: Array<{ id: string; name: string; position: number; category: StageCategory }> };
+type PipelineView = { id: string; name: string; description: string; clientId?: string | null; stages: Array<{ id: string; name: string; position: number; category: StageCategory }> };
 
 async function context() {
   const user = await getChatGPTUser();
@@ -56,28 +57,39 @@ export async function GET(request: Request) {
     await ensureOrderTable(db);
     const url = new URL(request.url);
     if (url.searchParams.get("summary") === "1") {
-      const rows = await db.prepare("SELECT s.category, o.currency, COUNT(*) AS total, SUM(o.value) AS value FROM crm_opportunities o JOIN crm_pipeline_stages s ON s.id=o.stage_id AND s.owner_id=o.owner_id JOIN crm_pipelines p ON p.id=o.pipeline_id AND p.owner_id=o.owner_id WHERE o.owner_id=?1 AND p.archived=0 AND s.category IN ('open','won') GROUP BY s.category, o.currency").bind(ownerId).all<{ category: string; currency: string; total: number; value: number }>();
+      const scopeClient = clean(url.searchParams.get("clientId"), 80);
+      const rows = await db.prepare("SELECT s.category, o.currency, COUNT(*) AS total, SUM(o.value) AS value FROM crm_opportunities o JOIN crm_pipeline_stages s ON s.id=o.stage_id AND s.owner_id=o.owner_id JOIN crm_pipelines p ON p.id=o.pipeline_id AND p.owner_id=o.owner_id WHERE o.owner_id=?1 AND p.archived=0 AND s.category IN ('open','won') AND (?2='' OR o.client_id=?2) GROUP BY s.category, o.currency").bind(ownerId, scopeClient).all<{ category: string; currency: string; total: number; value: number }>();
       const groups = (rows.results || []).map((row) => ({ category: row.category, currency: clean(row.currency, 3) || "EUR", count: Number(row.total) || 0, value: Number(row.value) || 0 }));
-      const stageRows = await db.prepare("SELECT s.name, s.category, s.position, o.currency, COUNT(o.id) AS total, COALESCE(SUM(o.value),0) AS value FROM crm_pipeline_stages s JOIN crm_pipelines p ON p.id=s.pipeline_id AND p.owner_id=s.owner_id LEFT JOIN crm_opportunities o ON o.stage_id=s.id AND o.owner_id=s.owner_id WHERE s.owner_id=?1 AND p.archived=0 GROUP BY s.id, o.currency ORDER BY p.created_at, s.position").bind(ownerId).all<{ name: string; category: string; position: number; currency: string | null; total: number; value: number }>();
+      const stageRows = await db.prepare("SELECT s.name, s.category, s.position, o.currency, COUNT(o.id) AS total, COALESCE(SUM(o.value),0) AS value FROM crm_pipeline_stages s JOIN crm_pipelines p ON p.id=s.pipeline_id AND p.owner_id=s.owner_id LEFT JOIN crm_opportunities o ON o.stage_id=s.id AND o.owner_id=s.owner_id AND (?2='' OR o.client_id=?2) WHERE s.owner_id=?1 AND p.archived=0 GROUP BY s.id, o.currency ORDER BY p.created_at, s.position").bind(ownerId, scopeClient).all<{ name: string; category: string; position: number; currency: string | null; total: number; value: number }>();
       const stages = (stageRows.results || []).map((row) => ({ name: String(row.name), category: String(row.category), currency: clean(row.currency, 3) || "EUR", count: Number(row.total) || 0, value: Number(row.value) || 0 }));
       return Response.json({ open: groups.filter((row) => row.category === "open"), won: groups.filter((row) => row.category === "won"), stages }, { headers: { "Cache-Control": "no-store" } });
     }
     const search = clean(url.searchParams.get("search"), 120).toLowerCase();
+    // Server-side client scope (f2b_client cookie or ?clientId=). No scope = everything (legacy behaviour).
+    const scope = crmScopeFrom(request) as { clientId: string | null } | null;
+    const pipeWhere = !scope ? "" : scope.clientId ? " AND p.client_id = ?2" : " AND p.client_id IS NULL";
+    const scopeArgs: string[] = scope?.clientId ? [ownerId, scope.clientId] : [ownerId];
+    const contactSql = !scope
+      ? "SELECT * FROM crm_contacts WHERE owner_id = ?1 ORDER BY updated_at DESC LIMIT 1000"
+      : scope.clientId
+        ? "SELECT * FROM crm_contacts WHERE owner_id = ?1 AND (client_id = ?2 OR id IN (SELECT o.contact_id FROM crm_opportunities o JOIN crm_pipelines p ON p.id = o.pipeline_id WHERE o.owner_id = ?1 AND p.client_id = ?2)) ORDER BY updated_at DESC LIMIT 1000"
+        : "SELECT * FROM crm_contacts WHERE owner_id = ?1 AND (client_id IS NULL OR id IN (SELECT o.contact_id FROM crm_opportunities o JOIN crm_pipelines p ON p.id = o.pipeline_id WHERE o.owner_id = ?1 AND p.client_id IS NULL)) ORDER BY updated_at DESC LIMIT 1000";
     const [contacts, pipelineRows, opportunityRows, activityRows] = await Promise.all([
-      db.prepare("SELECT * FROM crm_contacts WHERE owner_id = ?1 ORDER BY updated_at DESC LIMIT 1000").bind(ownerId).all<Record<string, unknown>>(),
-      db.prepare("SELECT p.*, s.id AS stage_id, s.name AS stage_name, s.position AS stage_position, s.category AS stage_category FROM crm_pipelines p LEFT JOIN crm_pipeline_stages s ON s.owner_id = p.owner_id AND s.pipeline_id = p.id WHERE p.owner_id = ?1 AND p.archived = 0 ORDER BY p.created_at, s.position").bind(ownerId).all<PipelineRow>(),
-      db.prepare("SELECT o.*, c.first_name, c.last_name, c.email, c.phone, c.company, s.name AS stage_name FROM crm_opportunities o LEFT JOIN crm_contacts c ON c.id = o.contact_id AND c.owner_id = o.owner_id LEFT JOIN crm_pipeline_stages s ON s.id = o.stage_id AND s.owner_id = o.owner_id WHERE o.owner_id = ?1 ORDER BY o.updated_at DESC LIMIT 2000").bind(ownerId).all<Record<string, unknown>>(),
+      db.prepare(contactSql).bind(...scopeArgs).all<Record<string, unknown>>(),
+      db.prepare(`SELECT p.*, s.id AS stage_id, s.name AS stage_name, s.position AS stage_position, s.category AS stage_category FROM crm_pipelines p LEFT JOIN crm_pipeline_stages s ON s.owner_id = p.owner_id AND s.pipeline_id = p.id WHERE p.owner_id = ?1 AND p.archived = 0${pipeWhere} ORDER BY p.created_at, s.position`).bind(...scopeArgs).all<PipelineRow & { client_id?: string | null }>(),
+      db.prepare(`SELECT o.*, c.first_name, c.last_name, c.email, c.phone, c.company, s.name AS stage_name FROM crm_opportunities o LEFT JOIN crm_contacts c ON c.id = o.contact_id AND c.owner_id = o.owner_id LEFT JOIN crm_pipeline_stages s ON s.id = o.stage_id AND s.owner_id = o.owner_id WHERE o.owner_id = ?1 AND o.pipeline_id IN (SELECT p.id FROM crm_pipelines p WHERE p.owner_id = ?1${pipeWhere}) ORDER BY o.updated_at DESC LIMIT 2000`).bind(...scopeArgs).all<Record<string, unknown>>(),
       db.prepare("SELECT * FROM crm_activities WHERE owner_id = ?1 ORDER BY created_at DESC LIMIT 1000").bind(ownerId).all<Record<string, unknown>>(),
     ]);
     const orderRows = await db.prepare("SELECT opportunity_id, sort_order FROM crm_opportunity_order WHERE owner_id = ?1").bind(ownerId).all<{ opportunity_id: string; sort_order: number }>();
     const orderByOpportunity = new Map((orderRows.results || []).map((row) => [row.opportunity_id, row.sort_order] as const));
     const pipelines = new Map<string, PipelineView>();
     for (const r of pipelineRows.results || []) {
-      if (!pipelines.has(r.id)) pipelines.set(r.id, { id: r.id, name: r.name, description: r.description, stages: [] });
+      if (!pipelines.has(r.id)) pipelines.set(r.id, { id: r.id, name: r.name, description: r.description, clientId: (r as { client_id?: string | null }).client_id ?? null, stages: [] } as PipelineView);
       if (r.stage_id && r.stage_name && r.stage_position !== null && r.stage_category) pipelines.get(r.id)?.stages.push({ id: r.stage_id, name: r.stage_name, position: r.stage_position, category: r.stage_category });
     }
+    const visibleOpps = new Set((opportunityRows.results || []).map((row) => String(row.id))), visibleContacts = new Set((contacts.results || []).map((row) => String(row.id)));
     const matches = (item: Record<string, unknown>) => !search || [item.title, item.first_name, item.last_name, item.email, item.company].some((value) => String(value || "").toLowerCase().includes(search));
-    return Response.json({ contacts: contacts.results || [], pipelines: [...pipelines.values()], opportunities: (opportunityRows.results || []).map((row) => ({ ...row, sort_order: orderByOpportunity.has(String(row.id)) ? orderByOpportunity.get(String(row.id)) : null })).filter(matches), activities: activityRows.results || [], clients: (workspace.clients || []).map((item) => ({ id: String(item.id), name: String(item.name), company: String(item.company || ""), logo: String(item.logo || ""), contact: String(item.contact || ""), email: String(item.email || ""), phone: String(item.phone || "") })), staff: (workspace.staff || []).filter((item) => !item.isBot).map((item) => ({ id: String(item.id), name: String(item.name), avatar: String(item.avatar || "") })) }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json({ contacts: contacts.results || [], pipelines: [...pipelines.values()], opportunities: (opportunityRows.results || []).map((row) => ({ ...row, sort_order: orderByOpportunity.has(String(row.id)) ? orderByOpportunity.get(String(row.id)) : null })).filter(matches), activities: (activityRows.results || []).filter((a) => !scope || visibleOpps.has(String(a.opportunity_id)) || visibleContacts.has(String(a.contact_id))), clients: (workspace.clients || []).map((item) => ({ id: String(item.id), name: String(item.name), company: String(item.company || ""), logo: String(item.logo || ""), contact: String(item.contact || ""), email: String(item.email || ""), phone: String(item.phone || "") })), staff: (workspace.staff || []).filter((item) => !item.isBot).map((item) => ({ id: String(item.id), name: String(item.name), avatar: String(item.avatar || "") })) }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) { return reply(error instanceof Error ? error.message : "Could not load CRM records.", 500); }
 }
 
@@ -136,7 +148,7 @@ export async function POST(request: Request) {
       if (!names.some((x) => stageCategory(x) === "open")) names.unshift("New lead");
       if (!names.some((x) => stageCategory(x) === "won")) names.push("Won");
       if (!names.some((x) => stageCategory(x) === "lost")) names.push("Lost");
-      await db.batch([db.prepare("INSERT INTO crm_pipelines (id, owner_id, name, description, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?5)").bind(id, ownerId, name, clean(body.description, 500), now), ...names.map((stageName: string, position: number) => db.prepare("INSERT INTO crm_pipeline_stages (id, owner_id, pipeline_id, name, position, category, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)").bind(crypto.randomUUID(), ownerId, id, stageName, position, stageCategory(stageName), now))]);
+      await db.batch([db.prepare("INSERT INTO crm_pipelines (id, owner_id, client_id, name, description, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)").bind(id, ownerId, (crmScopeFrom(request) as { clientId: string | null } | null)?.clientId ?? null, name, clean(body.description, 500), now), ...names.map((stageName: string, position: number) => db.prepare("INSERT INTO crm_pipeline_stages (id, owner_id, pipeline_id, name, position, category, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)").bind(crypto.randomUUID(), ownerId, id, stageName, position, stageCategory(stageName), now))]);
       return Response.json({ ok: true, id });
     }
     if (action === "createStage") {
