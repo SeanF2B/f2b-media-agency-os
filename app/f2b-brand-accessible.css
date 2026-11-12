@@ -7864,3 +7864,16 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
 .app-shell .pipeline-card.is-dragging, .crm-opportunity.is-dragging { display: none !important; }
 .crm-opportunity.is-just-dropped { animation: task-card-drop .48s cubic-bezier(.2,.85,.25,1) both !important; }
 .crm-opportunity-drag-preview, .pipeline-card-drag-preview { cursor: grabbing; }
+
+/* Pipeline cards and columns share the Tasks look; each column scrolls on its own */
+.app-shell .crm-stage { padding: 10px; border: 1px solid color-mix(in srgb, var(--f2b-border, #d9dee3) 78%, transparent); border-radius: 18px; background: color-mix(in srgb, var(--f2b-white, #fff) 70%, transparent); box-shadow: 0 5px 22px rgba(24,39,52,.035); }
+.app-shell .crm-opportunity { gap: 9px; padding: 11px; border: 1px solid var(--f2b-border, #d9dee3); border-radius: 15px; background: var(--f2b-white, #fff); box-shadow: 0 3px 12px rgba(26,40,50,.045); cursor: grab; animation: task-card-enter .32s cubic-bezier(.2,.75,.25,1) both; }
+.app-shell .crm-opportunity-client-logo { flex: 0 0 56px; width: 56px; height: 56px; border-radius: 12px; }
+.app-shell .crm-opportunity-client-logo img { padding: 4px; box-sizing: border-box; object-fit: contain; }
+.app-shell.dark-mode .crm-opportunity { background: #222124 !important; border-color: #3a393d !important; }
+.app-shell .crm-opportunity:hover, .app-shell .crm-opportunity:focus-within, .app-shell.dark-mode .crm-opportunity:hover, .app-shell.dark-mode .crm-opportunity:focus-within { border-color: #3b82f6 !important; box-shadow: 0 0 0 1px #3b82f6, 0 6px 18px rgba(59,130,246,.22) !important; }
+
+.app-shell .crm-kanban .crm-stage, .app-shell .pipeline-board .pipeline-column { max-height: calc(100vh - 240px); min-height: 220px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-gutter: stable; }
+.app-shell .crm-stage > header.crm-stage-header, .app-shell .pipeline-column > .pipeline-column-head { position: sticky; top: -10px; z-index: 3; margin: -10px -10px 8px; padding: 10px; background: color-mix(in srgb, var(--f2b-white, #fff) 94%, transparent); backdrop-filter: blur(8px); }
+.app-shell.dark-mode .crm-stage > header.crm-stage-header, .app-shell.dark-mode .pipeline-column > .pipeline-column-head { background: color-mix(in srgb, #1b1a1d 94%, transparent); }
+@media (max-width: 760px) { .app-shell .crm-kanban .crm-stage, .app-shell .pipeline-board .pipeline-column { max-height: none; overflow-y: visible; } }
