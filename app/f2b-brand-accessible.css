@@ -8224,3 +8224,34 @@ html body .app-shell.app-shell button[role="tab"] > span:last-child:not(:first-c
 .app-shell .file-thumb-icon, .app-shell .ai-task-tabs button.selected, .app-shell button[role="tab"].selected { background: linear-gradient(135deg, var(--brand-primary,#3b82f6), color-mix(in srgb, var(--brand-primary,#3b82f6) 70%, var(--brand-secondary,#1e3a8a))) !important; }
 .app-shell .sidebar nav button.active, .app-shell .sidebar .client-nav-item.active { border-left-color: var(--brand-primary,#3b82f6); }
 .app-shell h1 .eyebrow, .app-shell .eyebrow { color: var(--brand-primary,#3b82f6); }
+
+/* Client expense & tax tracker */
+.app-shell .client-tax { display:grid; gap:16px; margin:16px 0; }
+.app-shell .client-tax-head { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:flex-start; }
+.app-shell .client-tax-head h2 { margin:2px 0 4px; } .app-shell .client-tax-head p { margin:0; opacity:.8; }
+.app-shell .client-tax-choice { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; }
+.app-shell .client-tax-choice button { display:grid; gap:4px; text-align:left; padding:18px; border-radius:14px; border:1px solid rgba(127,127,127,.4); background:rgba(127,127,127,.12); color:inherit; cursor:pointer; transition:transform .16s, border-color .16s, background .16s; }
+.app-shell .client-tax-choice button:hover:not(:disabled) { transform:translateY(-2px); border-color:var(--brand-primary,#3b82f6); background:color-mix(in srgb,var(--brand-primary,#3b82f6) 16%,transparent); }
+.app-shell .client-tax-choice b { font-size:17px; }
+.app-shell .client-tax-type { display:flex; gap:6px; }
+.app-shell .client-tax-type button { padding:8px 14px; border-radius:10px; border:1px solid rgba(127,127,127,.4); background:rgba(127,127,127,.12); color:inherit; font-weight:700; cursor:pointer; }
+.app-shell .client-tax-type button.selected { background:var(--brand-primary,#3b82f6); border-color:var(--brand-primary,#3b82f6); color:#fff; }
+.app-shell .client-tax-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
+.app-shell .client-tax-stats > div { display:grid; gap:2px; padding:12px 14px; border-radius:12px; background:rgba(127,127,127,.12); border:1px solid rgba(127,127,127,.25); }
+.app-shell .client-tax-stats small { opacity:.75; text-transform:uppercase; letter-spacing:.06em; font-size:10.5px; font-weight:800; } .app-shell .client-tax-stats b { font-size:21px; }
+.app-shell .client-tax-stats .accent { border-color:var(--brand-primary,#3b82f6); background:color-mix(in srgb,var(--brand-primary,#3b82f6) 16%,transparent); }
+.app-shell .client-tax-calc { display:grid; gap:10px; }
+.app-shell .client-tax-inputs { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; } .app-shell .client-tax-inputs label { display:grid; gap:4px; font-size:13px; font-weight:700; }
+.app-shell .client-tax-rows { display:grid; border:1px solid rgba(127,127,127,.3); border-radius:12px; overflow:hidden; }
+.app-shell .client-tax-rows > div { display:flex; justify-content:space-between; gap:12px; padding:10px 14px; border-top:1px solid rgba(127,127,127,.2); } .app-shell .client-tax-rows > div:first-child { border-top:0; }
+.app-shell .client-tax-rows .total { background:color-mix(in srgb,var(--brand-primary,#3b82f6) 14%,transparent); font-weight:800; }
+.app-shell .client-tax-warn { margin:0; padding:10px 12px; border-radius:10px; background:rgba(245,158,11,.16); border:1px solid #f59e0b; font-weight:700; }
+.app-shell .client-tax-ok { margin:0; padding:10px 12px; border-radius:10px; background:rgba(34,197,94,.14); border:1px solid #22c55e; font-weight:700; }
+.app-shell .client-tax-note { opacity:.7; }
+.app-shell .client-tax-add h3, .app-shell .client-tax-cats h3, .app-shell .client-tax-list h3 { margin:0 0 8px; font-size:14px; }
+.app-shell .client-tax-form { display:grid; grid-template-columns:110px 150px minmax(160px,1.4fr) minmax(160px,1fr) 120px auto; gap:8px; }
+@media (max-width:900px) { .app-shell .client-tax-form { grid-template-columns:1fr 1fr; } }
+.app-shell .client-tax-form button { background:var(--brand-primary,#3b82f6); color:#fff; border:0; border-radius:10px; padding:0 16px; font-weight:800; cursor:pointer; min-height:40px; }
+.app-shell .client-tax-cats > div { display:grid; grid-template-columns:minmax(150px,1fr) 2fr auto; align-items:center; gap:10px; padding:4px 0; } .app-shell .client-tax-cats i { display:block; height:8px; border-radius:99px; background:var(--brand-primary,#3b82f6); }
+.app-shell .client-tax-list > div { display:grid; grid-template-columns:96px minmax(120px,1fr) minmax(100px,.7fr) auto auto; gap:10px; align-items:center; padding:8px 0; border-top:1px solid rgba(127,127,127,.2); }
+.app-shell .client-tax-list .income strong { color:#4ade80; } .app-shell .client-tax-list .expense strong { color:#f87171; }
