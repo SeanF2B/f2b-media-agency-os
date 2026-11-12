@@ -19,8 +19,9 @@ export function applyBranding(raw: Partial<Branding> | undefined | null) {
     const root = document.documentElement.style;
     root.setProperty("--brand-primary", next.primary); root.setProperty("--brand-secondary", next.secondary);
     // sidebar colour: exactly the secondary colour. Light colours get dark text instead of being darkened.
-    const n = parseInt(next.secondary.slice(1), 16), r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255, lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255, light = lum > 0.6, k = 1;
+    const n = parseInt(next.secondary.slice(1), 16), r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255, lin = (v: number) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }, L = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b), light = (L + 0.05) / 0.05 > 1.05 / (L + 0.05), k = 1;
     root.setProperty("--sb-fg", light ? "#1c2330" : "rgba(255,255,255,.92)"); root.setProperty("--sb-fg-strong", light ? "#0f1722" : "#fff"); root.setProperty("--sb-mix", light ? "#000" : "#fff"); root.setProperty("--sb-edge", light ? "rgba(0,0,0,.14)" : "rgba(255,255,255,.22)");
+    { const q = parseInt(next.primary.slice(1), 16), f = (v: number) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }, PL = 0.2126 * f((q >> 16) & 255) + 0.7152 * f((q >> 8) & 255) + 0.0722 * f(q & 255); root.setProperty("--brand-primary-fg", (PL + 0.05) / 0.05 > 1.05 / (PL + 0.05) ? "#10161d" : "#fff"); }
     root.setProperty("--brand-sidebar", "#" + [r, g, b].map((v) => Math.round(v * k).toString(16).padStart(2, "0")).join(""));
   }
   listeners.forEach((listener) => listener());
@@ -33,6 +34,7 @@ export async function logoFileToDataUrl(file: File): Promise<string> {
   if (file.size > 4 * 1024 * 1024) throw new Error("That image is over 4 MB. Choose a smaller logo.");
   const url = URL.createObjectURL(file);
   try {
+    let loadSrc = src; if (!src.startsWith("data:")) { try { const res = await fetch(src, { mode: "cors" }); if (res.ok) loadSrc = URL.createObjectURL(await res.blob()); } catch { /* fall back to direct load */ } }
     const img = await new Promise<HTMLImageElement>((resolve, reject) => { const el = new Image(); el.onload = () => resolve(el); el.onerror = () => reject(new Error("That image could not be read.")); el.src = url; });
     const scale = Math.min(1, 256 / Math.max(img.naturalWidth || 256, img.naturalHeight || 256));
     const canvas = document.createElement("canvas"); canvas.width = Math.max(1, Math.round((img.naturalWidth || 256) * scale)); canvas.height = Math.max(1, Math.round((img.naturalHeight || 256) * scale));
@@ -48,7 +50,7 @@ export async function extractLogoColours(src: string): Promise<{ primary: string
   if (!src || typeof document === "undefined") return null;
   if (colourCache.has(src)) return colourCache.get(src)!;
   try {
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => { const el = new Image(); if (!src.startsWith("data:")) el.crossOrigin = "anonymous"; el.onload = () => resolve(el); el.onerror = () => reject(new Error("load")); el.src = src; });
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => { const el = new Image(); if (!loadSrc.startsWith("data:") && !loadSrc.startsWith("blob:")) el.crossOrigin = "anonymous"; el.onload = () => resolve(el); el.onerror = () => reject(new Error("load")); el.src = loadSrc; });
     const size = 64, canvas = document.createElement("canvas"); canvas.width = size; canvas.height = size;
     const ctx = canvas.getContext("2d", { willReadFrequently: true }); if (!ctx) return null;
     const scale = Math.min(size / (img.naturalWidth || size), size / (img.naturalHeight || size));
