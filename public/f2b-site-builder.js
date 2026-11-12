@@ -482,7 +482,7 @@
       try { await openPage(slug); } catch (e) { toast(e.message, 'err'); renderTop(); }
     }
     async function doImportLive() {
-      const url = (window.prompt('Paste the website address to import (e.g. https://redislandinteriors-preview-v2.f2b-media.workers.dev)') || '').trim(); if (!url) return;
+      const url = (window.prompt('Website address to import', S.list.previewUrl || 'https://') || '').trim(); if (!url || url === 'https://') return;
       try {
         const cs = getComputedStyle(document.documentElement), hex = v => (/^#[0-9a-f]{6}$/i.test(v.trim()) ? v.trim() : '');
         toast('Reading the website…'); const r = await api('builder-import-live', {}, { url, businessName: opts.name || '', primary: hex(cs.getPropertyValue('--brand-primary')), secondary: hex(cs.getPropertyValue('--brand-secondary')) });
