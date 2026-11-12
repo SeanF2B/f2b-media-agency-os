@@ -9,6 +9,7 @@ declare namespace Cloudflare {
     F2B_CF_ACCESS_APP_ID?: string;
     F2B_CF_ACCESS_POLICY_ID?: string;
     CLOUDFLARE_ACCESS_API_TOKEN?: string;
+    CLOUDFLARE_DNS_API_TOKEN?: string;
     AGENCY_CREDENTIALS_ENCRYPTION_KEY?: string;
     OPENROUTER_API_KEY?: string;
     OPENROUTER_MODEL?: string;
