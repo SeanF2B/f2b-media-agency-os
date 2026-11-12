@@ -90,18 +90,18 @@ function shortRecommendationText(value: unknown, maxWords: number, maxChars: num
 
 function friendlyAiRunFailure(value: string): string {
   if (/too many subrequests|subrequest limit|single worker invocation/i.test(value)) {
-    return "Connors needed more account data than could be loaded in one run, so it stopped safely. No account changes were made. The task is saved and can be retried.";
+    return "The AI needed more account data than could be loaded in one run, so it stopped safely. No account changes were made. The task is saved and can be retried.";
   }
   if (/shared[- ]note persistence|persistence tool|save .*shared notes/i.test(value)) {
     return "The task findings could not be saved to the client’s shared notes. No account changes were made. The task is saved and can be retried.";
   }
   if (/timed out|timeout|network|fetch failed|service unavailable|http 5\d\d/i.test(value)) {
-    return "A connected service did not respond in time, so Connors stopped safely. No account changes were made. The task is saved and can be retried shortly.";
+    return "A connected service did not respond in time, so the AI stopped safely. No account changes were made. The task is saved and can be retried shortly.";
   }
   if (/not connected|connection.*(missing|unavailable)|api key missing|access token missing/i.test(value)) {
     return "A required account connection is unavailable. Reconnect the service in Settings, then retry this saved task.";
   }
-  return "Connors could not finish this task. It is still saved and open for review. No account changes were made.";
+  return "The AI could not finish this task. It is still saved and open for review. No account changes were made.";
 }
 
 import { generateGoogleAdsKeywordIdeas, getGoogleAdsAdPerformance, getGoogleAdsCampaignChangeEvents, getGoogleAdsCampaignConversionGoals, getGoogleAdsCampaignDailyPerformance, getGoogleAdsConversionActions, getGoogleAdsKeywordCriterion, getGoogleAdsKeywordPerformance, getGoogleAdsNegativeKeywords, getGoogleAdsSearchTerms, listGoogleAdsAdGroups, listGoogleAdsCampaignLevelAssets, listGoogleAdsCampaigns, listGoogleAdsResponsiveSearchAds } from "../lib/google-ads-direct";
@@ -498,11 +498,11 @@ export async function finishCancelledAiTask(env: SchedulerEnv, task: ScheduledTa
   const saved = await updateWorkspace(env, (current) => {
     const existing = (current.tasks || []).find((item: any) => item.id === task.id);
     if (!existing || existing.aiRunState !== "running" || !existing.aiCancelRequestedAt) return null;
-    const feedback = `Cancelled by ${existing.aiCancelRequestedBy || "a workspace admin"} at ${at}. Connors stopped at a safe checkpoint. The task and all completed work are saved; review the task before retrying. Any external request already sent cannot be recalled.`;
+    const feedback = `Cancelled by ${existing.aiCancelRequestedBy || "a workspace admin"} at ${at}. The AI stopped at a safe checkpoint. The task and all completed work are saved; review the task before retrying. Any external request already sent cannot be recalled.`;
     savedTask = { ...existing, status: "To do", aiRunState: "cancelled", aiRunStartedAt: undefined, aiRunAt: at, aiCancelledAt: at, aiCancelledBy: existing.aiCancelRequestedBy || "Workspace admin", aiCancelRequestedAt: undefined, aiCancelRequestedBy: undefined, aiProgressText: "Cancelled", aiProgressAt: at, aiFeedback: feedback };
     const durationSeconds = existing.aiRunStartedAt ? Math.max(1, Math.round((Date.parse(at) - Date.parse(existing.aiRunStartedAt)) / 1000)) : 0;
-    const entry = durationSeconds ? { id: crypto.randomUUID(), taskId: task.id, clientId: task.clientId, staffId: task.assigneeId, startAt: existing.aiRunStartedAt, endAt: at, seconds: durationSeconds, note: "Connors run cancelled by workspace admin", billable: false } : null;
-    const event = { id: crypto.randomUUID(), title: "AI task cancelled", detail: `${task.title} · ${(current.clients || []).find((client: any) => client.id === task.clientId)?.name || "Client"} · ${task.aiMode || task.service}`, icon: "⏹️", at, actor: "Connors", actorAvatar: "🤖", clientId: task.clientId, taskId: task.id, service: task.aiMode || task.service, kind: "task", note: feedback };
+    const entry = durationSeconds ? { id: crypto.randomUUID(), taskId: task.id, clientId: task.clientId, staffId: task.assigneeId, startAt: existing.aiRunStartedAt, endAt: at, seconds: durationSeconds, note: "The AI run cancelled by workspace admin", billable: false } : null;
+    const event = { id: crypto.randomUUID(), title: "AI task cancelled", detail: `${task.title} · ${(current.clients || []).find((client: any) => client.id === task.clientId)?.name || "Client"} · ${task.aiMode || task.service}`, icon: "⏹️", at, actor: "AI Assistant", actorAvatar: "🤖", clientId: task.clientId, taskId: task.id, service: task.aiMode || task.service, kind: "task", note: feedback };
     return { ...current, tasks: current.tasks.map((item: any) => item.id === task.id ? savedTask : item), ...(entry ? { entries: [entry, ...(current.entries || [])] } : {}), activity: [event, ...(current.activity || [])].slice(0, 100) };
   });
   const cancelledTask = savedTask as ScheduledTask | null;
@@ -534,7 +534,7 @@ async function claimRun(env: SchedulerEnv, task: ScheduledTask): Promise<boolean
     .bind(task.id, runKey, now).run();
   if (result.meta.changes === 1) {
     const clientName = task.clientName || "Client";
-    const event = { id: crypto.randomUUID(), title: "AI task started", detail: `${task.title} · ${clientName} · ${task.aiMode || task.service}`, icon: "🤖", at: now, actor: task.agentName || "Connors", actorAvatar: "🤖", clientId: task.clientId, taskId: task.id, service: task.aiMode || task.service, kind: "task", note: `Connors started this task. The live timer began at ${now}.` };
+    const event = { id: crypto.randomUUID(), title: "AI task started", detail: `${task.title} · ${clientName} · ${task.aiMode || task.service}`, icon: "🤖", at: now, actor: task.agentName || "AI Assistant", actorAvatar: "🤖", clientId: task.clientId, taskId: task.id, service: task.aiMode || task.service, kind: "task", note: `The AI started this task. The live timer began at ${now}.` };
     const started = await updateSingleTask(env, task.id, (existing) => {
       const retryWasRequested = Boolean(existing?.aiStartNowRequestedAt);
       if (!existing || existing.aiDismissedAt || (!retryWasRequested && existing.aiRunState !== "scheduled") || existing.status === "Done") return null;
@@ -552,7 +552,7 @@ async function claimRun(env: SchedulerEnv, task: ScheduledTask): Promise<boolean
   if (existing.status !== "failed" && !stale) return false;
   await env.DB.prepare("UPDATE ai_task_runs SET status = 'running', started_at = ?3, finished_at = NULL, note = NULL WHERE task_id = ?1 AND run_key = ?2")
     .bind(task.id, runKey, now).run();
-  const event = { id: crypto.randomUUID(), title: "AI task resumed", detail: `${task.title} · ${task.aiMode || task.service}`, icon: "🤖", at: now, actor: task.agentName || "Connors", actorAvatar: "🤖", clientId: task.clientId, taskId: task.id, service: task.aiMode || task.service, kind: "task", note: `Connors resumed work. The live timer restarted at ${now}.` };
+  const event = { id: crypto.randomUUID(), title: "AI task resumed", detail: `${task.title} · ${task.aiMode || task.service}`, icon: "🤖", at: now, actor: task.agentName || "AI Assistant", actorAvatar: "🤖", clientId: task.clientId, taskId: task.id, service: task.aiMode || task.service, kind: "task", note: `The AI resumed work. The live timer restarted at ${now}.` };
   const resumed = await updateSingleTask(env, task.id, (existing) => {
     if (!existing || existing.aiDismissedAt || existing.aiRunState !== "running" || existing.status === "Done") return null;
     return { ...existing, status: "In progress", pendingReason: undefined, pendingReasonBy: undefined, pendingReasonAt: undefined, aiRunState: "running", aiRunStartedAt: now, aiRunAt: undefined, aiStartNowRequestedAt: undefined, aiCancelRequestedAt: undefined, aiCancelRequestedBy: undefined, aiCancelledAt: undefined, aiCancelledBy: undefined, aiProgressText: "Checking task instructions and account access", aiProgressAt: now };
@@ -773,7 +773,7 @@ async function runSitesTask(env: SchedulerEnv, task: ScheduledTask, workspace: a
     const existing = (current.tasks || []).find((item: any) => item.id === task.id);
     if (!existing || existing.aiRunState !== "running") return null;
     const cancelArrivedDuringWrite = Boolean(existing.aiCancelRequestedAt);
-    const finalNote = cancelArrivedDuringWrite ? `${note}\n\nThe cancel request arrived after WordPress had already created the draft, so Connors saved its URL and result for you.` : note;
+    const finalNote = cancelArrivedDuringWrite ? `${note}\n\nThe cancel request arrived after WordPress had already created the draft, so the AI saved its URL and result for you.` : note;
     const pendingReason = completed ? undefined : shortTaskNoteLine(result.suggested_next_step || "Review the saved draft and complete the remaining checklist evidence.", 150);
     const updated = { ...existing, status: completed ? "Done" : "Blocked", completedAt: completed ? runAt : undefined, pendingReason, pendingReasonBy: completed ? undefined : agentName, pendingReasonAt: completed ? undefined : runAt, aiRunState: completed ? "completed" : "needs_review", aiRunStartedAt: undefined, aiRunAt: runAt, aiCancelRequestedAt: undefined, aiCancelRequestedBy: undefined, aiProgressText: completed ? "Draft ready" : "Draft ready · checklist review", aiProgressAt: runAt, aiFeedback: finalNote, wordpressDraftUrl: pageUrl, wordpressDraftTitle: page.title, ...(checklist.length ? { checklist } : {}), aiNotificationStatus: completed ? "not_required" : "pending", aiNotificationAttempts: 0, aiNotificationNextAttemptAt: undefined, aiNotificationDetail: undefined };
     const plan = normalizeSitePagePlan(existing.sitePagePlan);
@@ -1706,7 +1706,7 @@ async function runTask(env: SchedulerEnv, task: ScheduledTask, workspace: any, n
   }
   if (proposalsWithoutLinkedEvidence) {
     result.needs_review = true;
-    result.feedback = `${result.feedback.trim()} ${proposalsWithoutLinkedEvidence} proposed Ads change${proposalsWithoutLinkedEvidence === 1 ? " was" : "s were"} not sent for approval because the linked checklist step did not have verified evidence. Continue this task after Connors gathers that evidence.`;
+    result.feedback = `${result.feedback.trim()} ${proposalsWithoutLinkedEvidence} proposed Ads change${proposalsWithoutLinkedEvidence === 1 ? " was" : "s were"} not sent for approval because the linked checklist step did not have verified evidence. Continue this task after the AI gathers that evidence.`;
   }
   if (checklistResults.some((item) => !item.done)) {
     result.needs_review = true;
@@ -1835,7 +1835,7 @@ async function runTask(env: SchedulerEnv, task: ScheduledTask, workspace: any, n
   const saved = await updateSingleTask(env, task.id, (existing) => {
     if (!existing || existing.aiRunState !== "running" || existing.status === "Done" || existing.aiCancelRequestedAt && !externalWriteStarted) return null;
     const cancelArrivedDuringWrite = Boolean(existing.aiCancelRequestedAt && externalWriteStarted);
-    const finalNote = cancelArrivedDuringWrite ? `${note}\n\nYour cancel request arrived after an external change had already started. Connors finished verifying and recorded that change so the account and task history stay accurate.` : note;
+    const finalNote = cancelArrivedDuringWrite ? `${note}\n\nYour cancel request arrived after an external change had already started. The AI finished verifying and recorded that change so the account and task history stay accurate.` : note;
     const pendingReason = completed ? undefined : shortTaskNoteLine(stagedApprovals.length ? `Waiting for approval on ${stagedApprovals.length} proposed account change${stagedApprovals.length === 1 ? "" : "s"}.` : result.suggested_next_step || "Evidence or review is still required.", 150);
     const hasPendingApproval = finalApprovals.some((approval) => approval.status === "pending");
     return { ...existing, status: completed ? "Done" : "Blocked", completedAt: completed ? runAt : undefined, aiCompletedWithGaps: completedWithLimitations || undefined, ...((taskScreenshots.length || auditReportAttachments.length) ? { attachments: [...(existing.attachments || []).filter((attachment: TaskAttachment) => ![...taskScreenshots, ...auditReportAttachments].some((item) => item.id === attachment.id)), ...taskScreenshots, ...auditReportAttachments] } : {}), pendingReason, pendingReasonBy: completed ? undefined : agentName, pendingReasonAt: completed ? undefined : runAt, aiRunState: completed ? "completed" : "needs_review", aiRunStartedAt: undefined, aiRunAt: runAt, aiCancelRequestedAt: undefined, aiCancelRequestedBy: undefined, ...(cancelArrivedDuringWrite ? { aiCancelResolvedAfterWriteAt: runAt } : {}), aiProgressText: completed ? "Task complete" : "Review ready", aiProgressAt: runAt, aiFeedback: finalNote, aiCampaignNotes, aiRecommendations: result.recommendations.map((item) => ({ ...item, id: crypto.randomUUID() })), aiLandingPageRecommendations: result.landing_page_recommendations.map((item) => ({ id: crypto.randomUUID(), url: item.url, section: item.section, currentCopy: item.current_copy, suggestedCopy: item.suggested_copy, rationale: item.rationale, evidence: item.evidence, expectedImpact: item.expected_impact, confidence: item.confidence })), ...(checklist.length ? { checklist: checklistResults } : {}), aiApprovals: finalApprovals, aiNotificationStatus: hasPendingApproval ? "pending" : completed ? "not_required" : "pending", aiNotificationAttempts: 0, aiNotificationNextAttemptAt: undefined, aiNotificationDetail: undefined };
@@ -1930,7 +1930,7 @@ export async function processDueAiTasks(env: SchedulerEnv, scheduledTime = new D
     notes: parseArray(contextRow.notes_json),
   };
   task.clientName = client.name || "Client";
-  task.agentName = agent.name || "Connors";
+  task.agentName = agent.name || "AI Assistant";
   if (!await claimRun(env, task)) return;
   task.aiRunState = "running";
   task.aiRunStartedAt = new Date().toISOString();

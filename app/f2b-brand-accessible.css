@@ -1685,7 +1685,7 @@ html:has(.app-shell .chess-page),body:has(.app-shell .chess-page) { overflow-anc
 .activity-quick-link { width:100%; margin-top:10px; padding:9px 10px; border:1px solid var(--f2b-border); border-radius:8px; background:transparent; color:var(--f2b-ink); font:inherit; font-size:10px; font-weight:750; cursor:pointer; }.activity-quick-link:hover { border-color:#398bc7; color:#398bc7; }
 .app-shell.dark-mode .activity-quick-popover { background:#242327; color:var(--dark-text); border-color:var(--dark-border); box-shadow:0 12px 34px #0008; }.app-shell.dark-mode .activity-quick-head,.app-shell.dark-mode .activity-quick-row { border-color:var(--dark-border); }.app-shell.dark-mode .activity-quick-icon { background:#253647; }.app-shell.dark-mode .activity-quick-link { border-color:var(--dark-border); color:var(--dark-text); }
 @media(max-width:760px) { .activity-quick-popover { position:fixed; top:74px; right:12px; width:min(360px,calc(100vw - 24px)); } }
-/* Task workspace switcher for pipeline and Connors work. */
+/* Task workspace switcher for pipeline and the AI work. */
 .task-view-switch { display:inline-flex; align-items:center; gap:4px; width:max-content; max-width:100%; margin:0 0 14px; padding:4px; border:1px solid var(--f2b-border); border-radius:11px; background:var(--f2b-white); }
 .task-view-switch-row { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:0 0 14px; }
 .task-view-switch-row .task-view-switch { margin:0; }
@@ -2193,7 +2193,7 @@ html:has(.app-shell .chess-page),body:has(.app-shell .chess-page) { overflow-anc
   color:#8a1c26 !important;
 }
 
-/* Clearer Connors workflow: explain the stages once, make decision rows scannable,
+/* Clearer the AI workflow: explain the stages once, make decision rows scannable,
    and keep evidence-blocked work visually separate from actionable approvals. */
 .app-shell .ai-task-count-note {
   flex:1 0 100%;
@@ -5595,7 +5595,7 @@ html:has(.app-shell .chess-page),body:has(.app-shell .chess-page) { overflow-anc
 .activity-quick-link { width:100%; margin-top:10px; padding:9px 10px; border:1px solid var(--f2b-border); border-radius:8px; background:transparent; color:var(--f2b-ink); font:inherit; font-size:10px; font-weight:750; cursor:pointer; }.activity-quick-link:hover { border-color:#398bc7; color:#398bc7; }
 .app-shell.dark-mode .activity-quick-popover { background:#242327; color:var(--dark-text); border-color:var(--dark-border); box-shadow:0 12px 34px #0008; }.app-shell.dark-mode .activity-quick-head,.app-shell.dark-mode .activity-quick-row { border-color:var(--dark-border); }.app-shell.dark-mode .activity-quick-icon { background:#253647; }.app-shell.dark-mode .activity-quick-link { border-color:var(--dark-border); color:var(--dark-text); }
 @media(max-width:760px) { .activity-quick-popover { position:fixed; top:74px; right:12px; width:min(360px,calc(100vw - 24px)); } }
-/* Task workspace switcher for pipeline and Connors work. */
+/* Task workspace switcher for pipeline and the AI work. */
 .task-view-switch { display:inline-flex; align-items:center; gap:4px; width:max-content; max-width:100%; margin:0 0 14px; padding:4px; border:1px solid var(--f2b-border); border-radius:11px; background:var(--f2b-white); }
 .task-view-switch-row { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:0 0 14px; }
 .task-view-switch-row .task-view-switch { margin:0; }
@@ -6103,7 +6103,7 @@ html:has(.app-shell .chess-page),body:has(.app-shell .chess-page) { overflow-anc
   color:#8a1c26 !important;
 }
 
-/* Clearer Connors workflow: explain the stages once, make decision rows scannable,
+/* Clearer the AI workflow: explain the stages once, make decision rows scannable,
    and keep evidence-blocked work visually separate from actionable approvals. */
 .app-shell .ai-task-count-note {
   flex:1 0 100%;

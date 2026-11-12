@@ -312,7 +312,7 @@ export async function POST(request: Request) {
     }
     if (body.confirmed !== true || !body.pendingChangeId) return Response.json({ error: "Confirm the exact proposed change in the app before applying it." }, { status: 400 });
     const pending = await env.DB.prepare("SELECT * FROM google_ads_pending_changes WHERE id = ?1 AND owner_id = ?2").bind(body.pendingChangeId, access.ownerId).first<{ id: string; client_id: string; customer_id: string; campaign_id: string; campaign_name: string; campaign_budget_resource: string; change_type: string; old_value: string; new_value: string; payload_json: string; status: string }>();
-    if (!pending) return Response.json({ error: "This approval could not be found. Ask Connors to prepare it again." }, { status: 404 });
+    if (!pending) return Response.json({ error: "This approval could not be found. Ask the AI to prepare it again." }, { status: 404 });
     if (!canDecideGoogleAdsApproval(pending.status)) return Response.json({ error: "This approval has already been applied or decided." }, { status: 409 });
     const client = access.data.clients?.find((item: { id: string }) => item.id === pending.client_id);
     if (!client?.googleAdsAccountId || String(client.googleAdsAccountId).replace(/\D/g, "") !== pending.customer_id) return Response.json({ error: "This client’s connected Ads account changed. Prepare a fresh proposal." }, { status: 409 });
@@ -325,7 +325,7 @@ export async function POST(request: Request) {
     if (pending.change_type === "ADD_CAMPAIGN_ASSET") {
       const payload = JSON.parse(pending.payload_json || "{}") as { accountId?: string; campaignId?: string; assetName?: string; assetDraft?: { type?: string; linkText?: string; description1?: string; description2?: string; finalUrl?: string; calloutText?: string; header?: string; values?: string[] } };
       const accountId = String(payload.accountId || "").replace(/\D/g, "");
-      if (accountId !== pending.customer_id || payload.campaignId !== pending.campaign_id || !payload.assetName || !payload.assetDraft) return Response.json({ error: "The saved asset proposal is incomplete or no longer matches this campaign. Ask Connors to prepare it again." }, { status: 409 });
+      if (accountId !== pending.customer_id || payload.campaignId !== pending.campaign_id || !payload.assetName || !payload.assetDraft) return Response.json({ error: "The saved asset proposal is incomplete or no longer matches this campaign. Ask the AI to prepare it again." }, { status: 409 });
       const [campaigns, assets] = await Promise.all([
         listGoogleAdsCampaigns(access.ownerId, pending.customer_id),
         listGoogleAdsCampaignLevelAssets(access.ownerId, pending.customer_id, pending.campaign_id),

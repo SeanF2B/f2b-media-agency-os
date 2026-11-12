@@ -38,7 +38,7 @@ export async function POST(request: Request) {
   const taskId = String(body.taskId || "").slice(0, 120);
   const recommendationId = String(body.recommendationId || "").slice(0, 120);
   const instruction = String(body.instruction || "").trim().slice(0, 500);
-  if (!taskId || !recommendationId || instruction.length < 3) return Response.json({ error: "Tell Connors what to change." }, { status: 400 });
+  if (!taskId || !recommendationId || instruction.length < 3) return Response.json({ error: "Tell the AI what to change." }, { status: 400 });
 
   try {
     const row = await env.DB.prepare(`
@@ -85,7 +85,7 @@ export async function POST(request: Request) {
       evidence: String(recommendation.evidence || "").slice(0, 900),
       ...(landing ? { page: { url: String(recommendation.url || "").slice(0, 2000), section: String(recommendation.section || "").slice(0, 120), currentCopy: String(recommendation.currentCopy || "").slice(0, 1200), suggestedCopy: String(recommendation.suggestedCopy || "").slice(0, 1600) } } : {}),
     };
-    const instructions = `You are Connors, an experienced Google Ads strategist helping refine one existing recommendation. Rewrite only this recommendation based on the owner's request. Be concise, specific and easy to scan. Never invent metrics, services, landing pages, URLs, campaign facts, or evidence. Keep the evidence exactly unchanged. If the owner's request cannot be safely supported by the supplied facts, keep the original recommendation and explain the limitation in rationale. Include a short qualitative expected impact and confidence level based on supplied evidence; label impact as an estimate, never a promise. This is a draft only: do not apply changes to Google Ads or a website. Keep Google Ads copy within applicable character limits when a limit is explicitly known; if no exact copy or required destination is supplied, do not invent one. Return only the requested JSON.`;
+    const instructions = `You are the AI assistant, an experienced Google Ads strategist helping refine one existing recommendation. Rewrite only this recommendation based on the owner's request. Be concise, specific and easy to scan. Never invent metrics, services, landing pages, URLs, campaign facts, or evidence. Keep the evidence exactly unchanged. If the owner's request cannot be safely supported by the supplied facts, keep the original recommendation and explain the limitation in rationale. Include a short qualitative expected impact and confidence level based on supplied evidence; label impact as an estimate, never a promise. This is a draft only: do not apply changes to Google Ads or a website. Keep Google Ads copy within applicable character limits when a limit is explicitly known; if no exact copy or required destination is supplied, do not invent one. Return only the requested JSON.`;
     const response = await fetch(aiEndpoint(env, "responses", selectedAiProvider)!, {
       method: "POST",
       headers: aiHeaders(env, selectedAiProvider)!,
@@ -100,10 +100,10 @@ export async function POST(request: Request) {
       signal: AbortSignal.timeout(35_000),
     });
     const payload = await response.json() as any;
-    if (!response.ok) return Response.json({ error: "Connors could not refine this just now. Your recommendation is unchanged; try again shortly." }, { status: 502 });
+    if (!response.ok) return Response.json({ error: "The AI could not refine this just now. Your recommendation is unchanged; try again shortly." }, { status: 502 });
     let refined: any;
-    try { refined = JSON.parse(outputText(payload)); } catch { return Response.json({ error: "Connors returned an unreadable draft. Your recommendation is unchanged; try again." }, { status: 502 }); }
-    if (!refined || typeof refined.title !== "string" || typeof refined.detail !== "string" || typeof refined.rationale !== "string") return Response.json({ error: "Connors returned an incomplete draft. Your recommendation is unchanged; try again." }, { status: 502 });
+    try { refined = JSON.parse(outputText(payload)); } catch { return Response.json({ error: "The AI returned an unreadable draft. Your recommendation is unchanged; try again." }, { status: 502 }); }
+    if (!refined || typeof refined.title !== "string" || typeof refined.detail !== "string" || typeof refined.rationale !== "string") return Response.json({ error: "The AI returned an incomplete draft. Your recommendation is unchanged; try again." }, { status: 502 });
 
     const refinedAt = new Date().toISOString();
     const nextRecommendation: Recommendation = {
@@ -126,9 +126,9 @@ export async function POST(request: Request) {
         AND json_extract(data, ?1 || '.rejectedAt') IS NULL
         AND json_extract(data, ?1 || '.supersededAt') IS NULL`)
       .bind(path, JSON.stringify(nextRecommendation), `recommendation-refine-${crypto.randomUUID()}`, recommendationId).run();
-    if (saved.meta.changes !== 1) return Response.json({ error: "The board changed while Connors was refining this. Refresh and try again." }, { status: 409 });
+    if (saved.meta.changes !== 1) return Response.json({ error: "The board changed while the AI was refining this. Refresh and try again." }, { status: 409 });
     return Response.json({ ok: true, taskId, recommendation: nextRecommendation }, { headers: { "Cache-Control": "no-store" } });
   } catch {
-    return Response.json({ error: "Connors could not reach the service. Your saved recommendation is unchanged; try again shortly." }, { status: 502 });
+    return Response.json({ error: "The AI could not reach the service. Your saved recommendation is unchanged; try again shortly." }, { status: 502 });
   }
 }

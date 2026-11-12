@@ -14,15 +14,15 @@ export type AiEvidenceApproval = {
 };
 
 export function approvalEvidenceBlockReason(approval: AiEvidenceApproval, checklist: AiEvidenceStep[] = []) {
-  if (!String(approval.evidence || "").trim()) return "This change has no saved supporting evidence. Continue with Connors to gather it before approving.";
+  if (!String(approval.evidence || "").trim()) return "This change has no saved supporting evidence. Continue with the AI to gather it before approving.";
   const index = approval.checklistIndex;
   if (!Number.isInteger(index) || Number(index) < 0 || Number(index) >= checklist.length) {
-    return "This change is not linked to a saved checklist step. Continue with Connors to rebuild the evidence link before approving.";
+    return "This change is not linked to a saved checklist step. Continue with the AI to rebuild the evidence link before approving.";
   }
   const step = checklist[Number(index)];
   const label = `Checklist step ${Number(index) + 1}${step.text ? ` (“${step.text}”)` : ""}`;
-  if (!step.done) return `${label} still needs evidence. Continue with Connors to retry that step before approving.`;
-  if (!String(step.evidence || "").trim()) return `${label} is marked verified but has no saved evidence. Continue with Connors to record it before approving.`;
+  if (!step.done) return `${label} still needs evidence. Continue with the AI to retry that step before approving.`;
+  if (!String(step.evidence || "").trim()) return `${label} is marked verified but has no saved evidence. Continue with the AI to record it before approving.`;
   return "";
 }
 

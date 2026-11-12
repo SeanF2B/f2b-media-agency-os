@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 type Staff = { id: string; name: string; email: string; role: string; isBot?: boolean; costRate?: number; avatar?: string; permissions?: Partial<TeamPermissions>; clientAccessIds?: string[]; vaultAccessEntryIds?: string[]; aiModeAccess?: string[] };
 const botTeammates: Staff[] = [
-  { id: "f2b-ai-agent", name: "Connors", email: "", role: "AI teammate", costRate: 0, avatar: "🤖", isBot: true },
+  { id: "f2b-ai-agent", name: "AI Assistant", email: "", role: "AI teammate", costRate: 0, avatar: "🤖", isBot: true },
   { id: "f2b-audit-agent", name: "Audit Agent", email: "", role: "Audit Agent", costRate: 0, avatar: "🔎", isBot: true },
   { id: "f2b-reporting-agent", name: "Reporting Agent", email: "", role: "Reporting Agent", costRate: 0, avatar: "📊", isBot: true },
 ];
@@ -250,7 +250,7 @@ export async function PUT(request: Request) {
           aiRecommendations: preserveFeedback(task.aiRecommendations || [], prior.aiRecommendations || []),
           aiLandingPageRecommendations: preserveFeedback(task.aiLandingPageRecommendations || [], prior.aiLandingPageRecommendations || []),
         };
-        // The browser can keep an older workspace snapshot open while Connors
+        // The browser can keep an older workspace snapshot open while the AI
         // writes progress or a completed report. Never let that stale snapshot
         // roll back the AI run, its evidence, or its completion state.
         if (baseline && runtimeIsNewer) {

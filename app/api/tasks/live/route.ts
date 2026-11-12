@@ -94,21 +94,21 @@ export async function POST(request: Request) {
     if (!row?.data) return Response.json({ error: "The workspace could not be loaded." }, { status: 404 });
     let data: any;
     try { data = JSON.parse(row.data); } catch { return Response.json({ error: "The workspace data could not be read." }, { status: 500 }); }
-    if (!canManage(data, user)) return Response.json({ error: "Only an owner or admin can cancel a Connors run." }, { status: 403 });
+    if (!canManage(data, user)) return Response.json({ error: "Only an owner or admin can cancel an AI run." }, { status: 403 });
     const task = (data.tasks || []).find((item: LiveTask) => item.id === body.taskId && isAiAssignedTask(item));
     if (!task || task.aiRunState !== "running") return Response.json({ error: "This task is no longer running, so there is nothing to cancel." }, { status: 409 });
-    if (task.aiCancelRequestedAt) return Response.json({ task, message: "Connors is already stopping at the next safe checkpoint." });
+    if (task.aiCancelRequestedAt) return Response.json({ task, message: "The AI is already stopping at the next safe checkpoint." });
 
     const at = new Date().toISOString();
     const actor = data.staff?.find((member: Staff) => !member.isBot && (member.id === user.userId || member.email?.toLowerCase() === user.email.toLowerCase()));
     const updatedTask = { ...task, aiCancelRequestedAt: at, aiCancelRequestedBy: actor?.name || user.email, aiProgressText: "Stopping safely…", aiProgressAt: at };
     const client = data.clients?.find((item: any) => item.id === task.clientId);
-    const event = { id: crypto.randomUUID(), title: "AI task cancellation requested", detail: `${task.title} · ${client?.name || "Client"} · ${task.aiMode || task.service}`, icon: "⏹️", at, actor: actor?.name || user.email, actorAvatar: actor?.avatar || "", staffId: user.userId, clientId: task.clientId, taskId: task.id, service: task.aiMode || task.service, kind: "task", note: `${actor?.name || user.email} asked Connors to stop. It will stop at the next safe checkpoint; a request already sent to an external service cannot be recalled.` };
+    const event = { id: crypto.randomUUID(), title: "AI task cancellation requested", detail: `${task.title} · ${client?.name || "Client"} · ${task.aiMode || task.service}`, icon: "⏹️", at, actor: actor?.name || user.email, actorAvatar: actor?.avatar || "", staffId: user.userId, clientId: task.clientId, taskId: task.id, service: task.aiMode || task.service, kind: "task", note: `${actor?.name || user.email} asked the AI to stop. It will stop at the next safe checkpoint; a request already sent to an external service cannot be recalled.` };
     const next = { ...data, tasks: data.tasks.map((item: any) => item.id === task.id ? updatedTask : item), activity: [event, ...(data.activity || [])].slice(0, 100) };
     const revision = `ai-cancel-${crypto.randomUUID()}`;
     const result = await env.DB.prepare("UPDATE workspace_documents SET data = ?1, updated_at = ?2 WHERE id = ?3 AND updated_at = ?4")
       .bind(JSON.stringify(next), revision, "f2b-agency", row.updated_at).run();
-    if (result.meta.changes === 1) return Response.json({ task: updatedTask, message: "Cancellation requested. Connors will stop safely after the current check." }, { headers: { "Cache-Control": "no-store" } });
+    if (result.meta.changes === 1) return Response.json({ task: updatedTask, message: "Cancellation requested. The AI will stop safely after the current check." }, { headers: { "Cache-Control": "no-store" } });
   }
   return Response.json({ error: "The task changed while cancellation was being saved. Try again." }, { status: 409 });
 }
