@@ -273,6 +273,12 @@ export async function siteAction(env, clientId, req, { canWrite, actor, previewB
   const isClient = role === 'client';
   const site = await getSite(env.DB, clientId);
   const op = req.op;
+  if (!site && op === 'builder-list' && canWrite && !isClient) {
+    for (const q of D1_SCHEMA) await env.DB.prepare(q).run();
+    const at = nowIso();
+    await env.DB.prepare(`INSERT OR IGNORE INTO site_content_sites (client_id, backend, schema_json, image_dirs, preview_url, baseline_version, source_note, created_at, updated_at) VALUES (?1,'d1',?2,'[]','',0,'visual builder',?3,?3)`).bind(clientId, JSON.stringify({ version: 1, source: 'builder', navigation: {}, entries: [] }), at).run();
+    return siteAction(env, clientId, req, { canWrite, actor, previewBase, role });
+  }
   if (!site) { if (op === 'overview') return { ready: false, message: 'Website content has not been imported for this client yet.' }; throw new SiteError(404, 'Website content has not been imported for this client yet.'); }
   const store = storeFor(site, env, clientId);
   const schema = site.schema;

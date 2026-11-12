@@ -19,7 +19,7 @@ export const pathForSlug = slug => `${BUILDER_DIR}${slug}.json`;
 /** Default per-client block configuration. Admin can change it (op builder-save, slug _config). */
 export const DEFAULT_CONFIG = {
   v: 1,
-  theme: { primary: '#2f7de1', secondary: '#1f2a44', font: 'system', radius: 12, name: '' },
+  theme: { primary: '#2f7de1', secondary: '#1f2a44', font: 'system', radius: 12, name: '', phone: '' },
   blocks: ['hero', 'stats', 'services', 'features', 'steps', 'text', 'imagetext', 'image', 'gallery', 'reviews', 'faq', 'cta', 'contact'],
   custom: [],   // [{ type, label, fields: [{ key, label, kind: 'text'|'textarea'|'image'|'link' }] }] for client-specific sections
 };
@@ -74,7 +74,7 @@ export function normalizeConfig(SiteError, c) {
   })).filter(x => x.type);
   const known = DEFAULT_CONFIG.blocks;
   const blocks = (Array.isArray(c?.blocks) ? c.blocks : known).filter(b => known.includes(b) || custom.some(x => x.type === b)).slice(0, 40);
-  return { v: 1, theme: { primary: hex(theme.primary, DEFAULT_CONFIG.theme.primary), secondary: hex(theme.secondary, DEFAULT_CONFIG.theme.secondary), font: ['system', 'serif', 'rounded'].includes(theme.font) ? theme.font : 'system', radius: Math.min(32, Math.max(0, +theme.radius || 12)), name: str(theme.name, 60) }, blocks, custom };
+  return { v: 1, theme: { primary: hex(theme.primary, DEFAULT_CONFIG.theme.primary), secondary: hex(theme.secondary, DEFAULT_CONFIG.theme.secondary), font: ['system', 'serif', 'rounded'].includes(theme.font) ? theme.font : 'system', radius: Math.min(32, Math.max(0, +theme.radius || 12)), name: str(theme.name, 60), phone: str(theme.phone, 40) }, blocks, custom };
 }
 
 const J = text => { try { return JSON.parse(text); } catch { return null; } };
@@ -123,6 +123,15 @@ export async function importFromContent(store) {
   return { pages, config: { ...DEFAULT_CONFIG, theme } };
 }
 
+/** Clients whose site already has builder pages: they can be copied as a template. */
+async function templateSources(env, clientId) {
+  try {
+    const rows = (await env.DB.prepare(`SELECT DISTINCT f.client_id AS id FROM site_content_files f WHERE f.path = ?1 AND f.client_id <> ?2`).bind(BUILDER_DIR + 'home.json', clientId).all()).results || [];
+    const names = (await env.DB.prepare(`SELECT json_extract(c.value,'$.id') AS id, json_extract(c.value,'$.name') AS name FROM workspace_documents w, json_each(w.data,'$.clients') c WHERE w.id='f2b-agency'`).all()).results || [];
+    return rows.map(r => ({ id: r.id, name: names.find(n => n.id === r.id)?.name || 'Another client' }));
+  } catch { return []; }
+}
+
 export async function builderAction(SiteError, env, clientId, req, { store, site, canWrite, isClient, actor, preview }) {
   const op = req.op;
   const mustWrite = () => { if (!canWrite) throw err(SiteError, 403, 'Only an agency owner or admin can edit website content.'); };
@@ -133,7 +142,7 @@ export async function builderAction(SiteError, env, clientId, req, { store, site
     for (const f of files) { const r = await store.read(f.path); const d = J(r?.text || ''); if (!d) continue; pages.push({ slug: f.path.slice(BUILDER_DIR.length, -5), title: d.title || '', url: d.url || '', seo: d.seo || {}, blocks: (d.blocks || []).length, updatedAt: f.updated_at, updatedBy: f.updated_by, version: f.version }); }
     pages.sort((a, c) => (a.slug === 'home' ? -1 : c.slug === 'home' ? 1 : a.title.localeCompare(c.title)));
     const { config, sha } = await readConfig();
-    return { ready: true, canWrite, role: isClient ? 'client' : canWrite ? 'admin' : 'staff', previewUrl: preview, pages, config, configSha: sha, imageDir: BUILDER_IMAGE_DIR, history: await store.history({ limit: 15 }), canImport: canWrite && !isClient && pages.length === 0 };
+    return { ready: true, canWrite, role: isClient ? 'client' : canWrite ? 'admin' : 'staff', previewUrl: preview, pages, config, configSha: sha, imageDir: BUILDER_IMAGE_DIR, history: await store.history({ limit: 15 }), canImport: canWrite && !isClient && pages.length === 0 && (await store.list()).some(f => f.path.startsWith('src/content/')), templates: (canWrite && !isClient && pages.length === 0) ? await templateSources(env, clientId) : [] };
   }
   if (op === 'builder-read') {
     const slug = str(req.slug, 70); if (!SLUG_RE.test(slug)) throw err(SiteError, 400, 'Bad page name.');
@@ -149,6 +158,26 @@ export async function builderAction(SiteError, env, clientId, req, { store, site
     changes.push({ path: CONFIG_PATH, text: JSON.stringify(normalizeConfig(SiteError, config), null, 2) });
     const c = await store.commit({ changes, message: `Visual builder: started from the current site (${pages.length} pages)`, actor, kind: 'import-builder' });
     return { imported: pages.length, version: c.version };
+  }
+  if (op === 'builder-template') {
+    if (!canWrite || isClient) throw err(SiteError, 403, 'Only F2B Media can create a site from a template.');
+    if ((await store.list()).some(f => isBuilderPath(f.path))) throw err(SiteError, 409, 'This site already has builder pages.');
+    const from = str(req.sourceClientId, 80); if (!/^[\w-]{6,80}$/.test(from) || from === clientId) throw err(SiteError, 400, 'Choose a template site.');
+    const src = (await templateSources(env, clientId)).find(x => x.id === from); if (!src) throw err(SiteError, 404, 'That template has no builder pages yet. Open it in the builder and start it first.');
+    const { d1Store } = await import('./site-content-core');
+    const srcStore = d1Store(env.DB, env.BUCKET, from);
+    const files = (await srcStore.list()).filter(f => isBuilderPath(f.path));
+    const cfgSrc = J((await srcStore.read(CONFIG_PATH))?.text || '') || DEFAULT_CONFIG;
+    const name = str(req.businessName, 60), srcName = str(cfgSrc?.theme?.name || src.name, 60);
+    const swap = t => (srcName && name) ? t.split(srcName).join(name) : t;
+    const changes = [];
+    for (const f of files) { if (f.path === CONFIG_PATH) continue; const r = await srcStore.read(f.path); if (r?.text) changes.push({ path: f.path, text: swap(r.text) }); }
+    const theme = { ...(cfgSrc.theme || {}), name, phone: str(req.phone, 40) };
+    if (/^#[0-9a-fA-F]{6}$/.test(String(req.primary || ''))) theme.primary = req.primary;
+    if (/^#[0-9a-fA-F]{6}$/.test(String(req.secondary || ''))) theme.secondary = req.secondary;
+    changes.push({ path: CONFIG_PATH, text: JSON.stringify(normalizeConfig(SiteError, { ...cfgSrc, theme }), null, 2) });
+    const c = await store.commit({ changes, message: `Visual builder: created from the ${src.name} template (${files.length - (files.some(f => f.path === CONFIG_PATH) ? 1 : 0)} pages)`, actor, kind: 'import-builder' });
+    return { imported: changes.length - 1, version: c.version };
   }
   if (op === 'builder-save') {
     mustWrite();
