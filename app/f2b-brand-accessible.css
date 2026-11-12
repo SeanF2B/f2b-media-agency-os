@@ -8008,3 +8008,14 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
 /* No drop / appear animation on task or pipeline cards: they simply land in place */
 .app-shell .pipeline-card, .app-shell .pipeline-card.is-just-dropped, .app-shell .crm-opportunity, .app-shell .crm-opportunity.is-just-dropped, .app-shell.dark-mode .pipeline-card.is-just-dropped, .app-shell.dark-mode .crm-opportunity.is-just-dropped { animation: none !important; }
 .app-shell .pipeline-card.is-just-dropped, .app-shell .crm-opportunity.is-just-dropped { transform: none !important; }
+
+/* Column headers: fully solid bar pinned to the top, nothing shows through */
+.app-shell .crm-stage > header.crm-stage-header, .app-shell .pipeline-column > .pipeline-column-head {
+  background-color: var(--stage-base) !important;
+  background-image: linear-gradient(color-mix(in srgb, var(--stage-color, #94a3b8) 18%, transparent), color-mix(in srgb, var(--stage-color, #94a3b8) 18%, transparent)) !important;
+  opacity: 1 !important; backdrop-filter: none !important;
+  border-radius: 13px 13px 0 0 !important; border: 0 !important;
+  position: sticky !important; top: -1px !important; z-index: 20 !important;
+  margin: -1px -1px 8px !important; padding: 12px 12px 8px !important;
+  box-shadow: 0 6px 8px -4px var(--stage-base) !important;
+}
