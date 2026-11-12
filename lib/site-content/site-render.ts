@@ -53,3 +53,33 @@ ${luxCss}</style></head><body><header class="top"><div class="wrap"><b>${esc(t.n
 ${body}
 <footer class="site"><div class="wrap">© ${new Date().getFullYear()} ${esc(t.name || "")}</div></footer></body></html>`;
 }
+
+const EDIT_SCRIPT = `(function(){var S='h1,h2,h3,h4,h5,h6,p,li,span,a,button,label,small,strong,em,b,i,figcaption,blockquote,dt,dd,td,th,div,summary';
+function ht(el){for(var n=el.firstChild;n;n=n.nextSibling)if(n.nodeType===3&&n.nodeValue.trim())return true;return false}
+document.querySelectorAll(S).forEach(function(el){if(ht(el)){el.setAttribute('contenteditable','true');el.setAttribute('data-f2b-ed','1')}});
+var imgs=[].slice.call(document.images);
+document.addEventListener('click',function(e){var im=e.target.closest&&e.target.closest('img');if(im){e.preventDefault();e.stopPropagation();parent.postMessage({f2b:'img',idx:imgs.indexOf(im),src:im.currentSrc||im.src},'*');return}var a=e.target.closest&&e.target.closest('a,button,summary');if(a)e.preventDefault()},true);
+document.addEventListener('submit',function(e){e.preventDefault()},true);
+document.addEventListener('input',function(){parent.postMessage({f2b:'dirty'},'*')});
+document.addEventListener('paste',function(e){e.preventDefault();var t=(e.clipboardData||window.clipboardData).getData('text/plain');document.execCommand('insertText',false,t)});
+addEventListener('message',function(e){var d=e.data||{};if(d.f2b==='setimg'){var im=imgs[d.idx];if(im){im.removeAttribute('srcset');im.src=d.src;parent.postMessage({f2b:'dirty'},'*')}}
+if(d.f2b==='collect'){var c=document.body.cloneNode(true);c.querySelectorAll('[contenteditable],[data-f2b-ed]').forEach(function(x){x.removeAttribute('contenteditable');x.removeAttribute('data-f2b-ed')});c.querySelectorAll('#f2b-ed-style,#f2b-ed-script').forEach(function(x){x.remove()});parent.postMessage({f2b:'html',body:c.innerHTML},'*')}});
+parent.postMessage({f2b:'ready'},'*')})();`;
+const EDIT_CSS = '[data-f2b-ed]:hover{outline:2px dashed #4f8cff;outline-offset:2px;cursor:text}[data-f2b-ed]:focus{outline:2px solid #4f8cff;outline-offset:2px}img:hover{outline:2px dashed #4f8cff;cursor:pointer}*{animation:none!important;transition:none!important}';
+
+/** Exact copy of an existing website page (stored as raw HTML) rendered for the public preview or for in-place editing. */
+export function renderRaw(page: any, ctx: RenderCtx & { edit?: boolean }): string {
+  const r = page.raw, seo = page.seo || {};
+  const bySlugUrl = new Map<string, string>(ctx.pages.map((p) => [p.url, p.slug]));
+  let body = String(r.body || "");
+  if (!ctx.edit) {
+    body = body.replace(/href="(\/[^"#?]*)([^"]*)"/g, (m, path: string, rest: string) => {
+      const slug = bySlugUrl.get(path.endsWith("/") ? path : path + "/") || bySlugUrl.get(path);
+      return slug ? `href="${esc(`${ctx.base}?c=${encodeURIComponent(ctx.clientId)}&p=${encodeURIComponent(slug)}`)}${rest.replace(/^#/, "#")}"` : m;
+    });
+  }
+  const title = seo.title || page.title || "";
+  const desc = seo.description ? `<meta name="description" content="${esc(seo.description)}">` : "";
+  const anchors = `document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[href^="#"]');if(a){var id=a.getAttribute('href').slice(1);var t=id&&document.getElementById(id);e.preventDefault();if(t)t.scrollIntoView({behavior:'smooth'})}})`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base href="${esc(r.origin)}/"><title>${esc(title)}</title>${desc}<meta name="robots" content="noindex">${r.head || ""}${ctx.edit ? `<style id="f2b-ed-style">${EDIT_CSS}</style>` : ""}</head><body>${body}${ctx.edit ? `<script id="f2b-ed-script">${EDIT_SCRIPT}</script>` : `${r.scripts || ""}<script>${anchors}</script>`}</body></html>`;
+}

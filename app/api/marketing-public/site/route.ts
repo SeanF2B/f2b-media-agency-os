@@ -2,7 +2,7 @@
 import { env } from "cloudflare:workers";
 import { d1Store, getSite, workingImage } from "@/lib/site-content/site-content-core";
 import { BUILDER_DIR, CONFIG_PATH, DEFAULT_CONFIG, isBuilderPath, normalizeConfig } from "@/lib/site-content/site-builder-core";
-import { renderPage } from "@/lib/site-content/site-render";
+import { renderPage, renderRaw } from "@/lib/site-content/site-render";
 import { leadToCrm } from "@/lib/conversations/core";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +33,7 @@ export async function GET(request: Request) {
   const cfgFile = await store.read(CONFIG_PATH), cfg = normalizeConfig(Err as any, (cfgFile && J(cfgFile.text)) || DEFAULT_CONFIG);
   const siteJson = await store.read("src/content/settings/site.json"), phone = cfg.theme.phone || (siteJson && J(siteJson.text)?.business?.phoneDisplay) || "";
   const slug = url.searchParams.get("p") || "home", page = pages.find((p) => p.slug === slug) || pages[0];
+  if (page.raw) return html(renderRaw(page, { clientId: c, base: url.pathname, theme: { ...cfg.theme, name: cfg.theme.name || "" } as any, pages: pages.map((p) => ({ slug: p.slug, title: p.title, url: p.url })), phone, current: page.slug, edit: url.searchParams.get("edit") === "1" }));
   return html(renderPage(page, { clientId: c, base: url.pathname, theme: { ...cfg.theme, name: cfg.theme.name || "" } as any, pages: pages.map((p) => ({ slug: p.slug, title: p.title, url: p.url })), phone, current: page.slug }));
 }
 

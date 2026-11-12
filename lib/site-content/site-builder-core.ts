@@ -64,7 +64,14 @@ export function normalizePage(SiteError, page, slug) {
   if (url && !/^\/[a-z0-9\-/]*$/.test(url)) throw err(SiteError, 400, 'The page address can only use lowercase letters, numbers and dashes, like /roof-repair/.');
   if (!url) url = slug === 'home' ? '/' : `/${slug}/`;
   if (url !== '/' && !url.endsWith('/')) url += '/';
-  return { v: 1, slug, title: str(page.title, 120).trim() || slug, url, seo: clean, blocks };
+  let raw;
+  if (page.raw && typeof page.raw === 'object') {
+    const origin = String(page.raw.origin || ''), head = String(page.raw.head || ''), body = String(page.raw.body || ''), scripts = String(page.raw.scripts || '');
+    if (!/^https:\/\/[a-z0-9.-]+$/i.test(origin)) throw err(SiteError, 400, 'The copied page needs its original https address.');
+    if (head.length + body.length + scripts.length > MAX_TEXT - 8000) throw err(SiteError, 413, 'This page is too large to copy as one page.');
+    raw = { origin, head, body, scripts };
+  }
+  return { v: 1, slug, title: str(page.title, 120).trim() || slug, url, seo: clean, blocks, ...(raw ? { raw } : {}) };
 }
 export function normalizeConfig(SiteError, c) {
   const theme = c?.theme || {}, hex = (v, d) => /^#[0-9a-fA-F]{6}$/.test(String(v || '')) ? String(v).toLowerCase() : d;

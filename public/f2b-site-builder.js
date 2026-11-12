@@ -330,6 +330,14 @@
           h('p', { class: 'sb-sitenote' }, 'This is your website as built here. Save in the builder, then switch back to Preview to see every change.'));
         stage.append(frame); return;
       }
+      if (S.page.raw) {
+        const src = location.origin + '/api/marketing-public/site?c=' + encodeURIComponent(clientId) + '&p=' + encodeURIComponent(S.slug || 'home') + '&edit=' + (editing() ? '1' : '0') + '&r=' + Date.now();
+        const ifr = h('iframe', { src, title: 'Page editor', class: 'sb-iframe', style: 'width:100%;height:calc(100vh - 150px);border:0;background:#fff', referrerpolicy: 'no-referrer' });
+        S.rawFrame = ifr;
+        stage.append(h('div', { class: 'sb-frame vp-' + S.vp, style: 'background:#fff' },
+          h('div', { class: 'sb-sitebar' }, h('span', {}, editing() ? '✏️ Exact copy of your website · click any text to edit it, click a picture to change it' : 'Exact copy of your website'), h('a', { href: src.replace('&edit=1', '&edit=0'), target: '_blank', rel: 'noopener noreferrer', class: 'sb-btn' }, 'Open in new tab ↗')), ifr));
+        return;
+      }
       const t = S.config?.theme || {};
       frame = h('div', { class: 'sb-frame vp-' + S.vp + (t.font === 'luxury' ? ' lux' : ''), style: themeVars() });
       if (t.font === 'luxury' && !document.getElementById('sb-lux-css')) { const st = document.createElement('style'); st.id = 'sb-lux-css'; st.textContent = '@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Jost:wght@300;400;500&display=swap");.sb-frame.lux{font-family:Jost,system-ui,sans-serif;font-weight:300;color:#55575c;border-radius:0}.lux h1,.lux h2,.lux h3,.lux .sb-nav b{font-family:"Cormorant Garamond",Georgia,serif!important;font-weight:500;letter-spacing:0!important;color:#424448}.lux .sb-nav{background:#fff;border-bottom:1px solid #e7e2d8;padding:18px 40px}.lux .sb-nav span{letter-spacing:.14em;text-transform:uppercase;font-size:11px}.lux .b-hero{background:#f7f4ee;color:#424448}.lux .b-hero h1{font-size:52px;font-weight:400;color:#424448}.lux .b-hero p{opacity:1;color:#55575c;font-size:17px}.lux .b-hero .eyebrow{color:#a8895c;letter-spacing:.2em;font-weight:400}.lux .b-sec h2{font-size:38px}.lux .b-sec.alt,.lux .alt{background:#f7f4ee}.lux button,.lux .btn,.lux .b-hero a,.lux .b-cta a{border-radius:0!important;text-transform:uppercase;letter-spacing:.14em;font-size:12px;font-weight:400}.lux .b-cta{background:#424448}.lux img,.lux .sb-img{border-radius:0!important}.lux .g3>*,.lux .g4>*,.lux .g2>*{border-radius:0}'; document.head.appendChild(st); }
@@ -500,9 +508,17 @@
     async function doImport() {
       try { const r = await api('builder-import', {}, {}); toast(`Created ${r.imported} pages from the current website`); await loadList(); const first = S.list.pages[0]; if (first) await openPage(first.slug); } catch (e) { toast(e.message, 'err'); }
     }
+    window.addEventListener('message', e => {
+      const d = e.data || {}; if (!d.f2b || !S.rawFrame || e.source !== S.rawFrame.contentWindow) return;
+      if (d.f2b === 'dirty') { if (!S.dirty) { S.dirty = true; renderTop(); } }
+      else if (d.f2b === 'img' && editing()) { const next = prompt('Paste the new picture address (https://…). Leave empty to cancel.', d.src || ''); if (next && /^https?:\/\//.test(next.trim())) S.rawFrame.contentWindow.postMessage({ f2b: 'setimg', idx: d.idx, src: next.trim() }, '*'); }
+      else if (d.f2b === 'html' && S.rawWait) { S.rawWait(d.body); S.rawWait = null; }
+    });
+    const collectRaw = () => new Promise((res, rej) => { if (!S.rawFrame?.contentWindow) return rej(new Error('The page is still loading.')); const t = setTimeout(() => { S.rawWait = null; rej(new Error('Could not read the page. Try again.')); }, 4000); S.rawWait = b => { clearTimeout(t); res(b); }; S.rawFrame.contentWindow.postMessage({ f2b: 'collect' }, '*'); });
     async function save() {
       if (!S.page || S.saving) return; S.saving = true; renderTop();
       try {
+        if (S.page.raw && S.rawFrame) { S.page.raw.body = await collectRaw(); }
         clearTimeout(typingTimer); pushHistory();
         const r = await api('builder-save', {}, { slug: S.slug, page: S.page, baseSha: S.baseSha, message: S.isNew ? undefined : undefined, allowNew: true });
         if (r.unchanged) { S.dirty = false; toast('Nothing to save'); }
