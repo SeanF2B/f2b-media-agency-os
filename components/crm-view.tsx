@@ -27,7 +27,8 @@ export function CrmView({ onOpenClient, scopeClientId = "" }: { onOpenClient: (c
   const [pipelineId, setPipelineId] = useState("");
   const [search, setSearch] = useState("");
   const [clientFilterState, setClientFilter] = useState("");
-  const clientFilter = scopeClientId || clientFilterState;
+  // When a client sub-account is selected the server already returns only that client's pipelines, deals and contacts.
+  const clientFilter = scopeClientId ? "" : clientFilterState;
   const [modal, setModal] = useState<"contact" | "contact-details" | "opportunity" | "pipeline" | "stage" | "edit-stage" | "delete-stage" | "" > ("");
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [editingStage, setEditingStage] = useState<Stage | null>(null);
@@ -54,23 +55,23 @@ export function CrmView({ onOpenClient, scopeClientId = "" }: { onOpenClient: (c
   }, []);
 
   const load = useCallback(async () => {
-    const params = new URLSearchParams(); if (search.trim()) params.set("search", search.trim());
+    const params = new URLSearchParams(); if (search.trim()) params.set("search", search.trim()); params.set("clientId", scopeClientId || "agency");
     const response = await fetch(`/api/crm?${params}`, { cache: "no-store" });
     const result = await response.json() as Payload & { error?: string };
     if (!response.ok) throw new Error(result.error || "CRM could not be loaded.");
     setData(result); setPipelineId((current) => result.pipelines.some((item) => item.id === current) ? current : result.pipelines[0]?.id || "");
-  }, [search]);
+  }, [search, scopeClientId]);
   const syncedRef = useRef(false);
   useEffect(() => {
     let current = true;
-    const params = new URLSearchParams(); if (search.trim()) params.set("search", search.trim());
+    const params = new URLSearchParams(); if (search.trim()) params.set("search", search.trim()); params.set("clientId", scopeClientId || "agency");
     void (async () => { if (!syncedRef.current) { syncedRef.current = true; try { await fetch("/api/crm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "syncClients" }) }); } catch { /* sync is best-effort */ } } })().then(() => fetch(`/api/crm?${params}`, { cache: "no-store" })).then(async (response) => {
       const result = await response.json() as Payload & { error?: string };
       if (!response.ok) throw new Error(result.error || "CRM could not be loaded.");
       if (current) { setData(result); setPipelineId((selected) => result.pipelines.some((item) => item.id === selected) ? selected : result.pipelines[0]?.id || ""); }
     }).catch((reason) => { if (current) setError(reason instanceof Error ? reason.message : "CRM could not be loaded."); });
     return () => { current = false; };
-  }, [search]);
+  }, [search, scopeClientId]);
 
   const save = async (payload: Record<string, unknown>) => {
     setBusy(true); setError("");

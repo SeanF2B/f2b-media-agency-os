@@ -1162,9 +1162,9 @@ export function AgencyApp() {
   const isWorkspaceOwner = Boolean(sessionUser.id && sessionUser.id === workspace.ownerId);
   const previewPermissions = previewMember ? getTeamPermissions(previewMember.role, previewMember.permissions) : access;
   const [clientScope, setClientScopeState] = useState("");
-  useEffect(() => { try { const saved = window.localStorage.getItem("f2b-client-scope"); if (saved) setClientScopeState(saved); } catch { /* storage unavailable */ } }, []);
+  useEffect(() => { try { const saved = window.localStorage.getItem("f2b-client-scope"); if (saved) setClientScopeState(saved); document.cookie = `f2b_client=${encodeURIComponent(saved || "agency")}; Path=/; Max-Age=31536000; SameSite=Lax; Secure`; } catch { /* storage unavailable */ } }, []);
   const activeScopeId = workspace.clients.some((item) => item.id === clientScope) ? clientScope : "";
-  const setClientScope = (id: string) => { setClientScopeState(id); try { if (id) window.localStorage.setItem("f2b-client-scope", id); else window.localStorage.removeItem("f2b-client-scope"); } catch { /* storage unavailable */ } if (id) setSelectedClient(id); else setSelectedClient(""); if (id && page === "Lead Factory") setPage("Overview"); };
+  const setClientScope = (id: string) => { setClientScopeState(id); try { document.cookie = `f2b_client=${encodeURIComponent(id || "agency")}; Path=/; Max-Age=31536000; SameSite=Lax; Secure`; window.dispatchEvent(new CustomEvent("f2b-scope", { detail: id })); } catch { /* cookie unavailable */ } try { if (id) window.localStorage.setItem("f2b-client-scope", id); else window.localStorage.removeItem("f2b-client-scope"); } catch { /* storage unavailable */ } if (id) setSelectedClient(id); else setSelectedClient(""); if (id && page === "Lead Factory") setPage("Overview"); };
   const baseViewWorkspace = previewMember ? previewWorkspaceForStaff(workspace, previewMember) : workspace;
   const viewWorkspace = useMemo(() => scopeWorkspaceToClient(baseViewWorkspace, activeScopeId), [baseViewWorkspace, activeScopeId]);
   const viewHasClientScope = previewMember ? Array.isArray(previewMember.clientAccessIds) : hasClientScope;

@@ -1,3 +1,4 @@
+import { assertDeletable, AccountError } from "@/lib/client-accounts/client-accounts-core";
 import { getChatGPTUser } from "../../chatgpt-auth";
 import { env } from "cloudflare:workers";
 import { enforceOwnerOnlyOverview, fullTeamPermissions, getMemberPermissions, type TeamPermissions } from "@/lib/access-permissions";
@@ -297,6 +298,8 @@ export async function DELETE(request: Request) {
     const clientId = String(body.clientId || "").slice(0, 120);
     const client = (current.clients || []).find((item: any) => item.id === clientId);
     if (!client) return Response.json({ error: "That client could not be found." }, { status: 404 });
+    try { await assertDeletable(env.DB!, clientId); }
+    catch (e) { if (e instanceof AccountError) return Response.json({ error: e.message }, { status: e.status }); throw e; }
     const taskIds = new Set((current.tasks || []).filter((item: any) => item.clientId === clientId).map((item: any) => item.id));
     const removedVaultEntryIds = new Set((current.vaultEntries || []).filter((item: any) => item.clientId === clientId).map((item: any) => item.id));
     const now = new Date().toISOString();
