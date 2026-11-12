@@ -170,6 +170,15 @@ export async function POST(request: Request) {
       ]);
       return Response.json({ ok: true });
     }
+    if (action === "updateOpportunityValue") {
+      const id = clean(body.id, 80);
+      const value = Math.round(Number(body.value) * 100) / 100;
+      if (!Number.isFinite(value) || value < 0 || value > 1_000_000_000) return reply("Enter a valid amount.");
+      const current = await db.prepare("SELECT id FROM crm_opportunities WHERE owner_id=?1 AND id=?2").bind(ownerId, id).first();
+      if (!current) return reply("That opportunity is no longer available.", 404);
+      await db.prepare("UPDATE crm_opportunities SET value=?1, updated_at=?2 WHERE owner_id=?3 AND id=?4").bind(value, now, ownerId, id).run();
+      return Response.json({ ok: true, id, value });
+    }
     if (action === "updateOpportunityMeta") {
       const id = clean(body.id, 80);
       const current = await db.prepare("SELECT id FROM crm_opportunities WHERE owner_id=?1 AND id=?2").bind(ownerId, id).first();

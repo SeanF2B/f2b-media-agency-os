@@ -7852,3 +7852,11 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
 .custom-key-form { margin-bottom: 4px; }
 .app-shell.dark-mode .custom-key-list li { border-color: #404046; }
 @media (max-width: 620px) { .custom-key-list li { flex-wrap: wrap; } }
+
+/* CRM pipeline cards: blue hover edge, editable value */
+.crm-opportunity { transition: border-color .15s ease, box-shadow .15s ease; }
+.crm-opportunity:hover, .crm-opportunity:focus-within { border-color: #3b82f6 !important; box-shadow: 0 0 0 1px #3b82f6, 0 6px 18px rgba(59,130,246,.22) !important; }
+.crm-opportunity-value-button { display: inline-flex; align-items: baseline; gap: 8px; padding: 2px 8px; margin-left: -8px; border: 1px dashed transparent; border-radius: 8px; background: transparent; color: inherit; font: inherit; cursor: text; }
+.crm-opportunity-value-button:hover, .crm-opportunity-value-button:focus-visible { border-color: #3b82f6; background: rgba(59,130,246,.1); outline: none; }
+.crm-opportunity-value-button small { font-size: 11px; font-weight: 600; color: #3b82f6; }
+.crm-opportunity-value-input { width: 130px; max-width: 100%; padding: 4px 8px; font: inherit; font-size: 16px; font-weight: 700; border: 1px solid #3b82f6; border-radius: 8px; background: transparent; color: inherit; }
