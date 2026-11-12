@@ -68,7 +68,7 @@
 .sb-edit .sb-dz.over{height:64px;background:var(--acc-soft);outline:2px dashed var(--acc);outline-offset:-4px}
 .sb-edit .sb-dz.over::after{content:'Drop section here';position:absolute;inset:0;display:grid;place-items:center;color:var(--acc);font-weight:800}
 .sb-dragging .sb-dz{height:22px;background:rgba(47,125,225,.07)}
-.sb-empty{margin:40px;padding:50px 20px;border:3px dashed var(--line);border-radius:18px;text-align:center;display:grid;gap:12px;justify-items:center;color:var(--mut)}.sb-empty.over{border-color:var(--acc);background:var(--acc-soft);color:var(--acc)}
+.sb-sitebar{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 12px;background:#eef1f5;color:#344054;font-size:12px;border-bottom:1px solid #dfe4ec}.sb-iframe{display:block;width:100%;height:calc(100vh - 230px);min-height:480px;border:0;background:#fff}.sb-sitenote{margin:0;padding:10px 14px;font-size:12px;color:#667085;background:#f8fafc}.sb-empty{margin:40px;padding:50px 20px;border:3px dashed var(--line);border-radius:18px;text-align:center;display:grid;gap:12px;justify-items:center;color:var(--mut)}.sb-empty.over{border-color:var(--acc);background:var(--acc-soft);color:var(--acc)}
 .sb-empty h3{margin:0;font-size:20px;color:var(--fg)}
 [data-ph]:empty::before{content:attr(data-ph);color:#98a2b3;pointer-events:none}
 .sb-edit [contenteditable]{outline:none;border-radius:6px;transition:box-shadow .12s,background .12s;cursor:text;min-width:24px;white-space:pre-wrap}
@@ -161,7 +161,7 @@
     const clientId = opts.clientId;
     const S = {
       list: null, slug: null, page: null, baseSha: null, isNew: false, dirty: false, vp: 'desktop', sel: null, tab: 'add',
-      undo: [], redo: [], snap: '', history: [], saving: false, readonly: true, config: null, theme: 'light',
+      undo: [], redo: [], snap: '', history: [], saving: false, mode: 'edit', readonly: true, config: null, theme: 'light',
     };
     const darkNow = () => !!document.querySelector('.app-shell.dark-mode') || (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches && !document.querySelector('.app-shell'));
     const root = h('div', { class: 'sb', role: 'dialog', 'aria-label': 'Visual builder', 'data-theme': darkNow() ? 'dark' : 'light' });
@@ -319,6 +319,15 @@
           S.list.canWrite && !S.list.pages.length ? h('button', { type: 'button', class: 'sb-btn', onclick: () => newPageDialog(false) }, '＋ Blank page') : null));
         return;
       }
+      if (S.mode === 'site') {
+        const base = (S.list.previewUrl || '').replace(/\/$/, ''), url = base ? base + (S.page.url === '/' ? '/' : S.page.url) : '';
+        if (!url) { stage.append(h('div', { class: 'sb-empty' }, h('h3', {}, 'No preview site linked'), h('p', {}, 'Add the preview link under Marketing → Websites → Edit links.'))); return; }
+        frame = h('div', { class: 'sb-frame vp-' + S.vp, style: 'background:#fff' },
+          h('div', { class: 'sb-sitebar' }, h('span', {}, '🌐 ' + url), h('a', { href: url, target: '_blank', rel: 'noopener noreferrer', class: 'sb-btn' }, 'Open in new tab ↗')),
+          h('iframe', { src: url, title: 'Preview site', class: 'sb-iframe', referrerpolicy: 'no-referrer' }),
+          h('p', { class: 'sb-sitenote' }, 'This is the live preview website. Changes made in the builder appear here once the site is set to read them. If the site doesn’t show, use “Open in new tab”.'));
+        stage.append(frame); return;
+      }
       const t = S.config?.theme || {};
       frame = h('div', { class: 'sb-frame vp-' + S.vp, style: themeVars() });
       frame.append(h('div', { class: 'sb-nav' }, h('b', {}, t.name || S.list.clientName || opts.name || 'Your business'), h('span', {}, 'Home · Services · About · Contact')));
@@ -410,6 +419,7 @@
         L?.role !== 'client' && L?.canWrite ? h('button', { type: 'button', class: 'sb-btn', onclick: () => newPageDialog(false) }, '＋ New page') : null,
         L?.canWrite && S.page ? h('button', { type: 'button', class: 'sb-btn', onclick: () => newPageDialog(true) }, '⧉ Duplicate page') : null,
         h('span', { class: 'grow' }),
+        S.page ? h('div', { class: 'sb-seg', role: 'group', 'aria-label': 'View' }, [['edit', '✏️ Edit'], ['site', '🌐 Preview site']].map(([k, l]) => h('button', { type: 'button', class: S.mode === k ? 'on' : '', onclick: () => { S.mode = k; renderTop(); renderCanvas(); } }, l))) : null,
         h('div', { class: 'sb-seg', role: 'group', 'aria-label': 'Preview size' }, [['desktop', '🖥 Desktop'], ['tablet', '▭ Tablet'], ['mobile', '📱 Mobile']].map(([k, l]) => h('button', { type: 'button', class: S.vp === k ? 'on' : '', onclick: () => { S.vp = k; renderTop(); frame?.classList.remove('vp-desktop', 'vp-tablet', 'vp-mobile'); frame?.classList.add('vp-' + k); } }, l))),
         h('button', { type: 'button', class: 'sb-btn icon', title: 'Undo (Ctrl+Z)', 'aria-label': 'Undo', disabled: ro || !S.undo.length && S.json === json(), onclick: doUndo }, '↶'),
         h('button', { type: 'button', class: 'sb-btn icon', title: 'Redo (Ctrl+Shift+Z)', 'aria-label': 'Redo', disabled: ro || !S.redo.length, onclick: doRedo }, '↷'),
