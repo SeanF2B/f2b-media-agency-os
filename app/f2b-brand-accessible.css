@@ -8136,9 +8136,9 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
 .app-shell [class*="-tabs"] > button.selected, .app-shell [class*="-tabs"] > button.active, .app-shell [class*="subtabs"] > button.active, .app-shell [class*="subtabs"] > button.selected { background: var(--brand-primary,#3b82f6) !important; border-color: var(--brand-primary,#3b82f6) !important; color: #fff !important; }
 .app-shell button[role="tab"]:focus, .app-shell [class*="-tabs"] > button:focus { outline: none !important; }
 .app-shell button[role="tab"]:focus-visible, .app-shell [class*="-tabs"] > button:focus-visible { outline: 2px solid color-mix(in srgb,var(--brand-primary,#3b82f6) 55%,transparent) !important; outline-offset: 2px; }
-.app-shell button[role="tab"] > span:last-child:not(:first-child), .app-shell [class*="-tabs"] > button > span:last-child:not(:first-child) { background: #fff !important; color: var(--brand-secondary,#1e3a8a) !important; border-radius: 99px; padding: 1px 8px; min-width: 22px; text-align: center; font-weight: 800; }
+.app-shell button[role="tab"] > span:last-child:not(:first-child), .app-shell [class*="-tabs"] > button > span:last-child:not(:first-child) { background: #fff !important; color: var(--brand-secondary-ink,#1e3a8a) !important; border-radius: 99px; padding: 1px 8px; min-width: 22px; text-align: center; font-weight: 800; }
 /* Task tabs: override the earlier dark badge */
-.app-shell .workflow-review-tabs > button[role="tab"] > span, .app-shell .workflow-review-tabs > button[role="tab"].selected > span, .app-shell .workflow-review-tabs > button[role="tab"][aria-selected="true"] > span { background: #fff !important; color: var(--brand-secondary,#1e3a8a) !important; }
+.app-shell .workflow-review-tabs > button[role="tab"] > span, .app-shell .workflow-review-tabs > button[role="tab"].selected > span, .app-shell .workflow-review-tabs > button[role="tab"][aria-selected="true"] > span { background: #fff !important; color: var(--brand-secondary-ink,#1e3a8a) !important; }
 
 /* One accent blue across the whole OS */
 .app-shell { --os-blue: var(--brand-primary,#3b82f6); }
@@ -8155,7 +8155,7 @@ html body .app-shell.dark-mode.app-shell .ai-task-tabs button.selected span,
 html body .app-shell.dark-mode.app-shell .ai-task-tabs button.ai-approval-tab.has-pending span,
 html body .app-shell.app-shell .workflow-review-tabs > button[role="tab"] > span,
 html body .app-shell.app-shell button[role="tab"] > span:last-child:not(:first-child) {
-  background: #fff !important; color: var(--brand-secondary,#1e3a8a) !important; -webkit-text-fill-color: var(--brand-secondary,#1e3a8a) !important;
+  background: #fff !important; color: var(--brand-secondary-ink,#1e3a8a) !important; -webkit-text-fill-color: var(--brand-secondary-ink,#1e3a8a) !important;
   font-size: 12px !important; font-weight: 800 !important; opacity: 1 !important; text-shadow: none !important;
   display: inline-grid !important; place-items: center; min-width: 24px; height: 24px; padding: 0 6px; border-radius: 999px;
 }
@@ -8221,7 +8221,7 @@ html body .app-shell.app-shell button[role="tab"] > span:last-child:not(:first-c
 .app-shell .branding-logo-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 .app-shell .branding-logo-preview { width:56px; height:56px; border-radius:12px; background:#fff; border:1px solid rgba(127,127,127,.4); display:grid; place-items:center; overflow:hidden; }
 .app-shell .branding-logo-preview img { max-width:100%; max-height:100%; object-fit:contain; }
-.app-shell .file-thumb-icon, .app-shell .ai-task-tabs button.selected, .app-shell button[role="tab"].selected { background: linear-gradient(135deg, var(--brand-primary,#3b82f6), color-mix(in srgb, var(--brand-primary,#3b82f6) 70%, var(--brand-secondary,#1e3a8a))) !important; }
+.app-shell .file-thumb-icon, .app-shell .ai-task-tabs button.selected, .app-shell button[role="tab"].selected { background: linear-gradient(135deg, var(--brand-primary,#3b82f6), color-mix(in srgb, var(--brand-primary,#3b82f6) 70%, #000)) !important; color:#fff !important; }
 .app-shell .sidebar nav button.active, .app-shell .sidebar .client-nav-item.active { border-left-color: var(--brand-primary,#3b82f6); }
 .app-shell h1 .eyebrow, .app-shell .eyebrow { color: var(--brand-primary,#3b82f6); }
 
@@ -8331,8 +8331,8 @@ html body .app-shell.app-shell button[role="tab"] > span:last-child:not(:first-c
 .app-shell .sidebar .nav-count { background: color-mix(in srgb, var(--brand-secondary,#1e3a8a) 70%, #fff 8%) !important; color: #fff !important; }
 .app-shell .sidebar-settings-link, .app-shell .sidebar .sidebar-settings-link.active { background: color-mix(in srgb, var(--brand-secondary,#1e3a8a) 55%, #14171b) !important; }
 .app-shell .secondary-button:hover:not(:disabled) { border-color: var(--brand-secondary,#1e3a8a) !important; box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-secondary,#1e3a8a) 25%, transparent); }
-.app-shell .eyebrow { color: color-mix(in srgb, var(--brand-secondary,#1e3a8a) 80%, var(--brand-primary,#3b82f6)) !important; }
-.app-shell.dark-mode .eyebrow { color: color-mix(in srgb, var(--brand-secondary,#1e3a8a) 40%, #fff) !important; }
+.app-shell .eyebrow { color: var(--brand-secondary-ink,#1e3a8a) !important; }
+.app-shell.dark-mode .eyebrow { color: var(--brand-secondary-ink-dark,#9fb8ff) !important; }
 .scope-note { display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; margin:0 0 14px; padding:12px 16px; border-radius:12px; background:color-mix(in srgb,var(--brand-primary,#3b82f6) 10%,transparent); border:1px solid color-mix(in srgb,var(--brand-primary,#3b82f6) 40%,transparent); font-size:13px; }
 
 /* Client brand card (neat, compact) */
@@ -8449,3 +8449,9 @@ html body .app-shell.app-shell button[role="tab"] > span:last-child:not(:first-c
 .app-shell .sidebar .profile-row b{color:var(--sb-fg-strong,#fff)!important}
 .app-shell .sidebar .profile-row small{color:var(--sb-fg,rgba(255,255,255,.8))!important;opacity:.85}
 .app-shell .sidebar .profile-row{background:transparent!important}
+
+/* readability safety net: white text on any brand-coloured selected control */
+.app-shell button[role="tab"].selected,.app-shell button[role="tab"][aria-selected="true"],.app-shell .ai-task-tabs button.selected,.app-shell .client-tax-type button.selected,.app-shell .workflow-review-tabs>button.selected{color:#fff!important}
+.app-shell button[role="tab"].selected *,.app-shell .client-tax-type button.selected *{color:inherit}
+.app-shell .client-tax-type button.selected{background:var(--brand-primary,#3b82f6)!important}
+.app-shell .client-tax-head .eyebrow,.app-shell .welcome-row .eyebrow{color:var(--brand-secondary-ink,#1e3a8a)!important}
