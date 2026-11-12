@@ -527,24 +527,75 @@ function playTaskUiSound(kind: "open" | "complete" | "move" | "drop") {
   } catch { /* Audio is a progressive enhancement; task actions still work when sound is unavailable. */ }
 }
 
+type BotGeo = { eyes: Array<{ x: number; y: number; w: number; h: number; color: string }>; mouthY: number; mouthX: number };
+const botGeoCache = new Map<string, Promise<BotGeo | null>>();
+// Finds the two dark eyes in an agent's own picture so the original icon can keep its exact look while the eyes move.
+function detectBotEyes(src: string): Promise<BotGeo | null> {
+  const hit = botGeoCache.get(src); if (hit) return hit;
+  const job = new Promise<BotGeo | null>((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const W = 128, H = 128, canvas = document.createElement("canvas"); canvas.width = W; canvas.height = H;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true })!; ctx.drawImage(img, 0, 0, W, H);
+        const { data } = ctx.getImageData(0, 0, W, H);
+        const px = (x: number, y: number) => { const i = (y * W + x) * 4; return [data[i], data[i + 1], data[i + 2], data[i + 3]]; };
+        const dark = (x: number, y: number) => { const [r, g, b, al] = px(x, y); return al > 200 && Math.max(r, g, b) < 75; };
+        const seen = new Uint8Array(W * H), comps: Array<{ x0: number; x1: number; y0: number; y1: number; n: number }> = [];
+        for (let y = Math.round(H * 0.18); y < H * 0.8; y++) for (let x = Math.round(W * 0.12); x < W * 0.88; x++) {
+          const k = y * W + x; if (seen[k] || !dark(x, y)) continue;
+          const stack = [[x, y]]; seen[k] = 1; const c = { x0: x, x1: x, y0: y, y1: y, n: 0 };
+          while (stack.length) { const [cx, cy] = stack.pop()!; c.n++; c.x0 = Math.min(c.x0, cx); c.x1 = Math.max(c.x1, cx); c.y0 = Math.min(c.y0, cy); c.y1 = Math.max(c.y1, cy);
+            for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = cx + dx, ny = cy + dy, nk = ny * W + nx; if (nx >= 0 && ny >= 0 && nx < W && ny < H && !seen[nk] && dark(nx, ny)) { seen[nk] = 1; stack.push([nx, ny]); } } }
+          if (c.n >= 14) comps.push(c);
+        }
+        comps.sort((p, q) => q.n - p.n);
+        const first = comps[0]; const second = first && comps.slice(1).find((c) => Math.abs((c.y0 + c.y1) / 2 - (first.y0 + first.y1) / 2) < H * 0.12 && Math.abs((c.x0 + c.x1) / 2 - (first.x0 + first.x1) / 2) > W * 0.12);
+        if (!first || !second) { resolve(null); return; }
+        const eyes = [first, second].sort((p, q) => p.x0 - q.x0).map((c) => {
+          const m = 5; let r = 0, g = 0, b = 0, n = 0;
+          for (let y = Math.max(0, c.y0 - m); y <= Math.min(H - 1, c.y1 + m); y++) for (let x = Math.max(0, c.x0 - m); x <= Math.min(W - 1, c.x1 + m); x++) {
+            if (x >= c.x0 - 1 && x <= c.x1 + 1 && y >= c.y0 - 1 && y <= c.y1 + 1) continue;
+            const [pr, pg, pb, pa] = px(x, y); if (pa < 200 || Math.max(pr, pg, pb) < 75) continue; r += pr; g += pg; b += pb; n++;
+          }
+          const w = c.x1 - c.x0 + 1, h = c.y1 - c.y0 + 1;
+          return { x: ((c.x0 + c.x1 + 1) / 2) / W, y: ((c.y0 + c.y1 + 1) / 2) / H, w: w / W, h: h / H, color: n ? `rgb(${Math.round(r / n)},${Math.round(g / n)},${Math.round(b / n)})` : "transparent" };
+        });
+        resolve({ eyes, mouthX: (eyes[0].x + eyes[1].x) / 2, mouthY: (eyes[0].y + eyes[1].y) / 2 + Math.max(eyes[0].h, eyes[1].h) * 1.0 });
+      } catch { resolve(null); }
+    };
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+  botGeoCache.set(src, job); return job;
+}
 function AnimatedBot({ status, member }: { status: string; member: Staff }) {
   const ref = useRef<HTMLSpanElement>(null);
+  const [geo, setGeo] = useState<BotGeo | null>(null);
+  useEffect(() => {
+    let live = true; const avatar = member.avatar || "";
+    if (avatar.startsWith("data:image/") || avatar.startsWith("https://")) void detectBotEyes(avatar).then((g) => { if (live) setGeo(g); });
+    return () => { live = false; };
+  }, [member.avatar]);
   useEffect(() => {
     const move = (event: MouseEvent) => {
       const el = ref.current; if (!el) return;
       const box = el.getBoundingClientRect(), dx = event.clientX - (box.left + box.width / 2), dy = event.clientY - (box.top + box.height / 2), len = Math.hypot(dx, dy) || 1, k = Math.min(1, len / 140);
-      el.style.setProperty("--lx", ((dx / len) * k * 2.4).toFixed(2) + "px"); el.style.setProperty("--ly", ((dy / len) * k * 2.4).toFixed(2) + "px");
+      el.style.setProperty("--lx", ((dx / len) * k * 1.9).toFixed(2) + "px"); el.style.setProperty("--ly", ((dy / len) * k * 1.5).toFixed(2) + "px");
     };
     window.addEventListener("mousemove", move, { passive: true });
     return () => window.removeEventListener("mousemove", move);
   }, []);
-  const mood = status === "Done" ? "happy" : status === "Blocked" ? "panic" : status === "In progress" ? "whistle" : "confident";
-  return <span ref={ref} className={`bot-live bot-${mood}`} title={`${member.name} · ${mood === "happy" ? "all done" : mood === "panic" ? "needs attention" : mood === "whistle" ? "working on it" : "ready"}`}>
+  const mood = status === "Done" ? "relax" : status === "Blocked" ? "bored" : status === "In progress" ? "run" : "eager";
+  const pct = (n: number) => `${(n * 100).toFixed(2)}%`;
+  return <span ref={ref} className={`bot-live bot-${mood} ${geo ? "bot-ready" : ""}`} title={`${member.name} · ${mood === "relax" ? "all done" : mood === "bored" ? "waiting" : mood === "run" ? "working on it" : "ready to go"}`}>
     <span className="bot-body"><StaffProfileAvatar member={member} className="task-avatar" />
-      <span className="bot-eyes"><span className="bot-eye"><i /></span><span className="bot-eye"><i /></span></span>
-      <span className="bot-mouth" />
+      {geo && <>{geo.eyes.map((eye, index) => <span key={index}>
+        <span className="bot-patch" style={{ left: pct(eye.x), top: pct(eye.y), width: pct(eye.w * 2.1), height: pct(eye.h * 1.5), background: `radial-gradient(ellipse at center, ${eye.color} 55%, transparent 100%)` }} />
+        <span className="bot-pupil" style={{ left: pct(eye.x), top: pct(eye.y), width: pct(eye.w), height: pct(eye.h) }} />
+      </span>)}<span className="bot-mouth" style={{ left: pct(geo.mouthX), top: pct(geo.mouthY) }} /></>}
     </span>
-    {mood === "whistle" && <span className="bot-notes"><b>♪</b><b>♫</b></span>}{mood === "panic" && <span className="bot-sweat" />}
+    {mood === "run" && <span className="bot-speed"><b /><b /><b /></span>}{mood === "bored" && <span className="bot-bubble">…</span>}
   </span>;
 }
 function AiEyesIcon() { return <span className="ai-eyes-icon" aria-hidden="true"><span className="ai-eyes-antenna" /><span className="ai-eyes-face"><i /><i /></span></span>; }

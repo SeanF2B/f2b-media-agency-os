@@ -68,6 +68,7 @@ parent.postMessage({f2b:'ready'},'*')})();`;
 const EDIT_CSS = '[data-f2b-ed]:hover{outline:2px dashed #4f8cff;outline-offset:2px;cursor:text}[data-f2b-ed]:focus{outline:2px solid #4f8cff;outline-offset:2px}img:hover{outline:2px dashed #4f8cff;cursor:pointer}*{animation:none!important;transition:none!important}svg [style*="opacity:0"],svg [style*="opacity: 0"]{opacity:1!important}svg [style*="stroke-dashoffset"]{stroke-dashoffset:0!important}';
 
 /** Exact copy of an existing website page (stored as raw HTML) rendered for the public preview or for in-place editing. */
+const WIDE_CSS = '<style id="f2b-wide">@media(min-width:1024px){.container-x{max-width:min(1640px,92vw)!important}main>section.isolate:first-of-type>.container-x{padding-top:6rem;padding-bottom:6rem}main>section.isolate:first-of-type h1{font-size:4.1rem!important;max-width:46rem!important}.f2b-photo-band{max-width:none!important;padding:0!important}.f2b-photo-band div{gap:6px!important}.f2b-photo-band img{aspect-ratio:16/10!important}}</style>';
 export function renderRaw(page: any, ctx: RenderCtx & { edit?: boolean }): string {
   const r = page.raw, seo = page.seo || {};
   const bySlugUrl = new Map<string, string>(ctx.pages.map((p) => [p.url, p.slug]));
@@ -81,5 +82,5 @@ export function renderRaw(page: any, ctx: RenderCtx & { edit?: boolean }): strin
   const title = seo.title || page.title || "";
   const desc = seo.description ? `<meta name="description" content="${esc(seo.description)}">` : "";
   const anchors = `document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[href^="#"]');if(a){var id=a.getAttribute('href').slice(1);var t=id&&document.getElementById(id);e.preventDefault();if(t)t.scrollIntoView({behavior:'smooth'})}})`;
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base href="${esc(r.origin)}/"><title>${esc(title)}</title>${desc}<meta name="robots" content="noindex">${r.head || ""}${ctx.edit ? `<style id="f2b-ed-style">${EDIT_CSS}</style>` : ""}</head><body>${body}${ctx.edit ? `<script id="f2b-ed-script">${EDIT_SCRIPT}</script>` : `${r.scripts || ""}<script>${anchors}</script>`}</body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base href="${esc(r.origin)}/"><title>${esc(title)}</title>${desc}<meta name="robots" content="noindex">${r.head || ""}${WIDE_CSS}${ctx.edit ? `<style id="f2b-ed-style">${EDIT_CSS}</style>` : ""}</head><body>${body}${ctx.edit ? `<script id="f2b-ed-script">${EDIT_SCRIPT}</script>` : `${r.scripts || ""}<script>${anchors}</script>`}</body></html>`;
 }

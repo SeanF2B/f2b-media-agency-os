@@ -8502,40 +8502,43 @@ html body .app-shell.app-shell button[role="tab"] > span:last-child:not(:first-c
 .assistant-agent-pick .field{margin:0;min-width:210px}.assistant-agent-pick .field>span{font-size:11px;color:#63727b}.assistant-agent-pick .team-select-trigger{min-height:40px}
 .assistant-agent-pick .staff-select-note{display:none}
 .crm-add-contact{font-size:12px;padding:0;margin-left:4px}.crm-new-contact{margin-top:10px}.crm-new-contact summary{cursor:pointer;font-weight:700}.crm-notes-popup{display:grid;gap:8px;max-height:50vh;overflow:auto}.crm-notes-popup p{margin:0;padding:8px 10px;background:color-mix(in srgb,var(--brand-primary) 6%,#fff);border-radius:8px}
-/* Live AI bot on task cards: agent picture with live eyes and mouth */
+/* Live AI bot on task cards: the agent's own picture, with its original eyes moving */
 .bot-live{--lx:0px;--ly:0px;position:relative;display:inline-flex;flex:none;width:34px;height:34px}
 .bot-body{position:relative;display:block;width:34px;height:34px}
 .bot-body .avatar{width:34px!important;height:34px!important;min-width:34px}
-.bot-eyes{position:absolute;left:0;right:0;top:36%;height:26%;display:block;pointer-events:none}
-.bot-eye{position:absolute;top:0;width:24%;aspect-ratio:1;border-radius:50%;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.18);overflow:hidden;animation:bot-blink 4.6s infinite}
-.bot-eye:nth-child(1){left:24%}.bot-eye:nth-child(2){right:24%}
-.bot-eye i{position:absolute;left:50%;top:50%;width:48%;height:48%;margin:-24% 0 0 -24%;border-radius:50%;background:#14161c;transform:translate(var(--lx),var(--ly));transition:transform .08s linear}
-.bot-mouth{position:absolute;left:50%;top:68%;width:30%;height:14%;margin-left:-15%;border-bottom:2px solid #14161c;border-radius:0 0 40px 40px;pointer-events:none}
-.bot-confident .bot-mouth{transform:rotate(-5deg) scaleX(1.1)}
-/* done: happy closed eyes, big smile, hop */
-.bot-happy .bot-body{animation:bot-hop 1.5s ease-in-out infinite}
-.bot-happy .bot-eye{background:transparent;box-shadow:none;height:0;aspect-ratio:auto;width:24%;top:35%;border-top:2.5px solid #14161c;border-radius:50% 50% 0 0;height:30%;border-left:0;border-right:0;animation:none}
-.bot-happy .bot-eye i{display:none}
-.bot-happy .bot-mouth{width:38%;height:20%;margin-left:-19%;background:#14161c;border:0;border-radius:0 0 40px 40px}
-/* in progress: pursed whistling mouth, eyes glance up and to the side, head bobs to the tune */
-.bot-whistle .bot-body{animation:bot-bob 1.2s ease-in-out infinite}
-.bot-whistle .bot-mouth{width:15%;height:15%;margin-left:-7.5%;border:2px solid #14161c;border-radius:50%;animation:bot-whistle 1.2s ease-in-out infinite}
-.bot-notes{position:absolute;top:-8px;right:-13px;font-size:12px;font-weight:700;color:var(--brand-primary,#42baff);pointer-events:none}
-.bot-notes b{position:absolute;opacity:0;animation:bot-note 2.4s ease-out infinite}.bot-notes b:nth-child(2){animation-delay:1.2s;left:6px}
-/* pending: panic, wide eyes with tiny darting pupils, shaking, gasping mouth, sweat */
-.bot-panic .bot-body{animation:bot-shake .14s linear infinite}
-.bot-panic .bot-eye{width:28%;animation:none}.bot-panic .bot-eye i{width:26%;height:26%;margin:-13% 0 0 -13%;animation:bot-dart .9s steps(1) infinite;transform:none;transition:none}
-.bot-panic .bot-mouth{width:22%;height:20%;margin-left:-11%;border:2px solid #14161c;border-radius:50%;animation:bot-gasp .4s ease-in-out infinite alternate}
-.bot-sweat{position:absolute;top:-2px;right:0;width:6px;height:9px;border-radius:50% 50% 50% 50%/60% 60% 40% 40%;background:#7fd4ff;animation:bot-drip 1s ease-in infinite}
-@keyframes bot-blink{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.12)}}
-@keyframes bot-hop{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
-@keyframes bot-bob{0%,100%{transform:rotate(-4deg) translateY(0)}50%{transform:rotate(4deg) translateY(-1px)}}
-@keyframes bot-whistle{0%,100%{transform:scale(.8)}50%{transform:scale(1.25)}}
-@keyframes bot-note{0%{opacity:0;transform:translate(0,6px)}20%{opacity:1}100%{opacity:0;transform:translate(8px,-14px) rotate(14deg)}}
-@keyframes bot-shake{0%{transform:translate(-1.5px,0)}50%{transform:translate(1.5px,.5px)}100%{transform:translate(-1.5px,0)}}
-@keyframes bot-dart{0%{transform:translate(-35%,-20%)}25%{transform:translate(35%,15%)}50%{transform:translate(-20%,30%)}75%{transform:translate(30%,-30%)}100%{transform:translate(-35%,-20%)}}
-@keyframes bot-gasp{from{transform:scale(.8)}to{transform:scale(1.25)}}
-@keyframes bot-drip{0%{transform:translateY(-3px);opacity:0}30%{opacity:1}100%{transform:translateY(10px);opacity:0}}
+.bot-patch{position:absolute;transform:translate(-50%,-50%);border-radius:50%;pointer-events:none}
+.bot-pupil{position:absolute;transform:translate(calc(-50% + var(--lx)),calc(-50% + var(--ly)));border-radius:50%;background:#101319;pointer-events:none;transition:transform .08s linear;animation:bot-blink 4.6s infinite}
+.bot-mouth{position:absolute;width:20%;height:9%;transform:translateX(-50%);border-bottom:2px solid rgba(16,19,25,.9);border-radius:0 0 50px 50px;pointer-events:none}
+.bot-live:not(.bot-ready) .bot-mouth{display:none}
+/* To do: eager, bouncing with anticipation, wide eyes, big grin */
+.bot-eager .bot-body{animation:bot-eager 1.6s ease-in-out infinite}
+.bot-eager .bot-pupil{transform:translate(calc(-50% + var(--lx)),calc(-50% + var(--ly))) scale(1.15)}
+.bot-eager .bot-mouth{width:26%;height:14%;background:rgba(16,19,25,.9);border:0;border-radius:0 0 60px 60px}
+/* In progress: active, running on the spot, speed lines, panting mouth */
+.bot-run .bot-body{animation:bot-run .38s ease-in-out infinite;transform-origin:50% 90%}
+.bot-run .bot-mouth{width:12%;height:12%;border:2px solid rgba(16,19,25,.9);border-radius:50%;animation:bot-pant .38s ease-in-out infinite}
+.bot-speed{position:absolute;left:-7px;top:8px;width:9px;height:18px;pointer-events:none}
+.bot-speed b{position:absolute;right:0;height:2px;border-radius:2px;background:var(--brand-primary,#42baff);opacity:0;animation:bot-streak .5s linear infinite}
+.bot-speed b:nth-child(1){top:0;width:8px}.bot-speed b:nth-child(2){top:7px;width:6px;animation-delay:.15s}.bot-speed b:nth-child(3){top:14px;width:8px;animation-delay:.3s}
+/* Pending: bored, droopy half-lidded eyes that roll up, flat mouth, slow head droop */
+.bot-bored .bot-body{animation:bot-droop 5s ease-in-out infinite;transform-origin:50% 90%}
+.bot-bored .bot-pupil{animation:bot-roll 6s ease-in-out infinite;transform:translate(-50%,-30%) scaleY(.45)}
+.bot-bored .bot-patch{filter:brightness(.97)}
+.bot-bored .bot-mouth{width:18%;height:0;border-bottom:2px solid rgba(16,19,25,.85);border-radius:0;transform:translateX(-50%) rotate(2deg)}
+.bot-bubble{position:absolute;top:-7px;right:-4px;font-size:13px;font-weight:700;color:var(--brand-primary,#42baff);letter-spacing:1px;animation:bot-sigh 3.4s ease-in-out infinite;pointer-events:none}
+/* Done: relaxed, slow breathing sway, content closed eyes, soft smile */
+.bot-relax .bot-body{animation:bot-relax 4s ease-in-out infinite}
+.bot-relax .bot-pupil{animation:none;transform:translate(-50%,-10%) scaleY(.3)}
+.bot-relax .bot-mouth{width:20%;height:9%}
+@keyframes bot-blink{0%,92%,100%{scale:1 1}95%{scale:1 .12}}
+@keyframes bot-eager{0%,55%,100%{transform:translateY(0) scale(1)}62%{transform:translateY(-4px) scale(1.04)}70%{transform:translateY(0) scale(.97)}78%{transform:translateY(-2px)}86%{transform:translateY(0)}}
+@keyframes bot-run{0%,100%{transform:translateY(0) rotate(5deg)}50%{transform:translateY(-3px) rotate(-1deg)}}
+@keyframes bot-pant{0%,100%{transform:translateX(-50%) scale(.8)}50%{transform:translateX(-50%) scale(1.25)}}
+@keyframes bot-streak{0%{opacity:0;transform:translateX(5px)}30%{opacity:.9}100%{opacity:0;transform:translateX(-6px)}}
+@keyframes bot-droop{0%,100%{transform:rotate(0) translateY(0)}35%,65%{transform:rotate(-8deg) translateY(2px)}}
+@keyframes bot-roll{0%,40%,100%{translate:0 0}50%{translate:.9px -1.2px}60%{translate:-.9px -1.2px}70%{translate:0 0}}
+@keyframes bot-sigh{0%,100%{opacity:0;transform:translateY(2px)}40%,70%{opacity:1;transform:translateY(-2px)}}
+@keyframes bot-relax{0%,100%{transform:translateY(0) rotate(-2deg) scale(1)}50%{transform:translateY(1px) rotate(2deg) scale(1.04)}}
 @media (prefers-reduced-motion:reduce){.bot-live,.bot-live *{animation:none!important}}
 .pipeline-card-drag-preview .bot-live{animation:bot-spin .9s ease-in-out infinite!important}
 @keyframes bot-spin{0%{transform:rotate(0)}60%,100%{transform:rotate(360deg)}}
