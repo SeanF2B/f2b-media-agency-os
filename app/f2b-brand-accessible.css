@@ -7988,3 +7988,7 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
 
 .app-shell .crm-value-field .crm-opportunity-value-input, .app-shell .crm-value-field .crm-opportunity-value-input:focus, .app-shell .crm-value-field .crm-opportunity-value-input:focus-visible { outline: none !important; box-shadow: none !important; border: 0 !important; background: transparent !important; }
 .crm-value-field .crm-opportunity-value-input::-webkit-outer-spin-button, .crm-value-field .crm-opportunity-value-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+.currency-setting { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 16px; margin: 0 0 16px; }
+.currency-setting p { margin: 3px 0 0; font-size: 11px; opacity: .7; max-width: 560px; }
+.currency-setting select { min-width: 200px; }
