@@ -57,10 +57,11 @@ export function CrmView({ onOpenClient }: { onOpenClient: (clientId: string) => 
     if (!response.ok) throw new Error(result.error || "CRM could not be loaded.");
     setData(result); setPipelineId((current) => result.pipelines.some((item) => item.id === current) ? current : result.pipelines[0]?.id || "");
   }, [search]);
+  const syncedRef = useRef(false);
   useEffect(() => {
     let current = true;
     const params = new URLSearchParams(); if (search.trim()) params.set("search", search.trim());
-    void fetch(`/api/crm?${params}`, { cache: "no-store" }).then(async (response) => {
+    void (async () => { if (!syncedRef.current) { syncedRef.current = true; try { await fetch("/api/crm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "syncClients" }) }); } catch { /* sync is best-effort */ } } })().then(() => fetch(`/api/crm?${params}`, { cache: "no-store" })).then(async (response) => {
       const result = await response.json() as Payload & { error?: string };
       if (!response.ok) throw new Error(result.error || "CRM could not be loaded.");
       if (current) { setData(result); setPipelineId((selected) => result.pipelines.some((item) => item.id === selected) ? selected : result.pipelines[0]?.id || ""); }
@@ -354,7 +355,7 @@ export function CrmView({ onOpenClient }: { onOpenClient: (clientId: string) => 
       <dl className="crm-card-facts">
         <div><dt>Source:</dt><dd title={sourceLabel(item.source)}>{sourceLabel(item.source)}</dd></div>
         {(() => { const person = contact && contact !== "No contact linked" ? contact : ""; const shown = person || companyName; return shown ? <div><dt>{person ? "Contact:" : "Company:"}</dt><dd title={shown}>{shown}</dd></div> : null; })()}
-        <div className="crm-opportunity-value"><dt>Value:</dt><dd>{valueEditId === item.id ? <input className="crm-opportunity-value-input" type="number" inputMode="decimal" min="0" step="0.01" autoFocus aria-label={`Value for ${item.title}`} value={valueDraft} onChange={(event) => setValueDraft(event.target.value)} onBlur={() => void saveOpportunityValue(item)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur(); } else if (event.key === "Escape") { event.preventDefault(); setValueEditId(""); } }} /> : <button type="button" className="crm-opportunity-value-button" title="Click to edit the value" aria-label={`Edit value for ${item.title}, currently ${money(item.value, item.currency)}`} onClick={() => { setValueEditId(item.id); setValueDraft(item.value ? String(item.value) : ""); }}><strong>{money(item.value, item.currency)}</strong>{!item.value && <small>Add value</small>}</button>}</dd></div>
+        <div className="crm-opportunity-value"><dt>Value:</dt><dd className="crm-value-field"><span aria-hidden="true">€</span><input className="crm-opportunity-value-input" type="number" inputMode="decimal" min="0" step="0.01" placeholder="Add value" aria-label={`Value for ${item.title}`} value={valueEditId === item.id ? valueDraft : (item.value ? String(item.value) : "")} onFocus={() => { setValueEditId(item.id); setValueDraft(item.value ? String(item.value) : ""); }} onChange={(event) => setValueDraft(event.target.value)} onBlur={() => void saveOpportunityValue(item)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur(); } else if (event.key === "Escape") { event.preventDefault(); setValueEditId(""); event.currentTarget.blur(); } }} /></dd></div>
         {item.expected_close_date && <div><dt>Target:</dt><dd>{item.expected_close_date.slice(0, 10)}</dd></div>}
         <div className="crm-card-stage-row"><dt>Stage:</dt><dd><select className="crm-card-stage-select" aria-label={`Move ${item.title} to stage`} value={item.stage_id} onChange={(event) => void moveOpportunity(item.id, event.target.value)}>{pipeline!.stages.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}</select></dd></div>
       </dl>

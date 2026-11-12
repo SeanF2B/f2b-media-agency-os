@@ -7963,3 +7963,8 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
 .app-shell .crm-kanban > .crm-stage, .app-shell .pipeline-board > .pipeline-column { border: 1px solid color-mix(in srgb, var(--stage-color, #94a3b8) 45%, transparent) !important; background: linear-gradient(180deg, color-mix(in srgb, var(--stage-color, #94a3b8) 20%, var(--stage-base)) 0, var(--stage-base) 130px) !important; box-shadow: 0 -1px 0 color-mix(in srgb, var(--stage-color, #94a3b8) 55%, transparent) inset !important; }
 .app-shell .crm-stage > header.crm-stage-header, .app-shell .pipeline-column > .pipeline-column-head { background: transparent !important; }
 .app-shell .crm-stage > header.crm-stage-header::after, .app-shell .pipeline-column > .pipeline-column-head::after { height: 2px; opacity: .5; }
+
+.crm-value-field { display: flex; align-items: center; gap: 4px; border: 1px solid color-mix(in srgb, var(--stage-color, #94a3b8) 55%, transparent); border-radius: 7px; padding: 2px 8px; background: rgba(127,127,127,.08); }
+.crm-value-field:focus-within { border-color: var(--stage-color, #3b82f6); box-shadow: 0 0 0 2px color-mix(in srgb, var(--stage-color, #3b82f6) 30%, transparent); }
+.crm-value-field .crm-opportunity-value-input { flex: 1; min-width: 0; width: 100%; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 800; outline: none; padding: 2px 0; -moz-appearance: textfield; }
+.crm-value-field .crm-opportunity-value-input::placeholder { font-weight: 500; opacity: .5; }

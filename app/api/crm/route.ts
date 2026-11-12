@@ -87,6 +87,39 @@ export async function POST(request: Request) {
   let body: Record<string, unknown>; try { body = await request.json() as Record<string, unknown>; } catch { return reply("Send valid CRM details."); }
   const action = clean(body.action, 40), now = new Date().toISOString();
   try {
+    if (action === "syncClients") {
+      await db.prepare("CREATE TABLE IF NOT EXISTS crm_client_sync_done (owner_id TEXT NOT NULL, client_id TEXT NOT NULL, PRIMARY KEY (owner_id, client_id))").run();
+      await ensurePipeline(db, ownerId);
+      const pipeline = await db.prepare("SELECT id FROM crm_pipelines WHERE owner_id=?1 AND archived=0 ORDER BY created_at LIMIT 1").bind(ownerId).first<{ id: string }>();
+      if (!pipeline) return Response.json({ ok: true, created: 0 });
+      const stageRows = await db.prepare("SELECT id, category FROM crm_pipeline_stages WHERE owner_id=?1 AND pipeline_id=?2 AND category IN ('won','lost')").bind(ownerId, pipeline.id).all<{ id: string; category: string }>();
+      const wonStage = (stageRows.results || []).find((row) => row.category === "won")?.id, lostStage = (stageRows.results || []).find((row) => row.category === "lost")?.id;
+      const doneRows = await db.prepare("SELECT client_id FROM crm_client_sync_done WHERE owner_id=?1").bind(ownerId).all<{ client_id: string }>();
+      const done = new Set((doneRows.results || []).map((row) => row.client_id));
+      let created = 0;
+      for (const client of (access.workspace.clients || []) as Array<Record<string, unknown>>) {
+        const clientId = String(client.id || ""); if (!clientId || done.has(clientId)) continue;
+        const status = String(client.status || "Active");
+        const stageId = /lost|churn|cancel|inactive|ended|former|archiv/i.test(status) ? lostStage : wonStage;
+        const name = clean(client.name, 200) || clean(client.company, 200) || "Client";
+        const email = clean(client.email, 254).toLowerCase(), phone = clean(client.phone, 40), company = clean(client.company, 200) || name;
+        const person = clean(client.contact, 200) || name; const parts = person.split(/\s+/);
+        let contact = await db.prepare("SELECT id FROM crm_contacts WHERE owner_id=?1 AND (client_id=?2 OR (?3<>'' AND email=?3)) LIMIT 1").bind(ownerId, clientId, email).first<{ id: string }>();
+        if (!contact) {
+          const id = crypto.randomUUID();
+          await db.prepare("INSERT INTO crm_contacts (id, owner_id, client_id, first_name, last_name, email, phone, company, source, notes, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,'client','',?9,?9)").bind(id, ownerId, clientId, parts[0] || "", parts.slice(1).join(" "), email, phone, company, now).run();
+          contact = { id };
+        }
+        const existing = await db.prepare("SELECT id FROM crm_opportunities WHERE owner_id=?1 AND client_id=?2 LIMIT 1").bind(ownerId, clientId).first();
+        if (!existing && stageId) {
+          const fee = Array.isArray(client.services) ? (client.services as Array<{ fee?: number }>).reduce((sum, service) => sum + (Number(service.fee) || 0), 0) : 0;
+          await db.prepare("INSERT INTO crm_opportunities (id, owner_id, pipeline_id, stage_id, contact_id, client_id, title, value, currency, source, notes, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,'EUR','client','',?9,?9)").bind(crypto.randomUUID(), ownerId, pipeline.id, stageId, contact.id, clientId, name, Math.max(0, fee), now).run();
+          created += 1;
+        }
+        await db.prepare("INSERT OR IGNORE INTO crm_client_sync_done (owner_id, client_id) VALUES (?1,?2)").bind(ownerId, clientId).run();
+      }
+      return Response.json({ ok: true, created });
+    }
     if (action === "saveContact") {
       const id = clean(body.id, 80) || crypto.randomUUID(), email = clean(body.email, 254).toLowerCase();
       const firstName = clean(body.firstName, 100), lastName = clean(body.lastName, 100);
