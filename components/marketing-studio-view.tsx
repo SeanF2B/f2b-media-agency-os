@@ -278,7 +278,7 @@ function MarketingWorkflowCanvas({ nodes, edges, onSelect, onMove, onConnect }: 
   </div>;
 }
 
-export function MarketingStudioView({ kind, clients, staff = [], active }: { kind: Kind; clients: Client[]; staff?: Staff[]; active: boolean }) {
+export function MarketingStudioView({ kind, clients, staff = [], active, scopeClientId = "" }: { kind: Kind; clients: Client[]; staff?: Staff[]; active: boolean; scopeClientId?: string }) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [hasMoreAssets, setHasMoreAssets] = useState(false);
   const [nextAssetOffset, setNextAssetOffset] = useState<number | null>(null);
@@ -291,7 +291,8 @@ export function MarketingStudioView({ kind, clients, staff = [], active }: { kin
   const [automationView, setAutomationView] = useState<"list" | "editor">("list");
   const [automationEditorTab, setAutomationEditorTab] = useState<"builder" | "settings" | "history" | "logs">("builder");
   const [automationStatusFilter, setAutomationStatusFilter] = useState("all");
-  const [automationClientFilter, setAutomationClientFilter] = useState("");
+  const [automationClientFilter, setAutomationClientFilter] = useState(scopeClientId);
+  useEffect(() => { setAutomationClientFilter(scopeClientId); }, [scopeClientId]);
   const [automationSearch, setAutomationSearch] = useState("");
   const [showFolderCreate, setShowFolderCreate] = useState(false);
   const [automationActionSearch, setAutomationActionSearch] = useState("");
