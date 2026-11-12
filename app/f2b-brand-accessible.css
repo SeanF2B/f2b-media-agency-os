@@ -8091,3 +8091,14 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
 .done-upload-drop:hover { border-color: #3b82f6; background: rgba(59,130,246,.1); }
 .done-upload-drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .done-upload-count { color: #22c55e; font-weight: 700; font-size: 12px; }
+
+.client-scope { position: relative; }
+.client-scope-trigger { width: 100%; display: flex; align-items: center; gap: 9px; padding: 7px 10px; font: inherit; font-size: 12px; font-weight: 700; border-radius: 10px; border: 1px solid rgba(127,127,127,.4); background: rgba(127,127,127,.12); color: inherit; cursor: pointer; text-align: left; transition: border-color .15s ease, background .15s ease; }
+.client-scope-trigger:hover, .client-scope-trigger[aria-expanded="true"] { border-color: #3b82f6; background: rgba(59,130,246,.12); }
+.client-scope-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.client-scope-caret { opacity: .6; transition: transform .2s ease; } .client-scope-trigger[aria-expanded="true"] .client-scope-caret { transform: rotate(180deg); }
+.client-scope-menu { position: absolute; left: 14px; right: 14px; top: calc(100% - 6px); z-index: 80; margin: 0; padding: 6px; list-style: none; max-height: 340px; overflow-y: auto; border-radius: 12px; border: 1px solid rgba(127,127,127,.4); background: var(--stage-base, #29282b); box-shadow: 0 16px 36px rgba(0,0,0,.45); animation: lp-rise .18s ease both; }
+.client-scope-menu button { width: 100%; display: flex; align-items: center; gap: 9px; padding: 7px 8px; border: 0; border-radius: 8px; background: transparent; color: inherit; font: inherit; font-size: 12px; font-weight: 600; text-align: left; cursor: pointer; transition: background .12s ease; }
+.client-scope-menu button:hover { background: rgba(59,130,246,.18); }
+.client-scope-menu button.active { background: rgba(59,130,246,.26); font-weight: 800; }
+.client-scope .client-dot { flex: none; }

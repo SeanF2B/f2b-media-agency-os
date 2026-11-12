@@ -218,6 +218,28 @@ function selectedFormIds(form: Record<string, string>, key: string): string[] { 
 function parseObjectForm(value: string | undefined): Record<string, unknown> | null { try { const parsed = JSON.parse(value || ""); return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null; } catch { return null; } }
 function permissionsFromForm(form: Record<string, string>, role: string): TeamPermissions { const defaults = getTeamPermissions(role); const permissions = Object.fromEntries(permissionKeys.map((key) => [key, form[`permission_${key}`] === undefined ? defaults[key] : form[`permission_${key}`] === "true"])) as TeamPermissions; if (role !== "Owner") permissions.overview = false; if (!permissions.aiTasks) { permissions.aiApprovals = false; permissions.aiCompletedTasks = false; } return permissions; }
 const emptyWorkspace = (): Workspace => ({ ownerId: "", settings: { adminEmail: "sean@f2bmedia.com", currency: "EUR", weekStarts: "Monday" }, staff: botTeammates, clients: [], projects: [], tasks: [], entries: [], financeRecords: [], financeRecurring: [], notes: [], files: [], vault: null, vaultEntries: [], hiddenAiAgentIds: [], reportTemplates: [], leadProfiles: [], leadLists: [], activity: [], activeTimer: null });
+function ClientScopePicker({ value, clients, onChange }: { value: string; clients: Client[]; onChange: (id: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: MouseEvent | KeyboardEvent) => { if (event instanceof KeyboardEvent ? event.key === "Escape" : !rootRef.current?.contains(event.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", close); document.addEventListener("keydown", close);
+    return () => { document.removeEventListener("mousedown", close); document.removeEventListener("keydown", close); };
+  }, [open]);
+  const current = clients.find((item) => item.id === value);
+  const badge = (client?: Client) => client ? <span className={`client-dot ${client.logo ? "has-logo" : ""}`} style={{ background: client.color }}>{client.logo ? <img src={client.logo} alt="" /> : initials(client.name).slice(0, 1)}</span> : <span className="client-dot" style={{ background: "#24473e" }}>F</span>;
+  const pick = (id: string) => { onChange(id); setOpen(false); };
+  return <div className="client-scope" ref={rootRef}>
+    <label id="client-scope-label">Viewing</label>
+    <button type="button" className="client-scope-trigger" aria-haspopup="listbox" aria-expanded={open} aria-labelledby="client-scope-label" onClick={() => setOpen((state) => !state)}>{badge(current)}<span className="client-scope-name">{current ? current.name : "Agency"}</span><span className="client-scope-caret" aria-hidden="true">▾</span></button>
+    {open && <ul className="client-scope-menu" role="listbox" aria-labelledby="client-scope-label">
+      <li><button type="button" role="option" aria-selected={!value} className={!value ? "active" : ""} onClick={() => pick("")}>{badge()}<span>Agency</span></button></li>
+      {clients.map((client) => <li key={client.id}><button type="button" role="option" aria-selected={value === client.id} className={value === client.id ? "active" : ""} onClick={() => pick(client.id)}>{badge(client)}<span>{client.name}</span></button></li>)}
+    </ul>}
+  </div>;
+}
+
 function scopeWorkspaceToClient(workspace: Workspace, clientId: string): Workspace {
   if (!clientId) return workspace;
   const taskIds = new Set(workspace.tasks.filter((task) => task.clientId === clientId).map((task) => task.id));
@@ -2008,7 +2030,7 @@ ${senderName}`, limitClientAccess: String(Array.isArray(member.clientAccessIds))
   return <div className={`app-shell ${darkMode ? "dark-mode" : ""}`}>
     <aside className="sidebar">
       <div className="sidebar-brand"><BrandLogo className="sidebar-logo" /></div>
-      {viewWorkspace.clients.length > 0 || activeScopeId ? <div className="client-scope"><label htmlFor="client-scope-select">Viewing</label><select id="client-scope-select" className="client-scope-select" value={activeScopeId} onChange={(event) => setClientScope(event.target.value)}><option value="">Agency — F2B Media</option>{workspace.clients.filter((item) => (previewMember ? baseViewWorkspace.clients.some((allowed) => allowed.id === item.id) : true)).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>{activeScopeId && <small>Showing only {workspace.clients.find((item) => item.id === activeScopeId)?.name}</small>}</div> : null}
+      {viewWorkspace.clients.length > 0 || activeScopeId ? <ClientScopePicker value={activeScopeId} clients={workspace.clients.filter((item) => (previewMember ? baseViewWorkspace.clients.some((allowed) => allowed.id === item.id) : true))} onChange={setClientScope} /> : null}
       <div className="nav-label">WORKSPACE</div>
       <nav aria-label="Workspace">{nav.filter((item) => item.key === "Settings" || item.key === "Integrations" ? false : item.key === "Lead Factory" && activeScopeId ? false : item.key === "Marketing" ? availableMarketingPages.length > 0 : canOpenPage(item.key, viewAccess, viewIsAdmin, viewHasClientScope)).map((item) => <button key={item.key} className={`nav-item ${page === item.key || (item.key === "Marketing" && marketingPageActive) ? "active" : ""}`} aria-current={page === item.key || (item.key === "Marketing" && marketingPageActive) ? "page" : undefined} onClick={() => { if (item.key === "Marketing") { const next = availableMarketingPages.some((entry) => entry.key === marketingTab) ? marketingTab : availableMarketingPages[0]?.key; if (next) { setMarketingTab(next); setPage(next); } } else setPage(item.key); setSelectedClient(""); }}><span className="nav-icon">{item.key === "AI Assistant" ? <AiEyesIcon /> : item.key === "Lead Factory" ? <img className="nav-image-icon" src="/lead-factory-icon.png" alt="" /> : item.icon}</span>{item.key === "Integrations" ? "Launchpad" : item.key === "CRM" ? "Pipeline" : item.key}{item.key === "Tasks" && viewWorkspace.tasks.filter((t) => t.status !== "Done" && !t.aiDismissedAt).length > 0 && <span className="nav-count">{viewWorkspace.tasks.filter((t) => t.status !== "Done" && !t.aiDismissedAt).length}</span>}</button>)}</nav>
       <div className="nav-label clients-label">CLIENTS <span className="client-nav-actions">{(viewAccess.clients || viewHasClientScope) && <button onClick={() => { setPage("Clients"); setSelectedClient(""); }}>View all</button>}{viewIsAdmin && <button onClick={() => openModal("client")}>＋</button>}</span></div>
