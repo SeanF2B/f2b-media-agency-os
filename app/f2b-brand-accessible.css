@@ -8102,3 +8102,11 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
 .client-scope-menu button:hover { background: rgba(59,130,246,.18); }
 .client-scope-menu button.active { background: rgba(59,130,246,.26); font-weight: 800; }
 .client-scope .client-dot { flex: none; }
+
+/* Client selector: tidy, aligned, no overflow */
+.app-shell .sidebar .client-scope { box-sizing: border-box; width: 100%; padding: 6px 12px 12px !important; margin: 0; }
+.app-shell .sidebar .client-scope > label { display: block; margin: 0 0 6px 2px; font-size: 9px !important; line-height: 1; letter-spacing: .12em; font-weight: 800; text-transform: uppercase; opacity: .55; }
+.app-shell .sidebar .client-scope-trigger { box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; padding: 7px 10px; }
+.app-shell .sidebar .client-scope-name { font-size: 12.5px; }
+.app-shell .sidebar .client-scope-menu { left: 12px; right: 12px; box-sizing: border-box; }
+.app-shell .sidebar .client-scope .client-dot { width: 22px; height: 22px; flex: none; }

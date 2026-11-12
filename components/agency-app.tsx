@@ -1174,7 +1174,7 @@ export function AgencyApp() {
   const recentActivityPreview = (viewWorkspace.activity || []).slice().sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime()).slice(0, 4);
   const viewCounts = useMemo(() => {
     if (!previewMember && !activeScopeId) return counts;
-    const activeTasks = viewWorkspace.tasks.filter((task) => task.status !== "Done").length;
+    const activeTasks = viewWorkspace.tasks.filter((task) => task.status !== "Done" && !task.aiDismissedAt).length;
     const tracked = viewWorkspace.entries.reduce((sum, entry) => sum + entry.seconds, 0) + (viewWorkspace.activeTimer ? Math.floor((timerNow - new Date(viewWorkspace.activeTimer.startedAt).getTime()) / 1000) : 0);
     const finance = currentMonthFinanceSummary(viewWorkspace);
     return { activeTasks, tracked, retainer: finance.retainer, labor: finance.labor, expenses: finance.businessExpenses, profit: finance.profit, teamMembers: viewWorkspace.staff.filter((member) => !member.isBot).length };
