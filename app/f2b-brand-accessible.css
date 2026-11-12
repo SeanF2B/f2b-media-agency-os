@@ -8144,3 +8144,18 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
 .app-shell { --os-blue: #3b82f6; }
 .app-shell .primary, .app-shell button.primary, .app-shell .btn-primary { background: #3b82f6 !important; border-color: #3b82f6 !important; color: #fff !important; }
 .app-shell :focus-visible { outline-color: rgba(59,130,246,.6); }
+
+/* Count badges: always a white circle with a dark blue, clearly readable number */
+html body .app-shell.app-shell .ai-task-tabs button span,
+html body .app-shell.app-shell .ai-task-tabs button.selected span,
+html body .app-shell.app-shell .ai-task-tabs button.ai-approval-tab span,
+html body .app-shell.app-shell .ai-task-tabs button.ai-approval-tab.has-pending span,
+html body .app-shell.dark-mode.app-shell .ai-task-tabs button span,
+html body .app-shell.dark-mode.app-shell .ai-task-tabs button.selected span,
+html body .app-shell.dark-mode.app-shell .ai-task-tabs button.ai-approval-tab.has-pending span,
+html body .app-shell.app-shell .workflow-review-tabs > button[role="tab"] > span,
+html body .app-shell.app-shell button[role="tab"] > span:last-child:not(:first-child) {
+  background: #fff !important; color: #1e3a8a !important; -webkit-text-fill-color: #1e3a8a !important;
+  font-size: 12px !important; font-weight: 800 !important; opacity: 1 !important; text-shadow: none !important;
+  display: inline-grid !important; place-items: center; min-width: 24px; height: 24px; padding: 0 6px; border-radius: 999px;
+}
