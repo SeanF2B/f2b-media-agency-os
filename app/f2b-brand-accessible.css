@@ -3897,3 +3897,14 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
 .app-shell .ai-completed-screenshot-empty span { font-size:22px; }
 .app-shell .ai-completed-screenshot-empty small { font-size:12px; }
 
+
+/* Settings pinned to the bottom of the sidebar, with Launchpad as a Settings sub-tab */
+.sidebar-bottom { display: flex; flex-direction: column; gap: 10px; margin-top: auto; }
+.sidebar-bottom .sidebar-settings-link { width: 100%; }
+.settings-subtabs { display: flex; gap: 8px; margin: 0 0 18px; padding: 4px; width: fit-content; max-width: 100%; border: 1px solid var(--line, #d9dee3); border-radius: 12px; background: var(--panel, #fff); }
+.settings-subtabs button { border: 0; background: transparent; color: inherit; font: inherit; font-weight: 700; padding: 8px 16px; border-radius: 9px; cursor: pointer; }
+.settings-subtabs button.active { background: #172b28; color: #fff; }
+.settings-subtabs button:focus-visible { outline: 2px solid #ee5a29; outline-offset: 2px; }
+.dark-mode .settings-subtabs { background: #1d2124; border-color: #34373b; }
+.dark-mode .settings-subtabs button.active { background: #ee5a29; color: #fff; }
+@media (max-width: 760px) { .sidebar-bottom { display: flex !important; margin-top: 6px; } .sidebar-bottom .profile-row { display: none; } .sidebar-bottom .sidebar-settings-link { width: auto; } }
