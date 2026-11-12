@@ -13,7 +13,18 @@ async function context() {
   const user = await getChatGPTUser();
   if (!user) return { response: reply("Sign in before opening the CRM.", 401) };
   if (!env.DB) return { response: reply("The private workspace database is unavailable.", 503) };
-  const row = await env.DB.prepare("SELECT data FROM workspace_documents WHERE id = 'f2b-agency'").first<{ data: string }>();
+  const row = await env.DB.prepare(`
+    SELECT json_object(
+      'ownerId', owner_id,
+      'clients', json(COALESCE((SELECT json_group_array(json(value)) FROM json_each(data, '$.clients')), '[]')),
+      'staff', json(COALESCE((SELECT json_group_array(json_object(
+        'id', json_extract(value, '$.id'), 'name', json_extract(value, '$.name'),
+        'avatar', CASE WHEN substr(COALESCE(json_extract(value, '$.avatar'), ''), 1, 11) = 'data:image/' THEN '' ELSE json_extract(value, '$.avatar') END,
+        'email', json_extract(value, '$.email'), 'role', json_extract(value, '$.role'), 'isBot', json_extract(value, '$.isBot')
+      )) FROM json_each(data, '$.staff')), '[]'))
+    ) AS data
+    FROM workspace_documents WHERE id = 'f2b-agency'
+  `).first<{ data: string }>();
   if (!row?.data) return { response: reply("The agency workspace could not be found.", 503) };
   let workspace: WorkspaceData;
   try { workspace = JSON.parse(row.data); } catch { return { response: reply("The agency workspace data could not be read.", 503) }; }

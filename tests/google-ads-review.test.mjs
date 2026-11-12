@@ -20,6 +20,18 @@ test("Google Ads landing pages are matched to the selected campaign and carry it
   assert.deepEqual(result.targets[0].adIds, ["ad-1"]);
 });
 
+test("Google Ads audit includes all five campaign landing pages without silently omitting the fifth", () => {
+  const services = Array.from({ length: 5 }, (_, index) => ({
+    name: "Google Ads",
+    campaignName: "Dublin Painters",
+    landingPageUrl: `https://example.com/page-${index + 1}`,
+  }));
+  const result = buildGoogleAdsLandingPageTargets(services, [], "campaign-1", "Dublin Painters", 5);
+
+  assert.equal(result.targets.length, 5);
+  assert.deepEqual(result.omittedUrls, []);
+});
+
 test("recommendation preflight requires readable headlines and every enabled ad destination", () => {
   const target = buildGoogleAdsLandingPageTargets([], [ad], "campaign-1", "Dublin Painters").targets;
   const ready = assessGoogleAdsReviewPrerequisite({ adsStatus: "connected", activeAds: [ad], pageTargets: target, landingPages: [{ url: ad.finalUrls[0], status: "connected" }] });

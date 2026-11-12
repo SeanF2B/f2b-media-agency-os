@@ -4,6 +4,9 @@ type AiTaskVisibilityRecord = {
   assigneeId?: string;
   status?: string;
   aiRunState?: string;
+  aiCompletedWithGaps?: boolean;
+  aiFeedback?: string;
+  aiStartNowRequestedAt?: string;
   aiCancelRequestedAt?: string;
   aiDismissedAt?: string;
   aiMode?: string;
@@ -17,10 +20,15 @@ export function isAiAssignedTask(task: AiTaskVisibilityRecord): boolean {
 }
 
 export function isCompletedAiTask(task: AiTaskVisibilityRecord): boolean {
+  const completedWithDisclosedGaps = task.aiCompletedWithGaps === true
+    || /\nStatus: Completed · some data unavailable(?:\n|$)/.test(task.aiFeedback || "");
   return isAiAssignedTask(task)
     && task.status === "Done"
     && task.aiRunState === "completed"
-    && (task.checklist || []).every((step) => step.done && String(step.evidence || "").trim())
+    // Read-only account reviews may finish with clearly reported data gaps.
+    // The runner marks those explicitly; they belong in History, not Pending.
+    // The report check keeps older completed audits visible after deployment.
+    && (completedWithDisclosedGaps || (task.checklist || []).every((step) => step.done && String(step.evidence || "").trim()))
     && (task.aiApprovals || []).every((item) => item.status === "rejected" || (item.status === "applied" && item.verification === "verified" && !/could not verify the final live state|not verified/i.test(item.resultDetail || "")));
 }
 
@@ -38,7 +46,7 @@ export function getAiTaskStage(task: AiTaskVisibilityRecord): AiTaskStage {
   if (task.aiDismissedAt) return "dismissed";
   if (task.aiRunState === "cancelled") return "cancelled";
   if (isCompletedAiTask(task)) return "completed";
-  if (task.aiRunState === "running" || (task.aiApprovals || []).some((item) => item.status === "applying")) return "doing";
+  if (task.aiRunState === "running" || task.aiStartNowRequestedAt || (task.aiApprovals || []).some((item) => item.status === "applying")) return "doing";
   const pendingApprovals = (task.aiApprovals || []).filter((item) => item.status === "pending");
   if (pendingApprovals.some((item) => isDecisionReady(item, task.checklist || []))) return "approvals";
   // A proposal without its linked evidence is still Connors' work to finish,

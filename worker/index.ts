@@ -31,6 +31,13 @@ const accessKeys = new Map<
   string,
   { expiresAt: number; promise: Promise<CryptoKey | null> }
 >();
+// Access JWTs are sent with every same-session API request. Cache only a
+// successfully verified token briefly per isolate so bursts of workspace
+// requests do not repeat an expensive RSA signature check each time.
+const verifiedAccessTokens = new Map<
+  string,
+  { expiresAt: number; identity: AccessIdentity }
+>();
 
 async function verifyAccessToken(
   token: string | null,
@@ -54,6 +61,14 @@ async function verifyAccessToken(
     if (typeof payload.exp !== "number" || payload.exp <= now) return null;
     if (typeof payload.nbf === "number" && payload.nbf > now) return null;
     if (!payload.email || typeof payload.email !== "string") return null;
+
+    const cacheKey = `${audience}\u0000${token}`;
+    const cachedIdentity = verifiedAccessTokens.get(cacheKey);
+    if (cachedIdentity && cachedIdentity.expiresAt > now) {
+      verifiedAccessTokens.delete(cacheKey);
+      verifiedAccessTokens.set(cacheKey, cachedIdentity);
+      return cachedIdentity.identity;
+    }
 
     let cachedKey = accessKeys.get(header.kid);
     if (!cachedKey || cachedKey.expiresAt <= now) {
@@ -91,7 +106,15 @@ async function verifyAccessToken(
       signedContent,
     );
     if (!valid) return null;
-    return { email: payload.email, name: payload.name };
+    const identity = { email: payload.email, name: payload.name };
+    verifiedAccessTokens.set(cacheKey, { expiresAt: Math.min(payload.exp, now + 120), identity });
+    if (verifiedAccessTokens.size > 256) {
+      for (const [key, entry] of verifiedAccessTokens) {
+        if (entry.expiresAt <= now || verifiedAccessTokens.size > 192) verifiedAccessTokens.delete(key);
+        if (verifiedAccessTokens.size <= 192) break;
+      }
+    }
+    return identity;
   } catch {
     return null;
   }

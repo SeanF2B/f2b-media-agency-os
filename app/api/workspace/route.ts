@@ -2,7 +2,6 @@ import { getChatGPTUser } from "../../chatgpt-auth";
 import { env } from "cloudflare:workers";
 import { enforceOwnerOnlyOverview, fullTeamPermissions, getMemberPermissions, type TeamPermissions } from "@/lib/access-permissions";
 import { canViewAiAssignedTask, isAiAssignedTask } from "@/lib/ai-task-access";
-import { withoutChessActivity } from "@/lib/chess-engine";
 import { applyPendingReason } from "@/lib/task-pending-reason";
 
 export const dynamic = "force-dynamic";
@@ -39,11 +38,31 @@ export async function GET() {
   const user = await getChatGPTUser();
   if (!user) return Response.json({ error: "Sign in with ChatGPT to open this private workspace." }, { status: 401 });
   try {
-    const data = await getWorkspace();
+    if (!env.DB) return Response.json({ error: "The private workspace database is not connected yet." }, { status: 503 });
+    // Keep the owner read path out of the Worker's CPU budget. The complete
+    // workspace is a large JSON document, so parsing it and then serializing
+    // it again on every refresh can exceed the Free plan's CPU limit. Return
+    // the saved JSON as-is; the browser handles presentation-only cleanup.
+    const workspaceRow = await env.DB.prepare(`
+      SELECT owner_id,
+        (owner_id = ?1 OR lower(json_extract(data, '$.settings.adminEmail')) = lower(?3)) AS is_admin,
+        data
+      FROM workspace_documents WHERE id = ?2
+    `).bind(user.userId, "f2b-agency", user.email).first<{ owner_id: string; is_admin: number; data: string }>();
+    // Cloudflare Access identifies the owner by email, while legacy workspace
+    // rows can retain the owner's original ChatGPT user ID. Treat the saved
+    // admin email as the canonical owner identity so the owner always uses the
+    // lightweight response path instead of parsing the 1.4 MB snapshot in the
+    // Worker on every workspace refresh.
+    if (workspaceRow && workspaceRow.is_admin) {
+      const responseBody = `{"data":${workspaceRow.data},"user":${JSON.stringify({ id: user.userId, email: user.email, name: user.displayName })},"canManage":true,"permissions":${JSON.stringify(fullTeamPermissions)},"aiModes":["Google Ads","SEO","Audit","Research","Setup","Sites"]}`;
+      return new Response(responseBody, { headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } });
+    }
+    const data = workspaceRow?.data ? JSON.parse(workspaceRow.data) : null;
     if (data?.error) return Response.json(data, { status: 503 });
     if (!canView(data, user)) return Response.json({ error: "Your account is not on the F2B team yet. Ask an administrator to add your email and invite you to the private Site." }, { status: 403 });
     if (data) {
-      const activity = withoutChessActivity(data.activity || []).map((item: any) => {
+      const activity = (data.activity || []).filter((item: any) => !String(item.title || "").startsWith("Chess ")).map((item: any) => {
         // Activity rows repeat the full base64 staff photo even though the
         // profile image is already present in `staff`. Avoid retaining or
         // sending that same image with every event; ActivityEntry resolves it
@@ -158,9 +177,50 @@ export async function PUT(request: Request) {
     // Chess is updated by its own API, while this endpoint saves the full
     // workspace snapshot. Preserve the latest chessGames value atomically so
     // a stale workspace snapshot cannot make an active match disappear.
+    const currentTasks = new Map<string, any>((current.tasks || []).map((task: any) => [String(task.id), task]));
+    const preserveFeedback = (incoming: any[] = [], saved: any[] = []) => {
+      const savedById = new Map(saved.map((item) => [String(item.id), item]));
+      return incoming.map((item) => {
+        const prior = savedById.get(String(item.id));
+        if (!prior || (!prior.ownerFeedback && !prior.ownerFeedbackChoices?.length)) return item;
+        const incomingAt = Date.parse(String(item.ownerFeedbackUpdatedAt || "")) || 0;
+        const savedAt = Date.parse(String(prior.ownerFeedbackUpdatedAt || "")) || 0;
+        return savedAt >= incomingAt
+          ? { ...item, ownerFeedback: prior.ownerFeedback, ownerFeedbackChoices: prior.ownerFeedbackChoices || [], ownerFeedbackUpdatedAt: prior.ownerFeedbackUpdatedAt }
+          : item;
+      });
+    };
+    const aiRuntimeFields = [
+      "aiRunState", "aiRunAttempt", "aiRunStartedAt", "aiRunAt", "aiProgressText", "aiProgressAt",
+      "aiStartNowRequestedAt", "aiCancelRequestedAt", "aiCancelRequestedBy", "aiCancelledAt", "aiCancelledBy",
+      "aiCompletedWithGaps", "completedAt", "pendingReason", "pendingReasonBy", "pendingReasonAt",
+      "aiFeedback", "aiCampaignNotes", "aiRecommendations", "aiLandingPageRecommendations", "aiApprovals",
+      "aiNotificationStatus", "aiNotificationAttempts", "aiNotificationNextAttemptAt", "aiNotificationDetail",
+      "attachments", "checklist",
+    ];
+    const latestSignalAt = (task: any) => Math.max(0, ...[
+      task?.aiProgressAt, task?.aiRunAt, task?.aiRunStartedAt, task?.aiStartNowRequestedAt,
+      task?.aiCancelRequestedAt, task?.aiCancelledAt, task?.completedAt,
+    ].map((value) => Date.parse(String(value || ""))).filter(Number.isFinite));
+    const mergeServerActivity = (incoming: any[] = [], baseline: any[] = [], latest: any[] = [], limit = Infinity) => {
+      const incomingIds = new Set(incoming.map((item) => String(item?.id || "")));
+      const baselineIds = new Set(baseline.map((item) => String(item?.id || "")));
+      const concurrent = latest.filter((item) => {
+        const id = String(item?.id || "");
+        return id && !incomingIds.has(id) && !baselineIds.has(id);
+      });
+      return [...concurrent, ...incoming].slice(0, limit);
+    };
     const savedWorkspace = {
       ...next,
-      tasks,
+      tasks: tasks.map((task: any) => {
+        const prior = currentTasks.get(String(task.id));
+        return prior ? {
+          ...task,
+          aiRecommendations: preserveFeedback(task.aiRecommendations || [], prior.aiRecommendations || []),
+          aiLandingPageRecommendations: preserveFeedback(task.aiLandingPageRecommendations || [], prior.aiLandingPageRecommendations || []),
+        } : task;
+      }),
       staff: enforceOwnerOnlyOverview(
         next.staff as Array<{ id?: string; permissions?: Partial<TeamPermissions> | null }>,
         current.ownerId,
@@ -168,9 +228,59 @@ export async function PUT(request: Request) {
       ),
       marketingSetupWorkflows: current.marketingSetupWorkflows || [],
     };
-    await env.DB!.prepare("UPDATE workspace_documents SET data = json_set(?1, '$.chessGames', json(COALESCE(json_extract(data, '$.chessGames'), '[]'))), updated_at = ?2 WHERE id = ?3")
-      .bind(JSON.stringify(savedWorkspace), `workspace-${crypto.randomUUID()}`, "f2b-agency").run();
-    return Response.json({ ok: true, updatedAt: new Date().toISOString() });
+    // A full workspace save can race with the focused feedback endpoint. Use
+    // the version read above and retry against the newest snapshot, carrying
+    // forward any newer recommendation feedback instead of silently erasing it.
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const latest = await env.DB!.prepare("SELECT data, updated_at FROM workspace_documents WHERE id = ?1")
+        .bind("f2b-agency").first<{ data: string; updated_at: string }>();
+      if (!latest?.data) return Response.json({ error: "The workspace could not be found." }, { status: 503 });
+      const latestData = JSON.parse(latest.data);
+      const baselineTasks = new Map<string, any>((current.tasks || []).map((task: any) => [String(task.id), task]));
+      const latestTasks = new Map<string, any>((latestData.tasks || []).map((task: any) => [String(task.id), task]));
+      const incomingTaskIds = new Set(savedWorkspace.tasks.map((task: any) => String(task.id)));
+      const mergedTasks = savedWorkspace.tasks.map((task: any) => {
+        const prior = latestTasks.get(String(task.id));
+        if (!prior) return task;
+        const baseline = baselineTasks.get(String(task.id));
+        const runtimeIsNewer = latestSignalAt(prior) >= latestSignalAt(task)
+          && Number(prior.aiRunAttempt || 0) >= Number(task.aiRunAttempt || 0);
+        const merged = {
+          ...task,
+          aiRecommendations: preserveFeedback(task.aiRecommendations || [], prior.aiRecommendations || []),
+          aiLandingPageRecommendations: preserveFeedback(task.aiLandingPageRecommendations || [], prior.aiLandingPageRecommendations || []),
+        };
+        // The browser can keep an older workspace snapshot open while Connors
+        // writes progress or a completed report. Never let that stale snapshot
+        // roll back the AI run, its evidence, or its completion state.
+        if (baseline && runtimeIsNewer) {
+          for (const field of aiRuntimeFields) {
+            if (Object.prototype.hasOwnProperty.call(prior, field)) merged[field] = prior[field];
+            else delete merged[field];
+          }
+          if (prior.aiRunState || prior.aiRunAttempt) merged.status = prior.status;
+        }
+        return merged;
+      });
+      // Preserve tasks and run records created by a server process after this
+      // browser snapshot was loaded (for example, the next recurring task).
+      for (const task of latestData.tasks || []) {
+        const id = String(task?.id || "");
+        if (id && !baselineTasks.has(id) && !incomingTaskIds.has(id)) mergedTasks.unshift(task);
+      }
+      const mergedWorkspace = {
+        ...savedWorkspace,
+        tasks: mergedTasks,
+        notes: mergeServerActivity(savedWorkspace.notes || [], current.notes || [], latestData.notes || []),
+        entries: mergeServerActivity(savedWorkspace.entries || [], current.entries || [], latestData.entries || []),
+        activity: mergeServerActivity(savedWorkspace.activity || [], current.activity || [], latestData.activity || [], 100),
+      };
+      const version = `workspace-${crypto.randomUUID()}`;
+      const result = await env.DB!.prepare("UPDATE workspace_documents SET data = json_set(?1, '$.chessGames', json(COALESCE(json_extract(data, '$.chessGames'), '[]'))), updated_at = ?2 WHERE id = ?3 AND updated_at = ?4")
+        .bind(JSON.stringify(mergedWorkspace), version, "f2b-agency", latest.updated_at).run();
+      if (result.meta.changes === 1) return Response.json({ ok: true, updatedAt: new Date().toISOString() });
+    }
+    return Response.json({ error: "The workspace changed while saving. Please try again." }, { status: 409 });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Could not save changes." }, { status: 500 });
   }

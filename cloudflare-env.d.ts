@@ -2,12 +2,17 @@ declare namespace Cloudflare {
   interface Env {
     DB?: D1Database;
     BUCKET?: R2Bucket;
+    BROWSER?: { quickAction: (action: "screenshot", options: Record<string, unknown>) => Promise<Response> };
     F2B_ACCESS_TEAM_DOMAIN?: string;
     F2B_ACCESS_AUD?: string;
     F2B_CF_ACCOUNT_ID?: string;
     F2B_CF_ACCESS_APP_ID?: string;
     F2B_CF_ACCESS_POLICY_ID?: string;
     CLOUDFLARE_ACCESS_API_TOKEN?: string;
+    AGENCY_CREDENTIALS_ENCRYPTION_KEY?: string;
+    OPENROUTER_API_KEY?: string;
+    OPENROUTER_MODEL?: string;
+    OPENROUTER_IMAGE_MODEL?: string;
     OPENAI_API_KEY?: string;
     OPENAI_MODEL?: string;
     RESEND_API_KEY?: string;

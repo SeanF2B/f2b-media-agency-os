@@ -5,6 +5,10 @@ import { googleAdsAssetQueries, normalizeGoogleAdsAssetRows } from "@/lib/google
 
 const GOOGLE_ADS_SCOPE = "https://www.googleapis.com/auth/adwords";
 const GOOGLE_ADS_API_VERSION = "v26";
+// A scheduled task makes several Google Ads reads in one Worker invocation.
+// Reusing the short-lived access token avoids refreshing it once per report,
+// which otherwise creates a burst of OAuth and D1 requests for the same run.
+const googleAdsAccessTokens = new Map<string, { token: string; expiresAt: number }>();
 
 function googleAdsHeaders(accessToken: string) {
   // Google retired developer tokens as the API access gate in September 2026.
@@ -53,13 +57,21 @@ export async function googleAdsConnectionReady(ownerId: string) {
 }
 
 export async function getGoogleAdsAccessToken(ownerId: string) {
+  const cached = googleAdsAccessTokens.get(ownerId);
+  if (cached && cached.expiresAt > Date.now() + 60_000) return cached.token;
   if (!env.DB || !env.GOOGLE_ADS_CLIENT_ID || !env.GOOGLE_ADS_CLIENT_SECRET) throw new Error("Google Ads API credentials are not configured on the server.");
   const saved = await env.DB.prepare("SELECT encrypted_refresh_token, token_iv FROM google_ads_connections WHERE owner_id = ?1").bind(ownerId).first<{ encrypted_refresh_token: string; token_iv: string }>();
   if (!saved) throw new Error("Google Ads is not connected yet. Connect your Google Ads account first.");
   const refreshToken = await decryptRefreshToken(saved.token_iv, saved.encrypted_refresh_token);
   const response = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: env.GOOGLE_ADS_CLIENT_ID, client_secret: env.GOOGLE_ADS_CLIENT_SECRET, refresh_token: refreshToken, grant_type: "refresh_token" }), signal: AbortSignal.timeout(15000) });
-  const result = await response.json() as { access_token?: string; error?: string };
+  const result = await response.json() as { access_token?: string; expires_in?: number; error?: string };
   if (!response.ok || !result.access_token) throw new Error(result.error === "invalid_grant" ? "Google revoked or expired the saved authorization. Reconnect Google Ads." : "Google Ads could not refresh its authorization. Reconnect Google Ads if this continues.");
+  const expiresIn = Math.max(60, Number(result.expires_in) || 3600);
+  googleAdsAccessTokens.set(ownerId, { token: result.access_token, expiresAt: Date.now() + expiresIn * 1000 });
+  if (googleAdsAccessTokens.size > 50) {
+    const firstKey = googleAdsAccessTokens.keys().next().value;
+    if (firstKey) googleAdsAccessTokens.delete(firstKey);
+  }
   await env.DB.prepare("UPDATE google_ads_connections SET last_token_refresh_at = ?2 WHERE owner_id = ?1").bind(ownerId, new Date().toISOString()).run();
   return result.access_token;
 }
@@ -118,17 +130,72 @@ export async function readGoogleAdsCampaign(ownerId: string, customerId: string,
 }
 
 export async function listGoogleAdsCampaigns(ownerId: string, customerId: string) {
-  const accessToken = await getGoogleAdsAccessToken(ownerId);
   const cleanCustomerId = customerId.replace(/\D/g, "");
   if (!/^\d{6,20}$/.test(cleanCustomerId)) throw new Error("The Google Ads customer ID is not valid.");
-  const headers = googleAdsHeaders(accessToken);
-  const response = await fetch(`https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${cleanCustomerId}/googleAds:searchStream`, { method: "POST", headers, body: JSON.stringify({ query: "SELECT campaign.id, campaign.name, campaign.status, campaign.campaign_budget, campaign_budget.amount_micros FROM campaign WHERE campaign.status != 'REMOVED' ORDER BY campaign.name" }), signal: AbortSignal.timeout(20000) });
-  const payload: Array<{ results?: Array<{ campaign?: { id?: string; name?: string; status?: string; campaignBudget?: string }; campaignBudget?: { amountMicros?: string } }> }> = await response.json();
-  if (!response.ok) {
-    console.error("Google Ads campaign list failed", { status: response.status });
-    throw new Error("Google Ads could not list this client’s campaigns. Check the connected user’s account access and API access level.");
+  const { payload } = await googleAdsPost(ownerId, cleanCustomerId, "googleAds:searchStream", { query: "SELECT campaign.id, campaign.name, campaign.status, campaign.primary_status, campaign.primary_status_reasons, campaign.bidding_strategy_type, campaign.campaign_budget, campaign_budget.amount_micros, campaign_budget.status, metrics.impressions, metrics.clicks, metrics.ctr, metrics.cost_micros, metrics.conversions, metrics.conversions_value, metrics.cost_per_conversion FROM campaign WHERE segments.date DURING LAST_30_DAYS AND campaign.status != 'REMOVED' ORDER BY campaign.name" });
+  return (payload as Array<{ results?: Array<{ campaign?: { id?: string; name?: string; status?: string; primaryStatus?: string; primaryStatusReasons?: string[]; biddingStrategyType?: string; campaignBudget?: string }; campaignBudget?: { amountMicros?: string; status?: string }; metrics?: { impressions?: string; clicks?: string; ctr?: string; costMicros?: string; conversions?: string; conversionsValue?: string; costPerConversion?: string } }> }>).flatMap((item) => item.results || []).flatMap((row) => row.campaign?.id ? [{
+    id: String(row.campaign.id), name: row.campaign.name || `Campaign ${row.campaign.id}`, status: row.campaign.status || "UNKNOWN",
+    primaryStatus: row.campaign.primaryStatus || "UNKNOWN", primaryStatusReasons: row.campaign.primaryStatusReasons || [], biddingStrategy: row.campaign.biddingStrategyType || "UNKNOWN",
+    budgetResourceName: row.campaign.campaignBudget || "", budgetMicros: Number(row.campaignBudget?.amountMicros || 0), budgetStatus: row.campaignBudget?.status || "UNKNOWN",
+    impressions: Number(row.metrics?.impressions || 0), clicks: Number(row.metrics?.clicks || 0), ctr: Number(row.metrics?.ctr || 0), spend: Number(row.metrics?.costMicros || 0) / 1_000_000,
+    conversions: Number(row.metrics?.conversions || 0), conversionValue: Number(row.metrics?.conversionsValue || 0), costPerConversion: Number(row.metrics?.costPerConversion || 0) / 1_000_000,
+  }] : []);
+}
+
+export async function getGoogleAdsConversionActions(ownerId: string, customerId: string) {
+  const { payload } = await googleAdsPost(ownerId, customerId, "googleAds:searchStream", { query: "SELECT conversion_action.id, conversion_action.name, conversion_action.status, conversion_action.category, conversion_action.origin, conversion_action.include_in_conversions_metric, conversion_action.primary_for_goal FROM conversion_action WHERE conversion_action.status != 'REMOVED' ORDER BY conversion_action.name LIMIT 100" });
+  const rows = (payload as Array<{ results?: Array<any> }>).flatMap((batch) => batch.results || []);
+  return rows.map((row) => ({ id: String(row.conversionAction?.id || ""), name: String(row.conversionAction?.name || ""), status: String(row.conversionAction?.status || "UNKNOWN"), category: String(row.conversionAction?.category || "UNKNOWN"), origin: String(row.conversionAction?.origin || "UNKNOWN"), includedInConversions: Boolean(row.conversionAction?.includeInConversionsMetric), primaryForGoal: Boolean(row.conversionAction?.primaryForGoal) })).filter((item) => item.id);
+}
+
+export async function getGoogleAdsCampaignChangeEvents(ownerId: string, customerId: string, campaignId?: string) {
+  const cleanCampaignId = campaignId?.replace(/\D/g, "");
+  if (campaignId && !/^\d{3,20}$/.test(cleanCampaignId || "")) throw new Error("The Google Ads campaign ID is not valid.");
+  const campaignFilter = cleanCampaignId ? ` AND change_event.campaign = 'customers/${customerId.replace(/\D/g, "")}/campaigns/${cleanCampaignId}'` : "";
+  const query = `SELECT change_event.change_date_time, change_event.campaign, change_event.change_resource_type, change_event.resource_change_operation, change_event.changed_fields, change_event.user_email, change_event.client_type, change_event.change_resource_name FROM change_event WHERE change_event.change_date_time DURING LAST_30_DAYS${campaignFilter} ORDER BY change_event.change_date_time DESC LIMIT 1000`;
+  const { payload } = await googleAdsPost(ownerId, customerId, "googleAds:searchStream", { query });
+  const rows = (payload as Array<{ results?: Array<any> }>).flatMap((batch) => batch.results || []);
+  return rows.slice(0, 200).map((row) => {
+    const fields = row.changeEvent?.changedFields;
+    const changedFields = Array.isArray(fields?.paths) ? fields.paths.join(", ") : String(fields || "");
+    return { at: String(row.changeEvent?.changeDateTime || ""), campaign: String(row.changeEvent?.campaign || ""), resourceType: String(row.changeEvent?.changeResourceType || "UNKNOWN"), operation: String(row.changeEvent?.resourceChangeOperation || "UNKNOWN"), changedFields: changedFields.slice(0, 240), user: String(row.changeEvent?.userEmail || "").slice(0, 120), clientType: String(row.changeEvent?.clientType || "UNKNOWN"), resource: String(row.changeEvent?.changeResourceName || "").slice(0, 240) };
+  });
+}
+
+export async function getGoogleAdsCampaignDailyPerformance(ownerId: string, customerId: string, campaignId: string) {
+  const cleanCampaignId = campaignId.replace(/\D/g, "");
+  if (!/^\d{3,20}$/.test(cleanCampaignId)) throw new Error("The Google Ads campaign ID is not valid.");
+  const endDate = new Date(Date.now() - 24 * 60 * 60_000).toISOString().slice(0, 10);
+  const startDate = new Date(Date.parse(`${endDate}T00:00:00Z`) - 89 * 24 * 60 * 60_000).toISOString().slice(0, 10);
+  const query = `SELECT campaign.id, segments.date, metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions FROM campaign WHERE campaign.id = ${cleanCampaignId} AND segments.date BETWEEN '${startDate}' AND '${endDate}'`;
+  const { customerId: accountId, payload } = await googleAdsPost(ownerId, customerId, "googleAds:searchStream", { query });
+  const rows = (payload as Array<{ results?: Array<any> }>).flatMap((batch) => batch.results || []);
+  const reportedDays = rows.map((row) => ({ date: String(row.segments?.date || ""), impressions: Number(row.metrics?.impressions || 0), clicks: Number(row.metrics?.clicks || 0), spend: Number(row.metrics?.costMicros || 0) / 1_000_000, conversions: Number(row.metrics?.conversions || 0) }));
+  const days = reportedDays;
+  let budgetDiagnostics: { searchBudgetLostImpressionShare?: number; searchRankLostImpressionShare?: number } = {};
+  let budgetDiagnosticsNote = "Budget and rank lost-impression-share diagnostics are unavailable for this campaign.";
+  try {
+    const diagnosticsQuery = `SELECT campaign.id, metrics.search_budget_lost_impression_share, metrics.search_rank_lost_impression_share FROM campaign WHERE campaign.id = ${cleanCampaignId}`;
+    const diagnosticsResult = await googleAdsPost(ownerId, customerId, "googleAds:searchStream", { query: diagnosticsQuery });
+    const diagnosticRows = (diagnosticsResult.payload as Array<{ results?: Array<any> }>).flatMap((batch) => batch.results || []);
+    const metrics = diagnosticRows[0]?.metrics;
+    if (metrics) {
+      budgetDiagnostics = { searchBudgetLostImpressionShare: Number(metrics.searchBudgetLostImpressionShare || 0), searchRankLostImpressionShare: Number(metrics.searchRankLostImpressionShare || 0) };
+      budgetDiagnosticsNote = "Campaign budget and rank lost-impression-share diagnostics were queried separately from daily metrics.";
+    } else budgetDiagnosticsNote = "Google Ads returned no budget or rank lost-impression-share diagnostics for this campaign.";
+  } catch (error) {
+    budgetDiagnosticsNote = error instanceof Error ? error.message.slice(0, 240) : "Google Ads did not return budget or rank lost-impression-share diagnostics.";
   }
-  return payload.flatMap((item) => item.results || []).flatMap((row) => row.campaign?.id ? [{ id: String(row.campaign.id), name: row.campaign.name || `Campaign ${row.campaign.id}`, status: row.campaign.status || "UNKNOWN", budgetResourceName: row.campaign.campaignBudget || "", budgetMicros: Number(row.campaignBudget?.amountMicros || 0) }] : []);
+  return { source: "Google Ads API · campaign daily performance", accountId, campaignId: cleanCampaignId, range: `${startDate} to ${endDate}`, reportedDays: reportedDays.length, days, totals: days.reduce((total, day) => ({ impressions: total.impressions + day.impressions, clicks: total.clicks + day.clicks, spend: total.spend + day.spend, conversions: total.conversions + day.conversions }), { impressions: 0, clicks: 0, spend: 0, conversions: 0 }), budgetDiagnostics, budgetDiagnosticsNote };
+}
+
+export async function getGoogleAdsCampaignConversionGoals(ownerId: string, customerId: string, campaignId: string) {
+  const cleanCampaignId = campaignId.replace(/\D/g, "");
+  if (!/^\d{3,20}$/.test(cleanCampaignId)) throw new Error("The Google Ads campaign ID is not valid.");
+  const query = `SELECT campaign_conversion_goal.campaign, campaign_conversion_goal.category, campaign_conversion_goal.origin, campaign_conversion_goal.biddable FROM campaign_conversion_goal WHERE campaign.id = ${cleanCampaignId} LIMIT 200`;
+  const { customerId: accountId, payload } = await googleAdsPost(ownerId, customerId, "googleAds:searchStream", { query });
+  const rows = (payload as Array<{ results?: Array<any> }>).flatMap((batch) => batch.results || []);
+  return { source: "Google Ads API · campaign conversion goals", accountId, campaignId: cleanCampaignId, count: rows.length, goals: rows.map((row) => ({ campaign: String(row.campaignConversionGoal?.campaign || ""), category: String(row.campaignConversionGoal?.category || "UNKNOWN"), origin: String(row.campaignConversionGoal?.origin || "UNKNOWN"), biddable: Boolean(row.campaignConversionGoal?.biddable) })) };
 }
 
 export async function listGoogleAdsAccessibleCustomers(ownerId: string) {
@@ -153,13 +220,23 @@ async function googleAdsPost(ownerId: string, customerId: string, method: string
   const response = await fetch(`https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${cleanCustomerId}/${method}`, {
     method: "POST", headers, body: JSON.stringify(body), signal: AbortSignal.timeout(20000),
   });
-  const payload = await response.json() as any;
+  const responseText = await response.text();
+  let payload: any;
+  try { payload = responseText ? JSON.parse(responseText) : null; }
+  catch { payload = null; }
   if (!response.ok) {
-    const detail = String(payload.error?.message || "").slice(0, 500);
-    console.error("Google Ads API request failed", { method, status: response.status, detail });
+    // Google Ads searchStream can return an array containing an error envelope,
+    // while other endpoints return the usual { error: ... } object.
+    const apiError = payload?.error || (Array.isArray(payload) ? payload.find((item: any) => item?.error)?.error : undefined);
+    const nestedMessages = Array.isArray(apiError?.details)
+      ? apiError.details.flatMap((item: any) => Array.isArray(item?.errors) ? item.errors.map((entry: any) => entry?.message) : [])
+      : [];
+    const detail = String(apiError?.message || nestedMessages.find((message: unknown) => typeof message === "string") || "").slice(0, 700);
+    console.error("Google Ads API request failed", { method, status: response.status, code: apiError?.status || apiError?.code || "", detail, bodyType: payload ? "json" : responseText ? "other" : "empty" });
     if (/PERMISSION_DENIED|CUSTOMER_NOT_ENABLED|USER_PERMISSION_DENIED/i.test(detail)) throw new Error("Google Ads rejected this request because the connected Google account or Google Cloud project is not approved for this feature. Check API access and the user's access to this Ads account.");
-    throw new Error(`Google Ads ${method} failed (HTTP ${response.status}). ${detail || "Check account access and API permissions."}`);
+    throw new Error(`Google Ads ${method} failed (HTTP ${response.status}). ${detail || "Google Ads did not provide an error message. Check the saved account ID and API access."}`);
   }
+  if (!payload) throw new Error("Google Ads returned an unreadable response. Retry the audit; no account changes were made.");
   return { customerId: cleanCustomerId, payload };
 }
 
@@ -303,6 +380,62 @@ export async function listGoogleAdsCampaignAssets(ownerId: string, customerId: s
     ...normalizeGoogleAdsAssetRows(rows(adGroupResult), "Ad group"),
     ...normalizeGoogleAdsAssetRows(rows(assetGroupResult), "Performance Max asset group"),
   ];
+}
+
+// Single-query campaign-level asset read for scheduled audits. The full
+// inventory helper above makes four requests; keeping the runner to one query
+// avoids exhausting a Worker invocation while still providing real evidence.
+export async function listGoogleAdsCampaignLevelAssets(ownerId: string, customerId: string, campaignId?: string) {
+  const query = googleAdsAssetQueries(campaignId).campaign.replace(/LIMIT 10000\s*$/i, "LIMIT 200");
+  const { payload } = await googleAdsPost(ownerId, customerId, "googleAds:searchStream", { query });
+  const batches = payload as Array<{ results?: Array<any> }>;
+  return normalizeGoogleAdsAssetRows(batches.flatMap((batch) => batch.results || []), "Campaign").slice(0, 200);
+}
+
+export type GoogleAdsCampaignAssetDraft =
+  | { type: "SITELINK"; linkText: string; description1?: string; description2?: string; finalUrl: string }
+  | { type: "CALLOUT"; calloutText: string }
+  | { type: "STRUCTURED_SNIPPET"; header: string; values: string[] };
+
+/** Creates a text asset and links it to the selected campaign in one atomic Ads API request. */
+export async function createGoogleAdsCampaignAsset(ownerId: string, customerId: string, campaignId: string, draft: GoogleAdsCampaignAssetDraft, assetName?: string) {
+  const cleanCustomerId = customerId.replace(/\D/g, "");
+  const cleanCampaignId = campaignId.replace(/\D/g, "");
+  if (!/^\d{6,20}$/.test(cleanCustomerId) || !/^\d{3,20}$/.test(cleanCampaignId)) throw new Error("The Google Ads account or campaign ID is not valid.");
+  const assetResourceName = `customers/${cleanCustomerId}/assets/-1`;
+  const campaignResourceName = `customers/${cleanCustomerId}/campaigns/${cleanCampaignId}`;
+  const asset: Record<string, unknown> = { resourceName: assetResourceName, name: (assetName || `Agency OS ${draft.type.toLowerCase()} ${crypto.randomUUID().slice(0, 8)}`).slice(0, 120) };
+  if (draft.type === "SITELINK") {
+    if (!draft.linkText.trim() || draft.linkText.length > 25 || !/^https:\/\//i.test(draft.finalUrl)) throw new Error("Sitelinks need link text up to 25 characters and a secure destination URL.");
+    if ((draft.description1 || "").length > 35 || (draft.description2 || "").length > 35) throw new Error("Each sitelink description must be 35 characters or fewer.");
+    asset.sitelinkAsset = { linkText: draft.linkText.trim(), ...(draft.description1?.trim() ? { description1: draft.description1.trim() } : {}), ...(draft.description2?.trim() ? { description2: draft.description2.trim() } : {}) };
+    asset.finalUrls = [draft.finalUrl];
+  } else if (draft.type === "CALLOUT") {
+    if (!draft.calloutText.trim() || draft.calloutText.length > 25) throw new Error("Callout text must be 25 characters or fewer.");
+    asset.calloutAsset = { calloutText: draft.calloutText.trim() };
+  } else {
+    if (!draft.header.trim() || draft.header.length > 25 || draft.values.length < 3 || draft.values.length > 10 || draft.values.some((value) => !value.trim() || value.length > 25)) throw new Error("A structured snippet needs a supported heading and 3–10 values, each up to 25 characters.");
+    asset.structuredSnippetAsset = { header: draft.header.trim(), values: draft.values.map((value) => value.trim()) };
+  }
+  const fieldType = draft.type;
+  const { payload } = await googleAdsPost(ownerId, cleanCustomerId, "googleAds:mutate", {
+    mutateOperations: [
+      { assetOperation: { create: asset } },
+      { campaignAssetOperation: { create: { campaign: campaignResourceName, asset: assetResourceName, fieldType } } },
+    ],
+  });
+  const responses = (payload.mutateOperationResponses || []) as Array<{ assetResult?: { resourceName?: string }; campaignAssetResult?: { resourceName?: string } }>;
+  const createdAssetResourceName = String(responses[0]?.assetResult?.resourceName || "");
+  const associationResourceName = String(responses[1]?.campaignAssetResult?.resourceName || "");
+  if (!createdAssetResourceName || !associationResourceName) throw new Error("Google Ads accepted the asset request but did not return both saved resource names. Check the campaign before retrying.");
+  return { customerId: cleanCustomerId, campaignId: cleanCampaignId, assetResourceName: createdAssetResourceName, associationResourceName, fieldType };
+}
+
+export async function removeGoogleAdsCampaignAsset(ownerId: string, customerId: string, associationResourceName: string) {
+  const cleanCustomerId = customerId.replace(/\D/g, "");
+  const expectedPrefix = `customers/${cleanCustomerId}/campaignAssets/`;
+  if (!/^\d{6,20}$/.test(cleanCustomerId) || !associationResourceName.startsWith(expectedPrefix)) throw new Error("The saved campaign asset link does not match this Google Ads account.");
+  await googleAdsPost(ownerId, cleanCustomerId, "campaignAssets:mutate", { operations: [{ remove: associationResourceName }] });
 }
 
 export async function updateGoogleAdsResponsiveSearchAd(ownerId: string, customerId: string, input: { adId: string; headlines: Array<{ text: string; pinnedField?: string }>; descriptions: Array<{ text: string; pinnedField?: string }> }) {

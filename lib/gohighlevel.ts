@@ -62,7 +62,7 @@ export async function verifyGhlConnection(token: string, locationId: string) {
   return { name, funnelCount: Number.isFinite(funnelResult.count) ? Number(funnelResult.count) : funnels.length };
 }
 
-export async function readGhlLandingPageMap(ownerId: string, clientId: string, services: Array<{ landingPageUrl?: string }> = []) {
+export async function readGhlLandingPageMap(ownerId: string, clientId: string, services: Array<{ name?: string; campaignName?: string; landingPageUrl?: string }> = []) {
   let token = "";
   let locationId = "";
   let locationName = "";
@@ -89,20 +89,29 @@ export async function readGhlLandingPageMap(ownerId: string, clientId: string, s
     try { return [new URL(service.landingPageUrl || "").pathname.replace(/\/$/, "").toLowerCase()].filter(Boolean); }
     catch { return []; }
   });
-  const matchingFunnels = funnels.filter((funnel) => {
+  const campaignNames = services.flatMap((service) => [service.campaignName, service.name]
+    .map((value) => String(value || "").trim().toLowerCase())
+    .filter((value) => value.length >= 4));
+  const matchingFunnels = funnels.map((funnel) => {
     const paths = [funnel.path, ...funnel.steps.map((step) => step.path)].map((value) => value.replace(/\/$/, "").toLowerCase()).filter(Boolean);
-    return paths.some((funnelPath) => campaignPaths.some((campaignPath) => campaignPath === funnelPath || campaignPath.endsWith(funnelPath)));
-  });
-  // The documented v4 funnel list does not include the published URL or step
-  // paths. When those fields are absent, inventory all returned funnels so the
-  // assistant can still inspect the page names and IDs for the linked location.
-  const pageFunnels = (matchingFunnels.length ? matchingFunnels : funnels).slice(0, 100);
+    const name = funnel.name.trim().toLowerCase();
+    const pathMatch = paths.some((funnelPath) => campaignPaths.some((campaignPath) => campaignPath === funnelPath || campaignPath.endsWith(funnelPath)));
+    const nameMatch = campaignNames.some((campaignName) => campaignName.includes(name) || name.includes(campaignName));
+    return { funnel, score: pathMatch ? 2 : nameMatch ? 1 : 0 };
+  }).filter((item) => item.score > 0).sort((a, b) => b.score - a.score).map((item) => item.funnel);
+  // A location can contain hundreds of funnels. Read only the best URL/name
+  // matches. When there is no match, inspect just one funnel as a fallback;
+  // scanning unrelated funnels made a single audit consume too many Worker
+  // subrequests and could fail the entire task.
+  const pageFunnels = (matchingFunnels.length ? matchingFunnels : funnels).slice(0, 2);
   const pageGroups: GhlPage[][] = [];
   for (let start = 0; start < pageFunnels.length; start += 10) {
     const group = await Promise.all(pageFunnels.slice(start, start + 10).map(async (funnel) => {
     if (!funnel.id) return [] as GhlPage[];
       const pages: GhlPage[] = [];
-      for (let skip = 0; skip < 100; skip += 20) {
+      // One page per likely funnel is enough to establish the relevant page
+      // mapping. The saved campaign URL remains the source of truth.
+      for (let skip = 0; skip < 20; skip += 20) {
         const result = await ghlFetch(token, ghlFunnelPagesV4Path(funnel.id, locationId, skip)) as GhlPage[] | { pages?: GhlPage[] };
         const batch = normalizeGhlPages(result) as GhlPage[];
         pages.push(...batch);
@@ -113,7 +122,10 @@ export async function readGhlLandingPageMap(ownerId: string, clientId: string, s
     pageGroups.push(...group);
   }
   const pages = pageGroups.flat().map((page) => ({ id: String(page._id || page.id || ""), name: String(page.name || "Unnamed page"), funnelId: String(page.funnelId || ""), stepId: String(page.stepId || ""), updatedAt: String(page.updatedAt || ""), deleted: Boolean(page.deleted) })).filter((page) => !page.deleted).slice(0, 300);
-  return { status: "connected" as const, locationId, locationName, funnels, pages };
+  const pageInventoryNote = pageFunnels.length < funnels.length
+    ? `Checked ${pageFunnels.length} likely funnels and up to 20 pages per funnel. The full location inventory was not scanned.`
+    : `Checked up to 20 pages per funnel for the ${pageFunnels.length} returned funnels.`;
+  return { status: "connected" as const, locationId, locationName, funnels, pages, pageInventoryNote };
 }
 
 export function mapGhlPagesToCampaignUrls(map: Awaited<ReturnType<typeof readGhlLandingPageMap>>, services: Array<{ name?: string; campaignName?: string; landingPageUrl?: string }> = []) {

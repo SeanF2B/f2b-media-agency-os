@@ -5,10 +5,26 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { approvalEvidenceBlockReason, canCloseAiTask, canResumeAiTaskRun, hasRunnablePendingApproval } from "../lib/ai-task-lifecycle.ts";
+import { approvalEvidenceBlockReason, canCloseAiTask, canResumeAiTaskRun, googleAdsTaskEvidenceScope, hasRunnablePendingApproval } from "../lib/ai-task-lifecycle.ts";
+import { getAiTaskStage, isCompletedAiTask } from "../lib/ai-task-access.ts";
 
 const completeStep = { text: "Review keyword evidence", done: true, evidence: "Search term report confirms the target and query." };
 const approval = { status: "pending", checklistIndex: 0, evidence: "The live report supports this recommendation." };
+
+test("completed audit with disclosed evidence gaps appears in AI History", () => {
+  const completedAudit = {
+    assigneeId: "f2b-ai-agent",
+    status: "Done",
+    aiRunState: "completed",
+    aiCompletedWithGaps: true,
+    checklist: [{ text: "Check conversion tracking", done: false, evidence: "Not available in the connected data." }],
+    aiApprovals: [],
+  };
+  assert.equal(isCompletedAiTask(completedAudit), true);
+  assert.equal(getAiTaskStage(completedAudit), "completed");
+  assert.equal(getAiTaskStage({ ...completedAudit, aiCompletedWithGaps: false }), "pending", "unflagged incomplete work must not appear completed");
+  assert.equal(getAiTaskStage({ ...completedAudit, aiCompletedWithGaps: undefined, aiFeedback: "GOOGLE ADS AUDIT REPORT\nStatus: Completed · some data unavailable\n" }), "completed", "older completed audit reports should also be recovered into History");
+});
 
 test("Ads approval follows its linked evidence while task completion still requires every step", () => {
   const checklist = [completeStep, { text: "Check conversion setup", done: false, evidence: "No access to verify." }];
@@ -24,6 +40,15 @@ test("Ads approval follows its linked evidence while task completion still requi
   assert.equal(canCloseAiTask([completeStep, { ...checklist[1], done: true, evidence: "Conversion setup verified." }], [{ ...approval, status: "applied", verification: "verified" }]), true);
 });
 
+test("optional landing-page checks do not block a campaign health or budget review", () => {
+  const scope = googleAdsTaskEvidenceScope({
+    title: "Budget & Bidding Optimisation",
+    checklist: ["Review budgets and spend", "Check landing-page availability where a page is supplied"].map((text) => ({ text })),
+  });
+  assert.equal(scope.campaignDailyPerformance, true);
+  assert.equal(scope.landingPages, false);
+});
+
 function makeOpenAiResult({ allStepsDone, withApproval }) {
   const checklistResults = allStepsDone
     ? [{ index: 0, completed: true, evidence: "Search term report confirms the target and query." }, { index: 1, completed: true, evidence: "Conversion tracking is active and recorded." }]
@@ -34,7 +59,9 @@ function makeOpenAiResult({ allStepsDone, withApproval }) {
     needs_review: !allStepsDone,
     suggested_next_step: allStepsDone ? "Review the completed result." : "Confirm conversion setup, then continue.",
     checklist_results: checklistResults,
+    recommendations: [{ category: "Budget delivery", title: "Review the campaign budget", detail: "Confirm the daily budget still matches the agreed monthly spend before increasing campaign coverage.", rationale: "The live campaign status reports a limited budget, so confirm the amount with the owner before changing it.", evidence: "The selected campaign is enabled and currently marked limited by budget.", evidence_quote: "Campaign is enabled and limited by budget", priority: "normal" }],
     approval_items: withApproval ? [{ checklist_index: 0, action_type: "ADD_KEYWORD", campaign_id: "camp-1", campaign_name: "Test campaign", ad_group_id: "group-1", keyword: "painting in dublin", match_type: "EXACT", daily_budget: 0, title: "Add exact keyword painting in dublin", rationale: "The report supports testing the specific phrase.", evidence: "Live search term evidence supports the exact keyword test." }] : [],
+    landing_page_recommendations: [],
     action_campaign_id: "", action_type: "none", action_daily_budget: 0, action_ad_group_id: "", action_keyword: "", action_match_type: "EXACT",
   };
 }
@@ -49,6 +76,25 @@ class FakeStatement {
   constructor(db, sql) { this.db = db; this.sql = sql; this.args = []; }
   bind(...args) { this.args = args; return this; }
   async first() {
+    if (this.sql.includes("settings_json") && this.sql.includes("workspace_documents")) {
+      const clientId = this.args[1]; const assigneeId = this.args[2];
+      const selectedTask = this.db.workspace.tasks?.find((item) => item.id === this.args[0]);
+      return selectedTask ? {
+        owner_id: this.db.workspace.ownerId,
+        owner_json: JSON.stringify(this.db.workspace.staff?.find((item) => item.id === this.db.workspace.ownerId) || this.db.workspace.staff?.find((item) => item.role === "Owner" && !item.isBot) || null),
+        settings_json: JSON.stringify(this.db.workspace.settings || {}),
+        prompts_json: JSON.stringify(this.db.workspace.aiPrompts || {}),
+        client_json: JSON.stringify(this.db.workspace.clients?.find((item) => item.id === clientId) || null),
+        agent_json: JSON.stringify(this.db.workspace.staff?.find((item) => item.id === assigneeId) || null),
+        tasks_json: JSON.stringify(this.db.workspace.tasks?.filter((item) => item.clientId === clientId) || []),
+        notes_json: JSON.stringify(this.db.workspace.notes?.filter((item) => item.clientId === clientId) || []),
+      } : null;
+    }
+    if (this.sql.includes("AS task_json") && this.sql.includes("workspace_documents")) {
+      const taskId = this.args[this.args.length - 1];
+      const task = this.db.workspace.tasks?.find((item) => item.id === taskId);
+      return task ? { updated_at: this.db.revision, task_index: this.db.workspace.tasks.indexOf(task), task_json: JSON.stringify(task) } : null;
+    }
     if (this.sql.includes("FROM workspace_documents")) return { data: JSON.stringify(this.db.workspace), updated_at: this.db.revision };
     if (this.sql.includes("FROM google_ads_connections")) return { account_email: "mock-connected@example.test" };
     if (this.sql.includes("FROM wordpress_connections")) return this.db.wordpressConnection || null;
@@ -56,8 +102,35 @@ class FakeStatement {
     return null;
   }
   async run() {
-    if (this.sql.startsWith("UPDATE workspace_documents")) {
-      this.db.workspace = JSON.parse(this.args[0]); this.db.revision = this.args[1];
+    if (this.sql.trimStart().startsWith("UPDATE workspace_documents")) {
+      if (this.sql.includes("json_insert(")) {
+        const sqlWithoutStrings = this.sql.replace(/'[^']*'/g, "''");
+        let depth = 0;
+        for (const character of sqlWithoutStrings) {
+          if (character === "(") depth += 1;
+          if (character === ")") depth -= 1;
+          if (depth < 0) throw new Error("Unbalanced JSON update SQL.");
+        }
+        if (depth !== 0) throw new Error("Unbalanced JSON update SQL.");
+      }
+      if (String(this.args[0]).startsWith("$.tasks[")) {
+        const taskIndex = Number(String(this.args[0]).match(/\[(\d+)\]/)?.[1]);
+        this.db.workspace.tasks[taskIndex] = JSON.parse(this.args[1]);
+        for (let i = 2; i < this.args.length - 2;) {
+          const path = String(this.args[i]);
+          const key = path.slice(2);
+          const extractPath = this.args[i + 1];
+          if (extractPath !== path) break;
+          i += 2;
+          const values = [];
+          while (i < this.args.length - 2 && typeof this.args[i] === "string" && this.args[i].startsWith("{")) values.push(JSON.parse(this.args[i++]));
+          const existing = this.db.workspace[key] || [];
+          this.db.workspace[key] = key === "tasks" ? [...values, ...existing] : [...values, ...existing].slice(0, 100);
+        }
+        this.db.revision = this.args[this.args.length - 2];
+      } else {
+        this.db.workspace = JSON.parse(this.args[0]); this.db.revision = this.args[1];
+      }
       return { meta: { changes: 1 } };
     }
     if (this.sql.includes("INSERT OR IGNORE INTO ai_task_runs")) {
@@ -72,7 +145,7 @@ class FakeStatement {
       return { meta: { changes: 1 } };
     }
     if (this.sql.startsWith("INSERT INTO google_ads_pending_changes")) {
-      this.db.pendingChanges.push(this.args);
+      this.db.pendingChanges.push({ sql: this.sql, args: this.args });
       return { meta: { changes: 1 } };
     }
     if (this.sql.startsWith("INSERT INTO meta_ads_change_proposals")) {
@@ -81,12 +154,28 @@ class FakeStatement {
     }
     return { meta: { changes: 1 } };
   }
+  async all() {
+    if (!this.sql.includes("FROM workspace_documents")) return { results: [] };
+    if (this.sql.includes("recurrenceNoticePending")) {
+      return { results: (this.db.workspace.tasks || []).filter((task) => task.recurrenceNoticePending || ["pending", "failed", "blocked"].includes(task.recurrenceEmailStatus || "") || ["pending", "sending", "failed", "blocked"].includes(task.aiNotificationStatus || "")).map((task) => ({ task_json: JSON.stringify(task) })) };
+    }
+    const now = Date.parse(this.args[1] || new Date().toISOString());
+    const staleBefore = Date.parse(this.args[0] || new Date(0).toISOString());
+    const candidates = (this.db.workspace.tasks || []).filter((task) => {
+      const due = Date.parse(task.dueAt || `${task.due || "9999-12-31"}T09:00:00.000Z`);
+      const eligibleState = task.aiRunState === "scheduled" || Boolean(task.aiStartNowRequestedAt) || task.aiRunState === "running" && Date.parse(task.aiRunStartedAt || "") < staleBefore;
+      const agent = (this.db.workspace.staff || []).find((item) => item.id === task.assigneeId);
+      return !task.aiDismissedAt && task.aiMode && task.status !== "Done" && eligibleState && due <= now && agent?.isBot
+        && (!Array.isArray(agent.aiModeAccess) || agent.aiModeAccess.includes(task.aiMode));
+    }).sort((a, b) => Number(Boolean(b.aiStartNowRequestedAt)) - Number(Boolean(a.aiStartNowRequestedAt)) || Date.parse(a.dueAt || "") - Date.parse(b.dueAt || "")).slice(0, 8);
+    return { results: candidates.map((task) => ({ task_json: JSON.stringify(task) })) };
+  }
 }
 
 async function loadIsolatedWorker({ landingPageUnavailable = false, wordpressReadbackFails = false, metaAdsWritable = false, seoFieldExposed = true, sourcePageReadbackFails = false } = {}) {
   const temp = await mkdtemp(path.join(os.tmpdir(), "f2b-ai-lifecycle-"));
   const mocks = {
-    "../lib/google-ads-direct": `export const generateGoogleAdsKeywordIdeas=async()=>({status:"unavailable"}); export const getGoogleAdsAdPerformance=async()=>({}); export const getGoogleAdsKeywordCriterion=async()=>null; export const getGoogleAdsKeywordPerformance=async()=>({}); export const getGoogleAdsNegativeKeywords=async()=>({negatives:[]}); export const getGoogleAdsSearchTerms=async()=>({terms:[]}); export const listGoogleAdsAdGroups=async()=>[{campaignId:"camp-1",campaign:"Test campaign",id:"group-1",name:"Ad group 1",status:"ENABLED"}]; export const listGoogleAdsCampaigns=async()=>[{id:"camp-1",name:"Test campaign",status:"ENABLED",budgetResourceName:"budgets/1",budgetMicros:5000000}]; export const listGoogleAdsResponsiveSearchAds=async()=>[{campaignId:"camp-1",campaignName:"Test campaign",adGroupId:"group-1",adGroupName:"Ad group 1",adId:"ad-1",status:"ENABLED",finalUrls:["https://example.com/landing"],headlines:[{text:"Painting in Dublin"},{text:"Request a free quote"},{text:"Local painting team"}],descriptions:[{text:"Book a trusted painter in Dublin."},{text:"Get a clear quote for your project."}]}]; export const mutateGoogleAdsKeyword=async()=>{}; export const readGoogleAdsCampaign=async()=>({}); export const updateGoogleAdsCampaign=async()=>{}; export const updateGoogleAdsCampaignBudget=async()=>{};`,
+    "../lib/google-ads-direct": `export const generateGoogleAdsKeywordIdeas=async()=>({status:"unavailable"}); export const getGoogleAdsAdPerformance=async()=>({}); export const getGoogleAdsCampaignChangeEvents=async()=>[]; export const getGoogleAdsCampaignConversionGoals=async()=>({goals:[]}); export const getGoogleAdsCampaignDailyPerformance=async()=>({days:[]}); export const getGoogleAdsConversionActions=async()=>[]; export const getGoogleAdsKeywordCriterion=async()=>null; export const getGoogleAdsKeywordPerformance=async()=>({}); export const getGoogleAdsNegativeKeywords=async()=>({negatives:[]}); export const getGoogleAdsSearchTerms=async()=>({terms:[]}); export const listGoogleAdsAdGroups=async()=>[{campaignId:"camp-1",campaign:"Test campaign",id:"group-1",name:"Ad group 1",status:"ENABLED"}]; export const listGoogleAdsCampaignLevelAssets=async()=>[]; export const listGoogleAdsCampaigns=async()=>[{id:"camp-1",name:"Test campaign",status:"ENABLED",primaryStatusReasons:["Campaign is enabled and limited by budget"],budgetResourceName:"budgets/1",budgetMicros:5000000}]; export const listGoogleAdsResponsiveSearchAds=async()=>[{campaignId:"camp-1",campaignName:"Test campaign",adGroupId:"group-1",adGroupName:"Ad group 1",adId:"ad-1",status:"ENABLED",finalUrls:["https://example.com/landing"],headlines:[{text:"Painting in Dublin"},{text:"Request a free quote"},{text:"Local painting team"}],descriptions:[{text:"Book a trusted painter in Dublin."},{text:"Get a clear quote for your project."}]}]; export const mutateGoogleAdsKeyword=async()=>{}; export const readGoogleAdsCampaign=async()=>({}); export const updateGoogleAdsCampaign=async()=>{}; export const updateGoogleAdsCampaignBudget=async()=>{};`,
     "../lib/meta-ads-direct": `export const metaAdsConnectionExists=async()=>${metaAdsWritable}; export const directMetaAdsManagementPermission=async()=>${metaAdsWritable}; export const readDirectMetaAdsInsights=async()=>[{campaign_id:"meta-camp-1",campaign_name:"Local leads",spend:"27.50",clicks:"12"}]; export const readDirectMetaCampaign=async(_owner,accountId,id)=>({id,name:"Local leads",accountId,currency:"EUR",status:"ACTIVE",dailyBudgetMinor:10000});`,
     "../lib/landing-page-reader": `export const readLandingPage=async(url)=>({url,status:${JSON.stringify(landingPageUnavailable ? "unavailable" : "connected")},title:"Painting in Dublin",description:"Request a free quote from our local team.",text:"Painting services in Dublin. Request a free quote today from our experienced local painting team."});`,
     "../lib/ai-feedback-memory": `export const getAiCampaignFeedbackMemory=()=>[];`,
@@ -125,12 +214,12 @@ test("dismissed scheduled AI tasks are not claimed by Connors", async () => {
   }
 });
 
-test("scheduled AI task moves through approvals, completion, recurrence and email without live writes", async () => {
+test("scheduled Ads reviews finish with evidence limits while approvals and recurring work stay separate", async () => {
   const taskId = "task-lifecycle-test";
   const taskInstructions = "Review painting in dublin in the selected campaign. Propose the exact keyword only if live evidence supports it. Complete both checklist items and report missing evidence honestly.";
   const dueAt = new Date(Date.now() - 60_000).toISOString();
   const original = {
-    id: taskId, clientId: "client-1", title: "Scheduled Google Ads evidence review", service: "Google Ads", aiMode: "Google Ads", status: "To do", assigneeId: "f2b-ai-agent", createdById: "owner-1", aiRunState: "scheduled", aiRunAttempt: 1, dueAt, due: dueAt.slice(0, 10), repeatTime: "09:30", repeat: "Weekly", occurrence: 1, campaignId: "camp-1", campaignName: "Test campaign", aiInstructions: taskInstructions,
+    id: taskId, clientId: "client-1", title: "Scheduled Google Ads evidence review", service: "Google Ads", aiMode: "Google Ads", status: "To do", assigneeId: "f2b-ai-agent", createdById: "owner-1", aiRunState: "scheduled", aiRunAttempt: 1, dueAt, due: dueAt.slice(0, 10), repeatTime: "09:30", repeat: "Weekly", occurrence: 1, campaignId: "camp-1", campaignName: "Test campaign", aiInstructions: taskInstructions, pendingReason: "Previous attempt ran out of Worker capacity.", pendingReasonBy: "Connors", pendingReasonAt: dueAt, aiProgressText: "Starting now", aiProgressAt: dueAt, aiStartNowRequestedAt: dueAt,
     checklist: [{ id: "step-1", text: "Review the keyword evidence and prepare a recommendation", done: false }, { id: "step-2", text: "Confirm conversion tracking and record its status", done: false }],
   };
   const db = new FakeD1({ ownerId: "owner-1", staff: [{ id: "owner-1", name: "Owner", role: "Owner", email: "owner@example.test" }, { id: "f2b-ai-agent", name: "Connors", isBot: true }], clients: [{ id: "client-1", name: "Test Client", googleAdsAccountId: "1234567890", services: [] }], tasks: [original], notes: [{ id: "prior-note", taskId: "prior-task", clientId: "client-1", body: "Prior review: keep the selected campaign scope and verify conversions before recommendations.", createdAt: "2026-10-20T09:00:00.000Z", authorName: "Owner" }], entries: [], activity: [] });
@@ -155,29 +244,28 @@ test("scheduled AI task moves through approvals, completion, recurrence and emai
   try {
     await isolated.worker.processDueAiTasks(env, new Date());
     let task = db.workspace.tasks.find((item) => item.id === taskId);
-    assert.equal(task.aiRunState, "needs_review", "the first scheduled run should land in Pending");
-    assert.equal(task.status, "Blocked");
-    assert.ok(task.pendingReason, "an AI task in Pending must explain why");
-    assert.ok(task.pendingReason.length <= 150, "the AI pending reason must stay short");
-    assert.equal(task.pendingReasonBy, "Connors");
-    assert.equal((db.workspace.notes || []).filter((note) => note.taskId === taskId).length, 1, "pending runs must still save their findings and next steps");
+    assert.equal(task.aiRunState, "completed", "a connected campaign review should finish even when one optional evidence check is unavailable");
+    assert.equal(task.status, "Done");
+    assert.equal(task.pendingReason, undefined);
+    assert.equal((db.workspace.notes || []).filter((note) => note.taskId === taskId).length, 1, "the completed review must save its findings and follow-up");
     assert.equal(task.aiApprovals.length, 1, "an evidence-backed proposal should enter the approval queue");
+    assert.equal(task.aiRecommendations.length, 1, "general recommendations should be saved separately for the Approvals recommendations section");
+    assert.equal(task.aiRecommendations[0].title, "Review the campaign budget");
     assert.equal(task.aiApprovals[0].checklistIndex, 0);
     assert.equal(approvalEvidenceBlockReason(task.aiApprovals[0], task.checklist), "", "unrelated incomplete checklist work must not lock this approval");
     assert.equal(db.pendingChanges.length, 1, "the proposal should create one pending change record");
-    assert.equal(canCloseAiTask(task.checklist, task.aiApprovals), false, "the whole task must remain open while another checklist step is incomplete");
+    assert.equal(canCloseAiTask(task.checklist, task.aiApprovals), false, "unverified checklist work stays visible even though the read-only review is done");
     assert.equal(task.aiFeedback.includes(taskInstructions), true, "the full task card instructions should be recorded in the task report");
     const firstContext = JSON.parse(aiRequests[0].input);
     assert.ok(firstContext.recentWorkroomNotes.some((note) => note.body.includes("Prior review")), "Connors should receive relevant previous workroom notes");
     assert.equal(firstContext.scheduledTask.instructions, taskInstructions);
     assert.equal(firstContext.scheduledTask.checklist.length, 2);
-    assert.equal(firstContext.googleAdsReviewPrerequisite.status, "ready", "scheduled Google Ads reviews must pass the landing-page and headline gate before recommendations");
-    assert.deepEqual(firstContext.directGoogleAds.responsiveSearchAds.activeAds[0].headlines.map((item) => item.text), ["Painting in Dublin", "Request a free quote", "Local painting team"]);
-    assert.equal(firstContext.landingPages[0].associatedHeadlines.includes("Painting in Dublin"), true, "the matching ad headlines should accompany the destination page snapshot");
-    const firstAlert = emails.find((email) => email.subject.includes(original.title));
-    assert.ok(firstAlert, "a run that needs review should send one notification");
-    assert.match(firstAlert.text, /Reason:/);
-    assert.match(firstAlert.text, /taskId=task-lifecycle-test/);
+    assert.equal(firstContext.googleAdsReviewPrerequisite, undefined, "keyword-only work should not require an unrelated landing-page gate");
+    assert.equal(firstContext.directGoogleAds.responsiveSearchAds.status, "not_requested", "keyword-only work should fetch keyword evidence without unrelated ad-copy data");
+    assert.equal(firstContext.landingPages.length, 0, "keyword-only work should not load unrelated landing-page snapshots");
+    const firstAlert = emails.find((email) => email.subject.includes("AI changes ready for approval"));
+    assert.ok(firstAlert, "owner approval changes should be sent in one grouped notification per client");
+    assert.match(firstAlert.text, new RegExp(original.title));
     assert.doesNotMatch(firstAlert.text, /Exact card instructions|AI result:/, "email should link to the saved report instead of duplicating it");
     assert.doesNotMatch(firstAlert.text, new RegExp(taskInstructions.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "email should not include the full task instructions");
 
@@ -195,15 +283,24 @@ test("scheduled AI task moves through approvals, completion, recurrence and emai
     assert.ok(next, "a completed weekly task should create the next occurrence");
     assert.equal(next.aiInstructions, taskInstructions);
     assert.equal(next.aiRunState, "scheduled");
+    assert.equal(next.status, "To do");
+    assert.equal(next.pendingReason, undefined, "the next occurrence must not inherit an old failure reason");
+    assert.equal(next.pendingReasonBy, undefined);
+    assert.equal(next.pendingReasonAt, undefined);
+    assert.equal(next.aiProgressText, undefined, "the next occurrence must not inherit a previous run status");
+    assert.equal(next.aiProgressAt, undefined);
+    assert.equal(next.aiStartNowRequestedAt, undefined);
+    assert.deepEqual(next.aiRecommendations, [], "the next occurrence must not inherit previous recommendations");
+    assert.deepEqual(next.aiLandingPageRecommendations, [], "the next occurrence must not inherit previous page copy drafts");
     const accountNotes = db.workspace.notes.filter((note) => note.taskId === taskId);
     assert.equal(accountNotes.length, 2, "each AI execution should leave a persistent client and task note");
     assert.match(accountNotes[0].body, /STATUS: Completed/);
-    assert.match(accountNotes[1].body, /STATUS: Needs follow-up/);
+    assert.match(accountNotes[1].body, /STATUS: Completed/);
     assert.equal(accountNotes[0].clientId, "client-1");
     assert.equal(accountNotes[0].authorName, "Connors");
     const secondContext = JSON.parse(aiRequests[1].input);
-    assert.ok(secondContext.recentWorkroomNotes.some((note) => note.body.includes("STATUS: Needs follow-up")), "later runs should be able to read saved AI notes");
-    assert.equal(emails.filter((email) => email.subject.includes(original.title)).length, 1, "a completed run without a blocker should not send another email");
+    assert.ok(secondContext.recentWorkroomNotes.some((note) => note.body.includes("STATUS: Completed")), "later runs should be able to read saved AI notes");
+    assert.equal(emails.filter((email) => email.subject.includes("AI changes ready for approval")).length, 1, "a completed run without a blocker should not send another approval email");
     assert.equal(db.workspace.activity.some((event) => event.title === "AI task completed"), true);
     assert.equal(db.workspace.entries.some((entry) => entry.taskId === taskId && entry.note.includes("task run duration")), true);
     assert.equal(db.workspace.activity.some((event) => event.title === "Recurring task added to To do"), true);
@@ -211,11 +308,49 @@ test("scheduled AI task moves through approvals, completion, recurrence and emai
     await isolated.worker.processDueAiTasks(env, new Date());
     const emailedNext = db.workspace.tasks.find((item) => item.id === next.id);
     assert.equal(emailedNext.recurrenceNoticePending, false);
-    assert.equal(emailedNext.recurrenceEmailStatus, "sent");
-    const recurringEmail = emails.find((email) => email.subject === `New recurring task assigned: ${original.title}`);
-    assert.ok(recurringEmail, "the recurring occurrence should trigger its own email notification");
-    assert.match(recurringEmail.text, /added to To do/);
-    assert.match(recurringEmail.text, /Assigned to: F2B AI/);
+    assert.equal(emailedNext.recurrenceEmailStatus, "digest", "individual recurrence emails stay suppressed for the weekly client summary");
+    assert.equal(emails.some((email) => email.subject === `New recurring task assigned: ${original.title}`), false, "a recurring occurrence must not send a separate email");
+  } finally {
+    globalThis.fetch = originalFetch;
+    await isolated.dispose();
+  }
+});
+
+test("campaign asset suggestions become exact owner approvals and stay inside the campaign's verified domain", async () => {
+  const dueAt = new Date(Date.now() - 60_000).toISOString();
+  const task = { id: "sitelink-approval-test", clientId: "client-1", title: "Sitelink & asset review", service: "Google Ads", aiMode: "Google Ads", status: "To do", assigneeId: "f2b-ai-agent", aiRunAttempt: 1, aiRunState: "scheduled", dueAt, due: dueAt.slice(0, 10), campaignId: "camp-1", campaignName: "Test campaign", aiInstructions: "Review sitelinks and propose one helpful link for the selected campaign.", checklist: [{ id: "assets", text: "Review current campaign assets and recommend any missing sitelink", done: false }] };
+  const result = makeOpenAiResult({ allStepsDone: true, withApproval: false });
+  result.approval_items = [{ checklist_index: 0, action_type: "ADD_CAMPAIGN_ASSET", campaign_id: "camp-1", campaign_name: "Test campaign", ad_group_id: "", keyword: "", match_type: "EXACT", daily_budget: 0, title: "Add emergency roof repairs sitelink", rationale: "Make the main emergency service easier to reach from the ad.", evidence: "The selected campaign uses example.com and has no linked sitelink with this destination.", action_params: "", ad_id: "", headlines: [], descriptions: [], asset_type: "SITELINK", link_text: "Emergency repairs", description1: "Fast response for leaks", description2: "Request help today", final_url: "https://example.com/emergency-repairs/", callout_text: "", snippet_header: "", snippet_values: [] }];
+  const db = new FakeD1({ ownerId: "owner-1", staff: [{ id: "owner-1", name: "Owner", role: "Owner", email: "owner@example.test" }, { id: "f2b-ai-agent", name: "Connors", isBot: true }], clients: [{ id: "client-1", name: "Test Client", googleAdsAccountId: "1234567890", services: [] }], tasks: [task], entries: [], activity: [] });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    if (String(url).includes("api.openai.com/v1/responses")) return Response.json({ output_text: JSON.stringify(result) });
+    throw new Error("Unexpected request in isolated campaign asset approval test.");
+  };
+  const isolated = await loadIsolatedWorker();
+  try {
+    await isolated.worker.processDueAiTasks({ DB: db, OPENAI_API_KEY: "mock-key", GOOGLE_ADS_CLIENT_ID: "mock", GOOGLE_ADS_CLIENT_SECRET: "mock", GOOGLE_ADS_TOKEN_ENCRYPTION_KEY: "mock" }, new Date());
+    const updated = db.workspace.tasks[0];
+    assert.equal(updated.aiApprovals.length, 1, "a valid sitelink is prepared for owner approval");
+    assert.equal(updated.aiApprovals[0].actionType, "ADD_CAMPAIGN_ASSET");
+    assert.equal(db.pendingChanges.length, 1);
+    assert.match(db.pendingChanges[0].sql, /'ADD_CAMPAIGN_ASSET'/);
+    const savedProposal = JSON.parse(db.pendingChanges[0].args[10]);
+    assert.equal(savedProposal.assetDraft.finalUrl, "https://example.com/emergency-repairs/");
+    assert.ok(savedProposal.assetName, "the approval carries a stable name for safe duplicate recovery");
+
+    const crossDomain = { ...result, approval_items: [{ ...result.approval_items[0], final_url: "https://different.example/emergency-repairs/" }] };
+    const invalidDb = new FakeD1({ ...db.workspace, tasks: [{ ...task, id: "sitelink-cross-domain-test" }] });
+    globalThis.fetch = async (url) => {
+      if (String(url).includes("api.openai.com/v1/responses")) return Response.json({ output_text: JSON.stringify(crossDomain) });
+      throw new Error("Unexpected request in isolated campaign asset domain test.");
+    };
+    const secondIsolated = await loadIsolatedWorker();
+    try {
+      await secondIsolated.worker.processDueAiTasks({ DB: invalidDb, OPENAI_API_KEY: "mock-key", GOOGLE_ADS_CLIENT_ID: "mock", GOOGLE_ADS_CLIENT_SECRET: "mock", GOOGLE_ADS_TOKEN_ENCRYPTION_KEY: "mock" }, new Date());
+      assert.equal(invalidDb.pendingChanges.length, 0, "an unverified destination domain cannot enter the approval queue");
+      assert.equal(invalidDb.workspace.tasks[0].aiApprovals.length, 0);
+    } finally { await secondIsolated.dispose(); }
   } finally {
     globalThis.fetch = originalFetch;
     await isolated.dispose();
@@ -257,7 +392,7 @@ test("cancelling a live AI task stops before final results and preserves a retry
   }
 });
 
-test("scheduled Google Ads review with an unreadable landing page withholds recommendations and approvals", async () => {
+test("scheduled Google Ads review with an unreadable landing page completes with a clear limitation and no unsupported approval", async () => {
   const taskId = "landing-page-gate-test";
   const dueAt = new Date(Date.now() - 60_000).toISOString();
   const task = { id: taskId, clientId: "client-1", title: "Review the selected campaign page", service: "Google Ads", aiMode: "Google Ads", status: "To do", assigneeId: "f2b-ai-agent", aiRunState: "scheduled", dueAt, due: dueAt.slice(0, 10), campaignId: "camp-1", campaignName: "Test campaign", aiInstructions: "Review the landing page and headlines, then recommend an exact keyword only if supported.", checklist: [{ id: "step-1", text: "Review the landing page and recommend a keyword", done: false }] };
@@ -272,12 +407,47 @@ test("scheduled Google Ads review with an unreadable landing page withholds reco
   try {
     await isolated.worker.processDueAiTasks({ DB: db, OPENAI_API_KEY: "mock-key", GOOGLE_ADS_CLIENT_ID: "mock", GOOGLE_ADS_CLIENT_SECRET: "mock", GOOGLE_ADS_TOKEN_ENCRYPTION_KEY: "mock" }, new Date());
     const updated = db.workspace.tasks.find((item) => item.id === taskId);
-    assert.equal(updated.aiRunState, "needs_review");
+    assert.equal(updated.aiRunState, "completed", "an unreadable public page should be reported as a limitation, not strand the connected Ads audit");
+    assert.equal(updated.status, "Done");
     assert.equal(updated.aiApprovals.length, 0, "an unreadable destination must not create a decision item");
     assert.equal(db.pendingChanges.length, 0, "the blocked pre-review must not stage any Ads change");
     assert.equal(updated.checklist[0].done, false, "the recommendation step stays open until the page can be reviewed");
-    assert.match(updated.aiFeedback, /landing-page review is incomplete/i);
+    assert.match(updated.aiFeedback, /Completed · some data unavailable/i);
     assert.match(updated.aiFeedback, /could not be read/i);
+    assert.match(updated.aiFeedback, /No page-copy draft was supported/i);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await isolated.dispose();
+  }
+});
+
+test("landing-page copy recommendations are saved as drafts only and must match a page read in this run", async () => {
+  const taskId = "landing-page-copy-report-test";
+  const dueAt = new Date(Date.now() - 60_000).toISOString();
+  const task = { id: taskId, clientId: "client-1", title: "Landing Page & CRO Audit", service: "Google Ads", aiMode: "Google Ads", status: "To do", assigneeId: "f2b-ai-agent", aiRunState: "scheduled", dueAt, due: dueAt.slice(0, 10), campaignId: "camp-1", campaignName: "Test campaign", aiInstructions: "Review the campaign landing page and suggest evidence-based copy improvements.", checklist: [{ id: "step-1", text: "Inspect the supplied live landing page and report copy improvements", done: false }] };
+  const db = new FakeD1({ ownerId: "owner-1", staff: [{ id: "owner-1", name: "Owner", role: "Owner", email: "owner@example.test" }, { id: "f2b-ai-agent", name: "Connors", isBot: true }], clients: [{ id: "client-1", name: "Test Client", googleAdsAccountId: "1234567890", services: [] }], tasks: [task], entries: [], activity: [] });
+  const result = makeOpenAiResult({ allStepsDone: true, withApproval: false });
+  result.landing_page_recommendations = [
+    { url: "https://example.com/landing", section: "Main heading", current_copy: "Painting in Dublin", suggested_copy: "Get a trusted Dublin painter", rationale: "The page headline can state the service and next step more clearly.", evidence: "The current page heading reads Painting in Dublin.", evidence_quote: "Painting services in Dublin. Request a free quote today from our experienced local painting team." },
+    { url: "https://other.example/landing", section: "Main heading", current_copy: "Made up", suggested_copy: "Unsupported", rationale: "Unsupported domain", evidence: "No page evidence.", evidence_quote: "No page evidence." },
+  ];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    if (String(url).includes("api.openai.com/v1/responses")) return Response.json({ output_text: JSON.stringify(result) });
+    throw new Error(`Unexpected network request in isolated test: ${url}`);
+  };
+  const isolated = await loadIsolatedWorker();
+  try {
+    await isolated.worker.processDueAiTasks({ DB: db, OPENAI_API_KEY: "mock-key", GOOGLE_ADS_CLIENT_ID: "mock", GOOGLE_ADS_CLIENT_SECRET: "mock", GOOGLE_ADS_TOKEN_ENCRYPTION_KEY: "mock" }, new Date());
+    const updated = db.workspace.tasks.find((item) => item.id === taskId);
+    assert.equal(updated.aiRunState, "completed");
+    assert.equal(updated.aiLandingPageRecommendations.length, 1, "readable page copy should be saved for the Approvals recommendations section");
+    assert.equal(updated.aiLandingPageRecommendations[0].url, "https://example.com/landing");
+    assert.equal(updated.aiLandingPageRecommendations[0].suggestedCopy, "Get a trusted Dublin painter");
+    assert.match(updated.aiFeedback, /LANDING-PAGE COPY SUGGESTIONS/);
+    assert.match(updated.aiFeedback, /Get a trusted Dublin painter/);
+    assert.match(updated.aiFeedback, /Draft for owner review · no page was changed/);
+    assert.doesNotMatch(updated.aiFeedback, /Unsupported domain/);
   } finally {
     globalThis.fetch = originalFetch;
     await isolated.dispose();
@@ -413,14 +583,15 @@ test("a pending approval can retry for linked evidence without duplicating its s
   try {
     await isolated.worker.processDueAiTasks({ DB: db, OPENAI_API_KEY: "mock-key", GOOGLE_ADS_CLIENT_ID: "mock", GOOGLE_ADS_CLIENT_SECRET: "mock", GOOGLE_ADS_TOKEN_ENCRYPTION_KEY: "mock" }, new Date());
     const updated = db.workspace.tasks.find((item) => item.id === taskId);
-    assert.equal(updated.aiRunState, "needs_review");
+    assert.equal(updated.aiRunState, "completed", "the campaign review should finish while preserving incomplete checklist evidence for follow-up");
+    assert.equal(updated.status, "Done");
     assert.equal(updated.aiApprovals.length, 1, "the existing approval remains a single queue item");
     assert.equal(updated.aiApprovals[0].id, "approval-existing");
     assert.equal(updated.aiApprovals[0].pendingChangeId, "pending-existing");
     assert.equal(updated.aiApprovals[0].checklistIndex, 1);
     assert.equal(approvalEvidenceBlockReason(updated.aiApprovals[0], updated.checklist), "", "the newly verified linked step unlocks that specific approval");
     assert.equal(db.pendingChanges.length, 1, "the retry must not create a second Ads pending-change record");
-    assert.equal(canCloseAiTask(updated.checklist, updated.aiApprovals), false, "the other incomplete checklist step keeps the task Pending");
+    assert.equal(canCloseAiTask(updated.checklist, updated.aiApprovals), false, "the incomplete checklist step remains visible in the completed audit report");
   } finally {
     globalThis.fetch = originalFetch;
     await isolated.dispose();
@@ -442,7 +613,7 @@ test("a retry requested from Pending stays Pending until the worker claims it, t
   try {
     await isolated.worker.processDueAiTasks({ DB: db, OPENAI_API_KEY: "mock-key", GOOGLE_ADS_CLIENT_ID: "mock", GOOGLE_ADS_CLIENT_SECRET: "mock", GOOGLE_ADS_TOKEN_ENCRYPTION_KEY: "mock" }, new Date());
     const updated = db.workspace.tasks.find((item) => item.id === taskId);
-    assert.equal(updated.aiRunState, "needs_review", "the retry can return to Pending only after Connors actually runs and reports remaining evidence");
+    assert.equal(updated.aiRunState, "completed", "a successful source read that records the conversion limitation should finish this audit step");
     assert.equal(updated.aiStartNowRequestedAt, undefined, "claiming the retry clears the queue marker");
     assert.equal(updated.aiRunAttempt, 3, "the queued retry uses the attempt number recorded on the card");
     assert.equal(db.workspace.activity.some((event) => event.title === "AI task started" && event.taskId === taskId), true, "the run must be claimed and recorded as Doing before its result returns");

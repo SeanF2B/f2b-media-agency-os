@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "../../chatgpt-auth";
 import { fullTeamPermissions, getTeamPermissions, type TeamPermissions } from "@/lib/access-permissions";
 import { canViewAiAssignedTask, getAiTaskStage, isAiAssignedTask } from "@/lib/ai-task-access";
-import { generateGoogleAdsKeywordIdeas, getGoogleAdsKeywordCriterion, getGoogleAdsSearchTerms, listGoogleAdsAccessibleCustomers, listGoogleAdsAdGroups, listGoogleAdsCampaigns, listGoogleAdsResponsiveSearchAds, mutateGoogleAdsKeyword, readGoogleAdsCampaign, updateGoogleAdsCampaign, updateGoogleAdsCampaignBudget, updateGoogleAdsResponsiveSearchAd } from "@/lib/google-ads-direct";
+import { createGoogleAdsCampaignAsset, generateGoogleAdsKeywordIdeas, getGoogleAdsKeywordCriterion, getGoogleAdsSearchTerms, listGoogleAdsAccessibleCustomers, listGoogleAdsAdGroups, listGoogleAdsCampaignLevelAssets, listGoogleAdsCampaigns, listGoogleAdsResponsiveSearchAds, mutateGoogleAdsKeyword, readGoogleAdsCampaign, removeGoogleAdsCampaignAsset, updateGoogleAdsCampaign, updateGoogleAdsCampaignBudget, updateGoogleAdsResponsiveSearchAd } from "@/lib/google-ads-direct";
 import { executeWindsorAdsAction, getWindsorAdsActions, omitNullOptionalParams, validateWindsorParams } from "@/lib/windsor-google-ads-actions";
 import { canDecideGoogleAdsApproval } from "@/lib/google-ads-approval-retention";
 import { GOOGLE_ADS_APPROVAL_NEVER_EXPIRES_AT } from "@/lib/google-ads-approval-retention";
@@ -27,6 +27,13 @@ function validAdContent(value: string) {
   try {
     const parsed = JSON.parse(value) as { headlines?: Array<{ text: string; pinnedField?: string }>; descriptions?: Array<{ text: string; pinnedField?: string }> };
     return Array.isArray(parsed.headlines) && parsed.headlines.length >= 3 && Array.isArray(parsed.descriptions) && parsed.descriptions.length >= 2 ? parsed : null;
+  } catch { return null; }
+}
+
+function validCampaignAssetChange(value: string) {
+  try {
+    const parsed = JSON.parse(value) as { asset?: unknown; associationResourceName?: unknown; assetResourceName?: unknown };
+    return parsed.asset && typeof parsed.asset === "object" && typeof parsed.associationResourceName === "string" && parsed.associationResourceName.startsWith("customers/") ? parsed as { asset: Record<string, unknown>; associationResourceName: string; assetResourceName?: string } : null;
   } catch { return null; }
 }
 
@@ -121,7 +128,7 @@ export async function GET(request: Request) {
     const result = await env.DB.prepare("SELECT id, campaign_id, campaign_name, change_type, old_value, new_value, actor, created_at FROM google_ads_change_log WHERE owner_id = ?1 AND client_id = ?2 ORDER BY created_at DESC LIMIT 500").bind(access.ownerId, activityClientId).all<{ id: string; campaign_id: string; campaign_name: string; change_type: string; old_value: string; new_value: string; actor: string; created_at: string }>();
     const activity = result.results || [];
     const reverted = new Set(activity.flatMap((item) => item.change_type.startsWith("REVERT:") ? [item.change_type.slice("REVERT:".length)] : []));
-    return Response.json({ activity: activity.map((item) => ({ ...item, reverted: reverted.has(item.id), reversible: !reverted.has(item.id) && (["PAUSED", "ENABLED", "SET_DAILY_BUDGET"].includes(item.change_type) || (isKeywordChange(item.change_type) && Boolean(keywordActivityMetadata(item.campaign_name))) || (item.change_type === "UPDATE_RESPONSIVE_SEARCH_AD" && Boolean(validAdContent(item.old_value) && validAdContent(item.new_value)))) })) , scope: "Changes applied through Agency OS" }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json({ activity: activity.map((item) => ({ ...item, reverted: reverted.has(item.id), reversible: !reverted.has(item.id) && (["PAUSED", "ENABLED", "SET_DAILY_BUDGET"].includes(item.change_type) || (isKeywordChange(item.change_type) && Boolean(keywordActivityMetadata(item.campaign_name))) || (item.change_type === "UPDATE_RESPONSIVE_SEARCH_AD" && Boolean(validAdContent(item.old_value) && validAdContent(item.new_value))) || (item.change_type === "ADD_CAMPAIGN_ASSET" && Boolean(validCampaignAssetChange(item.new_value)))) })) , scope: "Changes applied through Agency OS" }, { headers: { "Cache-Control": "no-store" } });
   }
   const testCustomerId = url.searchParams.get("testCustomerId");
   const keywordTest = url.searchParams.get("keywordTest");
@@ -186,9 +193,37 @@ export async function POST(request: Request) {
       const pending = await env.DB.prepare("SELECT id, client_id, customer_id, campaign_id, campaign_name, change_type, old_value, new_value, payload_json, status FROM google_ads_pending_changes WHERE id = ?1 AND owner_id = ?2").bind(body.reconcilePendingChangeId, access.ownerId).first<{ id: string; client_id: string; customer_id: string; campaign_id: string; campaign_name: string; change_type: string; old_value: string; new_value: string; payload_json: string; status: string }>();
       if (!pending) return Response.json({ error: "This Ads change could not be found." }, { status: 404 });
       if (pending.status !== "applying") return Response.json({ error: `This Ads change is already ${pending.status}. Refresh the task to see its latest status.` }, { status: 409 });
-      if (!isKeywordChange(pending.change_type)) return Response.json({ error: "Automatic recovery is only available for keyword changes. Review this Ads change manually." }, { status: 409 });
       const client = access.data.clients?.find((item: { id: string; googleAdsAccountId?: string }) => item.id === pending.client_id);
       if (!client?.googleAdsAccountId || String(client.googleAdsAccountId).replace(/\D/g, "") !== pending.customer_id) return Response.json({ error: "The client’s connected Ads account changed; the approval was left untouched." }, { status: 409 });
+      if (pending.change_type === "ADD_CAMPAIGN_ASSET") {
+        const payload = JSON.parse(pending.payload_json || "{}") as { campaignId?: string; assetName?: string; assetDraft?: { type?: string; linkText?: string; description1?: string; description2?: string; finalUrl?: string; calloutText?: string; header?: string; values?: string[] }; applyStartedAt?: string };
+        if (payload.campaignId !== pending.campaign_id || !payload.assetName || !payload.assetDraft || !payload.applyStartedAt) return Response.json({ error: "The saved asset approval is missing recovery details. It was left untouched." }, { status: 409 });
+        const startedAt = Date.parse(payload.applyStartedAt);
+        if (!Number.isFinite(startedAt) || Date.now() - startedAt < 90_000) return Response.json({ error: "This change is still being checked. Wait a minute, then refresh before retrying." }, { status: 409 });
+        const campaigns = await listGoogleAdsCampaigns(access.ownerId, pending.customer_id);
+        const campaign = campaigns.find((item) => item.id === pending.campaign_id && item.name === pending.campaign_name);
+        if (!campaign) return Response.json({ error: "This campaign changed or is no longer available. The approval was left untouched." }, { status: 409 });
+        const linked = await listGoogleAdsCampaignLevelAssets(access.ownerId, pending.customer_id, pending.campaign_id);
+        const recovered = linked.find((item) => item.campaignId === pending.campaign_id && item.assetName === payload.assetName && item.status !== "REMOVED");
+        const now = new Date().toISOString();
+        if (recovered) {
+          const draft = payload.assetDraft;
+          const display = draft.type === "SITELINK" ? `${draft.linkText} → ${draft.finalUrl}` : draft.type === "CALLOUT" ? String(draft.calloutText || "") : `${draft.header}: ${(draft.values || []).join(" · ")}`;
+          const newValue = JSON.stringify({ asset: draft, assetResourceName: `customers/${pending.customer_id}/assets/${recovered.assetId}`, associationResourceName: recovered.associationResourceName });
+          const detail = `${client.name}: Google Ads confirms the ${String(draft.type || "").toLowerCase().replaceAll("_", " ")} is linked to ${campaign.name}: ${display}. The original response was interrupted; this is the recovery check time.`;
+          const saved = await env.DB.batch([
+            env.DB.prepare("UPDATE google_ads_pending_changes SET status = 'applied', payload_json = ?3 WHERE id = ?1 AND owner_id = ?2 AND status = 'applying'").bind(pending.id, access.ownerId, JSON.stringify({ ...payload, assetResourceName: `customers/${pending.customer_id}/assets/${recovered.assetId}`, associationResourceName: recovered.associationResourceName, recoveredAt: now })),
+            env.DB.prepare("INSERT INTO google_ads_change_log (id, owner_id, client_id, service, campaign_id, campaign_name, change_type, old_value, new_value, actor, created_at) VALUES (?1, ?2, ?3, 'Google Ads', ?4, ?5, 'ADD_CAMPAIGN_ASSET', 'absent', ?6, ?7, ?8, ?9)").bind(crypto.randomUUID(), access.ownerId, client.id, campaign.id, campaign.name, newValue, user.displayName, now),
+            env.DB.prepare("INSERT INTO client_ai_messages (id, client_id, service, role, content, created_by, created_at) VALUES (?1, ?2, ?3, 'assistant', ?4, ?5, ?6)").bind(crypto.randomUUID(), client.id, `Google Ads::campaign:${campaign.id}`, `✅ Google Ads asset verified\n${detail}`, user.displayName, now),
+          ]);
+          if (!saved[0]?.meta.changes) return Response.json({ error: "This approval changed while recovery was running. Refresh the task to see its latest status." }, { status: 409 });
+          return Response.json({ ok: true, applied: true, verified: true, checkedAt: now, detail });
+        }
+        const reset = await env.DB.prepare("UPDATE google_ads_pending_changes SET status = 'pending', payload_json = ?3 WHERE id = ?1 AND owner_id = ?2 AND status = 'applying'").bind(pending.id, access.ownerId, JSON.stringify({ ...payload, applyStartedAt: "" })).run();
+        if (!reset.meta.changes) return Response.json({ error: "This approval changed while recovery was running. Refresh the task before acting." }, { status: 409 });
+        return Response.json({ ok: true, applied: false, verified: true, checkedAt: now, detail: "Google Ads confirms the asset was not added. The approval is ready to retry." });
+      }
+      if (!isKeywordChange(pending.change_type)) return Response.json({ error: "Automatic recovery is not available for this change type yet. The approval was left untouched." }, { status: 409 });
       const keyword = JSON.parse(pending.payload_json || "{}") as { adGroupId?: string; keyword?: string; matchType?: "EXACT" | "PHRASE" | "BROAD"; negative?: boolean; remove?: boolean };
       if (!keyword.adGroupId || !keyword.keyword || !keyword.matchType || typeof keyword.negative !== "boolean") return Response.json({ error: "The saved keyword proposal is incomplete; the approval was left untouched." }, { status: 409 });
       const groups = await listGoogleAdsAdGroups(access.ownerId, pending.customer_id, pending.campaign_id);
@@ -218,13 +253,20 @@ export async function POST(request: Request) {
       const keywordMetadata = original ? keywordActivityMetadata(original.campaign_name) : null;
       const oldAdContent = original?.change_type === "UPDATE_RESPONSIVE_SEARCH_AD" ? validAdContent(original.old_value) : null;
       const newAdContent = original?.change_type === "UPDATE_RESPONSIVE_SEARCH_AD" ? validAdContent(original.new_value) : null;
-      if (!original || (!["PAUSED", "ENABLED", "SET_DAILY_BUDGET"].includes(original.change_type) && !(isKeywordChange(original.change_type) && keywordMetadata) && !(original.change_type === "UPDATE_RESPONSIVE_SEARCH_AD" && oldAdContent && newAdContent))) return Response.json({ error: "This activity item does not include enough detail to safely reverse it from this workspace." }, { status: 409 });
+      const campaignAssetChange = original?.change_type === "ADD_CAMPAIGN_ASSET" ? validCampaignAssetChange(original.new_value) : null;
+      if (!campaignAssetChange && (!original || (!["PAUSED", "ENABLED", "SET_DAILY_BUDGET"].includes(original.change_type) && !(isKeywordChange(original.change_type) && keywordMetadata) && !(original.change_type === "UPDATE_RESPONSIVE_SEARCH_AD" && oldAdContent && newAdContent)))) return Response.json({ error: "This activity item does not include enough detail to safely reverse it from this workspace." }, { status: 409 });
       const priorRevert = await env.DB.prepare("SELECT id FROM google_ads_change_log WHERE owner_id = ?1 AND change_type = ?2 LIMIT 1").bind(access.ownerId, `REVERT:${original.id}`).first<{ id: string }>();
       if (priorRevert) return Response.json({ error: "This change has already been reversed." }, { status: 409 });
       const client = access.data.clients?.find((item: { id: string; googleAdsAccountId?: string }) => item.id === original.client_id);
       const customerId = String(client?.googleAdsAccountId || "").replace(/\D/g, "");
       if (!client || !/^\d{6,20}$/.test(customerId)) return Response.json({ error: "The client’s connected Ads account is no longer available." }, { status: 409 });
-      if (original.change_type === "UPDATE_RESPONSIVE_SEARCH_AD" && oldAdContent && newAdContent) {
+      if (original.change_type === "ADD_CAMPAIGN_ASSET" && campaignAssetChange) {
+        const linked = await listGoogleAdsCampaignLevelAssets(access.ownerId, customerId, original.campaign_id);
+        if (!linked.some((item) => item.associationResourceName === campaignAssetChange.associationResourceName)) return Response.json({ error: "That asset link is no longer active in Google Ads, so it was not changed." }, { status: 409 });
+        await removeGoogleAdsCampaignAsset(access.ownerId, customerId, campaignAssetChange.associationResourceName);
+        const restored = await listGoogleAdsCampaignLevelAssets(access.ownerId, customerId, original.campaign_id);
+        if (restored.some((item) => item.associationResourceName === campaignAssetChange.associationResourceName)) return Response.json({ error: "Google Ads accepted the removal, but the live asset link is still visible. Check the campaign before retrying." }, { status: 502 });
+      } else if (original.change_type === "UPDATE_RESPONSIVE_SEARCH_AD" && oldAdContent && newAdContent) {
         const ads = await listGoogleAdsResponsiveSearchAds(access.ownerId, customerId);
         const currentAd = ads.find((item) => item.adId === original.campaign_id);
         if (!currentAd) return Response.json({ error: "The original responsive ad is no longer available in this account. The change was not reversed." }, { status: 409 });
@@ -279,6 +321,55 @@ export async function POST(request: Request) {
       const rejected = await env.DB.prepare("UPDATE google_ads_pending_changes SET status = 'rejected' WHERE id = ?1 AND owner_id = ?2 AND status = 'pending'").bind(pending.id, access.ownerId).run();
       if (!rejected.meta.changes) return Response.json({ error: "This proposal is already being applied or has already been decided." }, { status: 409 });
       return Response.json({ ok: true, decision: "rejected", client: client.name, campaign: pending.campaign_name, detail: "Rejected; no Google Ads change was made.", actor: user.displayName, changedAt: now, verified: false });
+    }
+    if (pending.change_type === "ADD_CAMPAIGN_ASSET") {
+      const payload = JSON.parse(pending.payload_json || "{}") as { accountId?: string; campaignId?: string; assetName?: string; assetDraft?: { type?: string; linkText?: string; description1?: string; description2?: string; finalUrl?: string; calloutText?: string; header?: string; values?: string[] } };
+      const accountId = String(payload.accountId || "").replace(/\D/g, "");
+      if (accountId !== pending.customer_id || payload.campaignId !== pending.campaign_id || !payload.assetName || !payload.assetDraft) return Response.json({ error: "The saved asset proposal is incomplete or no longer matches this campaign. Ask Connors to prepare it again." }, { status: 409 });
+      const [campaigns, assets] = await Promise.all([
+        listGoogleAdsCampaigns(access.ownerId, pending.customer_id),
+        listGoogleAdsCampaignLevelAssets(access.ownerId, pending.customer_id, pending.campaign_id),
+      ]);
+      const campaign = campaigns.find((item) => item.id === pending.campaign_id && item.name === pending.campaign_name);
+      if (!campaign) return Response.json({ error: "This campaign changed or is no longer available. Prepare a fresh proposal." }, { status: 409 });
+      const draft = payload.assetDraft;
+      const type = String(draft.type || "");
+      const duplicateText = type === "SITELINK" ? String(draft.linkText || "") : type === "CALLOUT" ? String(draft.calloutText || "") : type === "STRUCTURED_SNIPPET" ? String(draft.header || "") : "";
+      if (!duplicateText) return Response.json({ error: "The proposed asset text is missing." }, { status: 409 });
+      const alreadyLinked = assets.some((item) => item.campaignId === pending.campaign_id && item.type === type && item.text?.some((text) => text === duplicateText) && (type !== "SITELINK" || item.finalUrls?.includes(String(draft.finalUrl || ""))));
+      if (alreadyLinked) return Response.json({ error: "This asset is already linked to the selected campaign, so no duplicate was added." }, { status: 409 });
+      const applyStartedAt = new Date().toISOString();
+      const claim = await env.DB.prepare("UPDATE google_ads_pending_changes SET status = 'applying', payload_json = ?3 WHERE id = ?1 AND owner_id = ?2 AND status = 'pending'").bind(pending.id, access.ownerId, JSON.stringify({ ...payload, applyStartedAt })).run();
+      if (!claim.meta.changes) return Response.json({ error: "This proposal is already being applied or has already been used." }, { status: 409 });
+      let created: Awaited<ReturnType<typeof createGoogleAdsCampaignAsset>>;
+      try {
+        if (type === "SITELINK") created = await createGoogleAdsCampaignAsset(access.ownerId, pending.customer_id, pending.campaign_id, { type: "SITELINK", linkText: String(draft.linkText || ""), description1: String(draft.description1 || ""), description2: String(draft.description2 || ""), finalUrl: String(draft.finalUrl || "") }, payload.assetName);
+        else if (type === "CALLOUT") created = await createGoogleAdsCampaignAsset(access.ownerId, pending.customer_id, pending.campaign_id, { type: "CALLOUT", calloutText: String(draft.calloutText || "") }, payload.assetName);
+        else if (type === "STRUCTURED_SNIPPET") created = await createGoogleAdsCampaignAsset(access.ownerId, pending.customer_id, pending.campaign_id, { type: "STRUCTURED_SNIPPET", header: String(draft.header || ""), values: Array.isArray(draft.values) ? draft.values.map(String) : [] }, payload.assetName);
+        else {
+          await env.DB.prepare("UPDATE google_ads_pending_changes SET status = 'pending' WHERE id = ?1 AND owner_id = ?2 AND status = 'applying'").bind(pending.id, access.ownerId).run();
+          return Response.json({ error: "This asset type is not supported for automatic approval yet." }, { status: 400 });
+        }
+      } catch (error) {
+        console.error("Google Ads campaign asset approval needs recovery", error instanceof Error ? error.message : "unknown");
+        return Response.json({ error: "Google Ads did not confirm the result. The approval is saved safely; refresh after a minute and use Retry to check before applying again." }, { status: 502 });
+      }
+      let verified = false;
+      try {
+        const after = await listGoogleAdsCampaignLevelAssets(access.ownerId, pending.customer_id, pending.campaign_id);
+        verified = after.some((item) => item.associationResourceName === created.associationResourceName && item.status !== "REMOVED");
+      } catch (error) { console.error("Google Ads asset read-back failed", error instanceof Error ? error.message : "unknown"); }
+      const now = new Date().toISOString();
+      const newValue = JSON.stringify({ asset: draft, assetResourceName: created.assetResourceName, associationResourceName: created.associationResourceName });
+      const display = type === "SITELINK" ? String(draft.linkText) + " → " + String(draft.finalUrl) : type === "CALLOUT" ? String(draft.calloutText) : String(draft.header) + ": " + (draft.values || []).join(" · ");
+      const detail = client.name + ": added campaign " + type.toLowerCase().replaceAll("_", " ") + " to " + campaign.name + ": " + display + ". " + (verified ? "Google Ads read-back confirmed it is linked." : "Google Ads accepted the change, but live read-back did not confirm the link.") + " Approved and applied by " + user.displayName + ".";
+      const chatScope = "Google Ads::campaign:" + campaign.id;
+      await env.DB.batch([
+        env.DB.prepare("UPDATE google_ads_pending_changes SET status = 'applied', payload_json = ?3 WHERE id = ?1 AND owner_id = ?2 AND status = 'applying'").bind(pending.id, access.ownerId, JSON.stringify({ ...payload, assetResourceName: created.assetResourceName, associationResourceName: created.associationResourceName })),
+        env.DB.prepare("INSERT INTO google_ads_change_log (id, owner_id, client_id, service, campaign_id, campaign_name, change_type, old_value, new_value, actor, created_at) VALUES (?1, ?2, ?3, 'Google Ads', ?4, ?5, 'ADD_CAMPAIGN_ASSET', 'absent', ?6, ?7, ?8, ?9)").bind(crypto.randomUUID(), access.ownerId, client.id, campaign.id, campaign.name, newValue, user.displayName, now),
+        env.DB.prepare("INSERT INTO client_ai_messages (id, client_id, service, role, content, created_by, created_at) VALUES (?1, ?2, ?3, 'assistant', ?4, ?5, ?6)").bind(crypto.randomUUID(), client.id, chatScope, "✅ Google Ads asset added\n" + detail, user.displayName, now),
+      ]);
+      return Response.json({ ok: true, client: client.name, campaign: campaign.name, campaignId: campaign.id, action: "ADD_CAMPAIGN_ASSET", detail, oldValue: "absent", newValue, actor: user.displayName, changedAt: now, verified });
     }
     if (pending.change_type === "UPDATE_RESPONSIVE_SEARCH_AD") {
       const payload = JSON.parse(pending.payload_json || "{}") as { adId?: string; campaignId?: string; adGroupId?: string; newContent?: { headlines?: Array<{ text: string; pinnedField?: string }>; descriptions?: Array<{ text: string; pinnedField?: string }> } };

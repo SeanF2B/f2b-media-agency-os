@@ -2,11 +2,11 @@
  * Keep only the generic, sign-in-gated app shell and immutable static assets
  * available offline. Never cache workspace, client, or API responses.
  */
-const SHELL_CACHE = "f2b-app-shell-v5";
-const ASSET_CACHE = "f2b-static-assets-v5";
+const SHELL_CACHE = "f2b-app-shell-v7";
+const ASSET_CACHE = "f2b-static-assets-v7";
 // Keep the offline copy tied to this service-worker release. A generic `/`
 // cache key can otherwise restore an old client shell after a new deploy.
-const APP_SHELL = new URL("/?app-shell-version=5", self.location.origin).href;
+const APP_SHELL = new URL("/?app-shell-version=7", self.location.origin).href;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());

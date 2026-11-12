@@ -1,5 +1,6 @@
 import { getChatGPTUser } from "../../chatgpt-auth";
 import { env } from "cloudflare:workers";
+import { aiConfigured, aiEndpoint, aiHeaders, aiImageModel, aiModel, aiProviderName, resolveAiProvider } from "@/lib/ai-provider";
 import { fullTeamPermissions, getTeamPermissions, type TeamPermissions } from "@/lib/access-permissions";
 import { googleAdsPerformanceWindow, type GoogleAdsRange } from "@/lib/google-ads-performance";
 import { summarizeMetaAdsRows, summarizeMetaAdsTotals, type MetaAdsRow } from "@/lib/meta-ads-performance";
@@ -133,14 +134,16 @@ function wordpressLandingPage(parsed: any) {
 }
 
 async function openAiText(instructions: string, input: unknown, maxOutputTokens = 3000) {
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST", headers: { Authorization: `Bearer ${env.OPENAI_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: env.OPENAI_MODEL || "gpt-6-luna", instructions, input, max_output_tokens: maxOutputTokens, store: false }),
+  const selectedAiProvider = await resolveAiProvider(env);
+  const provider = aiProviderName(env, selectedAiProvider);
+  const response = await fetch(aiEndpoint(env, "responses", selectedAiProvider)!, {
+    method: "POST", headers: aiHeaders(env, selectedAiProvider)!,
+    body: JSON.stringify({ model: aiModel(env, undefined, selectedAiProvider), instructions, input, max_output_tokens: maxOutputTokens, store: false }),
   });
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
     console.error("Studio text generation failed", { status: response.status, requestId: response.headers.get("x-request-id"), detail: detail.slice(0, 700) });
-    throw new Error(response.status === 429 ? "OpenAI quota or rate limit reached. Check API billing and project limits." : "OpenAI could not generate this item. Check the API key and model access.");
+    throw new Error(response.status === 429 ? `${provider || "AI provider"} quota or rate limit reached. Check provider billing and project limits.` : `${provider || "AI provider"} could not generate this item. Check the API key and model access.`);
   }
   return outputText(await response.json());
 }
@@ -262,7 +265,8 @@ export async function POST(request: Request) {
     if (!admin && !permissions.reports) return respond("You do not have permission to use Studio.", 403);
     const body = await request.json() as Record<string, any>;
     const kind = String(body.kind || "");
-    if (!env.OPENAI_API_KEY && !(kind === "report" && body.includeAiCommentary === false)) return respond("OpenAI API key is not configured on the app server.", 503);
+    const selectedAiProvider = await resolveAiProvider(env, String(data.ownerId || ""));
+    if (!aiConfigured(env, selectedAiProvider) && !(kind === "report" && body.includeAiCommentary === false)) return respond("Connect an AI provider in Settings → API Keys before using Studio.", 503);
     const client = (data.clients || []).find((item: any) => item.id === String(body.clientId || ""));
     if (body.clientId && !client) return respond("Choose a client in this workspace.");
     if (client && !admin && !permissions.clients) {
@@ -447,11 +451,13 @@ export async function POST(request: Request) {
       const creative = await openAiText("Write concise Meta ad creative for a poster. Return a JSON object with headline, body, callToAction, imagePrompt, and altText. Keep claims grounded in the supplied client details; no fake offers, testimonials, guarantees or statistics. Image prompt should request a polished, legible ad poster with minimal on-image text; include exact headline only if short.", JSON.stringify({ client: clientContext, savedDesignFormula: String(data.studioSettings?.designFormula || ""), brief }), 1200);
       let parsed: any;
       try { parsed = JSON.parse(creative.replace(/^```json\s*|\s*```$/g, "")); } catch { return respond("Could not format the poster copy. Please try again with a shorter brief.", 502); }
-      const imageResponse = await fetch("https://api.openai.com/v1/images/generations", {
-        method: "POST", headers: { Authorization: `Bearer ${env.OPENAI_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "gpt-image-1.5", prompt: `${String(data.studioSettings?.designFormula || "")}\n${String(parsed.imagePrompt || "")}`, size: "1024x1536", quality: "medium", n: 1 }),
+      const imageResponse = await fetch(aiEndpoint(env, "images", selectedAiProvider)!, {
+        method: "POST", headers: aiHeaders(env, selectedAiProvider)!,
+        body: JSON.stringify(selectedAiProvider?.name === "OpenRouter"
+          ? { model: aiImageModel(env, selectedAiProvider), prompt: `${String(data.studioSettings?.designFormula || "")}\n${String(parsed.imagePrompt || "")}`, size: "1024x1536", quality: "medium", n: 1 }
+          : { model: aiImageModel(env, selectedAiProvider), prompt: `${String(data.studioSettings?.designFormula || "")}\n${String(parsed.imagePrompt || "")}`, size: "1024x1536", quality: "medium", n: 1 }),
       });
-      if (!imageResponse.ok) { const detail = await imageResponse.text().catch(() => ""); console.error("Studio poster generation failed", imageResponse.status, detail.slice(0, 500)); return respond(imageResponse.status === 429 ? "OpenAI image quota or rate limit reached." : "The image model could not create this poster. Check image model access and try again.", 502); }
+      if (!imageResponse.ok) { const detail = await imageResponse.text().catch(() => ""); const providerName = selectedAiProvider?.name || "AI provider"; console.error("Studio poster generation failed", { provider: providerName, status: imageResponse.status, detail: detail.slice(0, 500) }); return respond(imageResponse.status === 429 ? `${providerName} image quota or rate limit reached.` : "The image model could not create this poster. Check image model access and try again.", 502); }
       const imageData = await imageResponse.json() as { data?: Array<{ b64_json?: string }> };
       const b64 = imageData.data?.[0]?.b64_json;
       if (!b64) return respond("The image service returned no poster image.", 502);

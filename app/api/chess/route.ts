@@ -51,14 +51,25 @@ async function recordChessEmailActivity(actor: { id: string; name: string; avata
 export async function GET() {
   const user = await getChatGPTUser();
   if (!user) return Response.json({ error: "Sign in to open chess." }, { status: 401 });
-  const row = await readWorkspace();
+  if (!env.DB) return Response.json({ error: "Workspace database is unavailable." }, { status: 503 });
+  // Chess refreshes frequently. Read only its small state and team directory
+  // from the workspace JSON instead of parsing the full multi-megabyte record
+  // (which also contains client files, task history, and images) on each poll.
+  const row = await env.DB.prepare(`
+    SELECT owner_id,
+      json_extract(data, '$.staff') AS staff_json,
+      json_extract(data, '$.chessGames') AS games_json
+    FROM workspace_documents WHERE id = ?1
+  `).bind("f2b-agency").first<{ owner_id: string | null; staff_json: string | null; games_json: string | null }>();
   if (!row) return Response.json({ error: "Workspace database is unavailable." }, { status: 503 });
-  const data = JSON.parse(row.data); const identity = getIdentity(data, user);
-  if (!data.ownerId || !(data.ownerId === user.userId || identity.profile)) return Response.json({ error: "Chess is available to F2B team members only." }, { status: 403 });
-  const games: Game[] = data.chessGames || [];
+  const chessStaff = row.staff_json ? JSON.parse(row.staff_json) as Array<{ id: string; name: string; avatar?: string; email?: string; isBot?: boolean }> : [];
+  const data = { staff: chessStaff };
+  const identity = getIdentity(data, user);
+  if (!row.owner_id || !(row.owner_id === user.userId || identity.profile)) return Response.json({ error: "Chess is available to F2B team members only." }, { status: 403 });
+  const games: Game[] = row.games_json ? JSON.parse(row.games_json) as Game[] : [];
   const visible = games.filter((g) => g.status === "active" || g.status === "pending" || g.whiteId === identity.id || g.blackId === identity.id || g.challengerId === identity.id || g.challengedId === identity.id).map((g) => ({ ...g, ...(g.status === "active" || g.status === "pending" ? { timeControl: "inf" as const, clocks: { w: 0, b: 0 } } : {}), whiteName: memberName(data, g.whiteId), blackName: memberName(data, g.blackId) }));
   const aiAvatar = data.staff?.find((s: any) => s.id === "f2b-ai-agent")?.avatar || "🤖";
-  const staff = (data.staff || []).filter((s: any) => !s.isBot).map((s: any) => ({ id: s.id, name: s.name, avatar: s.avatar }));
+  const staff = chessStaff.filter((s: any) => !s.isBot).map((s: any) => ({ id: s.id, name: s.name, avatar: s.avatar }));
   const leaderboardPeople = [...staff, { id: "chess-ai", name: "Connor · AI", avatar: aiAvatar }];
   const standings = new Map<string, { id: string; name: string; avatar?: string; wins: number; games: number }>(leaderboardPeople.map((person: any) => [person.id, { id: person.id, name: person.name, avatar: person.avatar, wins: 0, games: 0 }] as const));
   for (const game of games) {

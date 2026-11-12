@@ -7,10 +7,12 @@ export function canOpenPage(page: string, permissions: TeamPermissions, isAdmin:
     : page === "CRM" ? isAdmin
     : page === "Tasks" ? permissions.tasks || permissions.aiTasks
     : page === "SEO" ? permissions.clients || hasClientScope || isAdmin
+    : page === "Tracking & Analytics" ? permissions.reports || isAdmin
+    : page === "Email Marketing" || page === "Cold Outreach" ? isAdmin
     : page === "Google Ads" || page === "Meta Ads" ? permissions.reports || isAdmin
     : page === "Time & Timesheets" ? permissions.timesheets
     : page === "AI Assistant" ? permissions.aiAssistant
-    : page === "Sites" || page === "Automations" || page === "Integrations" || page === "Lead Factory" ? isAdmin
+    : page === "Sites" || page === "Automations" || page === "Integrations" || page === "Lead Factory" || page === "Settings" ? isAdmin
     : ["Reports", "Report Studio", "Proposal Studio"].includes(page) ? permissions.reports || isAdmin
     : page === "Team" ? permissions.team || isAdmin
     : page === "Client Vault" ? permissions.vault && isAdmin

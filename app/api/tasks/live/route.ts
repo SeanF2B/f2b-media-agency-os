@@ -22,30 +22,44 @@ export async function GET() {
     // This avoids parsing and serializing the full workspace on every short poll.
     const row = await env.DB.prepare(`
       SELECT
-        json_extract(data, '$.ownerId') AS owner_id,
+        json_extract(data, '$.ownerId') AS owner_json_id,
+        (workspace.owner_id = ?1 OR lower(json_extract(data, '$.settings.adminEmail')) = lower(?2)
+          OR EXISTS (SELECT 1 FROM json_each(data, '$.staff') member
+            WHERE lower(json_extract(member.value, '$.email')) = lower(?2)
+              AND json_extract(member.value, '$.isBot') IS NOT 1
+              AND json_extract(member.value, '$.role') IN ('Owner', 'Admin'))) AS can_manage,
         json_extract(data, '$.staff') AS staff_json,
-        (SELECT json_group_array(json(value))
-          FROM json_each(data, '$.tasks')
-          WHERE json_extract(value, '$.assigneeId') LIKE 'f2b-ai-agent%') AS tasks_json,
-        (SELECT json_group_array(json_object(
-          'id', json_extract(client.value, '$.id'),
-          'name', json_extract(client.value, '$.name'),
-          'color', json_extract(client.value, '$.color'),
-          'logo', json_extract(client.value, '$.logo'),
-          'googleAdsAccountId', json_extract(client.value, '$.googleAdsAccountId')
-        ))
-          FROM json_each(data, '$.clients') AS client
+        (SELECT json_group_array(json(task.value))
+          FROM json_each(data, '$.tasks') AS task
+          WHERE json_extract(task.value, '$.assigneeId') LIKE 'f2b-ai-agent%'
+            AND coalesce(json_extract(task.value, '$.status'), '') NOT IN ('Done', 'Cancelled')
+            OR (json_extract(task.value, '$.assigneeId') LIKE 'f2b-ai-agent%'
+              AND json_extract(task.value, '$.status') = 'Done'
+              AND datetime(coalesce(json_extract(task.value, '$.aiRunAt'), json_extract(task.value, '$.completedAt'))) >= datetime('now', '-1 day'))) AS tasks_json,
+        (SELECT json_group_array(json(client.value)) FROM json_each(data, '$.clients') AS client
           WHERE json_extract(client.value, '$.id') IN (
-            SELECT json_extract(task.value, '$.clientId')
+            SELECT DISTINCT json_extract(task.value, '$.clientId')
             FROM json_each(data, '$.tasks') AS task
             WHERE json_extract(task.value, '$.assigneeId') LIKE 'f2b-ai-agent%'
+              AND coalesce(json_extract(task.value, '$.status'), '') NOT IN ('Done', 'Cancelled')
+              OR (json_extract(task.value, '$.assigneeId') LIKE 'f2b-ai-agent%'
+                AND json_extract(task.value, '$.status') = 'Done'
+                AND datetime(coalesce(json_extract(task.value, '$.aiRunAt'), json_extract(task.value, '$.completedAt'))) >= datetime('now', '-1 day'))
           )) AS clients_json
-      FROM workspace_documents WHERE id = ?1
-    `).bind("f2b-agency").first<{ owner_id: string | null; staff_json: string | null; tasks_json: string | null; clients_json: string | null }>();
+      FROM workspace_documents workspace WHERE workspace.id = ?3
+    `).bind(user.userId, user.email, "f2b-agency").first<{ owner_json_id: string | null; can_manage: number; staff_json: string | null; tasks_json: string | null; clients_json: string | null }>();
 
     if (!row) return Response.json({ tasks: [], clients: [] });
+    // Return D1's already-encoded JSON directly for owners. The live endpoint
+    // is polled every few seconds, so do not repeatedly send years of reports.
+    // The client keeps older task history from its workspace snapshot and
+    // overlays active tasks plus recently completed runs from this response.
+    if (row.can_manage) {
+      const body = `{"tasks":${row.tasks_json || "[]"},"clients":${row.clients_json || "[]"}}`;
+      return new Response(body, { headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } });
+    }
     const staff = row.staff_json ? JSON.parse(row.staff_json) as Staff[] : [];
-    const data = { ownerId: row.owner_id || undefined, staff };
+    const data = { ownerId: row.owner_json_id || undefined, staff };
     const manager = canManage(data, user);
     const profile = staff.find((member) => !member.isBot && (member.id === user.userId || member.email?.toLowerCase() === user.email.toLowerCase()));
     if (data.ownerId !== user.userId && !profile) return Response.json({ error: "Your account is not on the F2B team yet." }, { status: 403 });
