@@ -223,13 +223,14 @@ export function AutomationBuilder({ id, scope, onBack, onToggle, onChanged }: { 
           {graph.slots.map((slot) => <div key={`slot-${slot.afterId}-${slot.branch || "next"}`} className={`ca-slot ${slot.kind}`} style={{ left: slot.x, top: slot.y }} data-no-pan>
             {slot.label && <span className={`ca-branch-label ${slot.branch}`}>{slot.label}</span>}
             <button type="button" className="ca-plus" aria-label={`Add a step${slot.label ? ` on the ${slot.label} path` : ""}`} onClick={(event) => { const rect = canvasRef.current?.getBoundingClientRect(); setMenu({ afterId: slot.afterId, branch: slot.branch, x: event.clientX - (rect?.left || 0), y: event.clientY - (rect?.top || 0) }); }}><Plus size={14} /></button>
-            {slot.kind === "end" && <span className="ca-end-label">End</span>}
+            {slot.kind === "end" && <span className="ca-end-label">END</span>}
           </div>)}
           {graph.placed.map(({ node, x, y }) => {
             const Icon = iconFor(node);
             return <button key={node.id} type="button" data-no-pan className={`ca-node ${node.type === "trigger" ? "trigger" : ""} ${node.type === "if_else" ? "branch" : ""} ${selected === node.id ? "selected" : ""}`} style={{ left: x, top: y, width: NODE_W, height: NODE_H }} onClick={() => { setSelected(node.id); setMenu(null); }}>
               <span className={`ca-node-icon t-${node.type}`}><Icon size={18} /></span>
-              <span className="ca-node-text"><small>{node.type === "trigger" ? "When this happens" : nodeTitle(node)}</small><b>{node.type === "trigger" ? nodeTitle(node) : nodeSummary(node, { stageName, staffName })}</b>{node.type === "trigger" && <em>{nodeSummary(node, { stageName, staffName })}</em>}</span>
+              <span className="ca-node-text"><b>{nodeTitle(node)}</b><em>{nodeSummary(node, { stageName, staffName })}</em></span>
+              {node.type === "trigger" && <span className="ca-node-chip">Trigger</span>}
             </button>;
           })}
         </div>
