@@ -75,7 +75,16 @@ export function createCardDragFx(preview: HTMLElement, source: HTMLElement, grab
     const element = ensureSlot();
     const reference = before || null;
     if (element.parentElement === container && (reference ? element.nextElementSibling === reference : element === container.lastElementChild)) return;
+    // Trello-style: neighbouring cards glide to their new places as the slot moves.
+    const before0 = new Map(cards.map((card) => [card, card.getBoundingClientRect().top] as const));
     container.insertBefore(element, reference);
+    cards.forEach((card) => {
+      const from = before0.get(card);
+      if (from === undefined || typeof card.animate !== "function") return;
+      const delta = from - card.getBoundingClientRect().top;
+      if (Math.abs(delta) < 1) return;
+      card.animate([{ transform: `translateY(${delta}px)` }, { transform: "translateY(0)" }], { duration: 160, easing: "cubic-bezier(.2,.75,.25,1)" });
+    });
   };
 
   // Trello-style: dragging near the top or bottom edge of a long column scrolls it.
