@@ -129,19 +129,49 @@ export function createCardDragFx(preview: HTMLElement, source: HTMLElement, grab
   // Trello-style: dragging near the top or bottom edge of a long column scrolls it.
   const EDGE = 70;
   const MAX_STEP = 18;
+  let lastPointerX = 0;
+  const scrollableParent = (start: HTMLElement | null, axis: "x" | "y"): HTMLElement | null => {
+    for (let node = start; node && node !== document.body; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      const overflow = axis === "y" ? style.overflowY : style.overflowX;
+      const room = axis === "y" ? node.scrollHeight > node.clientHeight + 1 : node.scrollWidth > node.clientWidth + 1;
+      if (room && /(auto|scroll)/.test(overflow)) return node;
+    }
+    return null;
+  };
+  const edgeStep = (position: number, start: number, end: number) => {
+    if (position < start + EDGE) return -MAX_STEP * clamp(1 - (position - start) / EDGE, 0, 1);
+    if (position > end - EDGE) return MAX_STEP * clamp(1 - (end - position) / EDGE, 0, 1);
+    return 0;
+  };
   const autoScroll = () => {
     scrollFrame = 0;
+    let moved = false;
     const column = lastColumn;
-    if (!column || column.scrollHeight <= column.clientHeight + 1) return;
-    const rect = column.getBoundingClientRect();
-    let step = 0;
-    if (lastY < rect.top + EDGE) step = -MAX_STEP * clamp(1 - (lastY - rect.top) / EDGE, 0, 1);
-    else if (lastY > rect.bottom - EDGE) step = MAX_STEP * clamp(1 - (rect.bottom - lastY) / EDGE, 0, 1);
-    if (!step) return;
-    column.scrollTop += step;
-    placeSlot(lastY, column);
-    scrollFrame = window.requestAnimationFrame(autoScroll);
+    // 1. The column under the pointer scrolls when you reach its top or bottom edge.
+    if (column && column.scrollHeight > column.clientHeight + 1) {
+      const rect = column.getBoundingClientRect();
+      const step = edgeStep(lastY, rect.top, rect.bottom);
+      if (step) { column.scrollTop += step; moved = true; }
+    }
+    // 2. The page scrolls when you reach the top or bottom of the window.
+    const pageStep = edgeStep(lastY, 0, window.innerHeight);
+    if (pageStep) {
+      const pageScroller = scrollableParent(column?.parentElement || source.parentElement, "y");
+      if (pageScroller) pageScroller.scrollTop += pageStep; else window.scrollBy(0, pageStep);
+      moved = true;
+    }
+    // 3. The board scrolls sideways when you reach the left or right of the window.
+    const sideStep = edgeStep(lastPointerX, 0, window.innerWidth);
+    if (sideStep) {
+      const sideScroller = scrollableParent(column?.parentElement || source.parentElement, "x");
+      if (sideScroller) sideScroller.scrollLeft += sideStep; else window.scrollBy(sideStep, 0);
+      moved = true;
+    }
+    if (moved && column) placeSlot(lastY, column);
+    if (dragging) scrollFrame = window.requestAnimationFrame(autoScroll);
   };
+  let dragging = true;
 
   const moveInner = (clientX: number, clientY: number, column?: HTMLElement | null) => {
     if (lastX !== null) {
@@ -158,8 +188,9 @@ export function createCardDragFx(preview: HTMLElement, source: HTMLElement, grab
     }, 110);
     lastColumn = column || null;
     lastY = clientY;
-    if (column) { placeSlot(clientY, column); if (!scrollFrame) scrollFrame = window.requestAnimationFrame(autoScroll); }
-    else removeSlot();
+    lastPointerX = clientX;
+    if (column) placeSlot(clientY, column); else removeSlot();
+    if (!scrollFrame) scrollFrame = window.requestAnimationFrame(autoScroll);
   };
 
   return {
@@ -172,6 +203,7 @@ export function createCardDragFx(preview: HTMLElement, source: HTMLElement, grab
       return { column: target.column, beforeId: beforeCard ? beforeCard.dataset.opportunityId || beforeCard.id.replace(/^task-/, "") || null : null };
     },
     end() {
+      dragging = false;
       window.clearTimeout(idleTimer);
       if (scrollFrame) window.cancelAnimationFrame(scrollFrame);
       scrollFrame = 0;
