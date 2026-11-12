@@ -142,7 +142,7 @@ export async function builderAction(SiteError, env, clientId, req, { store, site
     for (const f of files) { const r = await store.read(f.path); const d = J(r?.text || ''); if (!d) continue; pages.push({ slug: f.path.slice(BUILDER_DIR.length, -5), title: d.title || '', url: d.url || '', seo: d.seo || {}, blocks: (d.blocks || []).length, updatedAt: f.updated_at, updatedBy: f.updated_by, version: f.version }); }
     pages.sort((a, c) => (a.slug === 'home' ? -1 : c.slug === 'home' ? 1 : a.title.localeCompare(c.title)));
     const { config, sha } = await readConfig();
-    return { ready: true, canWrite, role: isClient ? 'client' : canWrite ? 'admin' : 'staff', previewUrl: preview, pages, config, configSha: sha, imageDir: BUILDER_IMAGE_DIR, history: await store.history({ limit: 15 }), canImport: canWrite && !isClient && pages.length === 0 && (await store.list()).some(f => f.path.startsWith('src/content/')), templates: (canWrite && !isClient && pages.length === 0) ? await templateSources(env, clientId) : [] };
+    return { ready: true, canWrite, role: isClient ? 'client' : canWrite ? 'admin' : 'staff', previewUrl: preview, pages, config, configSha: sha, imageDir: BUILDER_IMAGE_DIR, history: await store.history({ limit: 15 }), canImport: canWrite && !isClient && pages.length === 0 && (await store.list()).some(f => f.path.startsWith('src/content/')), canImportLive: canWrite && !isClient && pages.length === 0, templates: (canWrite && !isClient && pages.length === 0) ? await templateSources(env, clientId) : [] };
   }
   if (op === 'builder-read') {
     const slug = str(req.slug, 70); if (!SLUG_RE.test(slug)) throw err(SiteError, 400, 'Bad page name.');
@@ -157,6 +157,23 @@ export async function builderAction(SiteError, env, clientId, req, { store, site
     const changes = pages.map(p => ({ path: pathForSlug(p.slug), text: JSON.stringify(normalizePage(SiteError, p, p.slug), null, 2) }));
     changes.push({ path: CONFIG_PATH, text: JSON.stringify(normalizeConfig(SiteError, config), null, 2) });
     const c = await store.commit({ changes, message: `Visual builder: started from the current site (${pages.length} pages)`, actor, kind: 'import-builder' });
+    return { imported: pages.length, version: c.version };
+  }
+  if (op === 'builder-import-live') {
+    if (!canWrite || isClient) throw err(SiteError, 403, 'Only F2B Media can import a website.');
+    if ((await store.list()).some(f => isBuilderPath(f.path))) throw err(SiteError, 409, 'This site already has builder pages.');
+    let u; try { u = new URL(String(req.url || '').trim()); } catch { throw err(SiteError, 400, 'Enter the full website address, e.g. https://example.workers.dev'); }
+    if (u.protocol !== 'https:' || !/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(u.hostname) || /^\d+(\.\d+){3}$/.test(u.hostname) || /(^|\.)(localhost|local|internal)$/i.test(u.hostname)) throw err(SiteError, 400, 'Only public https websites can be imported.');
+    const { importLiveSite } = await import('./html-import');
+    let pages; try { pages = await importLiveSite(u.origin); } catch (e) { throw err(SiteError, 502, `Could not read that website: ${String(e?.message || e).slice(0, 140)}`); }
+    if (!pages.length) throw err(SiteError, 404, 'No pages found on that website.');
+    const changes = pages.map(p => ({ path: pathForSlug(p.slug), text: JSON.stringify(normalizePage(SiteError, p, p.slug), null, 2) }));
+    const theme = { ...DEFAULT_CONFIG.theme, name: str(req.businessName, 60) };
+    if (/^#[0-9a-fA-F]{6}$/.test(String(req.primary || ''))) theme.primary = req.primary;
+    if (/^#[0-9a-fA-F]{6}$/.test(String(req.secondary || ''))) theme.secondary = req.secondary;
+    changes.push({ path: CONFIG_PATH, text: JSON.stringify(normalizeConfig(SiteError, { ...DEFAULT_CONFIG, theme }), null, 2) });
+    await env.DB.prepare('UPDATE site_content_sites SET preview_url = CASE WHEN preview_url = \'\' THEN ?2 ELSE preview_url END WHERE client_id = ?1').bind(clientId, u.origin).run();
+    const c = await store.commit({ changes, message: `Visual builder: imported ${pages.length} pages from ${u.hostname}`, actor, kind: 'import-builder' });
     return { imported: pages.length, version: c.version };
   }
   if (op === 'builder-template') {

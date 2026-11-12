@@ -316,6 +316,7 @@
       if (!S.page) {
         stage.append(h('div', { class: 'sb-empty' }, h('h3', {}, S.list.pages.length ? 'Choose a page' : 'No pages yet'), h('p', {}, S.list.pages.length ? 'Pick a page from the list at the top.' : 'Start from this client’s current website, or begin with a blank page.'),
           S.list.canImport ? h('button', { type: 'button', class: 'sb-btn primary', onclick: doImport }, '✨ Start from the current website') : null,
+          S.list.canImportLive ? h('button', { type: 'button', class: 'sb-btn primary', onclick: doImportLive }, '🌐 Import from a live website link') : null,
           ...(S.list.templates || []).map(t => h('button', { type: 'button', class: 'sb-btn primary', onclick: () => doTemplate(t) }, '🧩 Use the ' + t.name + ' template')),
           S.list.canWrite && !S.list.pages.length ? h('button', { type: 'button', class: 'sb-btn', onclick: () => newPageDialog(false) }, '＋ Blank page') : null));
         return;
@@ -479,6 +480,14 @@
       if (!slug || slug === S.slug) return;
       if (S.dirty && !confirm('You have unsaved changes on this page. Leave them behind?')) { renderTop(); return; }
       try { await openPage(slug); } catch (e) { toast(e.message, 'err'); renderTop(); }
+    }
+    async function doImportLive() {
+      const url = (window.prompt('Paste the website address to import (e.g. https://redislandinteriors-preview-v2.f2b-media.workers.dev)') || '').trim(); if (!url) return;
+      try {
+        const cs = getComputedStyle(document.documentElement), hex = v => (/^#[0-9a-f]{6}$/i.test(v.trim()) ? v.trim() : '');
+        toast('Reading the website…'); const r = await api('builder-import-live', {}, { url, businessName: opts.name || '', primary: hex(cs.getPropertyValue('--brand-primary')), secondary: hex(cs.getPropertyValue('--brand-secondary')) });
+        toast(`Imported ${r.imported} pages`); await loadList(); const first = S.list.pages[0]; if (first) await openPage(first.slug);
+      } catch (e) { toast(e.message, 'err'); }
     }
     async function doTemplate(t) {
       try {
