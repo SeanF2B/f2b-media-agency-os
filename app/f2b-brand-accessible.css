@@ -8398,3 +8398,11 @@ html body .app-shell.app-shell button[role="tab"] > span:last-child:not(:first-c
 .app-shell .client-dot.agency-dot img { object-fit: contain !important; border-radius: 8px !important; }
 .app-shell .sidebar .client-scope-menu .client-dot { width: 34px !important; height: 34px !important; }
 .app-shell .client-nav-item { min-height: 46px; gap: 12px; }
+
+/* Dark mode never changes the sidebar: it always uses the brand secondary colour */
+.app-shell.dark-mode .sidebar, .app-shell.dark-mode aside.sidebar { background: linear-gradient(180deg, var(--brand-sidebar,#1e3a8a), color-mix(in srgb, var(--brand-sidebar,#1e3a8a) 82%, #000)) !important; border-color: color-mix(in srgb, var(--brand-sidebar,#1e3a8a) 80%, #000) !important; }
+.app-shell.dark-mode .sidebar .nav-item, .app-shell.dark-mode .sidebar .client-nav-item { color: rgba(255,255,255,.92) !important; background: transparent; }
+.app-shell.dark-mode .sidebar .nav-item:hover, .app-shell.dark-mode .sidebar .client-nav-item:hover { background: color-mix(in srgb, #fff 12%, var(--brand-sidebar,#1e3a8a)) !important; }
+.app-shell.dark-mode .sidebar .nav-item.active, .app-shell.dark-mode .sidebar .client-nav-item.active, .app-shell.dark-mode .sidebar .sidebar-settings-link { background: color-mix(in srgb, #fff 18%, var(--brand-sidebar,#1e3a8a)) !important; color: #fff !important; }
+.app-shell.dark-mode .sidebar .nav-count { background: color-mix(in srgb, #fff 22%, var(--brand-sidebar,#1e3a8a)) !important; color: #fff !important; }
+.app-shell.dark-mode .sidebar .client-scope-trigger { background: color-mix(in srgb, #fff 10%, var(--brand-sidebar,#1e3a8a)) !important; border-color: color-mix(in srgb, #fff 28%, var(--brand-sidebar,#1e3a8a)) !important; color: #fff !important; }
