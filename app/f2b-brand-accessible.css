@@ -8047,3 +8047,10 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
   background: color-mix(in srgb, var(--icon-danger) 26%, transparent) !important; border-color: var(--icon-danger) !important; transform: translateY(-1px); box-shadow: 0 4px 10px color-mix(in srgb, var(--icon-danger) 25%, transparent) !important;
 }
 @media (prefers-reduced-motion: reduce) { .app-shell .icon-button:hover, .app-shell .task-delete:hover, .app-shell .crm-card-icon:hover { transform: none; } }
+
+/* Dropdown lists are readable everywhere (light and dark) */
+.app-shell.dark-mode select, .dark-mode select { color-scheme: dark; }
+.app-shell.dark-mode select option, .app-shell.dark-mode select optgroup, .dark-mode select option, .dark-mode select optgroup { background-color: #2b2c30 !important; color: #f4f4f5 !important; }
+.app-shell:not(.dark-mode) select { color-scheme: light; }
+.app-shell:not(.dark-mode) select option, .app-shell:not(.dark-mode) select optgroup { background-color: #ffffff !important; color: #1a1a1a !important; }
+.app-shell select option:checked, .app-shell select option:hover { background-color: #3b82f6 !important; color: #ffffff !important; }
