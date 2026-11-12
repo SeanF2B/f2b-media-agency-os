@@ -8019,3 +8019,31 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
   margin: -1px -1px 8px !important; padding: 12px 12px 8px !important;
   box-shadow: 0 6px 8px -4px var(--stage-base) !important;
 }
+
+/* ===== One consistent look for icon buttons across the whole OS ===== */
+.app-shell { --icon-accent: #3b82f6; --icon-danger: #e5484d; --icon-border: rgba(127,127,127,.38); --icon-fill: rgba(127,127,127,.12); }
+.app-shell .icon-button, .app-shell .crm-card-icon, .app-shell .crm-stage-action, .app-shell .crm-contact-action-icon, .app-shell .crm-contact-inline-icon,
+.app-shell .task-checklist-icon-button, .app-shell .team-edit-icon, .app-shell .assistant-header-action,
+.app-shell .task-card-actions > button:not(.task-delete), .app-shell .lead-profile-card-actions > button:not(.task-delete) {
+  display: inline-flex !important; align-items: center; justify-content: center; min-width: 30px; height: 30px; padding: 0 8px;
+  border: 1px solid var(--icon-border) !important; border-radius: 9px !important; background: var(--icon-fill) !important; color: inherit !important;
+  box-shadow: none !important; cursor: pointer; line-height: 1; font-size: 14px;
+  transition: background-color .16s ease, border-color .16s ease, color .16s ease, transform .16s ease, box-shadow .16s ease;
+}
+.app-shell .icon-button:hover, .app-shell .crm-card-icon:hover, .app-shell .crm-stage-action:hover, .app-shell .crm-contact-action-icon:hover, .app-shell .crm-contact-inline-icon:hover,
+.app-shell .task-checklist-icon-button:hover, .app-shell .team-edit-icon:hover, .app-shell .assistant-header-action:hover,
+.app-shell .task-card-actions > button:not(.task-delete):hover, .app-shell .lead-profile-card-actions > button:not(.task-delete):hover,
+.app-shell .icon-button:focus-visible, .app-shell .crm-card-icon:focus-visible, .app-shell .task-card-actions > button:focus-visible {
+  background: color-mix(in srgb, var(--icon-accent) 18%, transparent) !important; border-color: var(--icon-accent) !important; color: var(--icon-accent) !important;
+  transform: translateY(-1px); box-shadow: 0 4px 10px color-mix(in srgb, var(--icon-accent) 22%, transparent) !important; outline: none;
+}
+/* Delete / remove buttons share one red treatment */
+.app-shell .task-delete, .app-shell .crm-card-icon.danger, .app-shell .task-checklist-icon-button.remove, .app-shell button[aria-label^="Delete"], .app-shell button[title^="Delete"] {
+  border: 1px solid color-mix(in srgb, var(--icon-danger) 55%, transparent) !important; border-radius: 9px !important;
+  background: color-mix(in srgb, var(--icon-danger) 14%, transparent) !important; color: var(--icon-danger) !important;
+  transition: background-color .16s ease, border-color .16s ease, transform .16s ease, box-shadow .16s ease;
+}
+.app-shell .task-delete:hover, .app-shell .crm-card-icon.danger:hover, .app-shell .task-checklist-icon-button.remove:hover, .app-shell button[aria-label^="Delete"]:hover, .app-shell button[title^="Delete"]:hover {
+  background: color-mix(in srgb, var(--icon-danger) 26%, transparent) !important; border-color: var(--icon-danger) !important; transform: translateY(-1px); box-shadow: 0 4px 10px color-mix(in srgb, var(--icon-danger) 25%, transparent) !important;
+}
+@media (prefers-reduced-motion: reduce) { .app-shell .icon-button:hover, .app-shell .task-delete:hover, .app-shell .crm-card-icon:hover { transform: none; } }
