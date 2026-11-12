@@ -52,7 +52,9 @@ h1{font-size:24px;margin:0 0 4px}.lead{color:#5d6b64;margin:0 0 16px}
   web.innerHTML = '<h2 style="margin:0;font-size:18px">' + esc(me.client.name) + (st ? '<span class="badge ' + esc(st) + '">' + (st === 'live' ? '● Live' : '◐ Preview') + '</span>' : '') + '</h2>'
     + '<div class="links">' + (w.previewUrl ? '<a class="primary-button" href="' + esc(w.previewUrl) + '" target="_blank" rel="noopener noreferrer">👀 Open preview site ↗</a>' : '')
     + (w.liveUrl && st === 'live' ? '<a class="secondary-button" href="' + esc(w.liveUrl) + '" target="_blank" rel="noopener noreferrer">🌐 Open live site ↗</a>' : '') + '</div>'
-    + '<p class="note">Your login can edit: <b>' + esc(me.scopeLabel) + '</b>. Saving never changes your live website.</p>';
+    + '<p class="note">Your login can edit: <b>' + esc(me.scopeLabel) + '</b>. Saving never changes your live website.</p>'
+    + '<p><button type="button" class="primary-button" id="open-builder">🧱 Open visual builder</button></p>';
+  document.getElementById('open-builder').onclick = () => { const b = document.createElement('script'); b.src = '/f2b-site-builder.js'; b.onload = () => window.f2bSiteBuilder.open({ clientId: me.client.id, name: me.client.name }); document.head.appendChild(b); };
   const s = document.createElement('script'); s.src = '/f2b-site-editor.js';
   s.onload = () => window.f2bSiteEditor.mount(web, { clientId: me.client.id, name: me.client.name, admin: false, embedded: true });
   document.head.appendChild(s);

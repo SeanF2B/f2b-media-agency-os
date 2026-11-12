@@ -484,18 +484,20 @@ html:not(.f2b-mk-clean) .f2b-mk-sub{display:none}
         ${admin ? `<div class="r"><button type="button" class="secondary-button" data-a="edit">✏️ Edit links</button></div>` : ''}</div>
       <div class="links">${link('Preview', w.previewUrl, '👀 Open preview', { primary: st === 'preview' })}${link('Live site', w.liveUrl, '🌐 Open live site', { primary: st === 'live' })}
         <div class="link"><small>Content & SEO</small><span class="unset" style="font-style:normal;color:#5d6b64">Edit pages, images, sections and SEO right here. Saves go to the preview copy only.</span>
-          <button type="button" class="${editorOpen === a.clientId ? 'secondary-button' : 'primary-button'}" data-a="content">${editorOpen === a.clientId ? '✕ Close editor' : admin ? '✏️ Edit site content' : '👀 View site content'}</button></div></div>
+          <button type="button" class="primary-button" data-a="builder" style="margin-right:8px">🧱 Visual builder</button><button type="button" class="${editorOpen === a.clientId ? 'secondary-button' : 'secondary-button'}" data-a="content">${editorOpen === a.clientId ? '✕ Close editor' : admin ? '✏️ Edit site content' : '👀 View site content'}</button></div></div>
       ${admin && a.pendingClientEdits ? `<div class="pend">🟠 <b>${a.pendingClientEdits} client edit${a.pendingClientEdits > 1 ? 's' : ''}</b> waiting for your approval (made with ${esc(a.name)}’s own login).<button type="button" class="primary-button" data-a="review">Review</button></div>` : ''}
       <p class="note">Publishing to the live site is a separate step that only Sean approves. Nothing in this editor touches the live domain.</p>`;
     toolbar.after(box);
     box.querySelector('[data-a=edit]')?.addEventListener('click', () => websiteModal(a));
     box.querySelector('[data-a=content]')?.addEventListener('click', () => toggleEditor(a, box));
+    box.querySelector('[data-a=builder]')?.addEventListener('click', async () => { try { await loadBuilder(); } catch (e) { toast(e.message); return; } window.f2bSiteBuilder.open({ clientId: a.clientId, name: a.name, onClose: () => schedule() }); });
     box.querySelector('[data-a=review]')?.addEventListener('click', async () => { if (editorOpen !== a.clientId) await toggleEditor(a, box); const t0 = Date.now(); const go = () => { const b = editor?.root.querySelector('[data-a=approvals]'); if (b) b.click(); else if (Date.now() - t0 < 8000) setTimeout(go, 150); }; go(); });
     if (editor && editorOpen !== a.clientId) editor.close(true);
     if (editor && editorOpen === a.clientId && editor.root.isConnected) box.after(editor.root);
   }
   // in-app content editor (public/f2b-site-editor.js, loaded on first use)
   let editor = null, editorOpen = null;
+  const loadBuilder = () => window.f2bSiteBuilder ? Promise.resolve() : new Promise((ok, bad) => { const s = document.createElement('script'); s.src = '/f2b-site-builder.js'; s.onload = ok; s.onerror = () => bad(new Error('Could not load the builder.')); document.head.appendChild(s); });
   const loadEditor = () => window.f2bSiteEditor ? Promise.resolve() : new Promise((ok, bad) => { const s = document.createElement('script'); s.src = '/f2b-site-editor.js'; s.onload = ok; s.onerror = () => bad(new Error('Could not load the editor.')); document.head.appendChild(s); });
   async function toggleEditor(a, box) {
     if (editor && editorOpen === a.clientId) { editor.close(); return; }
