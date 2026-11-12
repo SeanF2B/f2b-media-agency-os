@@ -8061,3 +8061,4 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
 .client-scope-select:hover, .client-scope-select:focus { border-color: #3b82f6; outline: none; }
 .client-scope small { font-size: 10px; color: #3b82f6; font-weight: 700; }
 .sidebar-collapsed .client-scope, .sidebar.collapsed .client-scope { display: none; }
+.client-nav-item.active { background: rgba(59,130,246,.16); box-shadow: inset 3px 0 0 #3b82f6; }
