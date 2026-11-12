@@ -91,10 +91,10 @@ export function createCardDragFx(preview: HTMLElement, source: HTMLElement, grab
     dropPlacement() {
       const container = slot?.parentElement;
       if (!slot || !container) return null;
-      const column = container.closest<HTMLElement>("[data-task-drop-stage]") || container;
+      const column = container.closest<HTMLElement>("[data-task-drop-stage],[data-crm-stage]") || container;
       let next = slot.nextElementSibling as HTMLElement | null;
       while (next && !next.matches(options.cardSelector)) next = next.nextElementSibling as HTMLElement | null;
-      return { column, beforeId: next ? next.id.replace(/^task-/, "") || null : null };
+      return { column, beforeId: next ? next.dataset.opportunityId || next.id.replace(/^task-/, "") || null : null };
     },
     end() {
       window.clearTimeout(idleTimer);

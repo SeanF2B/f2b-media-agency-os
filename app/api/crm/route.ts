@@ -35,6 +35,10 @@ async function context() {
 
 function clean(value: unknown, max = 500) { return typeof value === "string" ? value.trim().slice(0, max) : ""; }
 function stageCategory(name: string): StageCategory { return /^won$/i.test(name) ? "won" : /^lost$/i.test(name) ? "lost" : "open"; }
+async function ensureOrderTable(db: D1Database) {
+  await db.prepare("CREATE TABLE IF NOT EXISTS crm_opportunity_order (owner_id TEXT NOT NULL, opportunity_id TEXT NOT NULL, sort_order REAL NOT NULL, PRIMARY KEY (owner_id, opportunity_id))").run();
+}
+
 async function ensurePipeline(db: D1Database, ownerId: string) {
   const existing = await db.prepare("SELECT id FROM crm_pipelines WHERE owner_id = ?1 AND archived = 0 ORDER BY created_at LIMIT 1").bind(ownerId).first<{ id: string }>();
   if (existing) return;
@@ -49,6 +53,7 @@ export async function GET(request: Request) {
   const { db, ownerId, workspace } = access;
   try {
     await ensurePipeline(db, ownerId);
+    await ensureOrderTable(db);
     const url = new URL(request.url);
     if (url.searchParams.get("summary") === "1") {
       const rows = await db.prepare("SELECT s.category, o.currency, COUNT(*) AS total, SUM(o.value) AS value FROM crm_opportunities o JOIN crm_pipeline_stages s ON s.id=o.stage_id AND s.owner_id=o.owner_id JOIN crm_pipelines p ON p.id=o.pipeline_id AND p.owner_id=o.owner_id WHERE o.owner_id=?1 AND p.archived=0 AND s.category IN ('open','won') GROUP BY s.category, o.currency").bind(ownerId).all<{ category: string; currency: string; total: number; value: number }>();
@@ -62,13 +67,15 @@ export async function GET(request: Request) {
       db.prepare("SELECT o.*, c.first_name, c.last_name, c.email, c.phone, c.company, s.name AS stage_name FROM crm_opportunities o LEFT JOIN crm_contacts c ON c.id = o.contact_id AND c.owner_id = o.owner_id LEFT JOIN crm_pipeline_stages s ON s.id = o.stage_id AND s.owner_id = o.owner_id WHERE o.owner_id = ?1 ORDER BY o.updated_at DESC LIMIT 2000").bind(ownerId).all<Record<string, unknown>>(),
       db.prepare("SELECT * FROM crm_activities WHERE owner_id = ?1 ORDER BY created_at DESC LIMIT 1000").bind(ownerId).all<Record<string, unknown>>(),
     ]);
+    const orderRows = await db.prepare("SELECT opportunity_id, sort_order FROM crm_opportunity_order WHERE owner_id = ?1").bind(ownerId).all<{ opportunity_id: string; sort_order: number }>();
+    const orderByOpportunity = new Map((orderRows.results || []).map((row) => [row.opportunity_id, row.sort_order] as const));
     const pipelines = new Map<string, PipelineView>();
     for (const r of pipelineRows.results || []) {
       if (!pipelines.has(r.id)) pipelines.set(r.id, { id: r.id, name: r.name, description: r.description, stages: [] });
       if (r.stage_id && r.stage_name && r.stage_position !== null && r.stage_category) pipelines.get(r.id)?.stages.push({ id: r.stage_id, name: r.stage_name, position: r.stage_position, category: r.stage_category });
     }
     const matches = (item: Record<string, unknown>) => !search || [item.title, item.first_name, item.last_name, item.email, item.company].some((value) => String(value || "").toLowerCase().includes(search));
-    return Response.json({ contacts: contacts.results || [], pipelines: [...pipelines.values()], opportunities: (opportunityRows.results || []).filter(matches), activities: activityRows.results || [], clients: (workspace.clients || []).map((item) => ({ id: String(item.id), name: String(item.name), company: String(item.company || ""), logo: String(item.logo || ""), contact: String(item.contact || ""), email: String(item.email || ""), phone: String(item.phone || "") })), staff: (workspace.staff || []).filter((item) => !item.isBot).map((item) => ({ id: String(item.id), name: String(item.name), avatar: String(item.avatar || "") })) }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json({ contacts: contacts.results || [], pipelines: [...pipelines.values()], opportunities: (opportunityRows.results || []).map((row) => ({ ...row, sort_order: orderByOpportunity.has(String(row.id)) ? orderByOpportunity.get(String(row.id)) : null })).filter(matches), activities: activityRows.results || [], clients: (workspace.clients || []).map((item) => ({ id: String(item.id), name: String(item.name), company: String(item.company || ""), logo: String(item.logo || ""), contact: String(item.contact || ""), email: String(item.email || ""), phone: String(item.phone || "") })), staff: (workspace.staff || []).filter((item) => !item.isBot).map((item) => ({ id: String(item.id), name: String(item.name), avatar: String(item.avatar || "") })) }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) { return reply(error instanceof Error ? error.message : "Could not load CRM records.", 500); }
 }
 
@@ -168,6 +175,17 @@ export async function POST(request: Request) {
         db.prepare("DELETE FROM crm_pipeline_stages WHERE owner_id=?1 AND pipeline_id=?2 AND id=?3").bind(ownerId, pipelineId, stageId),
         db.prepare("UPDATE crm_pipelines SET updated_at=?1 WHERE owner_id=?2 AND id=?3").bind(now, ownerId, pipelineId),
       ]);
+      return Response.json({ ok: true });
+    }
+    if (action === "reorderOpportunities") {
+      const ids = Array.isArray(body.ids) ? body.ids.map((value: unknown) => clean(value, 80)).filter(Boolean).slice(0, 500) : [];
+      if (!ids.length) return reply("Nothing to reorder.");
+      const placeholders = ids.map((_, index) => `?${index + 2}`).join(",");
+      const owned = await db.prepare(`SELECT id FROM crm_opportunities WHERE owner_id=?1 AND id IN (${placeholders})`).bind(ownerId, ...ids).all<{ id: string }>();
+      const ownedIds = new Set((owned.results || []).map((row) => row.id));
+      await ensureOrderTable(db);
+      const statements = ids.filter((id) => ownedIds.has(id)).map((id, index) => db.prepare("INSERT INTO crm_opportunity_order (owner_id, opportunity_id, sort_order) VALUES (?1, ?2, ?3) ON CONFLICT(owner_id, opportunity_id) DO UPDATE SET sort_order = excluded.sort_order").bind(ownerId, id, index));
+      if (statements.length) await db.batch(statements);
       return Response.json({ ok: true });
     }
     if (action === "updateOpportunityValue") {
