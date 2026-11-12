@@ -8542,3 +8542,7 @@ html body .app-shell.app-shell button[role="tab"] > span:last-child:not(:first-c
 @media (prefers-reduced-motion:reduce){.bot-live,.bot-live *{animation:none!important}}
 .pipeline-card-drag-preview .bot-live{animation:bot-spin .9s ease-in-out infinite!important}
 @keyframes bot-spin{0%{transform:rotate(0)}60%,100%{transform:rotate(360deg)}}
+/* Scrolling over a column scrolls it first, then hands off to the page when it reaches the end */
+.app-shell .crm-kanban .crm-stage, .app-shell .pipeline-board .pipeline-column, .app-shell .pipeline-board .pipeline-column * { overscroll-behavior-y: auto; }
+.app-shell .pipeline-card, .app-shell .pipeline-card * { touch-action: pan-y; }
+.app-shell .pipeline-card[draggable="true"] { touch-action: pan-y; }
