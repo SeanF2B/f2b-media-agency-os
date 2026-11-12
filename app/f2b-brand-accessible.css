@@ -331,6 +331,37 @@ body:has(.app-shell.dark-mode) { background: #2b2a2d !important; }
 .app-shell.dark-mode .vault-secret { background: #302f33 !important; border: 1px solid #454449 !important; color: #fff !important; }
 .app-shell.dark-mode .vault-secret small,
 .app-shell.dark-mode .vault-secret b { color: #fff !important; }
+
+.settings-view { max-width: 1040px; margin: 0 auto; padding: clamp(20px, 3vw, 36px); }
+.settings-page-header { margin-bottom: 24px; }
+.settings-page-header h1 { margin: 4px 0 8px; font-size: clamp(28px, 4vw, 38px); }
+.settings-page-header p:last-child, .settings-panel-heading p:last-child { margin: 0; color: #6d7882; }
+.settings-panel { padding: clamp(18px, 3vw, 28px); background: var(--card, #fff); border: 1px solid var(--border, #e3e8ec); border-radius: 16px; box-shadow: 0 8px 28px rgba(15, 23, 42, .045); }
+.settings-panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 22px; }
+.settings-panel-heading h2 { margin: 3px 0 7px; font-size: 23px; }
+.settings-connection-badge { display: inline-flex; align-items: center; gap: 7px; padding: 7px 11px; border-radius: 999px; background: #f2f5f7; color: #62707a; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.settings-connection-badge i { width: 8px; height: 8px; border-radius: 50%; background: #9aa5ad; }
+.settings-connection-badge.connected { background: #e8f7ee; color: #197144; }
+.settings-connection-badge.connected i { background: #25a75b; }
+.api-key-form { display: grid; gap: 10px; }
+.api-key-form > label { font-weight: 700; }
+.api-key-entry { display: flex; gap: 10px; }
+.api-key-entry input { flex: 1; min-width: 0; height: 44px; padding: 0 13px; border: 1px solid var(--border, #d7dee4); border-radius: 9px; background: var(--input, #fff); color: inherit; font: inherit; }
+.api-key-saved { display: flex; align-items: center; gap: 12px; padding: 13px; border: 1px solid #d9e4dc; border-radius: 11px; background: #f7fbf8; }
+.api-key-saved > span:nth-child(2) { display: grid; gap: 3px; flex: 1; }
+.api-key-saved small, .settings-muted { color: #6d7882; font-size: 13px; }
+.api-key-lock { font-size: 18px; }
+.settings-muted { margin: 0; line-height: 1.55; }
+.settings-provider-note { display: grid; gap: 4px; margin-top: 22px; padding-top: 17px; border-top: 1px solid var(--border, #e3e8ec); font-size: 13px; }
+.settings-provider-note span { color: #6d7882; }
+.settings-inline-error, .settings-inline-success { margin: 14px 0 0; padding: 10px 12px; border-radius: 8px; font-size: 13px; }
+.settings-inline-error { background: #fff1f0; color: #a52c25; }
+.settings-inline-success { background: #eaf7ee; color: #197144; }
+.app-shell.dark-mode .settings-panel { background: #25252a; border-color: #404046; }
+.app-shell.dark-mode .settings-page-header p:last-child, .app-shell.dark-mode .settings-panel-heading p:last-child, .app-shell.dark-mode .settings-muted, .app-shell.dark-mode .api-key-saved small, .app-shell.dark-mode .settings-provider-note span { color: #b5b4bb; }
+.app-shell.dark-mode .api-key-entry input, .app-shell.dark-mode .api-key-saved { background: #302f33; border-color: #49484e; }
+.app-shell.dark-mode .settings-connection-badge { background: #343339; color: #dedde2; }
+@media (max-width: 620px) { .settings-panel-heading { flex-direction: column; } .api-key-entry, .api-key-saved { align-items: stretch; flex-direction: column; } .api-key-entry .primary-button, .api-key-saved .secondary-button { width: 100%; } }
 .app-shell.dark-mode .status-pill,
 .app-shell.dark-mode .role-pill,
 .app-shell.dark-mode .coming-pill {
@@ -526,7 +557,11 @@ body:has(.app-shell.dark-mode) { background: #2b2a2d !important; }
 .team-access-selector select { min-height: 42px; padding: 8px 12px; border: 1px solid var(--f2b-border); border-radius: 9px; background: var(--background); color: inherit; }
 .team-access-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; margin-bottom: 14px; }
 .team-access-summary > span { padding: 5px 9px; border: 1px solid var(--f2b-border); border-radius: 999px; color: var(--f2b-muted); font-size: 12px; }
-.team-access-summary button { margin-left: auto; }
+.team-access-summary .team-edit-icon { margin-left: auto; }
+.team-edit-icon { display: inline-grid; place-items: center; flex: 0 0 34px; width: 34px; height: 34px; padding: 0; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--f2b-muted, #73808a); font: 700 19px/1 system-ui,sans-serif; cursor: pointer; transition: color .16s ease, background-color .16s ease, border-color .16s ease, box-shadow .16s ease, transform .16s ease; }
+.team-edit-icon:hover,.team-edit-icon:focus-visible { color: #0878d1; background: #e8f4ff; border-color: #78bfff; box-shadow: 0 3px 10px #1681e333; transform: translateY(-1px); outline: none; }
+.app-shell.dark-mode .team-edit-icon:hover,.app-shell.dark-mode .team-edit-icon:focus-visible { color: #b9e0ff; background: #18374c; border-color: #368bc2; box-shadow: 0 3px 12px #0005; }
+.team-card-footer .team-edit-icon { margin-left: auto; }
 .team-access-inspector-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .team-access-inspector-section { min-width: 0; padding: 13px; border: 1px solid var(--f2b-border); border-radius: 10px; }
 .team-access-inspector-section h3 { margin: 0 0 9px; font-size: 14px; }
@@ -539,8 +574,6 @@ body:has(.app-shell.dark-mode) { background: #2b2a2d !important; }
 .app-shell.dark-mode .team-access-status.allowed { color: #68d391; }
 .app-shell.dark-mode .team-access-status.blocked { color: #f6c453; }
 @media (max-width:760px) { .team-access-inspector-head { align-items: stretch; flex-direction: column; }.team-access-selector { min-width: 0; }.team-access-inspector-grid { grid-template-columns: 1fr; }.team-access-summary button { margin-left: 0; }.permission-group { padding: 9px; } }
-.clickable-team-card { cursor: pointer; }
-.clickable-team-card:hover,.clickable-team-card:focus-visible { outline: 2px solid #278be6; outline-offset: 2px; }
 .assistant-workspace { display: grid; gap: 16px; max-width: 940px; }
 .assistant-scope,.report-run-controls { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; padding: 16px; border: 1px solid var(--f2b-border); border-radius: 12px; background: var(--f2b-white); }
 .assistant-scope .field,.report-run-controls .field { flex: 1; min-width: 190px; }
@@ -1801,6 +1834,16 @@ html:has(.app-shell .chess-page),body:has(.app-shell .chess-page) { overflow-anc
 .app-shell .ai-completed-change-actions .ai-approval-account-link { margin-top:0; }
 .app-shell .ai-approval-inbox-row details summary,.app-shell .ai-completed-inbox-row details summary { cursor:pointer; color:var(--f2b-muted); font-size:12px; }
 .app-shell .ai-approval-inbox-row details p,.app-shell .ai-completed-inbox-row details p { margin:7px 0; line-height:1.5; overflow-wrap:anywhere; }
+.app-shell .ai-approval-recommendations { display:grid; gap:10px; margin:0 0 20px; padding:14px; border:1px solid var(--f2b-border); border-radius:14px; background:var(--f2b-surface); }
+.app-shell .ai-approval-recommendations .ai-approval-inbox-header { margin:0; }
+.app-shell .ai-recommendation-item { border:1px solid var(--f2b-border); border-radius:10px; background:var(--f2b-panel); }
+.app-shell .ai-recommendation-item .ai-approval-inbox-copy { min-width:0; }
+.app-shell .ai-recommendation-item .ai-approval-inbox-copy>b { display:block; color:var(--f2b-text); font-size:14px; }
+.app-shell .ai-recommendation-item .ai-approval-inbox-copy>small { display:block; margin:4px 0 8px; color:var(--f2b-muted); }
+.app-shell .ai-recommendation-item .ai-approval-inbox-copy>p { margin:0; line-height:1.5; overflow-wrap:anywhere; }
+.app-shell .ai-recommendation-item details { margin-top:8px; }
+.app-shell .ai-recommendation-priority { justify-self:end; color:var(--f2b-muted); font-size:12px; white-space:nowrap; }
+.app-shell .ai-recommendation-priority.high { color:#bd3b35; }
 .app-shell .ai-approval-inbox-locked { align-self:start; color:#a36c09; font-size:11px; font-weight:750; }
 .app-shell.dark-mode .ai-approval-inbox-locked { color:#ffd17b; }
 .app-shell .ai-completed-inbox-row time { white-space:nowrap; color:var(--f2b-muted); font-size:11px; }
@@ -2469,6 +2512,140 @@ html:has(.app-shell .chess-page),body:has(.app-shell .chess-page) { overflow-anc
 .app-shell .ai-review-queue.is-clear .ai-approval-inbox-header h3 { font-size:16px; }
 .app-shell .ai-review-queue.is-clear .ai-approval-inbox-header p:last-child { max-width:58ch; margin:3px 0 0; font-size:12px; line-height:1.45; }
 .app-shell .ai-review-queue.is-clear .ai-approval-inbox-empty { padding:10px 12px; font-size:12px; }
+
+/* Recommendations: short, high contrast and easy to scan. */
+.app-shell .ai-approval-recommendations { gap:12px; }
+.app-shell .ai-approval-recommendations .ai-approval-inbox-header p:last-child { max-width:64ch; font-family:Arial,Verdana,sans-serif; font-size:15px; line-height:1.55; }
+.app-shell .ai-approval-recommendations .ai-approval-inbox-rows { gap:10px; }
+.app-shell .ai-recommendation-item { display:grid; gap:10px; padding:14px; font-family:Arial,Verdana,sans-serif; line-height:1.55; }
+.app-shell .ai-recommendation-topline { display:grid; grid-template-columns:38px minmax(0,1fr) auto; align-items:start; gap:10px; }
+.app-shell .ai-recommendation-icon { display:grid; width:36px; height:36px; place-items:center; border-radius:10px; background:#e7f3fa; font-size:20px; }
+.app-shell.dark-mode .ai-recommendation-icon { background:#213b49; }
+.app-shell .ai-recommendation-topline .ai-approval-inbox-copy>b { font-size:16px; line-height:1.35; }
+.app-shell .ai-recommendation-topline .ai-approval-inbox-copy>small { margin:4px 0 5px; font-size:13px; }
+.app-shell .ai-recommendation-topline .ai-approval-inbox-copy>p { display:-webkit-box; overflow:hidden; -webkit-box-orient:vertical; -webkit-line-clamp:2; font-size:14px; line-height:1.5; }
+.app-shell .ai-recommendation-more { margin-left:48px; }
+.app-shell .ai-recommendation-more summary { min-height:32px; color:var(--f2b-link,#176fa7); font-size:14px !important; font-weight:700; }
+.app-shell .ai-recommendation-more p { font-family:Arial,Verdana,sans-serif; font-size:14px; }
+.app-shell .ai-recommendation-actions { display:grid; gap:8px; padding:10px 0 0 48px; border-top:1px solid var(--f2b-border); }
+.app-shell .ai-recommendation-actions>label { display:grid; gap:5px; font-size:14px; font-weight:700; }
+.app-shell .ai-recommendation-actions textarea { width:100%; min-height:58px; padding:9px 10px; resize:vertical; border:1px solid var(--f2b-border); border-radius:8px; background:var(--f2b-white); color:var(--f2b-text); font:15px/1.5 Arial,Verdana,sans-serif; }
+.app-shell.dark-mode .ai-recommendation-actions textarea { background:#202326; }
+.app-shell .ai-recommendation-actions>div { display:flex; flex-wrap:wrap; gap:8px; }
+.app-shell .ai-recommendation-actions button { min-height:40px; font-size:14px; }
+.app-shell .ai-recommendation-actions>small { color:var(--f2b-muted); font-size:12px; }
+@media(max-width:700px) {
+  .app-shell .ai-recommendation-topline { grid-template-columns:34px minmax(0,1fr); }
+  .app-shell .ai-recommendation-topline .ai-recommendation-priority { grid-column:2; justify-self:start; }
+  .app-shell .ai-recommendation-more,.app-shell .ai-recommendation-actions { margin-left:0; padding-left:0; }
+}
+
+/* Calm, native-feeling recommendation cards with the action first. */
+.app-shell .ai-approval-recommendations { padding:18px; border:1px solid #e5e5ea; border-radius:20px; background:#f5f5f7; font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+.app-shell.dark-mode .ai-approval-recommendations { border-color:#3a3a3f; background:#1c1c1e; }
+.app-shell .ai-approval-recommendations .ai-approval-inbox-header { align-items:center; }
+.app-shell .ai-approval-recommendations .ai-approval-inbox-header .eyebrow { color:#6e6e73; font-size:11px; letter-spacing:.07em; }
+.app-shell.dark-mode .ai-approval-recommendations .ai-approval-inbox-header .eyebrow { color:#a1a1a6; }
+.app-shell .ai-approval-recommendations .ai-approval-inbox-header h3 { color:#1d1d1f; font-size:23px; letter-spacing:-.025em; }
+.app-shell.dark-mode .ai-approval-recommendations .ai-approval-inbox-header h3 { color:#f5f5f7; }
+.app-shell .ai-approval-recommendations .ai-approval-inbox-header p:last-child { color:#6e6e73; font-size:14px; }
+.app-shell.dark-mode .ai-approval-recommendations .ai-approval-inbox-header p:last-child { color:#b8b8bd; }
+.app-shell .ai-approval-recommendations .ai-approval-inbox-total { min-width:76px; padding:9px 13px; border:0; border-radius:14px; background:#e8e8ed; color:#1d1d1f; }
+.app-shell.dark-mode .ai-approval-recommendations .ai-approval-inbox-total { background:#303034; color:#f5f5f7; }
+.app-shell .ai-approval-recommendations .ai-approval-inbox-total b { font-size:17px; }
+.app-shell .ai-approval-recommendations .ai-approval-inbox-rows { gap:12px; }
+.app-shell .ai-approval-recommendations .ai-recommendation-item { gap:11px; padding:16px; border:1px solid #e5e5ea; border-radius:16px; background:#fff; box-shadow:0 2px 8px rgba(0,0,0,.035); font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+.app-shell.dark-mode .ai-approval-recommendations .ai-recommendation-item { border-color:#3a3a3f; background:#252528; box-shadow:0 2px 8px rgba(0,0,0,.16); }
+.app-shell .ai-recommendation-topline { grid-template-columns:40px minmax(0,1fr) auto; align-items:center; gap:12px; }
+.app-shell .ai-recommendation-icon { width:40px; height:40px; border-radius:13px; background:#f2f2f7; }
+.app-shell.dark-mode .ai-recommendation-icon { background:#34343a; }
+.app-shell .ai-recommendation-topline .ai-approval-inbox-copy>b { color:#1d1d1f; font-size:16px; font-weight:680; letter-spacing:-.01em; }
+.app-shell.dark-mode .ai-recommendation-topline .ai-approval-inbox-copy>b { color:#f5f5f7; }
+.app-shell .ai-recommendation-topline .ai-approval-inbox-copy>small { margin:3px 0 5px; color:#6e6e73; font-size:13px; }
+.app-shell.dark-mode .ai-recommendation-topline .ai-approval-inbox-copy>small { color:#b8b8bd; }
+.app-shell .ai-recommendation-topline .ai-approval-inbox-copy>p { color:#3a3a3c; font-size:14px; line-height:1.55; }
+.app-shell.dark-mode .ai-recommendation-topline .ai-approval-inbox-copy>p { color:#e5e5ea; }
+.app-shell .ai-recommendation-priority { justify-self:end; padding:5px 9px; border-radius:999px; background:#f2f2f7; color:#6e6e73; font-size:12px; font-weight:650; }
+.app-shell .ai-recommendation-priority.high { background:#fff0ed; color:#b42318; }
+.app-shell.dark-mode .ai-recommendation-priority { background:#36363a; color:#d1d1d6; }
+.app-shell.dark-mode .ai-recommendation-priority.high { background:#482622; color:#ffb4a9; }
+.app-shell .ai-recommendation-more { margin:0 0 0 52px; }
+.app-shell .ai-recommendation-more summary { min-height:28px; color:#0066cc; font-size:13px !important; font-weight:600; }
+.app-shell.dark-mode .ai-recommendation-more summary { color:#64aaff; }
+.app-shell .ai-recommendation-more p,.app-shell .ai-recommendation-more small { color:#3a3a3c; font-size:14px; }
+.app-shell.dark-mode .ai-recommendation-more p,.app-shell.dark-mode .ai-recommendation-more small { color:#e5e5ea; }
+.app-shell .ai-recommendation-actions { grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:8px 12px; margin-left:52px; padding:10px 0 0; border-top:1px solid #e5e5ea; }
+.app-shell.dark-mode .ai-recommendation-actions { border-color:#3a3a3f; }
+.app-shell .ai-recommendation-feedback summary { min-height:38px; display:inline-flex; align-items:center; color:#0066cc; font-size:14px !important; font-weight:600; }
+.app-shell.dark-mode .ai-recommendation-feedback summary { color:#64aaff; }
+.app-shell .ai-recommendation-feedback>div { display:grid; gap:8px; padding:7px 0; }
+.app-shell .ai-recommendation-feedback textarea { font:14px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+.app-shell .ai-recommendation-actions>.primary-button { min-height:40px; padding:9px 15px; border:0; border-radius:11px; background:#007aff; color:#fff; font:600 14px system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; box-shadow:0 2px 5px rgba(0,122,255,.2); }
+.app-shell .ai-recommendation-actions>.primary-button:hover:not(:disabled) { background:#0067d9; }
+.app-shell.dark-mode .ai-recommendation-actions>.primary-button { background:#0a84ff; }
+.app-shell .ai-recommendation-actions>small { grid-column:1/-1; color:#6e6e73; font-size:12px; }
+.app-shell.dark-mode .ai-recommendation-actions>small { color:#a1a1a6; }
+@media(max-width:700px) {
+  .app-shell .ai-approval-recommendations { padding:13px; border-radius:16px; }
+  .app-shell .ai-recommendation-topline { grid-template-columns:36px minmax(0,1fr); }
+  .app-shell .ai-recommendation-topline .ai-recommendation-priority { grid-column:2; justify-self:start; }
+  .app-shell .ai-recommendation-more,.app-shell .ai-recommendation-actions { margin-left:0; padding-left:0; }
+  .app-shell .ai-recommendation-actions { grid-template-columns:1fr; }
+  .app-shell .ai-recommendation-actions>.primary-button { width:100%; }
+}
+
+/* Minimal recommendation list: one short action and one clear next step. */
+.app-shell .ai-approval-recommendations { gap:12px; padding:16px; border:1px solid #e3e4e8; border-radius:18px; background:#f5f5f7; }
+.app-shell.dark-mode .ai-approval-recommendations { border-color:#39393e; background:#1c1c1e; }
+.app-shell .ai-approval-recommendations .ai-approval-inbox-header { align-items:center; }
+.app-shell .ai-approval-recommendations .ai-approval-inbox-header .eyebrow { margin:0 0 4px; font-size:11px; letter-spacing:.06em; }
+.app-shell .ai-approval-recommendations .ai-approval-inbox-header h3 { margin:0; color:#1d1d1f; font:650 23px/1.25 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; letter-spacing:-.02em; }
+.app-shell.dark-mode .ai-approval-recommendations .ai-approval-inbox-header h3 { color:#f5f5f7; }
+.app-shell .ai-approval-recommendations .ai-approval-inbox-header p:last-child { margin:5px 0 0; color:#52545a; font:15px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+.app-shell.dark-mode .ai-approval-recommendations .ai-approval-inbox-header p:last-child { color:#dedee3; }
+.app-shell .ai-approval-recommendations .ai-approval-inbox-total { min-width:68px; padding:8px 11px; border:0; border-radius:12px; background:#e8e8ed; color:#1d1d1f; }
+.app-shell.dark-mode .ai-approval-recommendations .ai-approval-inbox-total { background:#303034; color:#f5f5f7; }
+.app-shell .ai-approval-recommendations .ai-approval-inbox-total b { font:650 18px/1.2 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+.app-shell .ai-approval-recommendations .ai-approval-inbox-total span { font-size:12px; }
+.app-shell .ai-approval-recommendations .ai-approval-inbox-rows { gap:8px; }
+.app-shell .ai-approval-recommendations .ai-recommendation-item { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:8px 18px; padding:13px 15px; border:1px solid #e3e4e8; border-radius:14px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.035); font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+.app-shell.dark-mode .ai-approval-recommendations .ai-recommendation-item { border-color:#3b3b41; background:#27272a; box-shadow:none; }
+.app-shell .ai-recommendation-main { display:grid; grid-template-columns:40px minmax(0,1fr); align-items:center; gap:11px; min-width:0; }
+.app-shell .ai-recommendation-icon { width:38px; height:38px; border-radius:12px; background:#f0f2f6; font-size:19px; }
+.app-shell.dark-mode .ai-recommendation-icon { background:#37373d; }
+.app-shell .ai-recommendation-main>div { min-width:0; }
+.app-shell .ai-recommendation-main b { display:block; color:#1d1d1f; font-size:16px; font-weight:650; line-height:1.35; overflow-wrap:anywhere; }
+.app-shell.dark-mode .ai-recommendation-main b { color:#f5f5f7; }
+.app-shell .ai-recommendation-main small { display:block; margin-top:2px; color:#61636a; font-size:13px; line-height:1.4; }
+.app-shell.dark-mode .ai-recommendation-main small { color:#c3c3c8; }
+.app-shell .ai-recommendation-main p { display:-webkit-box; margin:3px 0 0; overflow:hidden; color:#3e4046; font:15px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
+.app-shell.dark-mode .ai-recommendation-main p { color:#e4e4e9; }
+.app-shell .ai-recommendation-controls { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
+.app-shell .ai-recommendation-controls>.primary-button { min-height:40px; padding:9px 13px; border:0; border-radius:11px; background:#007aff; color:#fff; font:650 14px/1.2 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; white-space:nowrap; }
+.app-shell .ai-recommendation-controls>.primary-button:hover:not(:disabled) { background:#0068d8; }
+.app-shell .ai-recommendation-controls>.primary-button:disabled { opacity:.55; }
+.app-shell .ai-recommendation-more,.app-shell .ai-recommendation-feedback { margin:0; }
+.app-shell .ai-recommendation-controls details>summary { min-height:40px; display:inline-flex; align-items:center; padding:0 8px; color:#0066cc; font:600 14px/1.35 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif !important; cursor:pointer; list-style:none; }
+.app-shell .ai-recommendation-controls details>summary::-webkit-details-marker { display:none; }
+.app-shell .ai-recommendation-controls details>summary:hover { text-decoration:underline; }
+.app-shell.dark-mode .ai-recommendation-controls details>summary { color:#7db7ff; }
+.app-shell .ai-recommendation-controls details>p,.app-shell .ai-recommendation-controls details>small { color:#303137; font:15px/1.55 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+.app-shell.dark-mode .ai-recommendation-controls details>p,.app-shell.dark-mode .ai-recommendation-controls details>small { color:#eeeef2; }
+.app-shell .ai-recommendation-controls details[open] { position:relative; }
+.app-shell .ai-recommendation-controls details[open]>*:not(summary) { width:min(440px,80vw); margin:5px 0; }
+.app-shell .ai-recommendation-controls .ai-recommendation-feedback[open] { min-width:min(340px,80vw); }
+.app-shell .ai-recommendation-feedback>div { display:grid; gap:8px; }
+.app-shell .ai-recommendation-feedback textarea { width:100%; min-height:74px; padding:10px 11px; border:1px solid #c8c9ce; border-radius:10px; background:#fff; color:#1d1d1f; font:15px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; resize:vertical; }
+.app-shell .ai-recommendation-feedback textarea::placeholder { color:#6e6e73; opacity:1; }
+.app-shell.dark-mode .ai-recommendation-feedback textarea { border-color:#595960; background:#1d1d20; color:#f5f5f7; }
+.app-shell .ai-recommendation-feedback .secondary-button { min-height:38px; justify-self:start; border-radius:10px; }
+@media(max-width:760px) {
+  .app-shell .ai-approval-recommendations { padding:12px; }
+  .app-shell .ai-recommendation-item { grid-template-columns:minmax(0,1fr); gap:8px; }
+  .app-shell .ai-recommendation-controls { justify-content:flex-start; }
+  .app-shell .ai-recommendation-controls details[open]>*:not(summary) { width:min(100%, 560px); }
+  .app-shell .ai-recommendation-controls .ai-recommendation-feedback[open] { min-width:min(100%, 560px); }
+}
 .app-shell .ai-review-queue:not(.is-clear) .ai-review-card { transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease; }
 .app-shell .ai-review-queue:not(.is-clear) .ai-review-card:hover { transform:translateY(-2px); border-color:#71a9c6; box-shadow:0 12px 28px rgba(24,39,52,.12); }
 .app-shell .ai-review-card-details[open]>.ai-review-card-expanded { animation:task-detail-enter .2s ease-out both; }
@@ -2804,6 +2981,11 @@ body:has(.app-shell.dark-mode) .app-shell .ai-task-filter-disclosure>summary spa
 .app-shell .pipeline-card-footer > .ai-board-card-action { grid-column:2; justify-self:end; max-width:120px; min-height:27px !important; padding:4px 7px !important; font-size:9px !important; white-space:nowrap; }
 .app-shell .pipeline-card-footer > .pipeline-card-timer-actions { grid-column:1 / -1; }
 
+/* Keep the repeat label directly under the assignee, aligned to the card's left edge. */
+.app-shell .pipeline-card-footer-identity { flex-direction:column !important; align-items:flex-start !important; justify-content:flex-start !important; gap:4px !important; }
+.app-shell .pipeline-card-footer-identity .assignee-chip { flex:0 1 auto !important; align-self:flex-start !important; width:auto !important; max-width:100% !important; }
+.app-shell .pipeline-card-footer-identity > .repeat-chip { align-self:flex-start !important; max-width:150px; white-space:normal; line-height:1.15; }
+
 
 /* Show the saved estimate beside the task owner and due date. */
 
@@ -2909,6 +3091,7 @@ body:has(.app-shell.dark-mode) .app-shell .ai-task-filter-disclosure>summary spa
 .dark-mode .integrations-view .integration-sync-muted,
 .dark-mode .integrations-view .integrations-security-note p,
 .dark-mode .integrations-view .integrations-message{color:var(--dark-muted,#a6b2ba)}
+.launchpad-view{display:block;max-width:1320px}.launchpad-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:20px}.launchpad-heading h1{margin:3px 0 4px}.launchpad-heading .muted{max-width:720px;margin:0}.launchpad-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0 0 24px}.launchpad-summary article{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:68px;padding:13px 16px;border:1px solid var(--line,#d8e0e5);border-radius:12px;background:var(--surface,#fff)}.launchpad-summary span{color:var(--muted-foreground,#687781);font-size:12px;font-weight:700}.launchpad-summary b{display:grid;place-items:center;min-width:34px;height:34px;padding:0 8px;border-radius:10px;background:#e8f3fa;color:#176d9f;font-size:16px}.launchpad-groups{display:grid;gap:18px}.launchpad-group{overflow:hidden;border:1px solid var(--line,#d8e0e5);border-radius:14px;background:var(--surface,#fff)}.launchpad-group-heading{display:flex;align-items:center;gap:10px;padding:14px 17px;border-bottom:1px solid var(--line,#e3e8eb);background:var(--card,#f8fafb)}.launchpad-group-heading>span{display:grid;place-items:center;width:38px;height:38px;border-radius:11px;background:#e8f3fa;font-size:18px}.launchpad-group-heading h2{margin:0;font-size:14px}.launchpad-group-heading small{display:block;margin-top:3px;color:var(--muted-foreground,#687781);font-size:10px}.launchpad-list{display:grid}.launchpad-item{display:grid;grid-template-columns:52px minmax(0,1fr);gap:13px;padding:16px 17px;border-bottom:1px solid var(--line,#e6eaed)}.launchpad-item:last-child{border-bottom:0}.launchpad-brand{display:grid;place-items:center;width:48px;height:48px;border:1px solid var(--line,#d8e0e5);border-radius:13px;background:var(--card,#f7f9fa);font-size:22px}.launchpad-item-main{display:grid;min-width:0;gap:6px}.launchpad-item-heading{display:flex;align-items:center;flex-wrap:wrap;gap:8px}.launchpad-item-heading h3{margin:0;font-size:14px}.launchpad-item-main>p{display:-webkit-box;overflow:hidden;margin:0;color:var(--muted-foreground,#687781);font-size:11px;line-height:1.5;-webkit-line-clamp:2;-webkit-box-orient:vertical}.launchpad-item-actions{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin-top:3px}.launchpad-item-actions .primary-button,.launchpad-item-actions .secondary-button{min-height:33px;padding:7px 11px;font-size:10px;text-decoration:none}.launchpad-details{margin-top:2px;color:var(--muted-foreground,#687781);font-size:10px}.launchpad-details>summary,.launchpad-security>summary{width:max-content;max-width:100%;cursor:pointer;font-weight:750}.launchpad-details-content{display:grid;gap:9px;margin-top:10px;padding:12px;border:1px solid var(--line,#e0e6e9);border-radius:10px;background:var(--card,#f8fafb)}.launchpad-details-content>p{margin:0;font-size:11px;line-height:1.5}.launchpad-state{padding:16px;border:1px solid var(--line,#d8e0e5);border-radius:12px;background:var(--surface,#fff)}.launchpad-error{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px;border:1px solid #e2a49c;border-radius:12px;background:#fff4f2;color:#8f2c23;font-size:12px}.launchpad-security{margin-top:18px;padding:13px 15px;border:1px solid var(--line,#d8e0e5);border-radius:12px;background:var(--surface,#fff)}.launchpad-security p{margin:9px 0 0;color:var(--muted-foreground,#687781);font-size:11px;line-height:1.55}.launchpad-view .integration-sync,.launchpad-view .integration-usage{display:grid;gap:5px;padding:10px;border:1px solid var(--line,#d8e0e5);border-radius:9px;background:var(--surface,#fff)}.launchpad-view .integration-sync small,.launchpad-view .integration-usage small{color:var(--muted-foreground,#687781);font-size:10px;line-height:1.45}.launchpad-view .integration-sync p{margin:0;font-size:10px}.launchpad-view .integration-retry-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding-top:7px;border-top:1px solid var(--line,#e6eaed)}.launchpad-view .integration-usage-breakdown ul{margin:8px 0 0;padding-left:18px}.launchpad-view .integration-usage-breakdown li{display:flex;justify-content:space-between;gap:12px;padding:4px 0}.dark-mode .launchpad-summary article,.dark-mode .launchpad-group,.dark-mode .launchpad-security,.dark-mode .launchpad-state{border-color:var(--dark-border,#343e46);background:var(--dark-panel,#1e252b);color:var(--dark-text,#e6ecef)}.dark-mode .launchpad-summary span,.dark-mode .launchpad-group-heading small,.dark-mode .launchpad-item-main>p,.dark-mode .launchpad-details,.dark-mode .launchpad-security p,.dark-mode .launchpad-view .integration-sync small,.dark-mode .launchpad-view .integration-usage small{color:var(--dark-muted,#a6b2ba)}.dark-mode .launchpad-summary b,.dark-mode .launchpad-group-heading>span{background:#19394b;color:#a6dcf7}.dark-mode .launchpad-group-heading,.dark-mode .launchpad-item,.dark-mode .launchpad-details-content,.dark-mode .launchpad-brand,.dark-mode .launchpad-view .integration-sync,.dark-mode .launchpad-view .integration-usage{border-color:var(--dark-border,#343e46);background:var(--dark-panel-2,#252d33);color:var(--dark-text,#e6ecef)}.dark-mode .launchpad-error{border-color:#713c39;background:#392523;color:#f3c5be}.dark-mode .launchpad-view .integration-retry-row{border-color:var(--dark-border,#343e46)}@media(max-width:700px){.launchpad-heading{align-items:flex-start;flex-direction:column}.launchpad-summary{gap:7px}.launchpad-summary article{align-items:flex-start;flex-direction:column;min-height:86px;padding:11px}.launchpad-summary span{font-size:10px}.launchpad-summary b{min-width:28px;height:28px}.launchpad-item{grid-template-columns:40px minmax(0,1fr);gap:10px;padding:13px}.launchpad-brand{width:38px;height:38px;border-radius:10px;font-size:18px}.launchpad-item-heading{align-items:flex-start;flex-direction:column;gap:5px}.launchpad-error{align-items:flex-start;flex-direction:column}}
 
 .marketing-proposal-summary{margin:10px 0;padding:12px;border:1px solid var(--border,#45454b);border-radius:9px;background:var(--surface,#242428);overflow-wrap:anywhere}.marketing-proposal-summary p{margin:7px 0 0;color:var(--muted-foreground,#a4a8af);font-size:13px}.marketing-studio .marketing-proposal-summary b{color:inherit}
 .app-shell:not(.dark-mode) .marketing-studio .marketing-proposal-summary{background:#f7f9fa;border-color:#d9e2e8;color:#25343d}.dark-mode .marketing-studio .marketing-proposal-summary{background:var(--dark-panel-2);border-color:var(--dark-border);color:var(--dark-text)}
@@ -3350,3 +3533,367 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
 .app-shell.dark-mode .activity-entry-more > summary { color:#8fd3ff; }
 .app-shell.dark-mode .activity-entry-full { border-left-color:#428fb6; background:#202d36; color:#f1f3f5; }
 .app-shell.dark-mode .activity-note-preview { color:#c8c5cc; }
+
+/* Compact approvals sub-tabs and recommendation controls */
+.app-shell .approval-inbox-subtabs { display:flex; align-items:center; gap:8px; padding:8px; margin:0 0 14px; border:1px solid var(--f2b-border); border-radius:12px; background:#fff; }
+.app-shell .approval-inbox-subtabs [role="tab"] { min-height:40px; padding:8px 14px; border:1px solid transparent; border-radius:9px; background:transparent; color:var(--f2b-ink); font:inherit; font-weight:700; cursor:pointer; }
+.app-shell .approval-inbox-subtabs [role="tab"] span { display:inline-grid; min-width:22px; height:22px; place-items:center; margin-left:5px; border-radius:999px; background:#eef1f4; color:var(--f2b-ink); font-size:12px; }
+.app-shell .approval-inbox-subtabs [role="tab"].selected { border-color:#2b9be0; background:rgba(43,155,224,.14); color:var(--f2b-ink); }
+.app-shell .recommendation-bulk-toolbar { display:flex; align-items:center; flex-wrap:wrap; gap:12px; padding:12px 14px; margin:0 0 12px; border:1px solid var(--f2b-border); border-radius:10px; background:#fff; }
+.app-shell .recommendation-bulk-toolbar label { display:flex; align-items:center; gap:8px; font-weight:700; }
+.app-shell .recommendation-bulk-toolbar > span { color:var(--f2b-muted); }
+.app-shell .recommendation-bulk-actions { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-left:auto; }
+.app-shell .recommendation-bulk-toolbar .primary-button { margin-left:0; }
+.app-shell .recommendation-reject { min-height:40px; padding:8px 12px; border:1px solid #d7a5a5; border-radius:10px; background:#fff5f5; color:#9a3030; font-weight:700; white-space:nowrap; }
+.app-shell .recommendation-reject:hover:not(:disabled) { border-color:#c44747; background:#ffe8e8; }
+.app-shell.dark-mode .recommendation-reject { border-color:#804747; background:#392426; color:#ffc5c5; }
+.app-shell.dark-mode .recommendation-reject:hover:not(:disabled) { border-color:#c45a5a; background:#4b292b; }
+.app-shell .ai-recommendation-select { display:flex; align-items:flex-start; padding-top:2px; }
+.app-shell .ai-recommendation-select input { width:18px; height:18px; accent-color:#168fe0; cursor:pointer; }
+.app-shell .ai-recommendation-feedback > div { display:grid; gap:8px; min-width:min(440px, 75vw); padding:8px 0 2px; }
+.app-shell .recommendation-feedback-choices { display:flex; flex-wrap:wrap; gap:7px 12px; padding:8px; margin:0; border:1px solid var(--f2b-border); border-radius:8px; }
+.app-shell .recommendation-feedback-choices legend { padding:0 5px; color:var(--f2b-muted); font-size:12px; }
+.app-shell .recommendation-feedback-choices label { display:flex; align-items:center; gap:5px; font-size:12px; }
+.app-shell .ai-recommendation-feedback textarea { width:100%; min-height:64px; resize:vertical; }
+.app-shell.dark-mode .approval-inbox-subtabs,.app-shell.dark-mode .recommendation-bulk-toolbar { background:#222326; }
+.app-shell.dark-mode .approval-inbox-subtabs [role="tab"],.app-shell.dark-mode .approval-inbox-subtabs [role="tab"] span { color:#f4f5f6; }
+.app-shell.dark-mode .approval-inbox-subtabs [role="tab"] span { background:#34363a; }
+.app-shell.dark-mode .recommendation-feedback-choices { border-color:#44474c; }
+@media (max-width:640px) {
+  .app-shell .approval-inbox-subtabs { align-items:stretch; }
+  .app-shell .approval-inbox-subtabs [role="tab"] { flex:1; padding-inline:8px; }
+  .app-shell .recommendation-bulk-actions { width:100%; margin-left:0; }
+  .app-shell .recommendation-bulk-actions button { flex:1; }
+  .app-shell .ai-recommendation-feedback > div { min-width:0; }
+}
+
+/* Keep recommendation cards readable, arranged across the page, with compact icon actions. */
+.app-shell .ai-approval-recommendations .ai-approval-inbox-rows {
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));
+  align-items:stretch;
+  gap:12px;
+}
+.app-shell .ai-approval-recommendations .ai-recommendation-item {
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  min-width:0;
+  min-height:250px;
+  gap:14px;
+}
+.app-shell .ai-approval-recommendations .ai-recommendation-main {
+  grid-template-columns:20px 38px minmax(0,1fr);
+  align-items:start;
+  min-width:0;
+}
+.app-shell .ai-approval-recommendations .ai-recommendation-main>div { min-width:0; }
+.app-shell .ai-approval-recommendations .ai-recommendation-main b,
+.app-shell .ai-approval-recommendations .ai-recommendation-main small,
+.app-shell .ai-approval-recommendations .ai-recommendation-main p { overflow-wrap:anywhere; }
+.app-shell .ai-approval-recommendations .ai-recommendation-controls {
+  justify-content:flex-start;
+  margin-top:auto;
+  padding-top:10px;
+  border-top:1px solid var(--f2b-border);
+}
+.app-shell .ai-approval-recommendations .ai-recommendation-controls details>summary {
+  display:grid;
+  width:40px;
+  min-width:40px;
+  height:40px;
+  min-height:40px;
+  place-items:center;
+  padding:0;
+  border:1px solid var(--f2b-border);
+  border-radius:10px;
+  background:var(--f2b-panel);
+  color:var(--f2b-link,#176fa7);
+  font-size:19px !important;
+  text-decoration:none;
+}
+.app-shell.dark-mode .ai-approval-recommendations .ai-recommendation-controls details>summary { color:#9bcaff; }
+.app-shell .ai-approval-recommendations .ai-recommendation-controls details>summary:hover {
+  border-color:#168fe0;
+  background:rgba(22,143,224,.1);
+  text-decoration:none;
+}
+.app-shell .ai-approval-recommendations .ai-recommendation-controls details[open] { flex:1 0 100%; min-width:0; }
+.app-shell .ai-approval-recommendations .ai-recommendation-controls details[open]>div,
+.app-shell .ai-approval-recommendations .ai-recommendation-controls details[open]>p,
+.app-shell .ai-approval-recommendations .ai-recommendation-controls details[open]>small { width:100%; max-width:100%; }
+@media(max-width:760px) {
+  .app-shell .ai-approval-recommendations .ai-approval-inbox-rows { grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr)); }
+  .app-shell .ai-approval-recommendations .ai-recommendation-item { min-height:0; }
+}
+.app-shell .ai-recommendation-icon.has-client-logo { overflow:hidden; padding:3px; border:1px solid #d9e1ea; background:#fff; }
+.app-shell .ai-recommendation-icon.has-client-logo img { display:block; width:100%; height:100%; object-fit:contain; border-radius:8px; }
+.app-shell .ai-recommendation-campaign { display:flex; align-items:flex-start; gap:5px; width:fit-content; max-width:100%; margin-top:6px; padding:4px 8px; border:1px solid #edd69c; border-radius:8px; background:#fff8e8; color:#725018; font-size:12px; line-height:1.35; }
+.app-shell .ai-recommendation-campaign>span:nth-child(2) { flex:none; font-weight:650; }
+.app-shell .ai-recommendation-campaign>b { min-width:0; font-weight:750; overflow-wrap:anywhere; }
+.app-shell.dark-mode .ai-recommendation-campaign { border-color:#705d35; background:#3b3325; color:#ffe0a0; }
+.app-shell .ai-approval-recommendations .ai-recommendation-controls .ai-recommendation-feedback>summary { display:inline-flex; width:auto; min-width:40px; gap:5px; padding:0 9px; font-size:13px !important; font-weight:650; }
+.app-shell .ai-approval-recommendations .ai-recommendation-controls .ai-recommendation-feedback>summary>span[aria-hidden="true"] { font-size:16px; }
+.app-shell .ai-approval-recommendations .ai-recommendation-controls .ai-recommendation-feedback[open] { min-width:0; width:100%; }
+.app-shell .ai-approval-recommendations .recommendation-feedback-scope { display:flex; align-items:center; gap:6px; margin:0; color:var(--f2b-muted); font-size:12px; line-height:1.35; }
+.app-shell .ai-approval-recommendations .recommendation-feedback-choices { display:flex; flex-wrap:wrap; gap:6px; margin:0; padding:8px; border:1px solid var(--f2b-border); border-radius:12px; }
+.app-shell .ai-approval-recommendations .recommendation-feedback-choices legend { padding:0 5px; color:var(--f2b-muted); font-size:12px; }
+.app-shell .ai-approval-recommendations .recommendation-feedback-choices label { display:inline-flex; align-items:center; gap:5px; padding:6px 8px; border:1px solid var(--f2b-border); border-radius:999px; background:var(--f2b-panel); color:var(--f2b-text); font-size:12px; line-height:1.25; }
+.app-shell .ai-approval-recommendations .recommendation-feedback-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.app-shell .ai-approval-recommendations .recommendation-feedback-actions .secondary-button { min-height:38px; }
+.app-shell .ai-approval-recommendations .ai-recommendation-feedback textarea { min-height:66px; }
+.app-shell.dark-mode .ai-approval-recommendations .recommendation-feedback-choices label { background:#2b2b30; }
+.app-shell .ai-approval-recommendations .ai-recommendation-main { grid-template-columns:20px 40px minmax(0,1fr); }
+.app-shell .ai-recommendation-brand { position:relative; display:grid; width:38px; height:38px; place-items:center; }
+.app-shell .ai-recommendation-type-icon { display:grid; width:38px; height:38px; place-items:center; border:1px solid #dfe4eb; border-radius:12px; background:#f0f2f6; font-size:19px; line-height:1; }
+.app-shell.dark-mode .ai-recommendation-type-icon { border-color:#4a4a51; background:#37373d; }
+.app-shell .ai-recommendation-brand.has-client-logo .ai-recommendation-icon.has-client-logo { width:38px; height:38px; }
+.app-shell .ai-recommendation-brand.has-client-logo .ai-recommendation-type-icon { position:absolute; right:-7px; bottom:-5px; width:21px; height:21px; border:2px solid #fff; border-radius:8px; background:#fff; font-size:13px; box-shadow:0 1px 4px rgba(0,0,0,.18); }
+.app-shell.dark-mode .ai-recommendation-brand.has-client-logo .ai-recommendation-type-icon { border-color:#27272a; background:#37373d; }
+.app-shell .ai-approval-recommendations .ai-recommendation-controls { flex-wrap:nowrap; gap:6px; }
+.app-shell .ai-approval-recommendations .ai-recommendation-controls>.primary-button { min-width:0; padding:8px 9px; font-size:13px; }
+.app-shell .ai-approval-recommendations .ai-recommendation-controls .ai-recommendation-feedback>summary { gap:4px; padding:0 7px; font-size:12px !important; white-space:nowrap; }
+.app-shell .ai-approval-recommendations .ai-recommendation-controls .recommendation-reject { flex:0 0 38px; display:grid; width:38px; min-width:38px; height:38px; min-height:38px; place-items:center; padding:0; font-size:18px; line-height:1; }
+.app-shell .ai-approval-recommendations .ai-recommendation-campaign { align-items:center; width:100%; min-width:0; gap:5px; }
+.app-shell .ai-approval-recommendations .ai-recommendation-campaign>span:nth-child(2) { flex:none; }
+.app-shell .ai-approval-recommendations .ai-recommendation-campaign>b { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.app-shell .ai-approval-recommendations .ai-recommendation-main>div>b:first-child { display:-webkit-box; min-height:3.6em; overflow:hidden; -webkit-box-orient:vertical; -webkit-line-clamp:3; line-height:1.2; }
+.app-shell .ai-approval-recommendations .ai-recommendation-main>div>small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.app-shell .ai-approval-recommendations .ai-recommendation-campaign { display:grid; grid-template-columns:20px minmax(0,1fr); align-items:center; min-height:32px; padding:4px 8px; }
+.app-shell .ai-approval-recommendations .ai-recommendation-campaign>span:first-child { display:grid; width:20px; place-items:center; font-size:15px; line-height:1; }
+.app-shell .ai-approval-recommendations .ai-recommendation-campaign>b { line-height:1.2; }
+@media(max-width:520px) {
+  .app-shell .ai-approval-recommendations .ai-recommendation-controls { flex-wrap:wrap; }
+  .app-shell .ai-approval-recommendations .recommendation-feedback-actions { display:grid; grid-template-columns:1fr; }
+}
+
+/* Keep recommendation actions readable in compact cards and let open panels
+   take the full card width instead of squeezing the neighboring controls. */
+.app-shell .ai-approval-recommendations .ai-recommendation-controls {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 40px minmax(0,auto) 38px;
+  grid-template-areas:"run run run run" "details feedback feedback reject";
+  align-items:start;
+  justify-content:stretch;
+  gap:8px;
+  width:100%;
+  min-width:0;
+  flex-wrap:initial;
+  box-sizing:border-box;
+}
+.app-shell .ai-approval-recommendations .ai-recommendation-controls>.primary-button {
+  grid-area:run;
+  width:100%;
+  min-width:0;
+  min-height:40px;
+  white-space:normal;
+  text-align:center;
+  box-sizing:border-box;
+}
+.app-shell .ai-approval-recommendations .ai-recommendation-controls>.ai-recommendation-more { grid-area:details; min-width:0; }
+.app-shell .ai-approval-recommendations .ai-recommendation-controls>.ai-recommendation-feedback { grid-area:feedback; min-width:0; }
+.app-shell .ai-approval-recommendations .ai-recommendation-controls>.recommendation-reject { grid-area:reject; }
+.app-shell .ai-approval-recommendations .ai-recommendation-controls details[open] {
+  min-width:0;
+  width:100%;
+  box-sizing:border-box;
+}
+.app-shell .ai-approval-recommendations .ai-recommendation-controls details[open]>div,
+.app-shell .ai-approval-recommendations .ai-recommendation-controls details[open]>p,
+.app-shell .ai-approval-recommendations .ai-recommendation-controls details[open]>small {
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  overflow-wrap:anywhere;
+  box-sizing:border-box;
+}
+.app-shell .ai-approval-recommendations .ai-recommendation-controls:has(>.ai-recommendation-more[open]) {
+  grid-template-columns:minmax(0,1fr) 38px;
+  grid-template-areas:"run run" "feedback reject" "details details";
+}
+.app-shell .ai-approval-recommendations .ai-recommendation-controls:has(>.ai-recommendation-feedback[open]) {
+  grid-template-columns:minmax(0,1fr) 38px;
+  grid-template-areas:"run run" "details reject" "feedback feedback";
+}
+.app-shell .ai-approval-recommendations .ai-recommendation-controls .ai-recommendation-feedback>div {
+  min-width:0;
+  width:100%;
+  max-width:100%;
+  box-sizing:border-box;
+}
+.app-shell .ai-approval-recommendations .ai-recommendation-controls .recommendation-feedback-choices { min-width:0; }
+.app-shell .ai-approval-recommendations .ai-recommendation-controls .ai-recommendation-feedback textarea { min-width:0; box-sizing:border-box; }
+.app-shell .ai-approval-waiting-collapsible>summary {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:center;
+  gap:4px 12px;
+  cursor:pointer;
+  list-style:none;
+}
+.app-shell .ai-approval-waiting-collapsible>summary::-webkit-details-marker { display:none; }
+.app-shell .ai-approval-waiting-title { display:flex; align-items:center; gap:8px; min-width:0; }
+.app-shell .ai-approval-waiting-title>b { font-size:14px; }
+.app-shell .ai-approval-waiting-title>span { display:inline-grid; min-width:24px; height:24px; place-items:center; border-radius:999px; background:#f2e4bd; color:#584316; font-size:11px; font-weight:700; }
+.app-shell.dark-mode .ai-approval-waiting-title>span { background:#514123; color:#ffe3a0; }
+.app-shell .ai-approval-waiting-summary-copy { grid-column:1; color:var(--f2b-muted); font-size:13px; line-height:1.45; }
+.app-shell .ai-approval-waiting-toggle { grid-column:2; grid-row:1 / span 2; padding:7px 10px; border:1px solid var(--f2b-border); border-radius:9px; background:var(--f2b-panel); color:var(--f2b-text); font-size:12px; font-weight:650; white-space:nowrap; }
+.app-shell .ai-approval-waiting-collapsible[open]>summary { padding-bottom:10px; border-bottom:1px solid color-mix(in srgb,#d8b96e 50%,var(--f2b-border)); }
+.app-shell .ai-approval-waiting-collapsible>div { margin-top:2px; }
+@media(max-width:520px) {
+  .app-shell .ai-approval-waiting-collapsible>summary { grid-template-columns:minmax(0,1fr); }
+  .app-shell .ai-approval-waiting-summary-copy,.app-shell .ai-approval-waiting-toggle { grid-column:1; grid-row:auto; }
+  .app-shell .ai-approval-waiting-toggle { justify-self:start; }
+}
+@media(max-width:520px) {
+  .app-shell .ai-approval-recommendations .ai-recommendation-controls { grid-template-columns:minmax(0,1fr) 38px; grid-template-areas:"run run" "details feedback" "reject reject"; }
+  .app-shell .ai-approval-recommendations .ai-recommendation-controls>.recommendation-reject { justify-self:end; }
+}
+
+.app-shell .ai-completed-screenshots { display:grid; gap:9px; padding:12px; border:1px solid var(--f2b-border); border-radius:12px; background:color-mix(in srgb,var(--f2b-panel) 72%,transparent); }
+.app-shell .ai-completed-screenshots>header { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:13px; }
+.app-shell .ai-completed-screenshots>header span,.app-shell .ai-completed-screenshots>p { color:var(--f2b-muted); font-size:12px; }
+.app-shell .ai-completed-screenshots>p { margin:0; }
+.app-shell .ai-completed-screenshot-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px; }
+.app-shell .ai-completed-screenshot { display:grid; min-width:0; gap:6px; overflow:hidden; padding:6px; border:1px solid var(--f2b-border); border-radius:10px; background:var(--f2b-white); color:var(--f2b-text); text-align:left; cursor:zoom-in; }
+.app-shell .ai-completed-screenshot img { display:block; width:100%; aspect-ratio:16/10; object-fit:cover; border-radius:6px; background:#e8edf2; }
+.app-shell .ai-completed-screenshot span { overflow:hidden; padding:0 3px; font-size:11px; text-overflow:ellipsis; white-space:nowrap; }
+.app-shell .ai-add-screenshot { justify-self:start; }.app-shell .ai-history-screenshots { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0; }
+.app-shell .ai-history-screenshot { display:grid; width:112px; gap:4px; overflow:hidden; padding:4px; border:1px solid var(--f2b-border); border-radius:9px; background:var(--f2b-panel); color:var(--f2b-text); text-align:left; cursor:zoom-in; }
+.app-shell .ai-history-screenshot img { display:block; width:100%; aspect-ratio:16/10; object-fit:cover; border-radius:5px; background:var(--f2b-muted-bg); }
+.app-shell .ai-history-screenshot span { overflow:hidden; padding:0 2px; font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
+.app-shell .ai-history-no-screenshot { display:inline-block; margin:6px 0; color:var(--f2b-muted); }
+.recommendation-feedback-save.is-saved { color:#147a49; border-color:#67c394; }
+.recommendation-feedback-save-message { display:block; min-height:1.3em; margin-top:2px; color:var(--f2b-muted); font-size:12px; line-height:1.35; }
+.recommendation-feedback-save-message.saved { color:#147a49; font-weight:650; }
+.recommendation-feedback-save-message.error { color:#b42318; font-weight:650; }
+.app-shell.dark-mode .recommendation-feedback-save-message.saved { color:#7ce0a8; }
+.app-shell.dark-mode .recommendation-feedback-save-message.error { color:#ff8b83; }
+@media(max-width:600px) { .app-shell .ai-completed-screenshot-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
+
+
+
+
+
+.app-shell .quick-task-setup-menu{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 14px;padding:14px 16px;border:1px solid var(--f2b-border);border-radius:14px;background:var(--f2b-surface);color:var(--f2b-text)}.app-shell .quick-task-setup-menu>b{margin-right:auto}
+@media(max-width:600px){.app-shell .quick-task-setup-menu>b{width:100%}}
+
+/* Launchpad: one calm, centered connection list inspired by the supplied reference. */
+.app-shell .launchpad-view{max-width:1120px;margin-inline:auto;padding-top:28px}
+.app-shell .launchpad-heading{position:relative;display:grid;justify-items:center;gap:0;margin:0 0 22px;text-align:center}
+.app-shell .launchpad-heading>div{display:contents}
+.app-shell .launchpad-heading .eyebrow,.app-shell .launchpad-heading .muted{display:none}
+.app-shell .launchpad-heading h1{margin:0;color:var(--f2b-text);font-size:clamp(21px,2vw,27px);font-weight:650;letter-spacing:-.025em;line-height:1.25}
+.app-shell .launchpad-heading>button{position:absolute;right:0;top:50%;min-height:34px;padding:7px 11px;transform:translateY(-50%);font-size:11px}
+.app-shell .launchpad-catalog{width:min(100%,790px);margin:0 auto 22px;overflow:hidden;border:1px solid var(--f2b-border);border-radius:10px;background:var(--f2b-white);box-shadow:0 8px 28px rgba(21,43,62,.06)}
+.app-shell .launchpad-row{display:grid;grid-template-columns:48px minmax(0,1fr) 88px;align-items:center;gap:12px;min-height:76px;padding:10px 15px;border:0;border-bottom:1px solid var(--f2b-border);border-radius:0;background:transparent;color:var(--f2b-text)}
+.app-shell .launchpad-row:last-child{border-bottom:0}
+.app-shell .launchpad-brand{display:grid;width:42px;height:42px;place-items:center;border:0;border-radius:10px;background:transparent;font-size:29px;line-height:1}
+.app-shell .launchpad-item-main{display:grid;min-width:0;gap:3px}
+.app-shell .launchpad-item-heading{display:flex;align-items:center;gap:8px;min-width:0}
+.app-shell .launchpad-item-heading h3{overflow:hidden;margin:0;font-size:13px;font-weight:650;letter-spacing:0;text-overflow:ellipsis;white-space:nowrap}
+.app-shell .launchpad-item-heading .integration-status{flex:0 0 auto;padding:3px 7px;border-radius:999px;font-size:9px;line-height:1.2}
+.app-shell .launchpad-item-main>p{display:-webkit-box;overflow:hidden;margin:0;color:var(--f2b-muted);font-size:11px;font-weight:400;line-height:1.4;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.app-shell .launchpad-details{margin:2px 0 0;font-size:10px}
+.app-shell .launchpad-details>summary{color:var(--f2b-muted);font-weight:550}
+.app-shell .launchpad-row-status{display:flex;align-items:center;justify-content:flex-end}
+.app-shell .launchpad-connect-button{display:inline-flex;min-width:78px;min-height:34px;align-items:center;justify-content:center;padding:0 13px;border:1px solid #25252a;border-radius:5px;background:#25252a;color:#fff;font-size:10px;font-weight:650;text-decoration:none;transition:background .16s ease,transform .16s ease,box-shadow .16s ease}
+.app-shell .launchpad-connect-button:hover{transform:translateY(-1px);background:#111115;box-shadow:0 4px 10px rgba(21,25,30,.18)}
+.app-shell .launchpad-connected-check{display:grid;width:36px;height:36px;place-items:center;border-radius:50%;background:#25252a;color:#fff;font-size:18px;font-weight:700}
+.app-shell .launchpad-details-content{margin-top:8px;padding:11px}
+.app-shell .launchpad-detail-actions{display:flex;flex-wrap:wrap;gap:7px}
+.app-shell .launchpad-security{width:min(100%,790px);margin:0 auto 22px}
+.app-shell.dark-mode .launchpad-catalog{border-color:var(--dark-border);background:var(--dark-panel);color:var(--dark-text)}
+.app-shell.dark-mode .launchpad-row{border-color:var(--dark-border);background:transparent;color:var(--dark-text)}
+.app-shell.dark-mode .launchpad-item-heading h3{color:var(--dark-text)}
+.app-shell.dark-mode .launchpad-item-main>p,.app-shell.dark-mode .launchpad-details>summary{color:var(--dark-muted)}
+.app-shell.dark-mode .launchpad-details-content,.app-shell.dark-mode .launchpad-view .integration-sync,.app-shell.dark-mode .launchpad-view .integration-usage{border-color:var(--dark-border);background:var(--dark-panel-2);color:var(--dark-text)}
+.app-shell.dark-mode .launchpad-connect-button,.app-shell.dark-mode .launchpad-connected-check{border-color:#25252a;background:#25252a;color:#fff}
+.app-shell.dark-mode .launchpad-connect-button:hover{background:#111115;box-shadow:0 4px 12px rgba(0,0,0,.25)}
+@media(max-width:700px){
+  .app-shell .launchpad-view{padding-top:18px}
+  .app-shell .launchpad-heading{padding:0 0 42px}
+  .app-shell .launchpad-heading>button{top:auto;right:auto;bottom:0;transform:none}
+  .app-shell .launchpad-row{grid-template-columns:40px minmax(0,1fr) 72px;gap:9px;min-height:70px;padding:9px 10px}
+  .app-shell .launchpad-brand{width:36px;height:36px;font-size:25px}
+  .app-shell .launchpad-item-heading{align-items:flex-start;flex-direction:column;gap:3px}
+  .app-shell .launchpad-item-heading h3{max-width:100%}
+  .app-shell .launchpad-connect-button{min-width:66px;padding-inline:9px}
+}
+
+/* Shared card surface for staff approvals, AI approvals, recommendations and history. */
+.app-shell .workflow-review-card.task-review-shared-card,
+.app-shell .ai-approval-inbox-row.task-review-shared-card,
+.app-shell .ai-approval-recommendations .ai-recommendation-item.task-review-shared-card { padding:14px; border:1px solid var(--f2b-border); border-radius:14px; background:var(--f2b-panel); box-shadow:0 2px 8px rgba(0,0,0,.06); }
+.app-shell .task-review-grid { grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr)); align-items:start; gap:12px; }
+.app-shell .task-history-grid { grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr)); align-items:start; gap:12px; }
+.app-shell .task-history-card { align-content:start; min-width:0; height:fit-content; }
+.app-shell .task-review-shared-card:hover { border-color:var(--f2b-accent); box-shadow:0 5px 16px rgba(0,0,0,.12); }
+
+/* Keep recommendation details short and easy to scan; full page copy stays
+   available only when the owner opens the copy section. */
+.app-shell .ai-approval-recommendations .ai-recommendation-main>div>p { display:-webkit-box; overflow:hidden; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-height:1.4; }
+.app-shell .ai-approval-recommendations .ai-recommendation-more>p { margin:6px 0; line-height:1.4; }
+.app-shell .ai-approval-recommendations .ai-recommendation-more>p>b { color:var(--f2b-text); }
+.app-shell .ai-approval-recommendations .recommendation-quality-note { display:block; margin-top:7px; color:var(--f2b-muted); line-height:1.35; }
+.app-shell .ai-approval-recommendations .recommendation-copy-details { margin-top:8px; padding:8px 10px; border:1px solid var(--f2b-border); border-radius:10px; }
+.app-shell .ai-approval-recommendations .recommendation-copy-details>summary { color:var(--f2b-link,#176fa7); cursor:pointer; font-weight:650; }
+.app-shell .ai-approval-recommendations .recommendation-copy-details>p { overflow-wrap:anywhere; }
+/* Marketing hub navigation and Milestone 1 readiness pages */
+.sidebar { height: 100vh; max-height: 100vh; overflow-y: auto; position: sticky; top: 0; align-self: flex-start; scrollbar-width: thin; }
+.marketing-hub-tabs { position: sticky; top: 0; z-index: 8; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: thin; }
+.marketing-hub-tabs button { white-space: nowrap; flex: 0 0 auto; }
+.marketing-foundation-page { max-width: 1180px; margin: 0 auto; padding: 8px 0 40px; color: var(--text, #25313a); }
+.marketing-foundation-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding: 24px; border: 1px solid var(--line, #d8e0e5); border-radius: 16px; background: var(--surface, #fff); }
+.marketing-foundation-heading h1 { margin: 6px 0; font-size: clamp(25px, 3vw, 36px); }
+.marketing-foundation-heading p { margin: 0; color: #596773 !important; }
+.marketing-foundation-status { flex: none; padding: 8px 12px; border: 1px solid #d6a543; border-radius: 999px; background: #fff7e5; color: #77520c; font-size: 12px; font-weight: 750; }
+.marketing-foundation-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-top: 16px; }
+.marketing-foundation-card { padding: 18px; border: 1px solid var(--line, #d8e0e5); border-radius: 14px; background: var(--surface, #fff); }
+.marketing-foundation-step { color: #287fc0; font-size: 10px; font-weight: 800; letter-spacing: .1em; }
+.marketing-foundation-card p { margin: 9px 0 0; line-height: 1.55; }
+.marketing-foundation-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.marketing-foundation-actions button { padding: 10px 14px; border: 1px solid var(--line, #d8e0e5); border-radius: 9px; background: var(--surface, #fff); color: var(--text, #25313a); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.marketing-foundation-actions button:hover { border-color: #328de0; color: #176ba9; }
+.app-shell.dark-mode .marketing-foundation-page { color: var(--dark-text, #edf3f6); }
+.app-shell.dark-mode .marketing-foundation-heading,.app-shell.dark-mode .marketing-foundation-card,.app-shell.dark-mode .marketing-foundation-actions button { background: var(--dark-panel, #202a31); border-color: var(--dark-border, #3c4850); color: var(--dark-text, #edf3f6); }
+.app-shell.dark-mode .marketing-foundation-heading p { color: #bdc8ce !important; }
+.app-shell.dark-mode .marketing-foundation-status { background: #3c321e; color: #ffe1a0; border-color: #896c32; }
+@media (max-height: 760px) { .sidebar { position: static; } }
+@media (max-width: 760px) { .marketing-foundation-heading { flex-direction: column; padding: 18px; } .marketing-hub-tabs { margin: 10px 0 16px; } }
+
+/* Approvals: empty AI queue fills the page width like the staff queue */
+.app-shell .ai-review-queue.is-clear { width:100%; max-width:none; }
+.app-shell .ai-review-queue.is-clear .ai-approval-inbox,
+.app-shell .ai-review-queue .ai-approval-recommendations { width:100%; box-sizing:border-box; }
+.app-shell .ai-approval-recommendations .ai-approval-inbox-header h3,
+.app-shell .ai-approval-inbox-header h3 { margin:0; }
+
+/* ===== Drag & drop: tilt + drop shadow slot (lib/card-drag-fx.ts) ===== */
+.card-drop-shadow-slot { box-sizing:border-box; width:100%; flex:0 0 auto; border:2px dashed rgba(41,148,200,.75); border-radius:14px; background:rgba(41,148,200,.10); box-shadow:inset 0 8px 22px rgba(8,22,34,.26),0 10px 24px rgba(8,22,34,.2); pointer-events:none; animation:cardSlotIn .14s ease-out; }
+.dark-mode .card-drop-shadow-slot,.app-shell.dark-mode .card-drop-shadow-slot { border-color:rgba(117,196,234,.8); background:rgba(117,196,234,.10); box-shadow:inset 0 8px 22px rgba(0,0,0,.45),0 10px 24px rgba(0,0,0,.35); }
+@keyframes cardSlotIn { from { opacity:0; transform:scale(.97); } to { opacity:1; transform:scale(1); } }
+.pipeline-card-drag-preview,.crm-opportunity-drag-preview { cursor:grabbing; }
+
+/* ===== Task card logo: always a clean square, never stretched ===== */
+.app-shell .pipeline-card .task-client-mark,
+.app-shell .pipeline-card .task-client-mark.has-logo,
+.app-shell .pipeline-card .pipeline-card-summary-main>.task-client-mark,
+.app-shell .pipeline-card .pipeline-card-summary-main>.task-client-mark.has-logo { box-sizing:border-box !important; width:56px !important; height:56px !important; min-width:56px !important; min-height:56px !important; max-width:56px !important; max-height:56px !important; flex:0 0 56px !important; aspect-ratio:1/1 !important; align-self:flex-start !important; overflow:hidden !important; }
+.app-shell .pipeline-card .task-client-mark.has-logo img { width:100% !important; height:100% !important; padding:4px !important; object-fit:contain !important; object-position:center !important; }
+
+/* ===== Completed task runs: aligned cards with a steady thumbnail ===== */
+.app-shell .ai-review-grid.is-history { align-items:stretch; grid-auto-rows:auto; grid-template-columns:repeat(auto-fill,minmax(min(100%,19rem),1fr)); gap:12px; }
+.app-shell .ai-review-grid.is-history > .ai-review-card { display:flex; flex-direction:column; gap:10px; height:100%; min-width:0; }
+.app-shell .ai-review-grid.is-history .ai-completed-screenshots { flex:1 1 auto; align-content:start; }
+.app-shell .ai-review-grid.is-history .ai-review-card-details { margin-top:auto; }
+.app-shell .ai-completed-screenshot-grid { grid-template-columns:repeat(auto-fill,minmax(8.5rem,1fr)); }
+.app-shell .ai-completed-screenshot-grid > .ai-completed-screenshot:only-child { grid-column:1 / -1; }
+.app-shell .ai-completed-screenshot img { aspect-ratio:16/10; object-fit:cover; object-position:top center; }
+.app-shell .ai-completed-screenshot.is-broken img { display:none; }
+.app-shell .ai-completed-screenshot.is-broken::before { content:"🖼️ Preview unavailable"; display:grid; place-items:center; aspect-ratio:16/10; border-radius:6px; background:var(--f2b-muted-bg,#e8edf2); color:var(--f2b-muted,#5d6b76); font-size:12px; }
+.app-shell .ai-completed-screenshot-empty { display:grid; place-items:center; align-content:center; gap:4px; aspect-ratio:16/10; border:1px dashed var(--f2b-border); border-radius:8px; color:var(--f2b-muted); text-align:center; }
+.app-shell .ai-completed-screenshot-empty span { font-size:22px; }
+.app-shell .ai-completed-screenshot-empty small { font-size:12px; }
+

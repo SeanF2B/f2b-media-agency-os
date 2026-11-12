@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { createCardDragFx, type CardDragFx } from "@/lib/card-drag-fx";
 import { PhoneActionIcon, toPhoneHref, toWhatsAppNumber, WhatsAppActionIcon } from "@/components/contact-action-icons";
 
 type Contact = { id: string; client_id?: string | null; first_name: string; last_name: string; email: string; phone: string; company: string; source: string; notes: string; updated_at: string };
@@ -8,7 +9,7 @@ type Stage = { id: string; name: string; position: number; category: "open" | "w
 type Pipeline = { id: string; name: string; description: string; stages: Stage[] };
 type Opportunity = { id: string; pipeline_id: string; stage_id: string; contact_id?: string | null; client_id?: string | null; title: string; value: number; currency: string; assigned_to?: string | null; expected_close_date?: string | null; notes: string; first_name?: string; last_name?: string; email?: string; phone?: string; company?: string; stage_name?: string; updated_at: string };
 type Payload = { contacts: Contact[]; pipelines: Pipeline[]; opportunities: Opportunity[]; activities: Array<{ id: string; opportunity_id?: string; contact_id?: string; body: string; created_at: string }>; clients: Array<{ id: string; name: string; company?: string; logo?: string; email?: string; phone?: string; contact?: string }>; staff: Array<{ id: string; name: string; avatar?: string }> };
-type OpportunityDrag = { id: string; pointerId: number; startX: number; startY: number; offsetX: number; offsetY: number; width: number; source: HTMLElement; preview?: HTMLElement; overStage?: HTMLElement; moved: boolean; removeListeners?: () => void };
+type OpportunityDrag = { fx?: CardDragFx; id: string; pointerId: number; startX: number; startY: number; offsetX: number; offsetY: number; width: number; source: HTMLElement; preview?: HTMLElement; overStage?: HTMLElement; moved: boolean; removeListeners?: () => void };
 type StageDrag = { id: string; pointerId: number; startX: number; startY: number; moved: boolean; overId: string; removeListeners?: () => void };
 type DragPointEvent = Pick<PointerEvent, "pointerId" | "clientX" | "clientY" | "preventDefault" | "stopPropagation">;
 
@@ -216,10 +217,9 @@ export function CrmView({ onOpenClient }: { onOpenClient: (clientId: string) => 
       preview.style.zIndex = "2147483000";
       preview.style.pointerEvents = "none";
       preview.style.opacity = "1";
-      preview.style.transform = "scale(1.025) rotate(-.4deg)";
-      preview.style.boxShadow = "0 18px 40px rgba(9,30,48,.28),0 4px 12px rgba(30,137,190,.2)";
       document.body.appendChild(preview);
       drag.preview = preview;
+      drag.fx = createCardDragFx(preview, drag.source, { x: drag.offsetX, y: drag.offsetY }, { cardSelector: ".crm-opportunity" });
       setDraggingId(drag.id);
     }
     if (drag.preview) {
@@ -232,11 +232,13 @@ export function CrmView({ onOpenClient }: { onOpenClient: (clientId: string) => 
       overStage?.classList.add("is-drop-target");
       drag.overStage = overStage;
     }
+    drag.fx?.move(event.clientX, event.clientY, overStage || null);
   };
   const finishDrag = (event: DragPointEvent) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     dragRef.current = null;
+    drag.fx?.end();
     if (drag.moved) {
       event.preventDefault();
       event.stopPropagation();
@@ -262,6 +264,7 @@ export function CrmView({ onOpenClient }: { onOpenClient: (clientId: string) => 
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     dragRef.current = null;
+    drag.fx?.end();
     drag.removeListeners?.();
     drag.preview?.remove();
     drag.source.classList.remove("is-dragging");
