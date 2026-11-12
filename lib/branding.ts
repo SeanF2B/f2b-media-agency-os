@@ -18,8 +18,9 @@ export function applyBranding(raw: Partial<Branding> | undefined | null) {
   if (typeof document !== "undefined") {
     const root = document.documentElement.style;
     root.setProperty("--brand-primary", next.primary); root.setProperty("--brand-secondary", next.secondary);
-    // sidebar colour: the secondary colour itself, darkened only if it is too light for white text
-    const n = parseInt(next.secondary.slice(1), 16), r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255, lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255, k = lum > 0.5 ? 0.5 / lum : 1;
+    // sidebar colour: exactly the secondary colour. Light colours get dark text instead of being darkened.
+    const n = parseInt(next.secondary.slice(1), 16), r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255, lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255, light = lum > 0.6, k = 1;
+    root.setProperty("--sb-fg", light ? "#1c2330" : "rgba(255,255,255,.92)"); root.setProperty("--sb-fg-strong", light ? "#0f1722" : "#fff"); root.setProperty("--sb-mix", light ? "#000" : "#fff"); root.setProperty("--sb-edge", light ? "rgba(0,0,0,.14)" : "rgba(255,255,255,.22)");
     root.setProperty("--brand-sidebar", "#" + [r, g, b].map((v) => Math.round(v * k).toString(16).padStart(2, "0")).join(""));
   }
   listeners.forEach((listener) => listener());
@@ -76,13 +77,15 @@ export async function extractLogoColours(src: string): Promise<{ primary: string
     }
     const ranked = [...bins.values()].sort((x, y) => y.n - x.n).map((v) => ({ n: v.n, r: v.r / v.c, g: v.g / v.c, b: v.b / v.c }));
     let result: { primary: string; secondary: string } | null = null;
-    if (bg && bgLight < 0.75 && ranked.length) {
+    if (bg && ranked.length) {
       // dark/coloured logo background -> sidebar (secondary); the logo's accent -> buttons (primary)
       result = { primary: toHex(ranked[0].r, ranked[0].g, ranked[0].b), secondary: toHex(bg.r, bg.g, bg.b) };
     } else if (ranked.length) {
       const first = ranked[0], other = ranked.find((c) => dist(c, first) > 90);
       result = { primary: toHex(first.r, first.g, first.b), secondary: other ? toHex(other.r, other.g, other.b) : toHex(first.r * 0.55, first.g * 0.55, first.b * 0.55) };
-    } else if (bg && bgLight < 0.75) {
+    } else if (bg && bgLight >= 0.75) {
+      result = { primary: DEFAULT_BRANDING.primary, secondary: toHex(bg.r, bg.g, bg.b) };
+    } else if (bg) {
       result = { primary: toHex(bg.r * 1.6 + 40, bg.g * 1.6 + 40, bg.b * 1.6 + 40), secondary: toHex(bg.r, bg.g, bg.b) };
     }
     colourCache.set(src, result); return result;
