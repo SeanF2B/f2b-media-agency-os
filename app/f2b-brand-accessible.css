@@ -8082,3 +8082,12 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
 @keyframes lp-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 @keyframes lp-spin { from { transform: rotate(-90deg) scale(.7); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .lp-card, .lp-hero, .lp-ring { animation: none; } }
+
+.done-upload-backdrop { z-index: 60; }
+.done-upload-modal { text-align: center; max-width: 440px; animation: lp-rise .35s cubic-bezier(.2,.75,.25,1) both; }
+.done-upload-emoji { font-size: 38px; } .done-upload-modal h2 { margin: 6px 0 2px; }
+.done-upload-actions { display: flex; gap: 10px; justify-content: center; margin-top: 16px; }
+.done-upload-drop { display: grid; gap: 4px; place-items: center; padding: 26px 16px; margin-top: 10px; border: 2px dashed rgba(127,127,127,.5); border-radius: 14px; cursor: pointer; transition: border-color .15s ease, background .15s ease; }
+.done-upload-drop:hover { border-color: #3b82f6; background: rgba(59,130,246,.1); }
+.done-upload-drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.done-upload-count { color: #22c55e; font-weight: 700; font-size: 12px; }
