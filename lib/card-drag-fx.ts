@@ -32,6 +32,9 @@ export function createCardDragFx(preview: HTMLElement, source: HTMLElement, grab
   let velocity = 0;
   let idleTimer = 0;
   let slot: HTMLElement | null = null;
+  let scrollFrame = 0;
+  let lastColumn: HTMLElement | null = null;
+  let lastY = 0;
 
   // Pivot around the point where the card is being held, like picking up a card.
   preview.style.transformOrigin = `${grab.x}px ${grab.y}px`;
@@ -71,6 +74,23 @@ export function createCardDragFx(preview: HTMLElement, source: HTMLElement, grab
     container.insertBefore(element, reference);
   };
 
+  // Trello-style: dragging near the top or bottom edge of a long column scrolls it.
+  const EDGE = 70;
+  const MAX_STEP = 18;
+  const autoScroll = () => {
+    scrollFrame = 0;
+    const column = lastColumn;
+    if (!column || column.scrollHeight <= column.clientHeight + 1) return;
+    const rect = column.getBoundingClientRect();
+    let step = 0;
+    if (lastY < rect.top + EDGE) step = -MAX_STEP * clamp(1 - (lastY - rect.top) / EDGE, 0, 1);
+    else if (lastY > rect.bottom - EDGE) step = MAX_STEP * clamp(1 - (rect.bottom - lastY) / EDGE, 0, 1);
+    if (!step) return;
+    column.scrollTop += step;
+    placeSlot(lastY, column);
+    scrollFrame = window.requestAnimationFrame(autoScroll);
+  };
+
   return {
     move(clientX, clientY, column) {
       if (lastX !== null) {
@@ -85,7 +105,9 @@ export function createCardDragFx(preview: HTMLElement, source: HTMLElement, grab
         velocity = 0;
         setTilt(0);
       }, 110);
-      if (column) placeSlot(clientY, column);
+      lastColumn = column || null;
+      lastY = clientY;
+      if (column) { placeSlot(clientY, column); if (!scrollFrame) scrollFrame = window.requestAnimationFrame(autoScroll); }
       else removeSlot();
     },
     dropPlacement() {
@@ -98,6 +120,9 @@ export function createCardDragFx(preview: HTMLElement, source: HTMLElement, grab
     },
     end() {
       window.clearTimeout(idleTimer);
+      if (scrollFrame) window.cancelAnimationFrame(scrollFrame);
+      scrollFrame = 0;
+      lastColumn = null;
       removeSlot();
     },
   };
