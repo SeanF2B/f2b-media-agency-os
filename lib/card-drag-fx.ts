@@ -40,6 +40,10 @@ export function createCardDragFx(preview: HTMLElement, source: HTMLElement, grab
   preview.style.transformOrigin = `${grab.x}px ${grab.y}px`;
   preview.style.transition = "transform 110ms ease-out, box-shadow 160ms ease-out";
   preview.style.willChange = "transform";
+  // The cloned card still carries its "card appears" / "just dropped" animation.
+  // CSS animations beat inline styles, which would freeze the tilt and shadow.
+  preview.classList.add("card-drag-lifted");
+  preview.style.setProperty("animation", "none", "important");
   preview.style.transform = "rotate(0deg) scale(1.03)";
   preview.style.boxShadow = "0 22px 44px rgba(8,22,34,.34), 0 6px 14px rgba(8,22,34,.22)";
 

@@ -7943,3 +7943,6 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
 .app-shell.dark-mode .crm-card-facts dt, .app-shell.dark-mode .crm-card-notes summary { color: #9aa3ab; }
 .app-shell.dark-mode .crm-card-delete { color: #ff8a80; }
 .app-shell.dark-mode .crm-card-icon { border-color: #3a393d; }
+
+.card-drag-lifted, .card-drag-lifted * { animation: none !important; }
+.card-drag-lifted { position: fixed !important; pointer-events: none !important; }
