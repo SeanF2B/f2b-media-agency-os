@@ -8128,3 +8128,14 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
 .app-shell .workflow-review-tabs > button[role="tab"].ai-approval-tab.has-pending { border-color: #f59e0b !important; }
 .app-shell .workflow-review-tabs > button[role="tab"] > span { background: rgba(0,0,0,.35) !important; color: #fff !important; border-radius: 99px; padding: 1px 8px; font-weight: 800; }
 .app-shell .workflow-review-tabs > button[role="tab"].selected > span, .app-shell .workflow-review-tabs > button[role="tab"][aria-selected="true"] > span { background: rgba(255,255,255,.28) !important; color: #fff !important; }
+
+/* Unified tab buttons everywhere: blue pill when selected, white count badge with blue number */
+.app-shell button[role="tab"], .app-shell [class*="-tabs"] > button, .app-shell [class*="subtabs"] > button { transition: background .16s ease, border-color .16s ease, transform .16s ease, color .16s ease; box-shadow: none; }
+.app-shell button[role="tab"]:hover, .app-shell [class*="-tabs"] > button:hover, .app-shell [class*="subtabs"] > button:hover { transform: translateY(-1px); border-color: #3b82f6 !important; background-color: rgba(59,130,246,.16) !important; }
+.app-shell button[role="tab"].selected, .app-shell button[role="tab"].active, .app-shell button[role="tab"][aria-selected="true"],
+.app-shell [class*="-tabs"] > button.selected, .app-shell [class*="-tabs"] > button.active, .app-shell [class*="subtabs"] > button.active, .app-shell [class*="subtabs"] > button.selected { background: #3b82f6 !important; border-color: #3b82f6 !important; color: #fff !important; }
+.app-shell button[role="tab"]:focus, .app-shell [class*="-tabs"] > button:focus { outline: none !important; }
+.app-shell button[role="tab"]:focus-visible, .app-shell [class*="-tabs"] > button:focus-visible { outline: 2px solid rgba(59,130,246,.55) !important; outline-offset: 2px; }
+.app-shell button[role="tab"] > span:last-child:not(:first-child), .app-shell [class*="-tabs"] > button > span:last-child:not(:first-child) { background: #fff !important; color: #1e40af !important; border-radius: 99px; padding: 1px 8px; min-width: 22px; text-align: center; font-weight: 800; }
+/* Task tabs: override the earlier dark badge */
+.app-shell .workflow-review-tabs > button[role="tab"] > span, .app-shell .workflow-review-tabs > button[role="tab"].selected > span, .app-shell .workflow-review-tabs > button[role="tab"][aria-selected="true"] > span { background: #fff !important; color: #1e40af !important; }
