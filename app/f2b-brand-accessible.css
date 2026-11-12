@@ -8159,3 +8159,16 @@ html body .app-shell.app-shell button[role="tab"] > span:last-child:not(:first-c
   font-size: 12px !important; font-weight: 800 !important; opacity: 1 !important; text-shadow: none !important;
   display: inline-grid !important; place-items: center; min-width: 24px; height: 24px; padding: 0 6px; border-radius: 999px;
 }
+
+/* File thumbnails + icon buttons */
+.app-shell .task-attachment-row, .app-shell .file-row { display:flex; align-items:center; gap:10px; flex-wrap:nowrap; }
+.app-shell .task-attachment-row > a { flex:1 1 auto; min-width:0; display:grid; gap:2px; overflow:hidden; }
+.app-shell .task-attachment-row > a span, .app-shell .task-attachment-row > a { overflow-wrap:anywhere; word-break:normal; }
+.app-shell .file-thumb { position:relative; flex:0 0 auto; width:56px; height:56px; border-radius:8px; overflow:hidden; background:rgba(127,127,127,.18); border:1px solid rgba(127,127,127,.35); display:grid; place-items:center; }
+.app-shell .file-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+.app-shell .file-thumb iframe { width:200%; height:200%; border:0; transform:scale(.5); transform-origin:0 0; pointer-events:none; background:#fff; }
+.app-shell .file-thumb-icon { font-size:11px; font-weight:800; color:#fff; background:#3b82f6; border-color:#3b82f6; }
+.app-shell .file-icon-btn { flex:0 0 auto; display:inline-grid; place-items:center; width:34px; height:34px; padding:0; border-radius:8px; border:1px solid rgba(127,127,127,.4); background:rgba(127,127,127,.14); color:inherit; font-size:16px; line-height:1; text-decoration:none; cursor:pointer; transition:background .16s, border-color .16s, transform .16s; }
+.app-shell .file-icon-btn:hover { background:rgba(59,130,246,.22); border-color:#3b82f6; transform:translateY(-1px); }
+.app-shell .file-icon-btn.file-icon-danger:hover { background:rgba(239,68,68,.22); border-color:#ef4444; }
+.app-shell .file-row-actions { display:flex; gap:6px; align-items:center; }
