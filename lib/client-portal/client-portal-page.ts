@@ -55,6 +55,29 @@ h1{font-size:24px;margin:0 0 4px}.lead{color:#5d6b64;margin:0 0 16px}
     + '<p class="note">Your login can edit: <b>' + esc(me.scopeLabel) + '</b>. Saving never changes your live website.</p>'
     + '<p><button type="button" class="primary-button" id="open-builder">🧱 Open visual builder</button></p>';
   document.getElementById('open-builder').onclick = () => { const b = document.createElement('script'); b.src = '/f2b-site-builder.js'; b.onload = () => window.f2bSiteBuilder.open({ clientId: me.client.id, name: me.client.name }); document.head.appendChild(b); };
+  (() => {
+    const br = me.branding || {}, card = document.createElement('section'); card.className = 'f2b-cs-web'; card.style.marginTop = '16px';
+    card.innerHTML = '<h2 style="margin:0;font-size:18px">Your brand</h2><p class="note">Your logo and two colours. F2B Media uses them in your account.</p>'
+      + '<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:12px 0"><img id="bl" alt="" style="width:64px;height:64px;object-fit:contain;border:1px solid #d0d5dd;border-radius:12px;background:#fff;display:' + (br.logo || me.client.logo ? 'block' : 'none') + '"><label class="secondary-button" style="cursor:pointer">Upload logo<input id="bf" type="file" accept="image/*" hidden></label>'
+      + '<label>Main colour <input id="bp" type="color" value="' + esc(br.primary || '#3b82f6') + '"></label><label>Second colour <input id="bs" type="color" value="' + esc(br.secondary || '#1e3a8a') + '"></label></div>'
+      + '<button type="button" class="primary-button" id="bsave">Save brand</button> <span id="bmsg" role="status" style="margin-left:8px"></span>';
+    web.after(card);
+    const img = card.querySelector('#bl'); img.src = br.logo || me.client.logo || ''; let logo = br.logo || '';
+    card.querySelector('#bf').onchange = async (e) => {
+      const f = e.target.files[0]; if (!f) return; const msg = card.querySelector('#bmsg');
+      try {
+        if (!/^image\\//.test(f.type)) throw new Error('Choose an image file.');
+        const url = URL.createObjectURL(f); const im = await new Promise((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => bad(new Error('That image could not be read.')); i.src = url; });
+        const k = Math.min(1, 256 / Math.max(im.naturalWidth || 256, im.naturalHeight || 256)), c = document.createElement('canvas'); c.width = Math.max(1, Math.round(im.naturalWidth * k)); c.height = Math.max(1, Math.round(im.naturalHeight * k));
+        c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); logo = c.toDataURL('image/png'); img.src = logo; img.style.display = 'block'; msg.textContent = '';
+      } catch (er) { msg.textContent = er.message; }
+    };
+    card.querySelector('#bsave').onclick = async () => {
+      const msg = card.querySelector('#bmsg'); msg.textContent = 'Saving…';
+      try { const r = await fetch('/api/client-portal/brand', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ primary: card.querySelector('#bp').value, secondary: card.querySelector('#bs').value, logo }) }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'Could not save.'); msg.textContent = 'Saved ✓'; }
+      catch (er) { msg.textContent = er.message; }
+    };
+  })();
   const s = document.createElement('script'); s.src = '/f2b-site-editor.js';
   s.onload = () => window.f2bSiteEditor.mount(web, { clientId: me.client.id, name: me.client.name, admin: false, embedded: true });
   document.head.appendChild(s);

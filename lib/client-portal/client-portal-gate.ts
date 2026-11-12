@@ -13,6 +13,27 @@ import { PORTAL_HTML, PAUSED_HTML } from './client-portal-page';
 const notClient = new Map();   // email → expiry (ms). Only negative answers are cached, so pausing a login is immediate.
 const denyLog = new Map();
 const STATIC_OK = new Set(['/f2b-site-editor.js', '/f2b-site-builder.js', '/f2b-home-icon.png', '/favicon.ico', '/icon.png', '/apple-icon.png']);
+const HEX = /^#[0-9a-fA-F]{6}$/;
+async function brandIndex(db, clientId) {
+  return db.prepare(`SELECT CAST(c.key AS INTEGER) AS idx, json_extract(c.value,'$.branding') AS branding FROM workspace_documents w, json_each(w.data,'$.clients') c WHERE w.id = 'f2b-agency' AND json_extract(c.value,'$.id') = ?1`).bind(clientId).first();
+}
+async function saveBrand(request, env, cu, email) {
+  let b; try { b = await request.json(); } catch { return json({ error: 'Send a valid request.' }, 400); }
+  const primary = String(b.primary || ''), secondary = String(b.secondary || ''), logo = String(b.logo || '');
+  if (!HEX.test(primary) || !HEX.test(secondary)) return json({ error: 'Choose two valid colours.' }, 400);
+  if (logo && (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(logo) || logo.length > 200000)) return json({ error: 'That logo is too large or not a PNG, JPG or WebP image.' }, 400);
+  const row = await brandIndex(env.DB, cu.client_id);
+  if (!row) return json({ error: 'Your account could not be found.' }, 404);
+  const branding = JSON.stringify({ primary: primary.toLowerCase(), secondary: secondary.toLowerCase(), logo, name: '' });
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const meta = await env.DB.prepare(`SELECT updated_at FROM workspace_documents WHERE id = 'f2b-agency'`).first();
+    const base = `$.clients[${Number(row.idx)}]`;
+    const res = await env.DB.prepare(`UPDATE workspace_documents SET data = json_set(data, '${base}.branding', json(?1)${logo ? `, '${base}.logo', ?2` : ''}), updated_at = ? WHERE id = 'f2b-agency' AND updated_at = ?`)
+      .bind(...(logo ? [branding, logo] : [branding]), `client-brand-${crypto.randomUUID()}`, meta.updated_at).run();
+    if (res.meta.changes === 1) { await logClientEvent(env.DB, cu.client_id, email, 'brand', 'Updated logo and colours'); return json({ ok: true }); }
+  }
+  return json({ error: 'The workspace changed while saving. Try again.' }, 409);
+}
 const json = (b, status = 200) => Response.json(b, { status, headers: { 'Cache-Control': 'no-store' } });
 const html = (h, status = 200) => new Response(h, { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-frame-options': 'DENY', 'referrer-policy': 'same-origin' } });
 
@@ -34,9 +55,11 @@ export async function clientGate(request, env, user) {
   if (request.method === 'GET' && path === '/client-portal') return html(PORTAL_HTML);
   if (request.method === 'GET' && STATIC_OK.has(path)) return null;
   if (path === '/api/client-portal/me' && request.method === 'GET') {
-    return json({ email, scope: cu.scope, scopeLabel: SCOPES[cu.scope] || cu.scope, client: { id: cu.client_id, name: cu.client_name || 'Your website', logo: cu.client_logo || '' },
+    const bro = await brandIndex(env.DB, cu.client_id).catch(() => null); let branding = null; try { branding = bro?.branding ? JSON.parse(bro.branding) : null; } catch { /* ignore */ }
+    return json({ branding, email, scope: cu.scope, scopeLabel: SCOPES[cu.scope] || cu.scope, client: { id: cu.client_id, name: cu.client_name || 'Your website', logo: cu.client_logo || '' },
       website: { previewUrl: cu.preview_url || '', liveUrl: cu.live_url || '', status: cu.website_status || '' } });
   }
+  if (path === '/api/client-portal/brand' && request.method === 'POST') return saveBrand(request, env, cu, email);
   if (path === '/api/client-site') return handleClientSite(request, env, user, cu);
   // everything else is off-limits
   const k = `${email} ${request.method} ${path}`;

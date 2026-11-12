@@ -122,3 +122,22 @@ export async function botReply(ownerId: string, p: { settings: ConvSettings; con
     return text ? { text, handoff } : null;
   } catch { return null; }
 }
+
+/** First message from a new customer: add them to the CRM pipeline as a new lead (best effort, never blocks the reply). */
+export async function leadToCrm(ownerId: string, t: { clientId: string; channel: Channel; contact: string; name: string; firstMessage: string }) {
+  try {
+    const db = env.DB!, now = new Date().toISOString();
+    const pipeline = (t.clientId ? await db.prepare("SELECT id FROM crm_pipelines WHERE owner_id=?1 AND archived=0 AND client_id=?2 ORDER BY created_at LIMIT 1").bind(ownerId, t.clientId).first<{ id: string }>().catch(() => null) : null)
+      || await db.prepare("SELECT id FROM crm_pipelines WHERE owner_id=?1 AND archived=0 ORDER BY created_at LIMIT 1").bind(ownerId).first<{ id: string }>();
+    if (!pipeline) return;
+    const stage = await db.prepare("SELECT id FROM crm_pipeline_stages WHERE owner_id=?1 AND pipeline_id=?2 AND category='open' ORDER BY position LIMIT 1").bind(ownerId, pipeline.id).first<{ id: string }>();
+    if (!stage) return;
+    let contact = await db.prepare("SELECT id FROM crm_contacts WHERE owner_id=?1 AND phone=?2 AND COALESCE(client_id,'')=?3 LIMIT 1").bind(ownerId, t.contact, t.clientId).first<{ id: string }>();
+    if (!contact) {
+      const id = crypto.randomUUID(), parts = (t.name || t.contact).split(/\s+/);
+      await db.prepare("INSERT INTO crm_contacts (id, owner_id, client_id, first_name, last_name, email, phone, company, source, notes, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,'',?6,'',?7,'',?8,?8)").bind(id, ownerId, t.clientId || null, parts[0] || t.contact, parts.slice(1).join(" "), t.contact, t.channel === "whatsapp" ? "WhatsApp" : "SMS", now).run();
+      contact = { id };
+    }
+    await db.prepare("INSERT INTO crm_opportunities (id, owner_id, pipeline_id, stage_id, contact_id, client_id, title, value, currency, source, notes, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,0,'EUR',?8,?9,?10,?10)").bind(crypto.randomUUID(), ownerId, pipeline.id, stage.id, contact.id, t.clientId || null, `${t.channel === "whatsapp" ? "WhatsApp" : "Text"} enquiry · ${t.name || t.contact}`, t.channel === "whatsapp" ? "WhatsApp" : "SMS", t.firstMessage.slice(0, 500), now).run();
+  } catch (e) { console.error("leadToCrm", e); }
+}

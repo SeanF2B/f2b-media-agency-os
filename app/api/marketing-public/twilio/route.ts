@@ -1,7 +1,7 @@
 // Public Twilio webhook (SMS + WhatsApp). Lives under /api/marketing-public so the existing public Access bypass already covers it.
 // Every request is verified with Twilio's X-Twilio-Signature (HMAC-SHA1 with the saved Auth Token) before anything is stored.
 import { env } from "cloudflare:workers";
-import { addMessage, botReply, e164, findOwnerByNumber, loadSettings, twilioCredentials, upsertThread, verifyTwilio, type Channel } from "@/lib/conversations/core";
+import { addMessage, botReply, leadToCrm, e164, findOwnerByNumber, loadSettings, twilioCredentials, upsertThread, verifyTwilio, type Channel } from "@/lib/conversations/core";
 
 export const dynamic = "force-dynamic";
 const xml = (body: string, status = 200) => new Response(`<?xml version="1.0" encoding="UTF-8"?><Response>${body}</Response>`, { status, headers: { "Content-Type": "text/xml; charset=utf-8", "Cache-Control": "no-store" } });
@@ -31,7 +31,9 @@ export async function POST(request: Request) {
   const sid = String(params.MessageSid || "");
   if (sid) { const dup = await env.DB.prepare("SELECT 1 FROM conv_messages WHERE twilio_sid=?1 AND owner_id=?2").bind(sid, found.ownerId).first().catch(() => null); if (dup) return xml(""); }
   const thread = await upsertThread(found.ownerId, { channel, ourNumber, contact, contactName: String(params.ProfileName || ""), clientId: found.config.clientId });
+  const seen = await env.DB.prepare("SELECT COUNT(*) AS n FROM conv_messages WHERE thread_id=?1").bind(thread.id).first<{ n: number }>();
   await addMessage(found.ownerId, thread.id, { direction: "in", sender: "customer", body, sid });
+  if (!seen?.n) await leadToCrm(found.ownerId, { clientId: found.config.clientId, channel, contact, name: String(params.ProfileName || ""), firstMessage: body });
   const { settings } = await loadSettings(found.ownerId);
   if (!settings.botEnabled || !thread.bot_on || thread.status === "handoff" || thread.status === "closed") return xml("");
   const recent = await env.DB.prepare("SELECT COUNT(*) AS n FROM conv_messages WHERE thread_id=?1 AND sender='bot' AND created_at > ?2").bind(thread.id, new Date(Date.now() - 3600_000).toISOString()).first<{ n: number }>();
