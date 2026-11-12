@@ -65,7 +65,7 @@ document.addEventListener('paste',function(e){e.preventDefault();var t=(e.clipbo
 addEventListener('message',function(e){var d=e.data||{};if(d.f2b==='setimg'){var im=imgs[d.idx];if(im){im.removeAttribute('srcset');im.src=d.src;parent.postMessage({f2b:'dirty'},'*')}}
 if(d.f2b==='collect'){var c=document.body.cloneNode(true);c.querySelectorAll('[contenteditable],[data-f2b-ed]').forEach(function(x){x.removeAttribute('contenteditable');x.removeAttribute('data-f2b-ed')});c.querySelectorAll('#f2b-ed-style,#f2b-ed-script').forEach(function(x){x.remove()});parent.postMessage({f2b:'html',body:c.innerHTML},'*')}});
 parent.postMessage({f2b:'ready'},'*')})();`;
-const EDIT_CSS = '[data-f2b-ed]:hover{outline:2px dashed #4f8cff;outline-offset:2px;cursor:text}[data-f2b-ed]:focus{outline:2px solid #4f8cff;outline-offset:2px}img:hover{outline:2px dashed #4f8cff;cursor:pointer}*{animation:none!important;transition:none!important}';
+const EDIT_CSS = '[data-f2b-ed]:hover{outline:2px dashed #4f8cff;outline-offset:2px;cursor:text}[data-f2b-ed]:focus{outline:2px solid #4f8cff;outline-offset:2px}img:hover{outline:2px dashed #4f8cff;cursor:pointer}*{animation:none!important;transition:none!important}svg [style*="opacity:0"],svg [style*="opacity: 0"]{opacity:1!important}svg [style*="stroke-dashoffset"]{stroke-dashoffset:0!important}';
 
 /** Exact copy of an existing website page (stored as raw HTML) rendered for the public preview or for in-place editing. */
 export function renderRaw(page: any, ctx: RenderCtx & { edit?: boolean }): string {
