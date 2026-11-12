@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { createCardDragFx, type CardDragFx } from "@/lib/card-drag-fx";
+import { createCardDragFx, showFxError, type CardDragFx } from "@/lib/card-drag-fx";
 import { currencySymbol, getDisplayCurrency } from "@/lib/display-currency";
 import { PhoneActionIcon, toPhoneHref, toWhatsAppNumber, WhatsAppActionIcon } from "@/components/contact-action-icons";
 
@@ -268,7 +268,7 @@ export function CrmView({ onOpenClient }: { onOpenClient: (clientId: string) => 
       preview.style.opacity = "1";
       document.body.appendChild(preview);
       drag.preview = preview;
-      drag.fx = createCardDragFx(preview, drag.source, { x: drag.offsetX, y: drag.offsetY }, { cardSelector: ".crm-opportunity" });
+      try { drag.fx = createCardDragFx(preview, drag.source, { x: drag.offsetX, y: drag.offsetY }, { cardSelector: ".crm-opportunity" }); } catch (error) { showFxError(error); }
       setDraggingId(drag.id);
     }
     if (drag.preview) {

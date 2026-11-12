@@ -24,6 +24,18 @@ type Options = {
   maxTilt?: number;
 };
 
+let fxErrorShown = 0;
+function showFxError(error: unknown) {
+  if (typeof document === "undefined" || Date.now() - fxErrorShown < 5000) return;
+  fxErrorShown = Date.now();
+  const note = document.createElement("div");
+  note.textContent = `Drag effect problem: ${error instanceof Error ? error.message : String(error)}`;
+  note.style.cssText = "position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:2147483647;background:#7f1d1d;color:#fff;padding:8px 14px;border-radius:8px;font:12px/1.4 sans-serif;pointer-events:none";
+  document.body.appendChild(note);
+  window.setTimeout(() => note.remove(), 6000);
+}
+export { showFxError };
+
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
 export function createCardDragFx(preview: HTMLElement, source: HTMLElement, grab: { x: number; y: number }, options: Options): CardDragFx {
@@ -135,7 +147,7 @@ export function createCardDragFx(preview: HTMLElement, source: HTMLElement, grab
 
   return {
     move(clientX, clientY, column) {
-      try { moveInner(clientX, clientY, column); } catch (error) { console.warn("card drag effect failed", error); }
+      try { moveInner(clientX, clientY, column); } catch (error) { console.warn("card drag effect failed", error); showFxError(error); }
     },
     dropPlacement() {
       const container = slot?.parentElement;

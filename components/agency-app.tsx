@@ -21,7 +21,7 @@ const SettingsView = lazy(() => import("@/components/settings-view").then((modul
 import { MarketingStudioView } from "@/components/marketing-studio-view";
 import { CrmView } from "@/components/crm-view";
 import { PhoneActionIcon, toPhoneHref, toWhatsAppNumber, WhatsAppActionIcon } from "@/components/contact-action-icons";
-import { createCardDragFx, type CardDragFx } from "@/lib/card-drag-fx";
+import { createCardDragFx, showFxError, type CardDragFx } from "@/lib/card-drag-fx";
 const FullMarketingAudit = lazy(() => import("@/components/full-marketing-audit").then((module) => ({ default: module.FullMarketingAudit })));
 import type { MarketingAuditRun, MarketingService } from "@/lib/marketing-audit";
 import { resolveAgencyLogoUrl } from "@/lib/report-branding";
@@ -4263,7 +4263,7 @@ The app will check the live account first and only restore the previous value if
         // the column where it will land (see lib/card-drag-fx.ts).
         document.body.appendChild(preview);
         drag.preview = preview;
-        drag.fx = createCardDragFx(preview, drag.source, { x: drag.offsetX, y: drag.offsetY }, { cardSelector: ".pipeline-card" });
+        try { drag.fx = createCardDragFx(preview, drag.source, { x: drag.offsetX, y: drag.offsetY }, { cardSelector: ".pipeline-card" }); } catch (error) { showFxError(error); }
       }
       if (drag.preview) {
         drag.preview.style.left = `${event.clientX - drag.offsetX}px`;
