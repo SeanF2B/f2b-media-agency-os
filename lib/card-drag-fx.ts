@@ -44,11 +44,11 @@ export function createCardDragFx(preview: HTMLElement, source: HTMLElement, grab
   // CSS animations beat inline styles, which would freeze the tilt and shadow.
   preview.classList.add("card-drag-lifted");
   preview.style.setProperty("animation", "none", "important");
-  preview.style.transform = "rotate(0deg) scale(1.03)";
-  preview.style.boxShadow = "0 22px 44px rgba(8,22,34,.34), 0 6px 14px rgba(8,22,34,.22)";
+  preview.style.setProperty("transform", "rotate(0deg) scale(1.03)", "important");
+  preview.style.setProperty("box-shadow", "0 22px 44px rgba(8,22,34,.45), 0 6px 14px rgba(8,22,34,.3)", "important");
 
   const setTilt = (degrees: number) => {
-    preview.style.transform = `rotate(${degrees.toFixed(2)}deg) scale(1.03)`;
+    preview.style.setProperty("transform", `rotate(${degrees.toFixed(2)}deg) scale(1.03)`, "important");
   };
 
   const ensureSlot = () => {

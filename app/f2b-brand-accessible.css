@@ -7968,3 +7968,8 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
 .crm-value-field:focus-within { border-color: var(--stage-color, #3b82f6); box-shadow: 0 0 0 2px color-mix(in srgb, var(--stage-color, #3b82f6) 30%, transparent); }
 .crm-value-field .crm-opportunity-value-input { flex: 1; min-width: 0; width: 100%; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 800; outline: none; padding: 2px 0; -moz-appearance: textfield; }
 .crm-value-field .crm-opportunity-value-input::placeholder { font-weight: 500; opacity: .5; }
+
+.app-shell .crm-card-stage-select { color-scheme: dark; background-color: #2b2c30 !important; color: #f4f4f5 !important; }
+.app-shell .crm-card-stage-select option, .app-shell .crm-card-stage-select option:checked { background-color: #2b2c30 !important; color: #f4f4f5 !important; }
+.app-shell:not(.dark-mode) .crm-card-stage-select { color-scheme: light; background-color: #fff !important; color: #111 !important; }
+.app-shell:not(.dark-mode) .crm-card-stage-select option, .app-shell:not(.dark-mode) .crm-card-stage-select option:checked { background-color: #fff !important; color: #111 !important; }
