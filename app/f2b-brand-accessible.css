@@ -8382,3 +8382,7 @@ html body .app-shell.app-shell button[role="tab"] > span:last-child:not(:first-c
 .app-shell.dark-mode .marketing-subnav button, .app-shell.dark-mode .marketing-hub-tabs button { color:#edf3f6 !important; }
 .app-shell.dark-mode .marketing-subnav button:hover, .app-shell.dark-mode .marketing-hub-tabs button:hover { background:color-mix(in srgb,var(--brand-primary,#3b82f6) 25%,#20272d) !important; }
 .app-shell.dark-mode .marketing-subnav button.active, .app-shell.dark-mode .marketing-hub-tabs button.active, .app-shell.dark-mode .marketing-subnav button[aria-selected="true"], .app-shell.dark-mode .marketing-hub-tabs button[aria-selected="true"] { background:var(--brand-primary,#3b82f6) !important; color:#fff !important; }
+
+/* Approved tag on task cards: readable in dark mode (dark-mode is a class on .app-shell itself) */
+.app-shell.dark-mode .task-approved-tag, .app-shell.dark-mode .pipeline-card-summary-copy .task-approved-tag { border-color:#3f7d56 !important; background:#173a26 !important; color:#b9ecc9 !important; }
+.app-shell:not(.dark-mode) .task-approved-tag { background:#e8f7ed !important; color:#176139 !important; border-color:#acd9bd !important; }
