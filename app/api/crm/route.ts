@@ -288,7 +288,18 @@ export async function POST(request: Request) {
         const stage = await db.prepare("SELECT id FROM crm_pipeline_stages WHERE owner_id=?1 AND pipeline_id=?2 AND id=?3").bind(ownerId, current.pipeline_id, clean(body.stageId, 80)).first();
         if (!stage) return reply("Choose a stage in this pipeline.");
         await db.prepare("UPDATE crm_opportunities SET stage_id=?1, updated_at=?2 WHERE owner_id=?3 AND id=?4").bind(clean(body.stageId, 80), now, ownerId, id).run();
-      } else await db.prepare("UPDATE crm_opportunities SET title=?1, value=?2, notes=?3, assigned_to=?4, expected_close_date=?5, updated_at=?6 WHERE owner_id=?7 AND id=?8").bind(clean(body.title, 200) || "Untitled opportunity", Math.max(0, Number(body.value) || 0), clean(body.notes, 4000), clean(body.assignedTo, 80) || null, clean(body.expectedCloseDate, 20) || null, now, ownerId, id).run();
+      } else {
+        let contactId: string | null = clean(body.contactId, 80) || null;
+        const nc = body.newContact && typeof body.newContact === "object" ? body.newContact as Record<string, unknown> : null;
+        if (nc && (clean(nc.firstName, 100) || clean(nc.lastName, 100) || clean(nc.email, 254) || clean(nc.phone, 40))) {
+          contactId = crypto.randomUUID();
+          await db.prepare("INSERT INTO crm_contacts (id, owner_id, client_id, first_name, last_name, email, phone, company, source, notes, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'manual', '', ?9, ?9)").bind(contactId, ownerId, clean(body.clientId, 100) || null, clean(nc.firstName, 100), clean(nc.lastName, 100), clean(nc.email, 254).toLowerCase(), clean(nc.phone, 40), clean(nc.company, 200), now).run();
+        } else if (contactId && !await db.prepare("SELECT id FROM crm_contacts WHERE owner_id=?1 AND id=?2").bind(ownerId, contactId).first()) return reply("That contact is not in this workspace.");
+        const clientId = clean(body.clientId, 100) || null;
+        if (clientId && !(access.workspace.clients || []).some((item) => String(item.id) === clientId)) return reply("Choose a client in this workspace.");
+        await db.prepare("UPDATE crm_opportunities SET contact_id=?1, client_id=?2 WHERE owner_id=?3 AND id=?4").bind(contactId, clientId, ownerId, id).run();
+      }
+      if (action === "updateOpportunity") await db.prepare("UPDATE crm_opportunities SET title=?1, value=?2, notes=?3, assigned_to=?4, expected_close_date=?5, updated_at=?6 WHERE owner_id=?7 AND id=?8").bind(clean(body.title, 200) || "Untitled opportunity", Math.max(0, Number(body.value) || 0), clean(body.notes, 4000), clean(body.assignedTo, 80) || null, clean(body.expectedCloseDate, 20) || null, now, ownerId, id).run();
       return Response.json({ ok: true, id });
     }
     if (action === "addActivity") {
