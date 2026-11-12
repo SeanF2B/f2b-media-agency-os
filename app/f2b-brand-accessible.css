@@ -8054,3 +8054,10 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
 .app-shell:not(.dark-mode) select { color-scheme: light; }
 .app-shell:not(.dark-mode) select option, .app-shell:not(.dark-mode) select optgroup { background-color: #ffffff !important; color: #1a1a1a !important; }
 .app-shell select option:checked, .app-shell select option:hover { background-color: #3b82f6 !important; color: #ffffff !important; }
+
+.client-scope { padding: 0 14px 10px; display: grid; gap: 4px; }
+.client-scope label { font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; opacity: .6; }
+.client-scope-select { width: 100%; font: inherit; font-size: 12px; font-weight: 700; padding: 8px 10px; border-radius: 9px; border: 1px solid rgba(127,127,127,.4); background: rgba(127,127,127,.12); color: inherit; cursor: pointer; }
+.client-scope-select:hover, .client-scope-select:focus { border-color: #3b82f6; outline: none; }
+.client-scope small { font-size: 10px; color: #3b82f6; font-weight: 700; }
+.sidebar-collapsed .client-scope, .sidebar.collapsed .client-scope { display: none; }

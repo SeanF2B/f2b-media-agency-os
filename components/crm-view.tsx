@@ -21,12 +21,13 @@ const sourceLabel = (source?: string | null) => { const text = String(source || 
 const commaNumber = (raw: string) => { const [whole = "", ...rest] = raw.split("."); const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ","); return rest.length ? `${grouped}.${rest.join("")}` : grouped; };
 const money = (value: number, _currency?: string) => new Intl.NumberFormat("en-IE", { style: "currency", currency: getDisplayCurrency(), maximumFractionDigits: 0 }).format(Number(value) || 0);
 
-export function CrmView({ onOpenClient }: { onOpenClient: (clientId: string) => void }) {
+export function CrmView({ onOpenClient, scopeClientId = "" }: { onOpenClient: (clientId: string) => void; scopeClientId?: string }) {
   const [data, setData] = useState<Payload>(empty);
   const [tab, setTab] = useState<"Pipeline" | "Contacts">("Pipeline");
   const [pipelineId, setPipelineId] = useState("");
   const [search, setSearch] = useState("");
-  const [clientFilter, setClientFilter] = useState("");
+  const [clientFilterState, setClientFilter] = useState("");
+  const clientFilter = scopeClientId || clientFilterState;
   const [modal, setModal] = useState<"contact" | "contact-details" | "opportunity" | "pipeline" | "stage" | "edit-stage" | "delete-stage" | "" > ("");
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [editingStage, setEditingStage] = useState<Stage | null>(null);
