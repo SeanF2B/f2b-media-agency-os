@@ -8113,3 +8113,6 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
 
 .client-dot.agency-dot { background: #fff !important; overflow: hidden; padding: 0; display: inline-grid; place-items: center; }
 .client-dot.agency-dot img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+
+/* A selected client sub-account makes client filters redundant */
+.app-shell.client-scoped .client-filter { display: none !important; }
