@@ -7894,3 +7894,22 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
 .crm-delete-card:hover, .crm-delete-card:focus-visible { border-color: #b42318; background: rgba(180,35,24,.08); outline: none; }
 .app-shell.dark-mode .crm-delete-card { color: #ff8a80; }
 .app-shell.dark-mode .crm-delete-card:hover, .app-shell.dark-mode .crm-delete-card:focus-visible { border-color: #ff8a80; background: rgba(255,138,128,.1); }
+
+/* Coloured outline per stage (Pipeline and Tasks boards) + dark-mode column fix */
+.app-shell { --stage-base: #ffffff; }
+.app-shell.dark-mode { --stage-base: #29282b; }
+.app-shell .crm-kanban > .crm-stage:nth-child(5n+1) { --stage-color: #3b82f6; }
+.app-shell .crm-kanban > .crm-stage:nth-child(5n+2) { --stage-color: #f59e0b; }
+.app-shell .crm-kanban > .crm-stage:nth-child(5n+3) { --stage-color: #8b5cf6; }
+.app-shell .crm-kanban > .crm-stage:nth-child(5n+4) { --stage-color: #14b8a6; }
+.app-shell .crm-kanban > .crm-stage:nth-child(5n+5) { --stage-color: #ec4899; }
+.app-shell .crm-kanban > .crm-stage.won { --stage-color: #22c55e; }
+.app-shell .crm-kanban > .crm-stage.lost { --stage-color: #ef4444; }
+.app-shell .pipeline-board > .pipeline-column.stage-to-do { --stage-color: #3b82f6; }
+.app-shell .pipeline-board > .pipeline-column.stage-in-progress { --stage-color: #f59e0b; }
+.app-shell .pipeline-board > .pipeline-column.stage-pending { --stage-color: #8b5cf6; }
+.app-shell .pipeline-board > .pipeline-column.stage-done { --stage-color: #22c55e; }
+.app-shell .crm-kanban > .crm-stage, .app-shell .pipeline-board > .pipeline-column { border: 2px solid var(--stage-color, #94a3b8) !important; background: color-mix(in srgb, var(--stage-color, #94a3b8) 6%, var(--stage-base)) !important; }
+.app-shell .crm-stage > header.crm-stage-header, .app-shell .pipeline-column > .pipeline-column-head { background: color-mix(in srgb, var(--stage-color, #94a3b8) 6%, var(--stage-base)) !important; backdrop-filter: none; }
+.app-shell .crm-stage > header.crm-stage-header h2, .app-shell .pipeline-column > .pipeline-column-head h2 { text-shadow: none; }
+.app-shell .crm-stage > header.crm-stage-header::after, .app-shell .pipeline-column > .pipeline-column-head::after { content: ""; display: block; height: 3px; margin-top: 8px; border-radius: 3px; background: var(--stage-color, #94a3b8); opacity: .85; }
