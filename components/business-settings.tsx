@@ -16,7 +16,7 @@ function toDraft(value: BusinessSettingsValue): Draft {
   return { name: branding.name, logo: branding.logo, primary: branding.primary, secondary: branding.secondary, currency: value.currency || "EUR", country: taxCountry(value.tax), defaultBusinessType: value.tax?.defaultBusinessType || "", otherPersonalRate: String(value.tax?.otherPersonalRate ?? 20), otherCompanyRate: String(value.tax?.otherCompanyRate ?? 20) };
 }
 
-function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+export function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   const [text, setText] = useState(value);
   useEffect(() => setText(value), [value]);
   return <div className="bs-field"><span className="bs-label">{label}</span>
