@@ -31,7 +31,9 @@ const blocks: Record<string, (p: any, c: RenderCtx) => string> = {
 
 export function renderPage(page: any, ctx: RenderCtx): string {
   const t = ctx.theme, seo = page.seo || {};
-  const font = t.font === "serif" ? "Georgia,serif" : t.font === "rounded" ? 'ui-rounded,"Segoe UI",system-ui,sans-serif' : 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
+  const lux = t.font === "luxury";
+  const luxCss = lux ? '@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Jost:wght@300;400;500&display=swap");body{font-family:Jost,system-ui,sans-serif;font-weight:300;color:#55575c}h1,h2,h3{font-family:"Cormorant Garamond",Georgia,serif;font-weight:500;color:#424448}.hero h1,.cta h2,.stats b{color:inherit}.alt,.sec.alt{background:#f7f4ee}.btn{text-transform:uppercase;letter-spacing:.14em;font-size:12px;font-weight:400;padding:15px 30px;border-radius:0}.eyebrow{letter-spacing:.2em;text-transform:uppercase;font-size:12px}header.top{background:#fff;color:#424448;border-bottom:1px solid #e7e2d8}footer.site{background:#2c2d30}' : "";
+  const font = lux ? 'Jost,system-ui,sans-serif' : t.font === "serif" ? "Georgia,serif" : t.font === "rounded" ? 'ui-rounded,"Segoe UI",system-ui,sans-serif' : 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
   const nav = ctx.pages.map((p) => `<a href="${esc(`${ctx.base}?c=${encodeURIComponent(ctx.clientId)}&p=${encodeURIComponent(p.slug)}`)}"${p.slug === ctx.current ? ' class="on"' : ""}>${esc(p.title)}</a>`).join("");
   const body = arr(page.blocks).map((b: any) => (blocks[b.type] ? blocks[b.type](b.props || {}, ctx) : "")).join("\n");
   const title = seo.title || `${page.title}${t.name ? " | " + t.name : ""}`;
@@ -47,7 +49,7 @@ export function renderPage(page: any, ctx: RenderCtx): string {
 .gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-top:18px}.gal img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:var(--r)}details{background:#fff;border:1px solid #e3e8ee;border-radius:var(--r);padding:14px 18px;margin:10px 0}summary{font-weight:700;cursor:pointer}figure{margin:0}figcaption{color:#4d5b6a;font-size:14px;margin-top:6px}
 .cta{background:var(--s);color:#fff;text-align:center;padding:64px 0}.cta p{max-width:560px;margin:0 auto 6px;opacity:.95}.form{display:grid;gap:10px;margin-top:14px}.form input,.form textarea{font:inherit;padding:12px 14px;border:1px solid #cfd8e2;border-radius:var(--r);width:100%}.hp{position:absolute;left:-9999px}
 footer.site{background:#10161d;color:#b9c4d0;padding:28px 0;font-size:14px;text-align:center}
-</style></head><body><header class="top"><div class="wrap"><b>${esc(t.name || "")}</b><nav>${nav}</nav>${ctx.phone ? `<a class="call" href="tel:${esc(ctx.phone.replace(/[^+\d]/g, ""))}">${esc(ctx.phone)}</a>` : ""}</div></header>
+${luxCss}</style></head><body><header class="top"><div class="wrap"><b>${esc(t.name || "")}</b><nav>${nav}</nav>${ctx.phone ? `<a class="call" href="tel:${esc(ctx.phone.replace(/[^+\d]/g, ""))}">${esc(ctx.phone)}</a>` : ""}</div></header>
 ${body}
 <footer class="site"><div class="wrap">© ${new Date().getFullYear()} ${esc(t.name || "")}</div></footer></body></html>`;
 }

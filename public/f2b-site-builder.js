@@ -400,7 +400,7 @@
         pane.append(h('p', { style: 'margin:0;color:var(--mut)' }, 'Style and sections for this client’s site. Only owners and admins see this.'),
           field('Business name', h('input', { value: t.name || '', maxlength: 60, oninput: e => { t.name = e.target.value; } })),
           h('div', { class: 'sb-col2' }, field('Main colour', h('input', { type: 'color', value: t.primary, oninput: e => { t.primary = e.target.value; } })), field('Dark colour', h('input', { type: 'color', value: t.secondary, oninput: e => { t.secondary = e.target.value; } }))),
-          field('Font', h('select', { onchange: e => { t.font = e.target.value; } }, [['system', 'Clean (default)'], ['serif', 'Classic serif'], ['rounded', 'Friendly rounded']].map(([v, l]) => h('option', { value: v, selected: t.font === v }, l)))),
+          field('Font', h('select', { onchange: e => { t.font = e.target.value; } }, [['system', 'Clean (default)'], ['serif', 'Classic serif'], ['rounded', 'Friendly rounded'], ['luxury', 'Elegant (Cormorant + Jost)']].map(([v, l]) => h('option', { value: v, selected: t.font === v }, l)))),
           field('Corner roundness', h('input', { type: 'range', min: 0, max: 28, value: t.radius ?? 12, oninput: e => { t.radius = +e.target.value; } })),
           h('div', { class: 'sb-lab' }, 'Sections available for this client'),
           ...Object.keys(LABELS).map(k => h('label', { class: 'sb-check' }, h('input', { type: 'checkbox', checked: c.blocks.includes(k), onchange: e => { c.blocks = e.target.checked ? [...new Set([...c.blocks, k])] : c.blocks.filter(x => x !== k); } }), LABELS[k])),

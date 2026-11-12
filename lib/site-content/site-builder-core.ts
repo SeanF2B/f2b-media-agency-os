@@ -74,7 +74,7 @@ export function normalizeConfig(SiteError, c) {
   })).filter(x => x.type);
   const known = DEFAULT_CONFIG.blocks;
   const blocks = (Array.isArray(c?.blocks) ? c.blocks : known).filter(b => known.includes(b) || custom.some(x => x.type === b)).slice(0, 40);
-  return { v: 1, theme: { primary: hex(theme.primary, DEFAULT_CONFIG.theme.primary), secondary: hex(theme.secondary, DEFAULT_CONFIG.theme.secondary), font: ['system', 'serif', 'rounded'].includes(theme.font) ? theme.font : 'system', radius: Math.min(32, Math.max(0, +theme.radius || 12)), name: str(theme.name, 60), phone: str(theme.phone, 40) }, blocks, custom };
+  return { v: 1, theme: { primary: hex(theme.primary, DEFAULT_CONFIG.theme.primary), secondary: hex(theme.secondary, DEFAULT_CONFIG.theme.secondary), font: ['system', 'serif', 'rounded', 'luxury'].includes(theme.font) ? theme.font : 'system', radius: Math.min(32, Math.max(0, +theme.radius || 12)), name: str(theme.name, 60), phone: str(theme.phone, 40) }, blocks, custom };
 }
 
 const J = text => { try { return JSON.parse(text); } catch { return null; } };
