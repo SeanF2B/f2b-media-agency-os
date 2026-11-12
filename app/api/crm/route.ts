@@ -58,7 +58,9 @@ export async function GET(request: Request) {
     if (url.searchParams.get("summary") === "1") {
       const rows = await db.prepare("SELECT s.category, o.currency, COUNT(*) AS total, SUM(o.value) AS value FROM crm_opportunities o JOIN crm_pipeline_stages s ON s.id=o.stage_id AND s.owner_id=o.owner_id JOIN crm_pipelines p ON p.id=o.pipeline_id AND p.owner_id=o.owner_id WHERE o.owner_id=?1 AND p.archived=0 AND s.category IN ('open','won') GROUP BY s.category, o.currency").bind(ownerId).all<{ category: string; currency: string; total: number; value: number }>();
       const groups = (rows.results || []).map((row) => ({ category: row.category, currency: clean(row.currency, 3) || "EUR", count: Number(row.total) || 0, value: Number(row.value) || 0 }));
-      return Response.json({ open: groups.filter((row) => row.category === "open"), won: groups.filter((row) => row.category === "won") }, { headers: { "Cache-Control": "no-store" } });
+      const stageRows = await db.prepare("SELECT s.name, s.category, s.position, o.currency, COUNT(o.id) AS total, COALESCE(SUM(o.value),0) AS value FROM crm_pipeline_stages s JOIN crm_pipelines p ON p.id=s.pipeline_id AND p.owner_id=s.owner_id LEFT JOIN crm_opportunities o ON o.stage_id=s.id AND o.owner_id=s.owner_id WHERE s.owner_id=?1 AND p.archived=0 GROUP BY s.id, o.currency ORDER BY p.created_at, s.position").bind(ownerId).all<{ name: string; category: string; position: number; currency: string | null; total: number; value: number }>();
+      const stages = (stageRows.results || []).map((row) => ({ name: String(row.name), category: String(row.category), currency: clean(row.currency, 3) || "EUR", count: Number(row.total) || 0, value: Number(row.value) || 0 }));
+      return Response.json({ open: groups.filter((row) => row.category === "open"), won: groups.filter((row) => row.category === "won"), stages }, { headers: { "Cache-Control": "no-store" } });
     }
     const search = clean(url.searchParams.get("search"), 120).toLowerCase();
     const [contacts, pipelineRows, opportunityRows, activityRows] = await Promise.all([
