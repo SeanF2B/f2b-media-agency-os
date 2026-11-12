@@ -586,6 +586,24 @@ function detectBotEyes(src: string): Promise<BotGeo | null> {
   });
   botGeoCache.set(src, job); return job;
 }
+const DRAG_COPY_PROPS = ["display", "position", "box-sizing", "width", "height", "min-width", "min-height", "max-width", "margin", "padding", "border", "border-radius", "background", "background-color", "background-image", "background-size", "background-position", "color", "font", "letter-spacing", "line-height", "text-align", "text-transform", "white-space", "overflow", "text-overflow", "flex", "flex-direction", "flex-wrap", "align-items", "justify-content", "gap", "grid-template-columns", "opacity", "box-shadow", "object-fit", "fill", "stroke", "stroke-width", "visibility"];
+const botEls = new Set<HTMLElement>();
+let botMouseOn = false;
+function ensureBotMouse() {
+  if (botMouseOn || typeof window === "undefined") return; botMouseOn = true;
+  let raf = 0, mx = 0, my = 0;
+  const run = () => {
+    raf = 0;
+    if (document.body.classList.contains("task-card-drag-active")) return;
+    const vh = window.innerHeight;
+    botEls.forEach((el) => {
+      const box = el.getBoundingClientRect(); if (box.bottom < -40 || box.top > vh + 40) return;
+      const dx = mx - (box.left + box.width / 2), dy = my - (box.top + box.height / 2), len = Math.hypot(dx, dy) || 1, k = Math.min(1, len / 90);
+      el.style.setProperty("--lx", ((dx / len) * k * 3).toFixed(2) + "px"); el.style.setProperty("--ly", ((dy / len) * k * 2.4).toFixed(2) + "px"); el.style.setProperty("--tx", ((dx / len) * k * 1.2).toFixed(2) + "px"); el.style.setProperty("--ta", ((dx / len) * k * 7).toFixed(1) + "deg");
+    });
+  };
+  window.addEventListener("mousemove", (event) => { mx = event.clientX; my = event.clientY; if (!raf) raf = window.requestAnimationFrame(run); }, { passive: true });
+}
 function AnimatedBot({ status, member }: { status: string; member: Staff }) {
   const ref = useRef<HTMLSpanElement>(null);
   const [geo, setGeo] = useState<BotGeo | null>(null);
@@ -595,13 +613,9 @@ function AnimatedBot({ status, member }: { status: string; member: Staff }) {
     return () => { live = false; };
   }, [member.avatar]);
   useEffect(() => {
-    const move = (event: MouseEvent) => {
-      const el = ref.current; if (!el) return;
-      const box = el.getBoundingClientRect(), dx = event.clientX - (box.left + box.width / 2), dy = event.clientY - (box.top + box.height / 2), len = Math.hypot(dx, dy) || 1, k = Math.min(1, len / 90);
-      el.style.setProperty("--lx", ((dx / len) * k * 3).toFixed(2) + "px"); el.style.setProperty("--ly", ((dy / len) * k * 2.4).toFixed(2) + "px"); el.style.setProperty("--tx", ((dx / len) * k * 1.2).toFixed(2) + "px"); el.style.setProperty("--ta", ((dx / len) * k * 7).toFixed(1) + "deg");
-    };
-    window.addEventListener("mousemove", move, { passive: true });
-    return () => window.removeEventListener("mousemove", move);
+    const el = ref.current; if (!el) return;
+    botEls.add(el); ensureBotMouse();
+    return () => { botEls.delete(el); };
   }, []);
   const mood = status === "Done" ? "relax" : status === "Blocked" ? "bored" : status === "In progress" ? "run" : "eager";
   const pct = (n: number) => `${(n * 100).toFixed(2)}%`;
@@ -1269,7 +1283,11 @@ export function AgencyApp() {
   useEffect(() => { const own = scopedBranding && (scopedBranding.primary || scopedBranding.secondary || scopedBranding.logo); applyBranding(own ? { ...workspace.settings?.branding, ...scopedBranding } : workspace.settings?.branding); }, [workspace.settings?.branding, JSON.stringify(scopedBranding)]);
   const setClientScope = (id: string) => { setClientScopeState(id); try { document.cookie = `f2b_client=${encodeURIComponent(id || "agency")}; Path=/; Max-Age=31536000; SameSite=Lax; Secure`; window.dispatchEvent(new CustomEvent("f2b-scope", { detail: id })); } catch { /* cookie unavailable */ } try { if (id) window.localStorage.setItem("f2b-client-scope", id); else window.localStorage.removeItem("f2b-client-scope"); } catch { /* storage unavailable */ } if (id) setSelectedClient(id); else setSelectedClient(""); if (id && page === "Lead Factory") setPage("Overview"); };
   const baseViewWorkspace = previewMember ? previewWorkspaceForStaff(workspace, previewMember) : workspace;
-  const viewWorkspace = useMemo(() => scopeWorkspaceToClient(baseViewWorkspace, activeScopeId), [baseViewWorkspace, activeScopeId]);
+  const hideAgencyOnlyAgents = Boolean(previewMember) || !isAdmin || Boolean(scopedClient && !/^agency$/i.test(scopedClient.name.trim()));
+  const viewWorkspace = useMemo(() => {
+    const scoped = scopeWorkspaceToClient(baseViewWorkspace, activeScopeId);
+    return hideAgencyOnlyAgents ? { ...scoped, staff: scoped.staff.filter((member) => !(member.isBot && /client\s*brief/i.test(member.name))) } : scoped;
+  }, [baseViewWorkspace, activeScopeId, hideAgencyOnlyAgents]);
   const viewHasClientScope = previewMember ? Array.isArray(previewMember.clientAccessIds) : hasClientScope;
   const viewIsAdmin = previewMember ? false : isAdmin;
   const viewAccess = previewMember ? previewPermissions : access;
@@ -4424,10 +4442,7 @@ The app will check the live account first and only restore the previous value if
         const rendered = window.getComputedStyle(node);
         const clone = targetNodes[index];
         if (!clone) return;
-        for (let styleIndex = 0; styleIndex < rendered.length; styleIndex += 1) {
-          const property = rendered.item(styleIndex);
-          clone.style.setProperty(property, rendered.getPropertyValue(property));
-        }
+        for (const property of DRAG_COPY_PROPS) clone.style.setProperty(property, rendered.getPropertyValue(property));
       });
 
     };

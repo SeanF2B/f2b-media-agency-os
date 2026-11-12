@@ -8547,3 +8547,9 @@ html body .app-shell.app-shell button[role="tab"] > span:last-child:not(:first-c
 .app-shell .crm-kanban .crm-stage, .app-shell .pipeline-board .pipeline-column, .app-shell .pipeline-board .pipeline-column * { overscroll-behavior-y: auto; }
 .app-shell .pipeline-card, .app-shell .pipeline-card * { touch-action: pan-y; }
 .app-shell .pipeline-card[draggable="true"] { touch-action: pan-y; }
+
+/* Smooth card dragging: pause every bot animation on the board while a card is lifted, keep the lifted copy spinning. */
+body.task-card-drag-active .bot-live:not(.pipeline-card-drag-preview .bot-live),
+body.task-card-drag-active .bot-live:not(.pipeline-card-drag-preview .bot-live) * { animation-play-state: paused !important; }
+.pipeline-card-drag-preview, .pipeline-card-drag-preview * { transition: none !important; }
+.pipeline-card-drag-preview { will-change: transform; }
