@@ -7889,3 +7889,8 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
 .app-shell .ai-completed-screenshot-empty small { font-size: 12px; }
 .app-shell .ai-completed-screenshots .ai-add-screenshot { width: 100%; justify-content: center; padding: 7px 10px; font-size: 12px; }
 .app-shell.dark-mode .ai-completed-screenshot img { background: #2a292d; }
+
+.crm-delete-card { align-self: flex-end; margin-top: 2px; padding: 5px 10px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #b42318; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.crm-delete-card:hover, .crm-delete-card:focus-visible { border-color: #b42318; background: rgba(180,35,24,.08); outline: none; }
+.app-shell.dark-mode .crm-delete-card { color: #ff8a80; }
+.app-shell.dark-mode .crm-delete-card:hover, .app-shell.dark-mode .crm-delete-card:focus-visible { border-color: #ff8a80; background: rgba(255,138,128,.1); }

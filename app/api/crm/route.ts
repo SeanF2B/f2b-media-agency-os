@@ -177,6 +177,18 @@ export async function POST(request: Request) {
       ]);
       return Response.json({ ok: true });
     }
+    if (action === "deleteOpportunity") {
+      const id = clean(body.id, 80);
+      const current = await db.prepare("SELECT id FROM crm_opportunities WHERE owner_id=?1 AND id=?2").bind(ownerId, id).first();
+      if (!current) return reply("That opportunity is no longer available.", 404);
+      await ensureOrderTable(db);
+      await db.batch([
+        db.prepare("DELETE FROM crm_activities WHERE owner_id=?1 AND opportunity_id=?2").bind(ownerId, id),
+        db.prepare("DELETE FROM crm_opportunity_order WHERE owner_id=?1 AND opportunity_id=?2").bind(ownerId, id),
+        db.prepare("DELETE FROM crm_opportunities WHERE owner_id=?1 AND id=?2").bind(ownerId, id),
+      ]);
+      return Response.json({ ok: true, id });
+    }
     if (action === "reorderOpportunities") {
       const ids = Array.isArray(body.ids) ? body.ids.map((value: unknown) => clean(value, 80)).filter(Boolean).slice(0, 500) : [];
       if (!ids.length) return reply("Nothing to reorder.");
