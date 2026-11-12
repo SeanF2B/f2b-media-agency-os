@@ -50,22 +50,38 @@ export async function extractLogoColours(src: string): Promise<{ primary: string
     const scale = Math.min(size / (img.naturalWidth || size), size / (img.naturalHeight || size));
     ctx.drawImage(img, 0, 0, Math.max(1, Math.round((img.naturalWidth || size) * scale)), Math.max(1, Math.round((img.naturalHeight || size) * scale)));
     const data = ctx.getImageData(0, 0, size, size).data;
+    const px = (x: number, y: number) => { const k = (y * size + x) * 4; return { r: data[k], g: data[k + 1], b: data[k + 2], a: data[k + 3] }; };
+    // 1) the logo's own background: the most common opaque colour around the edge of the artwork
+    const edge = new Map<number, { c: number; r: number; g: number; b: number }>(); let opaqueEdge = 0, edgeTotal = 0;
+    for (let t = 0; t < size; t++) for (const [x, y] of [[t, 0], [t, size - 1], [0, t], [size - 1, t]] as const) {
+      const p = px(x, y); edgeTotal++; if (p.a < 200) continue; opaqueEdge++;
+      const key = ((p.r >> 4) << 8) | ((p.g >> 4) << 4) | (p.b >> 4), e = edge.get(key) || { c: 0, r: 0, g: 0, b: 0 }; e.c++; e.r += p.r; e.g += p.g; e.b += p.b; edge.set(key, e);
+    }
+    const topEdge = [...edge.values()].sort((a, b) => b.c - a.c)[0];
+    const bg = topEdge && opaqueEdge > edgeTotal * 0.6 && topEdge.c > opaqueEdge * 0.5 ? { r: topEdge.r / topEdge.c, g: topEdge.g / topEdge.c, b: topEdge.b / topEdge.c } : null;
+    const bgLight = bg ? (0.299 * bg.r + 0.587 * bg.g + 0.114 * bg.b) / 255 : 1;
+    const dist = (p: { r: number; g: number; b: number }, q: { r: number; g: number; b: number }) => Math.hypot(p.r - q.r, p.g - q.g, p.b - q.b);
+    // 2) accent colours: vivid, not white/black/grey, and not the background
     const bins = new Map<number, { n: number; c: number; r: number; g: number; b: number }>();
     for (let i = 0; i < data.length; i += 4) {
       const a = data[i + 3]; if (a < 200) continue;
       const r = data[i], g = data[i + 1], b = data[i + 2], max = Math.max(r, g, b), min = Math.min(r, g, b), sat = max === 0 ? 0 : (max - min) / max;
-      if (max > 242 && min > 225) continue;          // white
-      if (max < 40) continue;                         // black
-      if (sat < 0.22) continue;                       // grey
+      if (max > 242 && min > 225) continue; if (max < 40) continue; if (sat < 0.22) continue;
+      if (bg && dist({ r, g, b }, bg) < 60) continue;
       const key = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4), bin = bins.get(key) || { n: 0, c: 0, r: 0, g: 0, b: 0 };
       bin.c += 1; bin.n += 1 + sat; bin.r += r; bin.g += g; bin.b += b; bins.set(key, bin);
     }
     const ranked = [...bins.values()].sort((x, y) => y.n - x.n).map((v) => ({ n: v.n, r: v.r / v.c, g: v.g / v.c, b: v.b / v.c }));
-    if (!ranked.length) { colourCache.set(src, null); return null; }
-    const first = ranked[0], dist = (p: { r: number; g: number; b: number }, q: { r: number; g: number; b: number }) => Math.hypot(p.r - q.r, p.g - q.g, p.b - q.b);
-    const other = ranked.find((c) => dist(c, first) > 90);
-    const primary = toHex(first.r, first.g, first.b);
-    const secondary = other ? toHex(other.r, other.g, other.b) : toHex(first.r * 0.55, first.g * 0.55, first.b * 0.55);
-    const result = { primary, secondary }; colourCache.set(src, result); return result;
+    let result: { primary: string; secondary: string } | null = null;
+    if (bg && bgLight < 0.75 && ranked.length) {
+      // dark/coloured logo background -> sidebar (secondary); the logo's accent -> buttons (primary)
+      result = { primary: toHex(ranked[0].r, ranked[0].g, ranked[0].b), secondary: toHex(bg.r, bg.g, bg.b) };
+    } else if (ranked.length) {
+      const first = ranked[0], other = ranked.find((c) => dist(c, first) > 90);
+      result = { primary: toHex(first.r, first.g, first.b), secondary: other ? toHex(other.r, other.g, other.b) : toHex(first.r * 0.55, first.g * 0.55, first.b * 0.55) };
+    } else if (bg && bgLight < 0.75) {
+      result = { primary: toHex(bg.r * 1.6 + 40, bg.g * 1.6 + 40, bg.b * 1.6 + 40), secondary: toHex(bg.r, bg.g, bg.b) };
+    }
+    colourCache.set(src, result); return result;
   } catch { colourCache.set(src, null); return null; }
 }
