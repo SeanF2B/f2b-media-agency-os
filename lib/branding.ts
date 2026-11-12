@@ -34,7 +34,6 @@ export async function logoFileToDataUrl(file: File): Promise<string> {
   if (file.size > 4 * 1024 * 1024) throw new Error("That image is over 4 MB. Choose a smaller logo.");
   const url = URL.createObjectURL(file);
   try {
-    let loadSrc = src; if (!src.startsWith("data:")) { try { const res = await fetch(src, { mode: "cors" }); if (res.ok) loadSrc = URL.createObjectURL(await res.blob()); } catch { /* fall back to direct load */ } }
     const img = await new Promise<HTMLImageElement>((resolve, reject) => { const el = new Image(); el.onload = () => resolve(el); el.onerror = () => reject(new Error("That image could not be read.")); el.src = url; });
     const scale = Math.min(1, 256 / Math.max(img.naturalWidth || 256, img.naturalHeight || 256));
     const canvas = document.createElement("canvas"); canvas.width = Math.max(1, Math.round((img.naturalWidth || 256) * scale)); canvas.height = Math.max(1, Math.round((img.naturalHeight || 256) * scale));
@@ -50,6 +49,7 @@ export async function extractLogoColours(src: string): Promise<{ primary: string
   if (!src || typeof document === "undefined") return null;
   if (colourCache.has(src)) return colourCache.get(src)!;
   try {
+    let loadSrc = src; if (!src.startsWith("data:")) { try { const res = await fetch(src, { mode: "cors" }); if (res.ok) loadSrc = URL.createObjectURL(await res.blob()); } catch { /* fall back to direct load */ } }
     const img = await new Promise<HTMLImageElement>((resolve, reject) => { const el = new Image(); if (!loadSrc.startsWith("data:") && !loadSrc.startsWith("blob:")) el.crossOrigin = "anonymous"; el.onload = () => resolve(el); el.onerror = () => reject(new Error("load")); el.src = loadSrc; });
     const size = 64, canvas = document.createElement("canvas"); canvas.width = size; canvas.height = size;
     const ctx = canvas.getContext("2d", { willReadFrequently: true }); if (!ctx) return null;
@@ -64,7 +64,7 @@ export async function extractLogoColours(src: string): Promise<{ primary: string
       const key = ((p.r >> 4) << 8) | ((p.g >> 4) << 4) | (p.b >> 4), e = edge.get(key) || { c: 0, r: 0, g: 0, b: 0 }; e.c++; e.r += p.r; e.g += p.g; e.b += p.b; edge.set(key, e);
     }
     const topEdge = [...edge.values()].sort((a, b) => b.c - a.c)[0];
-    const bg = topEdge && opaqueEdge > edgeTotal * 0.6 && topEdge.c > opaqueEdge * 0.5 ? { r: topEdge.r / topEdge.c, g: topEdge.g / topEdge.c, b: topEdge.b / topEdge.c } : null;
+    const bg = topEdge && opaqueEdge > edgeTotal * 0.5 && topEdge.c > opaqueEdge * 0.35 ? { r: topEdge.r / topEdge.c, g: topEdge.g / topEdge.c, b: topEdge.b / topEdge.c } : null;
     const bgLight = bg ? (0.299 * bg.r + 0.587 * bg.g + 0.114 * bg.b) / 255 : 1;
     const dist = (p: { r: number; g: number; b: number }, q: { r: number; g: number; b: number }) => Math.hypot(p.r - q.r, p.g - q.g, p.b - q.b);
     // 2) accent colours: vivid, not white/black/grey, and not the background
@@ -90,6 +90,13 @@ export async function extractLogoColours(src: string): Promise<{ primary: string
     } else if (bg) {
       result = { primary: toHex(bg.r * 1.6 + 40, bg.g * 1.6 + 40, bg.b * 1.6 + 40), secondary: toHex(bg.r, bg.g, bg.b) };
     }
+    if (!result) {
+      // last resort: the most common opaque colour in the image becomes the sidebar
+      const all = new Map<number, { c: number; r: number; g: number; b: number }>();
+      for (let i = 0; i < data.length; i += 4) { if (data[i + 3] < 200) continue; const key = ((data[i] >> 4) << 8) | ((data[i + 1] >> 4) << 4) | (data[i + 2] >> 4), e = all.get(key) || { c: 0, r: 0, g: 0, b: 0 }; e.c++; e.r += data[i]; e.g += data[i + 1]; e.b += data[i + 2]; all.set(key, e); }
+      const top = [...all.values()].sort((a, b) => b.c - a.c)[0];
+      if (top) result = { primary: DEFAULT_BRANDING.primary, secondary: toHex(top.r / top.c, top.g / top.c, top.b / top.c) };
+    }
     colourCache.set(src, result); return result;
-  } catch { colourCache.set(src, null); return null; }
+  } catch (e) { (globalThis as any).__lastErr = String(e); colourCache.set(src, null); return null; }
 }
