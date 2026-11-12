@@ -8534,3 +8534,5 @@ html body .app-shell.app-shell button[role="tab"] > span:last-child:not(:first-c
 @keyframes bot-gasp{from{transform:scale(.8)}to{transform:scale(1.2)}}
 @keyframes bot-drip{0%{transform:translateY(-3px);opacity:0}30%{opacity:1}100%{transform:translateY(10px);opacity:0}}
 @media (prefers-reduced-motion:reduce){.bot-live,.bot-live *{animation:none!important}}
+.pipeline-card-drag-preview .bot-live{animation:bot-spin .9s ease-in-out infinite!important}
+@keyframes bot-spin{0%{transform:rotate(0)}60%,100%{transform:rotate(360deg)}}
