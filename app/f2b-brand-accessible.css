@@ -7913,3 +7913,8 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
 .app-shell .crm-stage > header.crm-stage-header, .app-shell .pipeline-column > .pipeline-column-head { background: color-mix(in srgb, var(--stage-color, #94a3b8) 6%, var(--stage-base)) !important; backdrop-filter: none; }
 .app-shell .crm-stage > header.crm-stage-header h2, .app-shell .pipeline-column > .pipeline-column-head h2 { text-shadow: none; }
 .app-shell .crm-stage > header.crm-stage-header::after, .app-shell .pipeline-column > .pipeline-column-head::after { content: ""; display: block; height: 3px; margin-top: 8px; border-radius: 3px; background: var(--stage-color, #94a3b8); opacity: .85; }
+
+/* Drop target + landing slot (GoHighLevel-style dashed placeholder) */
+.app-shell .crm-stage.is-drop-target, .app-shell .pipeline-column.is-drop-target, .app-shell.dark-mode .crm-stage.is-drop-target, .app-shell.dark-mode .pipeline-column.is-drop-target { border-color: var(--stage-color, #3b82f6) !important; background: color-mix(in srgb, var(--stage-color, #3b82f6) 14%, var(--stage-base)) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--stage-color, #3b82f6) 28%, transparent) !important; }
+.card-drop-shadow-slot, .app-shell.dark-mode .card-drop-shadow-slot { border: 2px dashed var(--stage-color, #3b82f6); border-radius: 15px; background: color-mix(in srgb, var(--stage-color, #3b82f6) 16%, transparent); box-shadow: inset 0 6px 18px rgba(0,0,0,.28), 0 8px 20px rgba(0,0,0,.22); margin: 2px 0; }
+.app-shell .crm-stage:has(.card-drop-shadow-slot) .crm-empty-stage { display: none; }
