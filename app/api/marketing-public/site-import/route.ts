@@ -23,6 +23,8 @@ export async function POST(request: Request) {
       const cur = await store0.read(pathForSlug(slug));
       if (!cur?.text) return out({ error: "Page not found." }, 404);
       const pg = JSON.parse(cur.text); let b = String(pg?.raw?.body || ""), n = 0;
+      let bi = 0; const bands = body.bands as string[][] | undefined;
+      if (Array.isArray(bands)) b = b.replace(/<section class="f2b-photo-band"><div>[\s\S]*?<\/div><\/section>/g, (m) => { const t = bands[bi++]; if (!t || t.length !== 3 || t.some((x) => !/^\/images\/[\w./-]+$/.test(x))) return m; n++; return '<section class="f2b-photo-band"><div>' + t.map((x) => `<img loading="lazy" src="${x}" alt="Interior design project by Red Island Interiors">`).join("") + "</div></section>"; });
       for (const pt of body.patches.slice(0, 40)) { const f = String(pt?.find || ""); if (f && b.includes(f)) { b = b.replace(f, () => String(pt.replace ?? "")); n++; } }
       if (!n) return out({ ok: true, applied: 0 });
       pg.raw.body = b;
