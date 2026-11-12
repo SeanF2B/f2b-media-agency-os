@@ -8455,3 +8455,15 @@ html body .app-shell.app-shell button[role="tab"] > span:last-child:not(:first-c
 .app-shell button[role="tab"].selected *,.app-shell .client-tax-type button.selected *{color:inherit}
 .app-shell .client-tax-type button.selected{background:var(--brand-primary,#3b82f6)!important}
 .app-shell .client-tax-head .eyebrow,.app-shell .welcome-row .eyebrow{color:var(--brand-secondary-ink,#1e3a8a)!important}
+
+/* client income/expenses + tax tidy */
+.client-tax{display:grid;gap:14px;padding:20px!important}
+.client-tax-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap}
+.client-tax-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.client-tax-stats>div{padding:12px 14px!important;border-radius:12px}
+.client-tax-actions{margin:0!important}
+.client-tax-list{border:1px solid #e3e8ec;border-radius:12px;padding:12px 14px;background:#fff}
+.client-tax-list h3,.client-tax-section h3{margin:0 0 8px;font-size:15px}
+.client-tax-section{border-top:1px solid #e3e8ec;padding-top:14px;display:grid;gap:10px}
+.client-tax-inputs{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.app-shell.dark-mode .client-tax-list{background:#20272d;border-color:#3c4850}.app-shell.dark-mode .client-tax-section{border-color:#3c4850}
