@@ -7976,3 +7976,8 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
 
 /* Column titles stay readable while cards scroll underneath */
 .app-shell .crm-stage > header.crm-stage-header, .app-shell .pipeline-column > .pipeline-column-head { background: color-mix(in srgb, var(--stage-color, #94a3b8) 17%, var(--stage-base)) !important; position: sticky !important; top: 0 !important; z-index: 6 !important; margin: 0 0 8px !important; padding: 10px 10px 6px !important; box-shadow: 0 8px 10px -6px var(--stage-base); }
+
+/* Calm value box and stage dropdown: no coloured neon outline */
+.app-shell .crm-value-field, .app-shell .crm-card-stage-select { border: 1px solid rgba(127,127,127,.35) !important; box-shadow: none !important; outline: none !important; }
+.app-shell .crm-value-field:focus-within, .app-shell .crm-card-stage-select:focus, .app-shell .crm-card-stage-select:focus-visible { border-color: rgba(127,127,127,.6) !important; box-shadow: none !important; outline: none !important; }
+.app-shell .crm-card-facts dt { min-width: 64px; white-space: nowrap; margin-right: 6px; }
