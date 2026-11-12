@@ -8502,3 +8502,35 @@ html body .app-shell.app-shell button[role="tab"] > span:last-child:not(:first-c
 .assistant-agent-pick .field{margin:0;min-width:210px}.assistant-agent-pick .field>span{font-size:11px;color:#63727b}.assistant-agent-pick .team-select-trigger{min-height:40px}
 .assistant-agent-pick .staff-select-note{display:none}
 .crm-add-contact{font-size:12px;padding:0;margin-left:4px}.crm-new-contact{margin-top:10px}.crm-new-contact summary{cursor:pointer;font-weight:700}.crm-notes-popup{display:grid;gap:8px;max-height:50vh;overflow:auto}.crm-notes-popup p{margin:0;padding:8px 10px;background:color-mix(in srgb,var(--brand-primary) 6%,#fff);border-radius:8px}
+/* Live AI bot on task cards */
+.bot-live{--lx:0px;--ly:0px;position:relative;display:inline-flex;flex:none;width:34px;height:34px;align-items:flex-end;justify-content:center}
+.bot-antenna{position:absolute;top:0;left:50%;width:2px;height:5px;margin-left:-1px;border-radius:2px;background:var(--brand-primary,#42baff)}
+.bot-antenna::after{content:"";position:absolute;top:-3px;left:-2px;width:6px;height:6px;border-radius:50%;background:var(--brand-primary,#42baff)}
+.bot-head{position:relative;width:30px;height:24px;border:2px solid var(--brand-primary,#42baff);border-radius:9px;background:#0f1b2a;display:block;box-shadow:0 0 8px color-mix(in srgb,var(--brand-primary,#42baff) 45%,transparent)}
+.bot-eye{position:absolute;top:5px;width:9px;height:9px;border-radius:50%;background:#fff;overflow:hidden;animation:bot-blink 5s infinite}
+.bot-eye:nth-of-type(1){left:3px}.bot-eye:nth-of-type(2){right:3px}
+.bot-eye i{position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px 0 0 -2px;border-radius:50%;background:#0f1b2a;transform:translate(var(--lx),var(--ly));transition:transform .08s linear}
+.bot-mouth{position:absolute;left:50%;bottom:3px;width:10px;height:5px;margin-left:-5px;border-bottom:2px solid var(--brand-primary,#42baff);border-radius:0 0 10px 10px}
+.bot-brow{position:absolute;display:none;top:2px;right:4px;width:7px;height:2px;background:var(--brand-primary,#42baff);transform:rotate(-14deg)}
+.bot-confident .bot-brow{display:block}.bot-confident .bot-mouth{width:12px;margin-left:-4px;transform:rotate(-6deg)}
+.bot-happy .bot-mouth{width:14px;height:7px;margin-left:-7px;background:var(--brand-primary,#42baff);border:0;border-radius:0 0 14px 14px}
+.bot-happy{animation:bot-hop 1.8s ease-in-out infinite}
+.bot-spark{position:absolute;top:-4px;right:-4px;font-size:10px;color:#f5b301;animation:bot-pop 1.8s infinite}
+.bot-whistle .bot-mouth{width:6px;height:6px;margin-left:-3px;border:2px solid var(--brand-primary,#42baff);border-radius:50%;animation:bot-whistle 1.2s ease-in-out infinite}
+.bot-whistle .bot-head{animation:bot-sway 2.4s ease-in-out infinite}
+.bot-notes{position:absolute;top:-6px;right:-12px;font-size:11px;color:var(--brand-primary,#42baff);pointer-events:none}
+.bot-notes b{position:absolute;opacity:0;animation:bot-note 2.4s ease-out infinite}.bot-notes b:nth-child(2){animation-delay:1.2s;left:6px}
+.bot-panic{animation:bot-shake .18s linear infinite}
+.bot-panic .bot-eye{width:11px;height:11px;top:4px;animation:none}.bot-panic .bot-eye i{width:3px;height:3px;margin:-1.5px 0 0 -1.5px}
+.bot-panic .bot-mouth{width:8px;height:8px;margin-left:-4px;bottom:2px;border:2px solid var(--brand-primary,#42baff);border-radius:50%;animation:bot-gasp .5s ease-in-out infinite alternate}
+.bot-sweat{position:absolute;top:6px;right:-1px;width:5px;height:8px;border-radius:50% 50% 50% 50%/60% 60% 40% 40%;background:#7fd4ff;animation:bot-drip 1s ease-in infinite}
+@keyframes bot-blink{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.1)}}
+@keyframes bot-hop{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes bot-pop{0%,100%{transform:scale(.6);opacity:.3}50%{transform:scale(1.1);opacity:1}}
+@keyframes bot-whistle{0%,100%{transform:scale(1)}50%{transform:scale(1.35)}}
+@keyframes bot-sway{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
+@keyframes bot-note{0%{opacity:0;transform:translate(0,6px)}20%{opacity:1}100%{opacity:0;transform:translate(8px,-14px) rotate(14deg)}}
+@keyframes bot-shake{0%{transform:translateX(-1px)}50%{transform:translateX(1px)}100%{transform:translateX(-1px)}}
+@keyframes bot-gasp{from{transform:scale(.8)}to{transform:scale(1.2)}}
+@keyframes bot-drip{0%{transform:translateY(-3px);opacity:0}30%{opacity:1}100%{transform:translateY(10px);opacity:0}}
+@media (prefers-reduced-motion:reduce){.bot-live,.bot-live *{animation:none!important}}
