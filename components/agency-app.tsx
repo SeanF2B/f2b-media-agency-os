@@ -4666,7 +4666,7 @@ function TeamView({ workspace, onAdd, onAddAi, onEdit, onRemoveAi, onRestoreAi }
       {member.isBot && <div className="ai-team-status">{member.aiModel?.startsWith("anthropic/") ? "Claude · OpenRouter" : "Grok · OpenRouter"}<br />{"All task modes · all clients"}<br />{member.agentPrompt ? "Custom instructions saved" : "Using the mode’s default instructions"}</div>}
       <div className="team-card-bottom"><span>Internal cost rate</span><b>{money(member.costRate)} <small>/ hr</small></b></div>
       <div className="team-card-footer"><span>{member.id === workspace.ownerId ? "Workspace owner" : member.isBot ? "AI profile" : member.role}</span><span className="green-dot" /><button type="button" className="team-edit-icon" aria-label={`Edit ${member.name} profile and permissions`} title="Edit profile and permissions" onClick={() => onEdit(member)}>✎</button>{member.id === workspace.ownerId && <b className="owner-tag">WORKSPACE OWNER</b>}</div>
-      {member.isBot && <button type="button" className="team-remove-ai" onClick={(event) => { event.stopPropagation(); onRemoveAi(member); }}>Remove AI teammate</button>}
+      {member.isBot && <button type="button" className="team-remove-ai task-delete" title="Remove AI teammate" aria-label={`Remove AI teammate ${member.name}`} onClick={(event) => { event.stopPropagation(); onRemoveAi(member); }}><span aria-hidden="true">🗑</span> Delete</button>}
     </article>)}</div>
   </>;
 }
