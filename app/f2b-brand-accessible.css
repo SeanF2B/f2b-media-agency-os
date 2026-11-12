@@ -8004,3 +8004,7 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
 .launchpad-row.status-ready { opacity: .8; }
 
 .card-drop-shadow-floating { margin: 0 !important; animation: none !important; }
+
+/* No drop / appear animation on task or pipeline cards: they simply land in place */
+.app-shell .pipeline-card, .app-shell .pipeline-card.is-just-dropped, .app-shell .crm-opportunity, .app-shell .crm-opportunity.is-just-dropped, .app-shell.dark-mode .pipeline-card.is-just-dropped, .app-shell.dark-mode .crm-opportunity.is-just-dropped { animation: none !important; }
+.app-shell .pipeline-card.is-just-dropped, .app-shell .crm-opportunity.is-just-dropped { transform: none !important; }
