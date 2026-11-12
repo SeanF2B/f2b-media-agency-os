@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CURRENCIES } from "@/lib/display-currency";
-import { DEFAULT_BRANDING, logoFileToDataUrl, normalizeBranding, type Branding } from "@/lib/branding";
+import { DEFAULT_BRANDING, extractLogoColours, logoFileToDataUrl, normalizeBranding, type Branding } from "@/lib/branding";
 import { TAX_COUNTRIES, taxCountry, type BusinessType, type TaxCountry, type TaxSettings } from "@/lib/tax-rules";
 
 export type BusinessSettingsValue = { currency?: string; branding?: Partial<Branding>; tax?: TaxSettings };
@@ -31,6 +31,7 @@ export function BusinessSettings({ value, onSave }: { value: BusinessSettingsVal
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [justSaved, setJustSaved] = useState(false);
+  const [note, setNote] = useState("");
   useEffect(() => { const next = toDraft(value); setSaved(next); setDraft((current) => JSON.stringify(current) === JSON.stringify(saved) ? next : current); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [JSON.stringify(value)]);
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
   const set = (patch: Partial<Draft>) => { setJustSaved(false); setDraft((current) => ({ ...current, ...patch })); };
@@ -46,7 +47,7 @@ export function BusinessSettings({ value, onSave }: { value: BusinessSettingsVal
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not save. Please try again."); }
     finally { setBusy(false); }
   };
-  const upload = (file?: File) => { if (!file) return; setError(""); void logoFileToDataUrl(file).then((logo) => set({ logo })).catch((cause) => setError(cause instanceof Error ? cause.message : "Could not use that image.")); };
+  const upload = (file?: File) => { if (!file) return; setError(""); void logoFileToDataUrl(file).then(async (logo) => { const colours = await extractLogoColours(logo); set(colours ? { logo, ...colours } : { logo }); if (colours) setNote("Colours picked from your logo. Change them if you like."); }).catch((cause) => setError(cause instanceof Error ? cause.message : "Could not use that image.")); };
   const preview = { "--bs-primary": draft.primary, "--bs-secondary": draft.secondary } as React.CSSProperties;
 
   return <section className="bs" aria-labelledby="business-settings-heading">
@@ -58,7 +59,7 @@ export function BusinessSettings({ value, onSave }: { value: BusinessSettingsVal
         <div className="bs-group"><h3>Brand</h3>
           <div className="bs-field"><span className="bs-label">Logo</span>
             <div className="bs-logo"><span className="bs-logo-tile">{draft.logo ? <img src={draft.logo} alt="Logo" /> : <img src="/f2b-home-icon.png" alt="Default logo" className="dim" />}</span>
-              <div className="bs-logo-actions"><label className="bs-btn">{draft.logo ? "Replace logo" : "Upload logo"}<input type="file" accept="image/*" hidden onChange={(event) => { upload(event.currentTarget.files?.[0]); event.currentTarget.value = ""; }} /></label>{draft.logo && <button type="button" className="bs-link" onClick={() => set({ logo: "" })}>Remove</button>}<small>PNG, JPG, SVG or WebP · square works best</small></div></div></div>
+              <div className="bs-logo-actions"><label className="bs-btn">{draft.logo ? "Replace logo" : "Upload logo"}<input type="file" accept="image/*" hidden onChange={(event) => { upload(event.currentTarget.files?.[0]); event.currentTarget.value = ""; }} /></label>{draft.logo && <button type="button" className="bs-link" onClick={() => set({ logo: "" })}>Remove</button>}{draft.logo && <button type="button" className="bs-link" onClick={() => { void extractLogoColours(draft.logo).then((colours) => { if (colours) { set(colours); setNote("Colours picked from your logo."); } else setNote("Couldn't find clear colours in that logo. Pick them by hand."); }); }}>🎨 Pull colours from logo</button>}<small>PNG, JPG, SVG or WebP · square works best</small></div>{note && <p className="bs-note" role="status">{note}</p>}</div></div>
           <label className="bs-field"><span className="bs-label">Business name</span><input className="bs-input" value={draft.name} maxLength={60} placeholder="F2B Media" onChange={(event) => set({ name: event.target.value })} /></label>
           <div className="bs-two"><ColorField label="Primary colour" value={draft.primary} onChange={(primary) => set({ primary })} /><ColorField label="Secondary colour" value={draft.secondary} onChange={(secondary) => set({ secondary })} /></div></div>
         <div className="bs-group"><h3>Money & tax</h3>
