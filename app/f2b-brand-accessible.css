@@ -8210,7 +8210,7 @@ html body .app-shell.app-shell button[role="tab"] > span:last-child:not(:first-c
 @media (prefers-reduced-motion: reduce) { .chess-board-wrap.fx-start .chess-board,.chess-board-wrap.fx-start .chess-square,.chess-board-wrap.fx-start .chess-piece-svg,.chess-end-confetti i,.chess-end-rain i { animation:none !important; } }
 
 /* Branding settings card + secondary colour use */
-.app-shell .branding-setting { display:grid; gap:14px; }
+.app-shell .branding-setting, .app-shell .tax-setting { display:grid; gap:14px; }
 .app-shell .branding-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
 .app-shell .branding-head p { margin:4px 0 0; opacity:.8; }
 .app-shell .branding-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; align-items:start; }
