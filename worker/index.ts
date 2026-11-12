@@ -1,6 +1,7 @@
 import handler from "vinext/server/fetch-handler";
 import { processDueAiTasks, processDueFinanceRecurring } from "./scheduled-ai";
 import { processDueMarketingAutomations } from "./marketing-automations";
+import { processCrmAutomations } from "../lib/crm-automations/engine.ts";
 import { processExpiredMarketingSubmissions } from "../lib/marketing-submission-retention";
 import { getGoogleAdsCampaignMetrics, googleAdsConnectionReady, keepGoogleAdsTokensFresh } from "../lib/google-ads-direct";
 import { ghlLocationRequest } from "../lib/gohighlevel-oauth";
@@ -133,6 +134,20 @@ function decodeJwtPart<T>(part: string): T {
 const worker = {
   async scheduled(controller: ScheduledController, env: Cloudflare.Env, ctx: ExecutionContext) {
     ctx.waitUntil(Promise.allSettled([
+      processCrmAutomations(env.DB! as unknown as Parameters<typeof processCrmAutomations>[0], new Date(controller.scheduledTime), {
+        sendEmail: env.RESEND_API_KEY && env.TASK_NOTIFICATION_FROM ? async (message) => {
+          const response = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json", "Idempotency-Key": message.idempotencyKey },
+            body: JSON.stringify({ from: env.TASK_NOTIFICATION_FROM, to: [message.to], subject: message.subject, text: message.text, html: message.html }),
+            signal: AbortSignal.timeout(15_000),
+          });
+          if (!response.ok) {
+            const detail = await response.json().catch(() => null) as { message?: string } | null;
+            throw new Error(`The email provider returned HTTP ${response.status}: ${detail?.message || "message was not accepted"}.`);
+          }
+        } : undefined,
+      }),
       processDueAiTasks({ ...env, hasDirectSearchConsole: hasGoogleSearchConsoleConnection, readDirectSearchConsole: readGoogleSearchConsoleRows }, new Date(controller.scheduledTime)),
       processDueFinanceRecurring(env, new Date(controller.scheduledTime)),
       processExpiredMarketingSubmissions(env.DB!, env.BUCKET, new Date(controller.scheduledTime)),
