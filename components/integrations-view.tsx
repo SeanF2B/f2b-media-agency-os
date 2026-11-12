@@ -31,6 +31,21 @@ function formatUsd(value: number | null | undefined) {
   return value == null ? "Cost not returned" : new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 5, maximumFractionDigits: 5 }).format(value);
 }
 
+const plainHelp: Record<string, string> = {
+  "google-ads": "Pulls campaign results and lets the AI suggest changes.",
+  "meta-ads": "Pulls Facebook and Instagram ad results.",
+  "search-console": "Shows search rankings and clicks for each client site.",
+  ga4: "Shows website visitors for each client.",
+  "business-profile": "Shows Google Maps listing results for each client.",
+  dataforseo: "Keyword and ranking research for SEO tasks.",
+  pagespeed: "Checks how fast client websites load.",
+  wordpress: "Lets the AI create draft pages on client websites.",
+  "marketing-public": "Lets public lead forms and landing pages work.",
+  gohighlevel: "Syncs leads with your GoHighLevel accounts.",
+  "landing-hosting": "Hosts client landing pages on their own domains.",
+};
+const firstSentence = (text: string) => { const clean = text.replace(/\s+/g, " ").trim(); const end = clean.search(/[.!?](\s|$)/); const sentence = end > 0 ? clean.slice(0, end + 1) : clean; return sentence.length > 110 ? `${sentence.slice(0, 107)}…` : sentence; };
+
 const integrationIcons: Record<string, string> = {
   "google-ads": "📣", "meta-ads": "📱", "search-console": "🔎", ga4: "📊", "business-profile": "📍",
   dataforseo: "🔍", pagespeed: "⚡", wordpress: "🌐", "marketing-public": "🚀", gohighlevel: "🧩", "landing-hosting": "🪄",
@@ -102,10 +117,11 @@ export function IntegrationsView({ onNavigate }: { onNavigate: (page: string) =>
     <header className="launchpad-heading"><div><p className="eyebrow">🚀 WORKSPACE CONNECTIONS</p><h1>Let’s get you on the path to success</h1><p className="muted">Connect your tools and check which workspace services are ready.</p></div><button className="secondary-button" type="button" onClick={() => void load()} disabled={loading}>{loading ? "Checking…" : "↻ Refresh"}</button></header>
     {loading && <p role="status" className="integrations-message launchpad-state">Checking connection setup…</p>}
     {message && <div role="alert" className="launchpad-error"><span>{message}</span><button className="secondary-button" type="button" onClick={() => void load()} disabled={loading}>Try again</button></div>}
-    {!loading && !message && <section className="launchpad-catalog" aria-label="Workspace services">{items.map((item) => <article className={`launchpad-row status-${item.status}`} key={item.id}>
+    {!loading && !message && (() => { const done = items.filter((item) => item.status === "ready").length; const todo = items.filter((item) => item.status !== "ready" && item.status !== "optional").length; return <section className="launchpad-progress" aria-label="Setup progress"><div className="launchpad-progress-top"><b>{done} of {items.length} connected</b><span>{todo ? `${todo} still need${todo === 1 ? "s" : ""} setting up` : "Everything important is connected 🎉"}</span></div><div className="launchpad-progress-track"><div style={{ width: `${items.length ? Math.round(done / items.length * 100) : 0}%` }} /></div></section>; })()}
+    {!loading && !message && <section className="launchpad-catalog" aria-label="Workspace services">{[...items].sort((a, b) => Number(a.status === "ready") - Number(b.status === "ready")).map((item) => <article className={`launchpad-row status-${item.status}`} key={item.id}>
       <div className="launchpad-brand" aria-hidden="true">{integrationIcons[item.id] || "🔗"}</div>
-      <div className="launchpad-item-main"><div className="launchpad-item-heading"><h3>{item.name}</h3><span className={`integration-status status-${item.status}`}>{statusLabels[item.status]}</span></div><p>{item.detail}</p>
-        <details className="launchpad-details"><summary>{item.mappingUnit ? mappingSummary(item) : "View setup details"}</summary><div className="launchpad-details-content">
+      <div className="launchpad-item-main"><div className="launchpad-item-heading"><h3>{item.name}</h3><span className={`integration-status status-${item.status}`}>{statusLabels[item.status]}</span></div><p>{plainHelp[item.id] || firstSentence(item.detail)}{item.status !== "ready" && <span className="launchpad-next"> {firstSentence(item.detail)}</span>}</p>
+        <details className="launchpad-details"><summary>{item.mappingUnit ? mappingSummary(item) : "View setup details"}</summary><div className="launchpad-details-content"><p className="launchpad-full-detail">{item.detail}</p>
           <div className="launchpad-detail-actions"><button className="secondary-button" type="button" onClick={() => onNavigate(item.actionPage)}>{item.actionLabel} ↗</button>{item.connectHref && <a className="secondary-button" href={item.connectHref}>Reconnect</a>}{item.id === "marketing-public" && item.publicAccessSetupConfigured && <button className="secondary-button" type="button" onClick={() => void configurePublicMarketingAccess()} disabled={settingUpPublicAccess}>{settingUpPublicAccess ? "Applying…" : "Apply public paths"}</button>}</div>
           {item.id === "marketing-public" && !item.publicAccessSetupConfigured && <p>The approved routes are ready to apply after the Cloudflare Access API token is configured as a Worker secret. Never share the token in chat.</p>}{item.id === "marketing-public" && publicAccessSetupMessage && <p role="status" className="integrations-message">{publicAccessSetupMessage}</p>}
           {item.usage && <div className={`integration-usage ${item.usage.status === "unavailable" ? "is-error" : ""}`}><b>Provider usage · last 30 days</b>{item.usage.status === "unavailable" ? <small>Usage totals could not be loaded. No provider requests were made by this check.</small> : <><span>{item.usage.requestCount || 0} saved request{item.usage.requestCount === 1 ? "" : "s"} · {formatUsd(item.usage.knownCostUsd)} known cost</span><small>{item.usage.unknownCostCount ? `${item.usage.unknownCostCount} request${item.usage.unknownCostCount === 1 ? "" : "s"} did not return a cost; totals may be incomplete.` : "All saved requests returned a cost, or no requests were recorded."}</small>{item.usage.periodStart && <small>Since {new Date(item.usage.periodStart).toLocaleDateString("en-IE", { dateStyle: "medium" })}. DataForSEO costs are provider-reported estimates, not an invoice total.</small>}{item.usage.byService && <details className="integration-usage-breakdown"><summary>See usage by service</summary><ul>{([["Keyword research", item.usage.byService.keywordResearch], ["Competitor keyword gaps", item.usage.byService.competitorResearch], ["Google Maps rankings", item.usage.byService.localMaps], ["Backlink checks", item.usage.byService.backlinks]] as const).map(([label, bucket]) => bucket && bucket.requestCount > 0 ? <li key={label}><span>{label} · {bucket.requestCount} request{bucket.requestCount === 1 ? "" : "s"}</span><span>{formatUsd(bucket.knownCostUsd)}{bucket.unknownCostCount ? ` · ${bucket.unknownCostCount} cost unknown` : ""}</span></li> : null)}</ul></details>}</>}</div>}

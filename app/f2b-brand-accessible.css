@@ -7992,3 +7992,13 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
 .currency-setting { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 16px; margin: 0 0 16px; }
 .currency-setting p { margin: 3px 0 0; font-size: 11px; opacity: .7; max-width: 560px; }
 .currency-setting select { min-width: 200px; }
+
+.launchpad-progress { margin: 14px 0 12px; }
+.launchpad-progress-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 13px; margin-bottom: 6px; }
+.launchpad-progress-top span { opacity: .7; font-size: 12px; }
+.launchpad-progress-track { height: 8px; border-radius: 8px; background: rgba(127,127,127,.25); overflow: hidden; }
+.launchpad-progress-track > div { height: 100%; border-radius: 8px; background: linear-gradient(90deg, #3f8179, #22c55e); transition: width .4s ease; }
+.launchpad-row .launchpad-item-main > p { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.launchpad-next { opacity: .75; }
+.launchpad-full-detail { font-size: 12px; opacity: .85; margin: 0 0 8px; }
+.launchpad-row.status-ready { opacity: .8; }
