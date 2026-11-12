@@ -7918,3 +7918,28 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
 .app-shell .crm-stage.is-drop-target, .app-shell .pipeline-column.is-drop-target, .app-shell.dark-mode .crm-stage.is-drop-target, .app-shell.dark-mode .pipeline-column.is-drop-target { border-color: var(--stage-color, #3b82f6) !important; background: color-mix(in srgb, var(--stage-color, #3b82f6) 14%, var(--stage-base)) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--stage-color, #3b82f6) 28%, transparent) !important; }
 .card-drop-shadow-slot, .app-shell.dark-mode .card-drop-shadow-slot { border: 2px dashed var(--stage-color, #3b82f6); border-radius: 15px; background: color-mix(in srgb, var(--stage-color, #3b82f6) 16%, transparent); box-shadow: inset 0 6px 18px rgba(0,0,0,.28), 0 8px 20px rgba(0,0,0,.22); margin: 2px 0; }
 .app-shell .crm-stage:has(.card-drop-shadow-slot) .crm-empty-stage { display: none; }
+
+/* Compact pipeline card (title, assignee, facts, icon row) */
+.app-shell .crm-opportunity { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; }
+.crm-card-top { display: flex; align-items: flex-start; gap: 8px; }
+.crm-card-logo { flex: 0 0 28px; width: 28px; height: 28px; border-radius: 8px; overflow: hidden; background: #fff; border: 1px solid var(--f2b-border, #d9dee3); display: grid; place-items: center; }
+.crm-card-logo img { width: 100%; height: 100%; object-fit: contain; padding: 2px; box-sizing: border-box; }
+.crm-card-title { flex: 1; min-width: 0; font-size: 15px; line-height: 1.3; overflow-wrap: anywhere; }
+.crm-card-avatar { position: relative; flex: 0 0 auto; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; }
+.crm-card-avatar .crm-assignee-avatar { width: 30px; height: 30px; flex: 0 0 30px; font-size: 11px; }
+.crm-card-avatar select, .crm-card-picker input, .crm-card-picker select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
+.crm-card-facts { margin: 0; display: grid; gap: 5px; font-size: 13px; }
+.crm-card-facts > div { display: grid; grid-template-columns: 62px 1fr; align-items: baseline; gap: 6px; }
+.crm-card-facts dt { color: #6d7882; font-weight: 800; }
+.crm-card-facts dd { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.crm-card-facts .crm-opportunity-value { padding: 0; }
+.crm-card-facts .crm-opportunity-value dd { overflow: visible; }
+.crm-card-icons { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding-top: 4px; }
+.crm-card-icon { position: relative; display: inline-grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--f2b-border, #d9dee3); border-radius: 9px; background: transparent; color: inherit; font-size: 14px; line-height: 1; text-decoration: none; cursor: pointer; }
+.crm-card-icon:hover, .crm-card-icon:focus-within { border-color: #3b82f6; background: rgba(59,130,246,.12); }
+.crm-card-delete { margin-left: auto; color: #b42318; }
+.crm-card-delete:hover { border-color: #b42318; background: rgba(180,35,24,.1); }
+.crm-card-notes summary { font-size: 12px; cursor: pointer; color: #6d7882; }
+.app-shell.dark-mode .crm-card-facts dt, .app-shell.dark-mode .crm-card-notes summary { color: #9aa3ab; }
+.app-shell.dark-mode .crm-card-delete { color: #ff8a80; }
+.app-shell.dark-mode .crm-card-icon { border-color: #3a393d; }
