@@ -8467,3 +8467,12 @@ html body .app-shell.app-shell button[role="tab"] > span:last-child:not(:first-c
 .client-tax-section{border-top:1px solid #e3e8ec;padding-top:14px;display:grid;gap:10px}
 .client-tax-inputs{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
 .app-shell.dark-mode .client-tax-list{background:#20272d;border-color:#3c4850}.app-shell.dark-mode .client-tax-section{border-color:#3c4850}
+
+/* sidebar text always follows the sidebar's own contrast colour, in light AND dark mode */
+.app-shell .sidebar .nav-item, .app-shell .sidebar .nav-item *, .app-shell .sidebar .client-nav-item, .app-shell .sidebar .client-nav-item *,
+.app-shell .sidebar .client-scope-trigger, .app-shell .sidebar .client-scope-trigger *, .app-shell .sidebar .nav-label, .app-shell .sidebar .nav-label *,
+.app-shell .sidebar .sidebar-settings-link, .app-shell .sidebar .sidebar-settings-link *, .app-shell .sidebar small, .app-shell .sidebar label, .app-shell .sidebar .profile-row b, .app-shell .sidebar .profile-row small,
+.app-shell.dark-mode .sidebar .nav-item, .app-shell.dark-mode .sidebar .nav-item *, .app-shell.dark-mode .sidebar .client-nav-item, .app-shell.dark-mode .sidebar .client-nav-item *, .app-shell.dark-mode .sidebar .client-scope-trigger *, .app-shell.dark-mode .sidebar .nav-label, .app-shell.dark-mode .sidebar .sidebar-settings-link *, .app-shell.dark-mode .sidebar label, .app-shell.dark-mode .sidebar small
+{ color: var(--sb-fg, #fff) !important; -webkit-text-fill-color: var(--sb-fg, #fff) !important; opacity: 1 !important; }
+.app-shell .sidebar .nav-item.active, .app-shell .sidebar .nav-item.active *, .app-shell .sidebar .client-nav-item.active, .app-shell .sidebar .client-nav-item.active *, .app-shell.dark-mode .sidebar .nav-item.active *, .app-shell .sidebar .profile-row b { color: var(--sb-fg-strong, #fff) !important; -webkit-text-fill-color: var(--sb-fg-strong, #fff) !important; }
+.app-shell .sidebar .nav-label, .app-shell .sidebar .nav-label *{ opacity:.8 !important }
