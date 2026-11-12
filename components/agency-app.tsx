@@ -124,8 +124,9 @@ const serviceCardClasses: Record<string, string> = { "AI Automation": "ai-automa
 function renderAssistantText(content: string) {
   return content.split("\n").map((line, lineIndex) => <Fragment key={lineIndex}>{lineIndex > 0 && <br />}{line.split(/(\*\*[^*]+\*\*)/g).map((part, partIndex) => part.startsWith("**") && part.endsWith("**") ? <strong key={partIndex}>{part.slice(2, -2)}</strong> : <Fragment key={partIndex}>{part}</Fragment>)}</Fragment>);
 }
-// Cards the team has dragged into a manual position keep it; new cards still arrive on top.
-const byBoardOrder = (list: Task[]) => [...list.filter((task) => task.boardOrder == null), ...list.filter((task) => task.boardOrder != null).sort((a, b) => (a.boardOrder as number) - (b.boardOrder as number))];
+// Cards the team has dragged into a manual position keep it; other cards sit above them with Urgent/High priority first.
+const priorityRank = (task: Task) => ({ Urgent: 0, High: 1, Normal: 2, Low: 3 } as Record<string, number>)[task.priority] ?? 4;
+const byBoardOrder = (list: Task[]) => [...list.filter((task) => task.boardOrder == null).sort((a, b) => priorityRank(a) - priorityRank(b)), ...list.filter((task) => task.boardOrder != null).sort((a, b) => (a.boardOrder as number) - (b.boardOrder as number))];
 const nav = [
   { key: "Overview", icon: "📊" }, { key: "Settings", icon: "⚙️" }, { key: "Clients", icon: "👥" }, { key: "CRM", icon: "🗂️" }, { key: "Tasks", icon: "✅" }, { key: "Lead Factory", icon: "🎯" }, { key: "Marketing", icon: "📣" }, { key: "Team", icon: "🧑‍💼" }, { key: "Chess", icon: "♟️" }, { key: "Activity", icon: "🕘" }, { key: "AI Assistant", icon: "" }, { key: "Integrations", icon: "🚀" },
 ];
@@ -4100,11 +4101,12 @@ The app will check the live account first and only restore the previous value if
   const priorityFilteredTasks = clientServiceFilteredTasks.filter((task) => !priorityOnly || task.priority === "High" || task.priority === "Urgent");
   const tasks = priorityFilteredTasks
     .sort((a, b) => {
-      const recencyDiff = taskRecency(b) - taskRecency(a);
-      if (recencyDiff) return recencyDiff;
+      // Urgent and High priority tasks sit at the top of each column.
       const order: Record<string, number> = { Urgent: 0, High: 1, Normal: 2, Low: 3 };
       const priorityDiff = (order[a.priority] ?? 4) - (order[b.priority] ?? 4);
       if (priorityDiff) return priorityDiff;
+      const recencyDiff = taskRecency(b) - taskRecency(a);
+      if (recencyDiff) return recencyDiff;
       if (!a.due) return b.due ? 1 : 0;
       if (!b.due) return -1;
       return a.due.localeCompare(b.due);
