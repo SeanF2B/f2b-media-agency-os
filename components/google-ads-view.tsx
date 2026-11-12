@@ -37,6 +37,7 @@ function delta(value: number | null | undefined, inverse = false) {
 
 export function GoogleAdsView({ clients, active, selectedClientId, canEditClients, onEditClient, onMapAccount, onCreateTask, onCreateCampaignReport, auditRuns = [], canRunAudit, onSaveAudit, onCreateAuditTask, agents = [], onOpenTaskList, onOpenSites = () => {} }: { clients: Client[]; active: boolean; selectedClientId?: string; canEditClients: boolean; onEditClient: (client: Client) => void; onMapAccount: (clientId: string, accountId: string) => Promise<boolean>; onCreateTask: (clientId: string, campaign: Campaign, rangeLabel: string) => void; onCreateCampaignReport: (clientId: string, campaignId: string, campaignName: string, range: string, from: string, to: string) => void; auditRuns?: MarketingAuditRun[]; canRunAudit: boolean; onSaveAudit: (run: MarketingAuditRun) => Promise<boolean>; onCreateAuditTask: (clientId: string, title: string, notes: string) => void; agents?: Array<{ id: string; name: string; isBot?: boolean; avatar?: string }>; onOpenTaskList: () => void; onOpenSites?: () => void }) {
   const [clientId, setClientId] = useState(clients.find((client) => client.googleAdsAccountId)?.id || clients[0]?.id || "");
+  useEffect(() => { if (clients.length && !clients.some((item) => item.id === clientId)) setClientId(clients[0].id); }, [clients, clientId]);
   const [range, setRange] = useState("last_30d");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");

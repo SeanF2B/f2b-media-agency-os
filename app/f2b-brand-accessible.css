@@ -8492,3 +8492,4 @@ html body .app-shell.app-shell button[role="tab"] > span:last-child:not(:first-c
 .ai-eyes-face i:nth-child(2) { animation-delay:.12s !important;}
 .ai-avatar .ai-eyes-icon { transform:scale(.78); transform-origin:center !important;}
 @keyframes ai-eye-blink { 0%,43%,47%,100% { transform:scaleY(1); } 45% { transform:scaleY(.12); } }
+.sites-builder-card{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin:14px 0;padding:16px 18px;border:1px solid color-mix(in srgb,var(--brand-primary,#3b82f6) 35%,#d8dee3);border-radius:14px;background:color-mix(in srgb,var(--brand-primary,#3b82f6) 7%,#fff)}.sites-builder-card>div:first-child{display:grid;gap:4px;max-width:640px}.sites-builder-card span{color:#4d5b6a;font-size:13px}.sites-builder-actions{display:flex;gap:10px;flex-wrap:wrap}.app-shell.dark-mode .sites-builder-card{background:#20272d;border-color:#3c4850}.app-shell.dark-mode .sites-builder-card span{color:#9fb0ba}
