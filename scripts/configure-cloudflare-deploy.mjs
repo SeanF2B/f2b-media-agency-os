@@ -23,6 +23,9 @@ if (ghlInstallUrl) {
 
 config.name = "f2b-media-agency-os";
 config.workers_dev = true;
+// Keep plain variables set in the Cloudflare dashboard (e.g. GHL_INSTALL_URL)
+// when automated Git deploys don't supply them. Secrets are always kept.
+config.keep_vars = true;
 config.triggers = { ...(config.triggers || {}), crons: ["*/5 * * * *"] };
 d1.database_name = "f2b-media-agency-os";
 d1.database_id = databaseId;

@@ -11,7 +11,8 @@
     "start": "node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js dev --config dist/server/wrangler.json --local --persist-to .wrangler/state --ip 127.0.0.1 --inspector-port 0",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
-    "db:verify:remote": "node scripts/verify-d1-schema.mjs"
+    "db:verify:remote": "node scripts/verify-d1-schema.mjs",
+    "deploy:cloudflare": "node scripts/configure-cloudflare-deploy.mjs 4a73e2b0-ad98-492d-be09-317e04f00073 f2b-marketing-studio-assets && wrangler deploy --config dist/server/wrangler.json"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
