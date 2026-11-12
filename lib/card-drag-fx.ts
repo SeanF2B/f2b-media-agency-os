@@ -12,6 +12,8 @@
 
 export type CardDragFx = {
   move: (clientX: number, clientY: number, column?: HTMLElement | null) => void;
+  /** Where the shadow slot currently sits: the column and the id of the card it is in front of (null = end of column). */
+  dropPlacement: () => { column: HTMLElement; beforeId: string | null } | null;
   end: () => void;
 };
 
@@ -85,6 +87,14 @@ export function createCardDragFx(preview: HTMLElement, source: HTMLElement, grab
       }, 110);
       if (column) placeSlot(clientY, column);
       else removeSlot();
+    },
+    dropPlacement() {
+      const container = slot?.parentElement;
+      if (!slot || !container) return null;
+      const column = container.closest<HTMLElement>("[data-task-drop-stage]") || container;
+      let next = slot.nextElementSibling as HTMLElement | null;
+      while (next && !next.matches(options.cardSelector)) next = next.nextElementSibling as HTMLElement | null;
+      return { column, beforeId: next ? next.id.replace(/^task-/, "") || null : null };
     },
     end() {
       window.clearTimeout(idleTimer);
