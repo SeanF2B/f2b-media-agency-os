@@ -1,0 +1,1 @@
+export function validateLeadPersonalLine(line: unknown, evidence: unknown, sourceText: unknown): { status: "supported"; line: string; evidence: string } | { status: "needs_review"; line: ""; evidence: "" } | { status: "invalid"; error: string };

@@ -1,0 +1,27 @@
+export type GoogleAdsAssetScope = "Account" | "Campaign" | "Ad group" | "Performance Max asset group";
+export type GoogleAdsAssetRow = {
+  scope: GoogleAdsAssetScope;
+  campaignId: string;
+  campaignName: string;
+  adGroupId: string;
+  adGroupName: string;
+  assetId: string;
+  assetName: string;
+  type: string;
+  source: string;
+  fieldType: string;
+  status: string;
+  performanceLabel: string;
+  associationResourceName: string;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  spend: number;
+  conversions: number;
+  conversionValue: number;
+  text: string[];
+  finalUrls: string[];
+  imageUrl: string;
+};
+export function googleAdsAssetQueries(campaignId?: string, dateWindow?: { start: string; end: string }): { campaign: string; adGroup: string; customer: string; assetGroup: string };
+export function normalizeGoogleAdsAssetRows(rows: unknown[], scope: GoogleAdsAssetScope): GoogleAdsAssetRow[];

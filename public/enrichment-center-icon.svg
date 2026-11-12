@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <linearGradient id="tile" x1="18" y1="12" x2="110" y2="116" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#38D6C1"/><stop offset="1" stop-color="#2375DC"/>
+    </linearGradient>
+    <linearGradient id="card" x1="31" y1="34" x2="84" y2="91" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/><stop offset="1" stop-color="#D9F8F4"/>
+    </linearGradient>
+    <filter id="shadow" x="8" y="8" width="112" height="116" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#071B35" flood-opacity=".28"/>
+    </filter>
+  </defs>
+  <g filter="url(#shadow)">
+    <rect x="12" y="10" width="104" height="104" rx="29" fill="#13283A"/>
+    <rect x="15" y="13" width="98" height="98" rx="26" stroke="url(#tile)" stroke-width="5"/>
+    <!-- contact details flow from the central record to email and phone -->
+    <path d="M73 51h12c7 0 11 4 11 10v2m-23 11h12c7 0 11-4 11-10" stroke="#7CE8DC" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="96" cy="64" r="3.5" fill="#7CE8DC"/>
+    <circle cx="96" cy="64" r="10" stroke="#7CE8DC" stroke-opacity=".45" stroke-width="2"/>
+    <!-- email card -->
+    <rect x="82" y="32" width="26" height="19" rx="5" fill="#F6FFFE"/>
+    <path d="m85 36 10 7 10-7" stroke="#20A99F" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- phone card -->
+    <rect x="86" y="78" width="19" height="29" rx="5" fill="#F6FFFE"/>
+    <path d="M92 83h7m-8 18h9" stroke="#2874D7" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="95.5" cy="97" r="1.2" fill="#2874D7"/>
+    <!-- enrichment hub and contact record -->
+    <circle cx="48" cy="63" r="30" fill="url(#tile)"/>
+    <circle cx="48" cy="63" r="26" stroke="#C9FFF7" stroke-opacity=".55" stroke-width="2"/>
+    <rect x="33" y="40" width="30" height="43" rx="7" fill="url(#card)"/>
+    <circle cx="43" cy="52" r="5" fill="#36BBAF"/>
+    <path d="M37 65c1.5-5 10.5-5 12 0v2H37v-2Z" fill="#36BBAF"/>
+    <path d="M53 49h6m-6 6h6m-22 17h22" stroke="#2874D7" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M70 63h10" stroke="#7CE8DC" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="76" cy="63" r="3" fill="#F6FFFE"/>
+  </g>
+</svg>
