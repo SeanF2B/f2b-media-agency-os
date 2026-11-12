@@ -527,9 +527,10 @@ function playTaskUiSound(kind: "open" | "complete" | "move" | "drop") {
   } catch { /* Audio is a progressive enhancement; task actions still work when sound is unavailable. */ }
 }
 
-type BotGeo = { eyes: Array<{ x: number; y: number; w: number; h: number; color: string }>; mouthY: number; mouthX: number };
+type BotGeo = { body: string; eyes: Array<{ x: number; y: number; w: number; h: number; url: string }>; mouthX: number; mouthY: number };
 const botGeoCache = new Map<string, Promise<BotGeo | null>>();
-// Finds the two dark eyes in an agent's own picture so the original icon can keep its exact look while the eyes move.
+// Cuts the two dark eyes out of an agent's own picture: the body is repainted without them and each eye becomes its own
+// sprite, so the original icon looks identical while the eyes can move and the face can change expression.
 function detectBotEyes(src: string): Promise<BotGeo | null> {
   const hit = botGeoCache.get(src); if (hit) return hit;
   const job = new Promise<BotGeo | null>((resolve) => {
@@ -538,30 +539,46 @@ function detectBotEyes(src: string): Promise<BotGeo | null> {
       try {
         const W = 128, H = 128, canvas = document.createElement("canvas"); canvas.width = W; canvas.height = H;
         const ctx = canvas.getContext("2d", { willReadFrequently: true })!; ctx.drawImage(img, 0, 0, W, H);
-        const { data } = ctx.getImageData(0, 0, W, H);
-        const px = (x: number, y: number) => { const i = (y * W + x) * 4; return [data[i], data[i + 1], data[i + 2], data[i + 3]]; };
-        const dark = (x: number, y: number) => { const [r, g, b, al] = px(x, y); return al > 200 && Math.max(r, g, b) < 75; };
+        const frame = ctx.getImageData(0, 0, W, H), data = frame.data;
+        const lum = (i: number) => data[i] * 0.3 + data[i + 1] * 0.59 + data[i + 2] * 0.11;
+        const dark = (x: number, y: number) => { const i = (y * W + x) * 4; return data[i + 3] > 200 && Math.max(data[i], data[i + 1], data[i + 2]) < 75; };
         const seen = new Uint8Array(W * H), comps: Array<{ x0: number; x1: number; y0: number; y1: number; n: number }> = [];
-        for (let y = Math.round(H * 0.18); y < H * 0.8; y++) for (let x = Math.round(W * 0.12); x < W * 0.88; x++) {
+        for (let y = Math.round(H * 0.15); y < H * 0.85; y++) for (let x = Math.round(W * 0.1); x < W * 0.9; x++) {
           const k = y * W + x; if (seen[k] || !dark(x, y)) continue;
           const stack = [[x, y]]; seen[k] = 1; const c = { x0: x, x1: x, y0: y, y1: y, n: 0 };
           while (stack.length) { const [cx, cy] = stack.pop()!; c.n++; c.x0 = Math.min(c.x0, cx); c.x1 = Math.max(c.x1, cx); c.y0 = Math.min(c.y0, cy); c.y1 = Math.max(c.y1, cy);
             for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = cx + dx, ny = cy + dy, nk = ny * W + nx; if (nx >= 0 && ny >= 0 && nx < W && ny < H && !seen[nk] && dark(nx, ny)) { seen[nk] = 1; stack.push([nx, ny]); } } }
-          if (c.n >= 14) comps.push(c);
+          if (c.n >= 30) comps.push(c);
         }
         comps.sort((p, q) => q.n - p.n);
-        const first = comps[0]; const second = first && comps.slice(1).find((c) => Math.abs((c.y0 + c.y1) / 2 - (first.y0 + first.y1) / 2) < H * 0.12 && Math.abs((c.x0 + c.x1) / 2 - (first.x0 + first.x1) / 2) > W * 0.12);
+        const first = comps[0]; const second = first && comps.slice(1).find((c) => Math.abs((c.y0 + c.y1) / 2 - (first.y0 + first.y1) / 2) < H * 0.14 && Math.abs((c.x0 + c.x1) / 2 - (first.x0 + first.x1) / 2) > W * 0.08);
         if (!first || !second) { resolve(null); return; }
-        const eyes = [first, second].sort((p, q) => p.x0 - q.x0).map((c) => {
-          const m = 5; let r = 0, g = 0, b = 0, n = 0;
-          for (let y = Math.max(0, c.y0 - m); y <= Math.min(H - 1, c.y1 + m); y++) for (let x = Math.max(0, c.x0 - m); x <= Math.min(W - 1, c.x1 + m); x++) {
-            if (x >= c.x0 - 1 && x <= c.x1 + 1 && y >= c.y0 - 1 && y <= c.y1 + 1) continue;
-            const [pr, pg, pb, pa] = px(x, y); if (pa < 200 || Math.max(pr, pg, pb) < 75) continue; r += pr; g += pg; b += pb; n++;
+        const pair = [first, second].sort((p, q) => p.x0 - q.x0), M = 4;
+        // body colour from the ring around each eye
+        const bodyRgb = (c: { x0: number; x1: number; y0: number; y1: number }) => { let r = 0, g = 0, b = 0, n = 0;
+          for (let y = Math.max(0, c.y0 - 7); y <= Math.min(H - 1, c.y1 + 7); y++) for (let x = Math.max(0, c.x0 - 7); x <= Math.min(W - 1, c.x1 + 7); x++) {
+            if (x >= c.x0 - M && x <= c.x1 + M && y >= c.y0 - M && y <= c.y1 + M) continue; const i = (y * W + x) * 4;
+            if (data[i + 3] < 250 || Math.max(data[i], data[i + 1], data[i + 2]) < 75) continue; r += data[i]; g += data[i + 1]; b += data[i + 2]; n++; }
+          return n ? [r / n, g / n, b / n] : [128, 128, 128]; };
+        const bodyCanvas = document.createElement("canvas"); bodyCanvas.width = W; bodyCanvas.height = H;
+        const bctx = bodyCanvas.getContext("2d")!; const bodyImg = bctx.createImageData(W, H); bodyImg.data.set(data);
+        const eyes = pair.map((c) => {
+          const [br, bg, bb] = bodyRgb(c), bl = br * 0.3 + bg * 0.59 + bb * 0.11;
+          let el = 255, er = 0, eg = 0, eb = 0; for (let y = c.y0; y <= c.y1; y++) for (let x = c.x0; x <= c.x1; x++) { const i = (y * W + x) * 4; const l = lum(i); if (l < el) { el = l; er = data[i]; eg = data[i + 1]; eb = data[i + 2]; } }
+          const x0 = Math.max(0, c.x0 - M), x1 = Math.min(W - 1, c.x1 + M), y0 = Math.max(0, c.y0 - M), y1 = Math.min(H - 1, c.y1 + M), w = x1 - x0 + 1, h = y1 - y0 + 1;
+          const sprite = document.createElement("canvas"); sprite.width = w; sprite.height = h; const sctx = sprite.getContext("2d")!, simg = sctx.createImageData(w, h);
+          for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+            const i = (y * W + x) * 4; if (data[i + 3] < 200) continue;
+            const a = Math.max(0, Math.min(1, (bl - lum(i)) / Math.max(1, bl - el)));
+            if (a < 0.04) continue;
+            const o = ((y - y0) * w + (x - x0)) * 4; simg.data[o] = er; simg.data[o + 1] = eg; simg.data[o + 2] = eb; simg.data[o + 3] = Math.round(a * 255);
+            bodyImg.data[i] = br; bodyImg.data[i + 1] = bg; bodyImg.data[i + 2] = bb; bodyImg.data[i + 3] = data[i + 3];
           }
-          const w = c.x1 - c.x0 + 1, h = c.y1 - c.y0 + 1;
-          return { x: ((c.x0 + c.x1 + 1) / 2) / W, y: ((c.y0 + c.y1 + 1) / 2) / H, w: w / W, h: h / H, color: n ? `rgb(${Math.round(r / n)},${Math.round(g / n)},${Math.round(b / n)})` : "transparent" };
+          sctx.putImageData(simg, 0, 0);
+          return { x: (x0 + w / 2) / W, y: (y0 + h / 2) / H, w: w / W, h: h / H, url: sprite.toDataURL() };
         });
-        resolve({ eyes, mouthX: (eyes[0].x + eyes[1].x) / 2, mouthY: (eyes[0].y + eyes[1].y) / 2 + Math.max(eyes[0].h, eyes[1].h) * 1.0 });
+        bctx.putImageData(bodyImg, 0, 0);
+        resolve({ body: bodyCanvas.toDataURL(), eyes, mouthX: (eyes[0].x + eyes[1].x) / 2, mouthY: (eyes[0].y + eyes[1].y) / 2 + Math.max(eyes[0].h, eyes[1].h) * 0.62 });
       } catch { resolve(null); }
     };
     img.onerror = () => resolve(null);
@@ -580,8 +597,8 @@ function AnimatedBot({ status, member }: { status: string; member: Staff }) {
   useEffect(() => {
     const move = (event: MouseEvent) => {
       const el = ref.current; if (!el) return;
-      const box = el.getBoundingClientRect(), dx = event.clientX - (box.left + box.width / 2), dy = event.clientY - (box.top + box.height / 2), len = Math.hypot(dx, dy) || 1, k = Math.min(1, len / 140);
-      el.style.setProperty("--lx", ((dx / len) * k * 1.9).toFixed(2) + "px"); el.style.setProperty("--ly", ((dy / len) * k * 1.5).toFixed(2) + "px");
+      const box = el.getBoundingClientRect(), dx = event.clientX - (box.left + box.width / 2), dy = event.clientY - (box.top + box.height / 2), len = Math.hypot(dx, dy) || 1, k = Math.min(1, len / 90);
+      el.style.setProperty("--lx", ((dx / len) * k * 3).toFixed(2) + "px"); el.style.setProperty("--ly", ((dy / len) * k * 2.4).toFixed(2) + "px"); el.style.setProperty("--tx", ((dx / len) * k * 1.2).toFixed(2) + "px"); el.style.setProperty("--ta", ((dx / len) * k * 7).toFixed(1) + "deg");
     };
     window.addEventListener("mousemove", move, { passive: true });
     return () => window.removeEventListener("mousemove", move);
@@ -589,11 +606,8 @@ function AnimatedBot({ status, member }: { status: string; member: Staff }) {
   const mood = status === "Done" ? "relax" : status === "Blocked" ? "bored" : status === "In progress" ? "run" : "eager";
   const pct = (n: number) => `${(n * 100).toFixed(2)}%`;
   return <span ref={ref} className={`bot-live bot-${mood} ${geo ? "bot-ready" : ""}`} title={`${member.name} · ${mood === "relax" ? "all done" : mood === "bored" ? "waiting" : mood === "run" ? "working on it" : "ready to go"}`}>
-    <span className="bot-body"><StaffProfileAvatar member={member} className="task-avatar" />
-      {geo && <>{geo.eyes.map((eye, index) => <span key={index}>
-        <span className="bot-patch" style={{ left: pct(eye.x), top: pct(eye.y), width: pct(eye.w * 2.1), height: pct(eye.h * 1.5), background: `radial-gradient(ellipse at center, ${eye.color} 55%, transparent 100%)` }} />
-        <span className="bot-pupil" style={{ left: pct(eye.x), top: pct(eye.y), width: pct(eye.w), height: pct(eye.h) }} />
-      </span>)}<span className="bot-mouth" style={{ left: pct(geo.mouthX), top: pct(geo.mouthY) }} /></>}
+    <span className="bot-body">{geo ? <span className="avatar task-avatar bot-flat" style={{ backgroundImage: `url(${geo.body})`, backgroundSize: "cover" }} /> : <StaffProfileAvatar member={member} className="task-avatar" />}
+      {geo && <>{geo.eyes.map((eye, index) => <img key={index} className="bot-pupil" alt="" src={eye.url} style={{ left: pct(eye.x), top: pct(eye.y), width: pct(eye.w), height: pct(eye.h) }} />)}<span className="bot-mouth" style={{ left: pct(geo.mouthX), top: pct(geo.mouthY) }} /></>}
     </span>
     {mood === "run" && <span className="bot-speed"><b /><b /><b /></span>}{mood === "bored" && <span className="bot-bubble">…</span>}
   </span>;
