@@ -1209,7 +1209,7 @@ export function AgencyApp() {
     setProfileMenuOpen(false);
   };
   const pageAllowed = canOpenPage(page, viewAccess, viewIsAdmin, viewHasClientScope);
-  const availableMarketingPages = marketingPages.filter((subpage) => canOpenPage(subpage.key, viewAccess, viewIsAdmin, viewHasClientScope));
+  const availableMarketingPages = marketingPages.filter((subpage) => !["Tracking & Analytics", "Email Marketing", "Cold Outreach"].includes(subpage.key) && canOpenPage(subpage.key, viewAccess, viewIsAdmin, viewHasClientScope));
   const marketingPageActive = marketingPages.some((subpage) => subpage.key === page);
 
   const openModal = (name: string, initial: Record<string, string> = {}) => { if (name === "client" && !initial.clientId) setClientServiceRows(serviceTypes.map((service, index) => ({ id: `service-${index}`, name: service, campaignName: "", fee: "", mediaSpend: "", landingPageUrl: "", landingPagePlatform: "Other" }))); if (name === "client") setServiceToAdd(""); if (name === "staff" && !initial.staffId) setForm({ ...permissionFormValues(getTeamPermissions("Staff")), limitClientAccess: "true", clientAccessIds: "[]", aiModeAccess: "[]", vaultAccessEntryIds: "[]", ...initial }); else { const scopedDefaults: Record<string, string> = activeScopeId && name !== "client" && name !== "staff" && !initial.clientId ? { clientId: activeScopeId } : {}; setForm(name === "task" && !initial.taskId && initial.assigneeId === undefined ? { assigneeId: selfProfile?.id || sessionUser.id, ...scopedDefaults, ...initial } : { ...scopedDefaults, ...initial }); } setModal(name); };

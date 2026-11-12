@@ -8372,3 +8372,13 @@ html body .app-shell.app-shell button[role="tab"] > span:last-child:not(:first-c
 .app-shell .sidebar .nav-count { background: color-mix(in srgb, #fff 22%, var(--brand-sidebar,#1e3a8a)) !important; color: #fff !important; }
 .app-shell .sidebar .client-nav .eyebrow, .app-shell .sidebar [class*="label"] { color: rgba(255,255,255,.7) !important; }
 .app-shell .sidebar .client-scope-trigger { background: color-mix(in srgb, #fff 10%, var(--brand-sidebar,#1e3a8a)) !important; border-color: color-mix(in srgb, #fff 28%, var(--brand-sidebar,#1e3a8a)) !important; color: #fff !important; }
+
+/* Marketing tab bar: simple, light, always readable */
+.app-shell .marketing-subnav, .app-shell .marketing-hub-tabs { display:flex; gap:6px; padding:5px; margin:0 0 18px; overflow-x:auto; background:#fff !important; border:1px solid #dce3e7 !important; border-radius:12px; box-shadow:none !important; width:fit-content; max-width:100%; }
+.app-shell .marketing-subnav button, .app-shell .marketing-hub-tabs button { flex:none; padding:9px 16px !important; border:0 !important; border-radius:9px !important; background:transparent !important; color:#26333b !important; font:inherit; font-size:13px !important; font-weight:700 !important; cursor:pointer; opacity:1 !important; white-space:nowrap; transition:background .15s,color .15s; }
+.app-shell .marketing-subnav button:hover, .app-shell .marketing-hub-tabs button:hover { background:color-mix(in srgb,var(--brand-primary,#3b82f6) 12%,#fff) !important; }
+.app-shell .marketing-subnav button.active, .app-shell .marketing-hub-tabs button.active, .app-shell .marketing-subnav button[aria-selected="true"], .app-shell .marketing-hub-tabs button[aria-selected="true"] { background:var(--brand-primary,#3b82f6) !important; color:#fff !important; }
+.app-shell.dark-mode .marketing-subnav, .app-shell.dark-mode .marketing-hub-tabs { background:#20272d !important; border-color:#3c4850 !important; }
+.app-shell.dark-mode .marketing-subnav button, .app-shell.dark-mode .marketing-hub-tabs button { color:#edf3f6 !important; }
+.app-shell.dark-mode .marketing-subnav button:hover, .app-shell.dark-mode .marketing-hub-tabs button:hover { background:color-mix(in srgb,var(--brand-primary,#3b82f6) 25%,#20272d) !important; }
+.app-shell.dark-mode .marketing-subnav button.active, .app-shell.dark-mode .marketing-hub-tabs button.active, .app-shell.dark-mode .marketing-subnav button[aria-selected="true"], .app-shell.dark-mode .marketing-hub-tabs button[aria-selected="true"] { background:var(--brand-primary,#3b82f6) !important; color:#fff !important; }
