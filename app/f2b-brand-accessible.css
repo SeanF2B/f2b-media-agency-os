@@ -8443,3 +8443,4 @@ html body .app-shell.app-shell button[role="tab"] > span:last-child:not(:first-c
 .app-shell:not(.dark-mode) .primary-button{background:var(--brand-primary,var(--f2b-blue))!important;border-color:var(--brand-primary,var(--f2b-blue))!important}
 .assistant-agent-pick select{max-width:210px}
 .staff-view-pick{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:4px 8px;border:1px solid #cfd8de;border-radius:10px;background:#fff;color:#26333b}.staff-view-pick select{border:0;background:transparent;font:inherit;color:inherit;max-width:170px}.app-shell.dark-mode .staff-view-pick{background:#20272d;border-color:#3c4850;color:#edf3f6}.app-shell.dark-mode .staff-view-pick select{color:#edf3f6}
+.client-tax-actions{display:flex;gap:10px;margin:6px 0 10px}.income-button{color:#12804a!important}.expense-button{color:#a14a3b!important}
