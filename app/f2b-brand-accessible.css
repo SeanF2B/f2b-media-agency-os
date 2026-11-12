@@ -7985,3 +7985,6 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
 /* Card hover highlight uses the column's own stage colour */
 .app-shell .crm-opportunity:hover, .app-shell .crm-opportunity:focus-within, .app-shell.dark-mode .crm-opportunity:hover, .app-shell.dark-mode .crm-opportunity:focus-within,
 .app-shell .pipeline-card:hover, .app-shell .pipeline-card:focus-within, .app-shell.dark-mode .pipeline-card:hover, .app-shell.dark-mode .pipeline-card:focus-within { border-color: var(--stage-color, #3b82f6) !important; box-shadow: 0 0 0 1px var(--stage-color, #3b82f6), 0 6px 18px color-mix(in srgb, var(--stage-color, #3b82f6) 22%, transparent) !important; }
+
+.app-shell .crm-value-field .crm-opportunity-value-input, .app-shell .crm-value-field .crm-opportunity-value-input:focus, .app-shell .crm-value-field .crm-opportunity-value-input:focus-visible { outline: none !important; box-shadow: none !important; border: 0 !important; background: transparent !important; }
+.crm-value-field .crm-opportunity-value-input::-webkit-outer-spin-button, .crm-value-field .crm-opportunity-value-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
