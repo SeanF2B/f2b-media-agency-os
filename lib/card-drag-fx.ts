@@ -55,6 +55,11 @@ export function createCardDragFx(preview: HTMLElement, source: HTMLElement, grab
   // The cloned card still carries its "card appears" / "just dropped" animation.
   // CSS animations beat inline styles, which would freeze the tilt and shadow.
   preview.classList.add("card-drag-lifted");
+  // The copied card carries each child's computed style, including pointer-events:auto.
+  // Those children would be hit by elementFromPoint instead of the column underneath,
+  // so no column (and no landing slot) would ever be found. Make every part click-through.
+  preview.style.setProperty("pointer-events", "none", "important");
+  preview.querySelectorAll<HTMLElement>("*").forEach((node) => node.style.setProperty("pointer-events", "none", "important"));
   preview.style.setProperty("animation", "none", "important");
   preview.style.setProperty("transform", "rotate(0deg) scale(1.03)", "important");
   preview.style.setProperty("box-shadow", "0 22px 44px rgba(8,22,34,.45), 0 6px 14px rgba(8,22,34,.3)", "important");
