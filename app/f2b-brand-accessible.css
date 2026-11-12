@@ -8110,3 +8110,6 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
 .app-shell .sidebar .client-scope-name { font-size: 12.5px; }
 .app-shell .sidebar .client-scope-menu { left: 12px; right: 12px; box-sizing: border-box; }
 .app-shell .sidebar .client-scope .client-dot { width: 22px; height: 22px; flex: none; }
+
+.client-dot.agency-dot { background: #fff !important; overflow: hidden; padding: 0; display: inline-grid; place-items: center; }
+.client-dot.agency-dot img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
