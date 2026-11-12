@@ -18,6 +18,9 @@ export function applyBranding(raw: Partial<Branding> | undefined | null) {
   if (typeof document !== "undefined") {
     const root = document.documentElement.style;
     root.setProperty("--brand-primary", next.primary); root.setProperty("--brand-secondary", next.secondary);
+    // sidebar colour: the secondary colour itself, darkened only if it is too light for white text
+    const n = parseInt(next.secondary.slice(1), 16), r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255, lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255, k = lum > 0.5 ? 0.5 / lum : 1;
+    root.setProperty("--brand-sidebar", "#" + [r, g, b].map((v) => Math.round(v * k).toString(16).padStart(2, "0")).join(""));
   }
   listeners.forEach((listener) => listener());
 }

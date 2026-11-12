@@ -8361,3 +8361,14 @@ html body .app-shell.app-shell button[role="tab"] > span:last-child:not(:first-c
 .bs-note { margin: 8px 0 0; font-size: 12px; font-weight: 700; color: color-mix(in srgb,var(--brand-primary,#3b82f6) 75%,#000); }
 .app-shell.dark-mode .bs-note { color: color-mix(in srgb,var(--brand-primary,#3b82f6) 55%,#fff); }
 .app-shell.dark-mode .scope-note { background: color-mix(in srgb,var(--brand-primary,#3b82f6) 18%,#20272d); border-color: color-mix(in srgb,var(--brand-primary,#3b82f6) 50%,#20272d); color: #edf3f6; }
+
+/* Whole sidebar = the secondary colour (solid, with a gentle depth gradient) */
+.app-shell .sidebar { background: linear-gradient(180deg, var(--brand-sidebar,#1e3a8a), color-mix(in srgb, var(--brand-sidebar,#1e3a8a) 82%, #000)) !important; border-color: color-mix(in srgb, var(--brand-sidebar,#1e3a8a) 80%, #000) !important; }
+.app-shell .sidebar .nav-item, .app-shell .sidebar .client-nav-item, .app-shell .sidebar .sidebar-brand b, .app-shell .sidebar .sidebar-brand span, .app-shell .sidebar .sidebar-empty { color: rgba(255,255,255,.92) !important; }
+.app-shell .sidebar .nav-icon { color: #fff !important; }
+.app-shell .sidebar .nav-item:hover, .app-shell .sidebar .client-nav-item:hover { background: color-mix(in srgb, #fff 12%, var(--brand-sidebar,#1e3a8a)) !important; color: #fff !important; }
+.app-shell .sidebar .nav-item.active, .app-shell .sidebar .client-nav-item.active, .app-shell .sidebar-settings-link, .app-shell .sidebar .sidebar-settings-link.active { background: color-mix(in srgb, #fff 18%, var(--brand-sidebar,#1e3a8a)) !important; color: #fff !important; }
+.app-shell .sidebar .nav-item.active { box-shadow: inset 3px 0 var(--brand-primary,#3b82f6) !important; }
+.app-shell .sidebar .nav-count { background: color-mix(in srgb, #fff 22%, var(--brand-sidebar,#1e3a8a)) !important; color: #fff !important; }
+.app-shell .sidebar .client-nav .eyebrow, .app-shell .sidebar [class*="label"] { color: rgba(255,255,255,.7) !important; }
+.app-shell .sidebar .client-scope-trigger { background: color-mix(in srgb, #fff 10%, var(--brand-sidebar,#1e3a8a)) !important; border-color: color-mix(in srgb, #fff 28%, var(--brand-sidebar,#1e3a8a)) !important; color: #fff !important; }
