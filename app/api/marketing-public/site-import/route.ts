@@ -18,6 +18,17 @@ export async function POST(request: Request) {
   const row = await env.DB.prepare("SELECT client_id, expires_at FROM site_import_tokens WHERE token = ?1").bind(token).first<{ client_id: string; expires_at: string }>();
   if (!row || row.client_id !== clientId || row.expires_at < new Date().toISOString()) return out({ error: "This import link has expired." }, 403);
   try {
+    if (Array.isArray(body.patches)) {
+      const store0 = d1Store(env.DB, env.BUCKET, clientId);
+      const cur = await store0.read(pathForSlug(slug));
+      if (!cur?.text) return out({ error: "Page not found." }, 404);
+      const pg = JSON.parse(cur.text); let b = String(pg?.raw?.body || ""), n = 0;
+      for (const pt of body.patches.slice(0, 40)) { const f = String(pt?.find || ""); if (f && b.includes(f)) { b = b.replace(f, () => String(pt.replace ?? "")); n++; } }
+      if (!n) return out({ ok: true, applied: 0 });
+      pg.raw.body = b;
+      const c0 = await store0.commit({ changes: [{ path: pathForSlug(slug), text: JSON.stringify(pg) }], message: `Updated images and sections on /${slug === "home" ? "" : slug}`, actor: "Website import", kind: "import-builder" });
+      return out({ ok: true, applied: n, of: body.patches.length, version: c0.version });
+    }
     const seo = body.seo || {};
     const page = normalizePage(Err as any, { title: String(body.title || slug).slice(0, 120), url: String(body.url || "/"), seo: { title: String(seo.title || "").slice(0, 60), description: String(seo.description || "").slice(0, 155), focusKeyword: "" }, blocks: [], raw: body.raw }, slug);
     const store = d1Store(env.DB, env.BUCKET, clientId);
