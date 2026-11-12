@@ -7877,3 +7877,15 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
 .app-shell .crm-stage > header.crm-stage-header, .app-shell .pipeline-column > .pipeline-column-head { position: sticky; top: -10px; z-index: 3; margin: -10px -10px 8px; padding: 10px; background: color-mix(in srgb, var(--f2b-white, #fff) 94%, transparent); backdrop-filter: blur(8px); }
 .app-shell.dark-mode .crm-stage > header.crm-stage-header, .app-shell.dark-mode .pipeline-column > .pipeline-column-head { background: color-mix(in srgb, #1b1a1d 94%, transparent); }
 @media (max-width: 760px) { .app-shell .crm-kanban .crm-stage, .app-shell .pipeline-board .pipeline-column { max-height: none; overflow-y: visible; } }
+
+/* History cards: compact, consistent screenshot section */
+.app-shell .ai-review-grid.is-history .ai-completed-screenshots { gap: 8px; padding: 10px; align-content: start; }
+.app-shell .ai-completed-screenshot-grid { grid-template-columns: 1fr; }
+.app-shell .ai-completed-screenshot { padding: 4px; background: transparent; border-color: var(--f2b-border); }
+.app-shell .ai-completed-screenshot img, .app-shell .ai-completed-screenshot.is-broken::before { height: 150px; aspect-ratio: auto; width: 100%; box-sizing: border-box; }
+.app-shell .ai-completed-screenshot.is-broken::before { content: "🖼️  Preview unavailable"; display: grid; place-items: center; border-radius: 8px; border: 1px dashed var(--f2b-border); background: color-mix(in srgb, var(--f2b-muted, #5d6b76) 10%, transparent); color: var(--f2b-muted, #5d6b76); font-size: 12px; }
+.app-shell .ai-completed-screenshot-empty { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 8px; aspect-ratio: auto; min-height: 0; padding: 12px; border: 1px dashed var(--f2b-border); border-radius: 10px; }
+.app-shell .ai-completed-screenshot-empty span { font-size: 16px; line-height: 1; }
+.app-shell .ai-completed-screenshot-empty small { font-size: 12px; }
+.app-shell .ai-completed-screenshots .ai-add-screenshot { width: 100%; justify-content: center; padding: 7px 10px; font-size: 12px; }
+.app-shell.dark-mode .ai-completed-screenshot img { background: #2a292d; }
