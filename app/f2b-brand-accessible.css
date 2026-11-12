@@ -8500,3 +8500,4 @@ html body .app-shell.app-shell button[role="tab"] > span:last-child:not(:first-c
 .app-shell .sidebar .nav-item:hover:not(.active), .app-shell .sidebar .client-nav-item:hover:not(.active), .app-shell.dark-mode .sidebar .nav-item:hover:not(.active), .app-shell.dark-mode .sidebar .client-nav-item:hover:not(.active) { background: color-mix(in srgb, var(--brand-primary,#3b82f6) 28%, var(--brand-sidebar,#1e3a8a)) !important; }
 .app-shell .sidebar .nav-item.active .nav-count, .app-shell .sidebar .nav-count { background: color-mix(in srgb, var(--brand-primary,#3b82f6) 85%, #000) !important; color: #fff !important; -webkit-text-fill-color: #fff !important; }
 .assistant-agent-pick .field{margin:0;min-width:210px}.assistant-agent-pick .field>span{font-size:11px;color:#63727b}.assistant-agent-pick .team-select-trigger{min-height:40px}
+.assistant-agent-pick .staff-select-note{display:none}
