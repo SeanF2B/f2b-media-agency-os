@@ -7844,3 +7844,11 @@ body.task-card-drag-active,body.task-card-drag-active * { user-select:none !impo
 .app-shell.dark-mode .dns-field input, .app-shell.dark-mode .dns-field select, .app-shell.dark-mode .dns-search { background: #1d2124; border-color: #404046; }
 .app-shell.dark-mode .dns-type { background: #34373b; }
 .app-shell.dark-mode .dns-table th, .app-shell.dark-mode .dns-table td, .app-shell.dark-mode .dns-table-wrap { border-color: #404046; }
+
+.custom-key-list { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 10px; }
+.custom-key-list li { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--border, #e3e8ec); border-radius: 12px; }
+.custom-key-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.custom-key-text small { color: #6d7882; overflow-wrap: anywhere; }
+.custom-key-form { margin-bottom: 4px; }
+.app-shell.dark-mode .custom-key-list li { border-color: #404046; }
+@media (max-width: 620px) { .custom-key-list li { flex-wrap: wrap; } }
