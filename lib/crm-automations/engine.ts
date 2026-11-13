@@ -420,7 +420,10 @@ async function detectFormLeads(db: Db, ownerId: string, now: Date) {
   const cursor = await readCursor(db, ownerId, "form_leads");
   if (!cursor) { await cursorStatement(db, ownerId, "form_leads", iso(now)).run(); return; } // start from "now", never backfill
   const rows = (await db.prepare("SELECT id, client_id, source, created_at, updated_at FROM crm_contacts WHERE owner_id=?1 AND updated_at>=?2 AND created_at>=?2 AND source LIKE 'Website form%' ORDER BY updated_at LIMIT 200").bind(ownerId, cursor).all<{ id: string; client_id: string | null; source: string; created_at: string; updated_at: string }>()).results || [];
+  // Returning contacts who book again: a new website-form opportunity for an existing contact also starts the automation.
+  const repeat = (await db.prepare("SELECT o.id, o.contact_id, o.client_id, c.source, o.updated_at FROM crm_opportunities o JOIN crm_contacts c ON c.id=o.contact_id AND c.owner_id=o.owner_id WHERE o.owner_id=?1 AND o.created_at>=?2 AND c.created_at<?2 AND o.source LIKE 'Website form%' ORDER BY o.created_at LIMIT 100").bind(ownerId, cursor).all<{ id: string; contact_id: string; client_id: string | null; source: string; updated_at: string }>()).results || [];
   await db.batch([
+    ...repeat.map((row) => eventStatement(db, { ownerId, scopeId: row.client_id || "", type: "form_lead", contactId: row.contact_id, payload: { source: row.source }, dedupeKey: `lead-opp:${row.id}` }, now)),
     ...rows.map((row) => eventStatement(db, { ownerId, scopeId: row.client_id || "", type: "form_lead", contactId: row.id, payload: { source: row.source }, dedupeKey: `lead:${row.id}` }, now)),
     cursorStatement(db, ownerId, "form_leads", nextCursor(rows.map((row) => row.updated_at), rows.length === 200, now, cursor)),
   ]);
