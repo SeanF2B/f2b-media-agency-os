@@ -6,7 +6,7 @@ export function canOpenPage(page: string, permissions: TeamPermissions, isAdmin:
     : page === "Clients" ? permissions.clients || hasClientScope
     : page === "CRM" || page === "CRM Automations" || page === "Conversations" || page === "Invoicing" ? isAdmin
     : page === "Tasks" ? permissions.tasks || permissions.aiTasks
-    : page === "SEO" ? permissions.clients || hasClientScope || isAdmin
+    : page === "SEO" || page === "Media Library" ? permissions.clients || hasClientScope || isAdmin
     : page === "Tracking & Analytics" ? permissions.reports || isAdmin
     : page === "Email Marketing" || page === "Cold Outreach" ? isAdmin
     : page === "Google Ads" || page === "Meta Ads" ? permissions.reports || isAdmin

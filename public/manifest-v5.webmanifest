@@ -22,5 +22,20 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Media Library",
+      "short_name": "Media",
+      "description": "Open the Media Library and upload photos",
+      "url": "/media?upload=1",
+      "icons": [
+        {
+          "src": "/f2b-app-icon-v5-192.png?v=20261022-3",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
   ]
 }

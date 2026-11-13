@@ -19,6 +19,7 @@ const DomainsDnsView = lazy(() => import("@/components/domains-dns-view").then((
 const IntegrationsView = lazy(() => import("@/components/integrations-view").then((module) => ({ default: module.IntegrationsView })));
 const SettingsView = lazy(() => import("@/components/settings-view").then((module) => ({ default: module.SettingsView })));
 import { MarketingStudioView } from "@/components/marketing-studio-view";
+import { MediaLibraryView } from "@/components/media-library-view";
 import { CrmView } from "@/components/crm-view";
 import { CrmAutomationsView } from "@/components/crm-automations-view";
 import { ConversationsView } from "@/components/conversations-view";
@@ -141,6 +142,7 @@ const nav = [
 ];
 const marketingPages: Array<{ key: string; label: string; icon: string }> = [
   { key: "Sites", label: "Websites", icon: "🌐" },
+  { key: "Media Library", label: "Media Library", icon: "🖼️" },
   { key: "Tracking & Analytics", label: "Tracking & Analytics", icon: "📊" },
   { key: "SEO", label: "SEO", icon: "🔎" },
   { key: "Google Ads", label: "Google Ads", icon: "📣" },
@@ -1282,6 +1284,15 @@ export function AgencyApp() {
   useEffect(() => { if (page === "Chess" && scopedClient && !/^agency$/i.test(scopedClient.name.trim())) setPage("Overview"); }, [page, scopedClient?.id]);
   useEffect(() => { const own = scopedBranding && (scopedBranding.primary || scopedBranding.secondary || scopedBranding.logo); applyBranding(own ? { ...workspace.settings?.branding, ...scopedBranding } : workspace.settings?.branding); }, [workspace.settings?.branding, JSON.stringify(scopedBranding)]);
   const setClientScope = (id: string) => { setClientScopeState(id); try { document.cookie = `f2b_client=${encodeURIComponent(id || "agency")}; Path=/; Max-Age=31536000; SameSite=Lax; Secure`; window.dispatchEvent(new CustomEvent("f2b-scope", { detail: id })); } catch { /* cookie unavailable */ } try { if (id) window.localStorage.setItem("f2b-client-scope", id); else window.localStorage.removeItem("f2b-client-scope"); } catch { /* storage unavailable */ } if (id) setSelectedClient(id); else setSelectedClient(""); if (id && page === "Lead Factory") setPage("Overview"); };
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("page") !== "Media Library") return;
+    const linkedClient = params.get("client");
+    if (linkedClient) setClientScope(linkedClient);
+    setPage("Media Library");
+    if (!params.has("driveConnection") && !params.has("upload")) { params.delete("page"); params.delete("client"); const query = params.toString(); window.history.replaceState({}, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const baseViewWorkspace = previewMember ? previewWorkspaceForStaff(workspace, previewMember) : workspace;
   const hideAgencyOnlyAgents = Boolean(previewMember) || !isAdmin || Boolean(scopedClient && !/^agency$/i.test(scopedClient.name.trim()));
   const viewWorkspace = useMemo(() => {
@@ -2215,6 +2226,7 @@ ${senderName}`, limitClientAccess: String(Array.isArray(member.clientAccessIds))
         {(viewAccess.reports || viewIsAdmin) && <div hidden={page !== "Proposal Studio"}><ProposalStudio workspace={viewWorkspace} onSaveFormula={(formula) => mutate("Design formula saved", (current) => ({ ...current, studioSettings: { ...(current.studioSettings || {}), designFormula: formula } }))} /></div>}
         {viewIsAdmin && page === "Sites" && <div className="marketing-subnav" role="tablist" aria-label="Websites tools">{(["Website", "Landing Pages", "Forms", "Surveys"] as const).map((tab) => <button type="button" role="tab" aria-selected={sitesBuilderTab === tab} className={sitesBuilderTab === tab ? "active" : ""} key={tab} onClick={() => setSitesBuilderTab(tab)}>{tab === "Website" ? "🌐 " : tab === "Landing Pages" ? "🚀 " : tab === "Forms" ? "📝 " : "📋 "}{tab}</button>)}</div>}
         {viewIsAdmin && (page === "Sites" || visitedPages.has("Sites")) && (sitesBuilderTab === "Website" || sitesBuilderTab === "Landing Pages") && <div hidden={page !== "Sites" || !["Website", "Landing Pages"].includes(sitesBuilderTab)}><Suspense fallback={<div className="empty-state" role="status">Loading Sites…</div>}><SitesView active={page === "Sites" && (sitesBuilderTab === "Website" || sitesBuilderTab === "Landing Pages")} initialSection={sitesBuilderTab === "Landing Pages" ? "landing" : "website"} hideSectionTabs clients={viewWorkspace.clients} vaultEntries={vaultRows} vaultUnlocked={!!vaultKey} pageMetadata={viewWorkspace.sitePageMetadata || []} landingDomainChecks={viewWorkspace.siteLandingDomainChecks || []} onSaveLandingDomainCheck={(check) => mutate("Landing domain check saved", (current) => ({ ...current, siteLandingDomainChecks: [check, ...(current.siteLandingDomainChecks || []).filter((item) => item.clientId !== check.clientId)] }))} onSavePageMetadata={(metadata) => mutate("Site page classification saved", (current) => ({ ...current, sitePageMetadata: [metadata, ...(current.sitePageMetadata || []).filter((item) => item.clientId !== metadata.clientId || item.pageId !== metadata.pageId)] }))} onUnlockVault={() => openModal("vault-access")} onCreateTask={(clientId, title, notes, checklist, service, sitePagePlan) => openModal("task", { clientId, title, service: service || "Sites", notes, checklist, ...(sitePagePlan ? { campaignId: sitePagePlan.campaignId || "", campaignName: sitePagePlan.campaignName || "", sitePagePlan: JSON.stringify(sitePagePlan) } : {}) })} /></Suspense></div>}
+        {page === "Media Library" && pageAllowed && <MediaLibraryView scopeClientId={activeScopeId} clients={viewWorkspace.clients} active />}
         {viewIsAdmin && <div hidden={page !== "Automations"}><MarketingStudioView scopeClientId={activeScopeId} key="automation" kind="automation" clients={viewWorkspace.clients} staff={viewWorkspace.staff} active={page === "Automations"} /></div>}
         {viewIsAdmin && page === "Sites" && (sitesBuilderTab === "Forms" || sitesBuilderTab === "Surveys") && <MarketingStudioView scopeClientId={activeScopeId} key={sitesBuilderTab} kind={sitesBuilderTab === "Forms" ? "form" : "survey"} clients={viewWorkspace.clients} staff={viewWorkspace.staff} active={page === "Sites"} />}
         {viewIsAdmin && !activeScopeId && <div hidden={page !== "Lead Factory"}><LeadFactoryWorkspace profiles={viewWorkspace.leadProfiles || []} lists={viewWorkspace.leadLists || []} onSave={(profiles, lists) => mutate("Lead Factory updated", (current) => ({ ...current, leadProfiles: profiles, leadLists: lists }))} /></div>}
