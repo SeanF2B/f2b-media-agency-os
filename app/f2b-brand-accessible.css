@@ -8838,3 +8838,19 @@ fieldset.crm-new-contact legend { padding:0 6px; font-size:12px; font-weight:700
 .app-shell.dark-mode .ops-notice { background:#14532d; color:#fff; }
 .ai-card-actions { display:inline-flex; gap:6px; align-items:center; }
 .onb-scrape { display:flex; gap:8px; } .onb-scrape input { flex:1; } .onb-scrape button { white-space:nowrap; }
+
+/* Sidebar (13 Nov): floats with a slight rounded edge and soft drop shadow (desktop only). */
+@media (min-width: 761px) {
+  .app-shell .sidebar { margin: 10px 0 10px 10px; height: calc(100vh - 20px); max-height: calc(100vh - 20px); top: 10px; border-radius: 14px; border: 1px solid rgba(255,255,255,.08); box-shadow: 0 10px 30px rgba(15,23,42,.22), 0 2px 6px rgba(15,23,42,.12); }
+}
+
+/* Sidebar icons: line icons in one fixed column, same width as the Lead Factory icon, so labels line up. */
+.app-shell .sidebar .nav-item .nav-icon { width: 25px !important; min-width: 25px; height: 25px; display: inline-flex !important; align-items: center; justify-content: center; flex: 0 0 25px; }
+.app-shell .sidebar .nav-icon .lucide-nav-icon { display: block; width: 19px; height: 19px; transform-origin: 50% 75%; }
+.marketing-hub-tabs .lucide-nav-icon { vertical-align: -3px; margin-right: 2px; }
+
+/* Motion like the Lead Factory icon: the open tab's icon bobs gently; others bob on hover. */
+@keyframes f2b-nav-bob { 0%,100% { transform: translateY(0) rotate(-7deg); } 50% { transform: translateY(-3px) rotate(7deg); } }
+.app-shell .sidebar .nav-item.active .lucide-nav-icon, .app-shell .sidebar .nav-item.active .nav-image-icon { animation: f2b-nav-bob 2.2s ease-in-out infinite; transform-origin: 50% 75%; }
+.app-shell .sidebar .nav-item:hover .lucide-nav-icon, .app-shell .sidebar .nav-item:hover .nav-image-icon { animation: f2b-nav-bob 1.1s ease-in-out infinite; transform-origin: 50% 75%; }
+@media (prefers-reduced-motion: reduce) { .app-shell .sidebar .lucide-nav-icon, .app-shell .sidebar .nav-image-icon { animation: none !important; } }
