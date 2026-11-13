@@ -52,7 +52,7 @@ export function getAiTaskStage(task: AiTaskVisibilityRecord): AiTaskStage {
   // A proposal without its linked evidence is still the AI’s work to finish,
   // not a decision the owner can act on. Keep it in Pending until it is ready.
   if (pendingApprovals.length) return "pending";
-  if (task.aiRunState === "scheduled") return "scheduled";
+  if (task.aiRunState === "scheduled" || task.aiRunState === "paused") return "scheduled"; // paused (Task manager) stays in To do
   return "pending";
 }
 

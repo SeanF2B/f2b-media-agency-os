@@ -8733,3 +8733,26 @@ fieldset.crm-new-contact legend { padding:0 6px; font-size:12px; font-weight:700
 .crm-card-answers { margin: 6px 0 4px; font-size: 12px; }
 .crm-card-answers summary { cursor: pointer; font-weight: 700; }
 .crm-card-answers pre { margin: 6px 0 0; white-space: pre-wrap; font: inherit; font-size: 12px; line-height: 1.5; max-height: 220px; overflow: auto; padding: 8px; border-radius: 8px; background: rgba(127,127,127,.08); }
+
+/* Tasks: Task manager panel */
+.task-manager-panel { margin:0 0 16px; padding:16px 18px; border:1px solid var(--f2b-border,#d9dee3); border-radius:16px; background:var(--f2b-white,#fff); color:var(--f2b-ink,#1f2328); }
+.task-manager-panel > header { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; margin-bottom:12px; }
+.task-manager-panel h2 { margin:2px 0 4px; font-size:20px; }
+.task-manager-tools { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:12px; }
+.task-manager-tools .segmented { display:inline-flex; gap:4px; padding:3px; border-radius:10px; background:color-mix(in srgb,currentColor 6%,transparent); }
+.task-manager-tools .segmented button { border:0; padding:7px 12px; border-radius:8px; background:transparent; color:inherit; font:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+.task-manager-tools .segmented button.active { background:var(--brand-primary,#6b6250); color:#fff; }
+.task-manager-tools input { flex:1; min-width:180px; min-height:36px; padding:0 10px; border:1px solid var(--f2b-border,#d9dee3); border-radius:8px; background:var(--f2b-white,#fff); color:inherit; font:inherit; }
+.task-manager-group { margin-top:14px; border:1px solid var(--f2b-border,#d9dee3); border-radius:12px; overflow:hidden; }
+.task-manager-group-head { display:flex; align-items:center; gap:12px; padding:10px 12px; background:color-mix(in srgb,var(--brand-primary,#6b6250) 8%,transparent); }
+.task-manager-group-head > span { flex:1; font-size:12px; opacity:.8; }
+.task-manager-table { width:100%; border-collapse:collapse; font-size:13px; }
+.task-manager-table th { text-align:left; padding:8px 12px; font-size:11px; text-transform:uppercase; letter-spacing:.04em; opacity:.75; }
+.task-manager-table td { padding:8px 12px; border-top:1px solid var(--f2b-border,#e6e9ec); vertical-align:middle; }
+.task-manager-table td small { display:block; opacity:.7; font-size:11px; }
+.task-manager-title { padding:0; text-align:left; font-weight:700; color:inherit; }
+.task-manager-table tr.is-paused td { opacity:.55; }
+.task-manager-table tr.is-paused td:last-child { opacity:1; }
+.app-shell.dark-mode .task-manager-panel, .app-shell.dark-mode .task-manager-tools input { background:#1f1e22; border-color:#3a393d; color:#fff; }
+.app-shell.dark-mode .task-manager-group, .app-shell.dark-mode .task-manager-table td { border-color:#3a393d; }
+@media (max-width:760px) { .task-manager-table th:nth-child(3), .task-manager-table td:nth-child(3), .task-manager-table th:nth-child(5), .task-manager-table td:nth-child(5) { display:none; } }
