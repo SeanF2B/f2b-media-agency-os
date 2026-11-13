@@ -8969,3 +8969,17 @@ html body .app-shell .sidebar .nav-item .nav-icon svg.lucide-nav-icon * { stroke
 @media (max-width:700px) { .aiv-form { grid-template-columns:1fr; } }
 .app-shell.dark-mode .aiv-form, .app-shell.dark-mode .aiv-form input:not([type=checkbox]), .app-shell.dark-mode .aiv-form textarea { background:#1f1e22; border-color:#3a393d; color:#fff; }
 .app-shell .report-preview-header img.report-brand-logo.report-agency-icon { width:22px; height:22px; max-height:22px; opacity:.7; }
+
+/* Overview ad spend panel: same rhythm as the Sales pipeline panel */
+.app-shell .overview-adspend-panel { padding:16px; margin:0 0 16px; }
+.app-shell .overview-adspend-panel .panel-heading { margin:0 0 14px; }
+.app-shell .overview-adspend-panel .panel-heading h2 { margin:2px 0 4px; }
+.app-shell .overview-adspend-panel .panel-heading p:last-child { margin:0; }
+.app-shell .overview-adspend-panel .ad-report-grid { margin:0; gap:12px; }
+.app-shell .overview-adspend-panel .ad-report-card { padding:14px 16px; background:var(--f2b-white,#fff); }
+.app-shell .overview-adspend-panel .ad-report-head { min-height:32px; margin:0 0 12px; }
+.app-shell .overview-adspend-panel .ad-campaign-select { height:32px; min-height:32px; padding:0 28px 0 10px; font-size:12px; line-height:30px; border-radius:8px; max-width:55%; box-shadow:none; }
+.app-shell .overview-adspend-panel .ad-campaign-select:focus { outline:2px solid color-mix(in srgb,var(--brand-primary,#6b6250) 45%,transparent); outline-offset:1px; }
+.app-shell .overview-adspend-panel .ad-report-stats { gap:12px; }
+.app-shell .overview-adspend-panel .ad-report-off h3 { margin:0 0 8px; }
+.app-shell.dark-mode .overview-adspend-panel .ad-report-card { background:transparent; }
