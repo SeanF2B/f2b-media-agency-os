@@ -531,3 +531,13 @@ export async function updateGoogleAdsCampaignBudget(ownerId: string, customerId:
 }
 
 export const googleAdsScope = GOOGLE_ADS_SCOPE;
+
+// Onboarding prefill: the account name and the website its ads point to (most common final URL host).
+export async function getGoogleAdsAccountWebsite(ownerId: string, customerId: string) {
+  const { payload } = await googleAdsPost(ownerId, customerId, "googleAds:search", { query: "SELECT customer.descriptive_name, ad_group_ad.ad.final_urls FROM ad_group_ad WHERE ad_group_ad.status != 'REMOVED' LIMIT 50" });
+  const rows = (payload?.results || []) as Array<{ customer?: { descriptiveName?: string }; adGroupAd?: { ad?: { finalUrls?: string[] } } }>;
+  const counts = new Map<string, number>();
+  for (const row of rows) for (const url of row.adGroupAd?.ad?.finalUrls || []) { try { const host = new URL(url).hostname.replace(/^www\./, ""); counts.set(host, (counts.get(host) || 0) + 1); } catch { /* skip */ } }
+  const host = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || "";
+  return { name: rows[0]?.customer?.descriptiveName || "", website: host ? `https://${host}` : "" };
+}

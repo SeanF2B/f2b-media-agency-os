@@ -9117,3 +9117,11 @@ html body .app-shell .sidebar .nav-item.active, html body .app-shell .sidebar .n
 .pipeline-card-drag-shell,.pipeline-card-drag-shell .drag-shell-node{display:contents!important;pointer-events:none!important}
 .pipeline-card-drag-shell .drag-shell-node::before,.pipeline-card-drag-shell .drag-shell-node::after{content:none!important;display:none!important}
 .pipeline-card-drag-preview,.pipeline-card-drag-preview *{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;pointer-events:none!important}
+/* Keyword research form: tidy 4-column layout */
+.seo-keyword-form.seo-kw-research{grid-template-columns:repeat(4,minmax(0,1fr));grid-template-areas:"source source geo geo" "seeds seeds seeds seeds" "url url url go";align-items:end;gap:12px;padding:14px}
+.seo-kw-research .kw-source{grid-area:source}.seo-kw-research .kw-geo{grid-area:geo}.seo-kw-research .kw-seeds{grid-area:seeds}.seo-kw-research .kw-url{grid-area:url}.seo-kw-research .kw-go{grid-area:go;min-height:40px}
+.seo-kw-research label span{font-size:11px}.seo-kw-research textarea{min-height:58px}
+@media(max-width:700px){.seo-keyword-form.seo-kw-research{grid-template-columns:1fr;grid-template-areas:"source" "geo" "seeds" "url" "go"}}
+.seo-kw-bulk{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:10px 0;padding:10px 12px;border:1px solid var(--line,#e5e7eb);border-radius:10px;background:var(--card,#fff)}.seo-kw-bulk>span{font-size:13px;font-weight:600;margin-right:auto}
+.seo-data-table .seo-kw-check{width:36px;text-align:center}.seo-data-table .seo-kw-check input{width:16px;height:16px;accent-color:#0b77b0}.seo-data-table tr.picked td{background:rgba(11,119,176,.06)}
+.dark-mode .seo-kw-bulk{border-color:var(--dark-border);background:var(--dark-panel-2)}

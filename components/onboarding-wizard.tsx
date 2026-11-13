@@ -94,6 +94,18 @@ export function OnboardingWizard({ clients, initialClientId = "", existingSetupS
     } catch (reason) { setScrape({ error: reason instanceof Error && reason.name === "AbortError" ? "The website took too long to read. Fill the fields in by hand or try again." : reason instanceof Error ? reason.message : "Couldn’t read the website." }); }
     finally { window.clearTimeout(timer); }
   };
+  // Existing clients with no website saved: find it from where their Google Ads send people, then the auto-read below fills the rest.
+  const adsLookupFor = useRef("");
+  useEffect(() => {
+    if (!clientId || form.website.trim() || !form.googleAdsAccountId.trim() || adsLookupFor.current === clientId) return;
+    adsLookupFor.current = clientId;
+    const forClient = clientId;
+    setScrape({ busy: true, message: "Finding the website from Google Ads…" });
+    fetch(`/api/onboarding-scrape?googleAdsAccountId=${encodeURIComponent(form.googleAdsAccountId)}`, { cache: "no-store" }).then((response) => response.json()).then((j: { website?: string }) => {
+      setScrape({});
+      if (j.website && adsLookupFor.current === forClient) setForm((current) => current.website.trim() ? current : { ...current, website: j.website || "" });
+    }).catch(() => setScrape({}));
+  }, [clientId, form.website, form.googleAdsAccountId]);
   // Existing clients: read their website automatically once (only when there's a site and key details are still empty).
   const autoReadFor = useRef("");
   useEffect(() => {

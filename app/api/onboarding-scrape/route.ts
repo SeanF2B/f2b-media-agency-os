@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "../../chatgpt-auth";
 import { readLandingPage } from "@/lib/landing-page-reader";
+import { getGoogleAdsAccountWebsite } from "@/lib/google-ads-direct";
 import { aiConfigured, aiEndpoint, aiHeaders, aiModel, resolveAiProvider } from "@/lib/ai-provider";
 
 // Operations → Onboarding → "Fill from website": reads the client's public website (home + a few key pages)
@@ -42,6 +43,21 @@ function outputText(payload: any) {
   if (typeof payload?.output_text === "string") return payload.output_text;
   for (const item of payload?.output || []) for (const content of item?.content || []) if (content?.type === "output_text" && typeof content.text === "string") return content.text;
   return "";
+}
+
+// GET ?googleAdsAccountId=… → the website the client's ads send people to (used to prefill onboarding).
+export async function GET(request: Request) {
+  const user = await getChatGPTUser();
+  if (!user) return respond({ error: "Sign in first." }, 401);
+  if (!env.DB) return respond({ error: "The workspace database is unavailable." }, 503);
+  const row = await env.DB.prepare("SELECT owner_id, json_extract(data, '$.ownerId') AS owner, json_extract(data, '$.staff') AS staff FROM workspace_documents WHERE id = ?1").bind("f2b-agency").first<{ owner_id: string; owner: string; staff: string }>();
+  const staff = JSON.parse(row?.staff || "[]") as Array<{ id?: string; email?: string; role?: string; isBot?: boolean }>;
+  const profile = staff.find((item) => !item.isBot && (item.id === user.userId || item.email?.toLowerCase() === user.email.toLowerCase()));
+  if (!(row?.owner === user.userId || row?.owner_id === user.userId || ["Owner", "Admin"].includes(profile?.role || ""))) return respond({ error: "Only an owner or admin can run onboarding." }, 403);
+  const accountId = (new URL(request.url).searchParams.get("googleAdsAccountId") || "").replace(/\D/g, "");
+  if (!accountId || !row?.owner_id) return respond({ website: "", name: "" });
+  try { return respond(await getGoogleAdsAccountWebsite(row.owner_id, accountId)); }
+  catch (reason) { return respond({ website: "", name: "", error: reason instanceof Error ? reason.message.slice(0, 200) : "Google Ads unavailable." }); }
 }
 
 export async function POST(request: Request) {
