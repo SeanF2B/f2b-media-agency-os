@@ -8660,3 +8660,10 @@ fieldset.crm-new-contact legend { padding:0 6px; font-size:12px; font-weight:700
 .app-shell.dark-mode .crm-smart-lists > button:not(.active), .app-shell.dark-mode .crm-smart-list-chip:not(.active) > button:first-child, .app-shell.dark-mode .crm-contact-filters, .app-shell.dark-mode .crm-contact-filters input:not([type=checkbox]), .app-shell.dark-mode .crm-contact-filters select { background:#1f1e22; border-color:#3a393d; color:#fff; }
 .app-shell.dark-mode .crm-contact-filters label { color:#fff; }
 .app-shell.dark-mode .crm-tag { background:color-mix(in srgb,var(--brand-primary,#6b6250) 40%,#1f1e22); color:#fff; }
+
+/* AI Assistant: Search Console overview strip (SEO) */
+.assistant-ads-overview-metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin-top:8px; }
+.assistant-ads-overview-metrics > div { display:grid; gap:2px; padding:8px 10px; border-radius:10px; background:color-mix(in srgb,currentColor 5%,transparent); }
+.assistant-ads-overview-metrics b { font-size:18px; font-weight:800; }
+.assistant-ads-overview-metrics small { font-size:11px; opacity:.8; }
+.assistant-seo-top-queries { margin:8px 0 0; font-size:12px; }
