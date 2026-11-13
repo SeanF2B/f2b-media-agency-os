@@ -1,6 +1,7 @@
 // One indexed log of every website/OS form submission, so submissions can be tracked
 // per form, per page and per client with cheap range queries (no full-table scans).
 // Writers must never let logging break a lead: every write here swallows its own errors.
+import { classifyLeadChannel, type LeadTouch } from "./lead-attribution";
 
 export type FormSubmissionLogEntry = {
   id: string;
@@ -15,6 +16,7 @@ export type FormSubmissionLogEntry = {
   phone?: string;
   message?: string;
   contactId?: string;
+  touch?: LeadTouch;
   createdAt: string;
 };
 
@@ -23,10 +25,16 @@ export const FORM_SUBMISSION_LOG_SQL = [
   "CREATE INDEX IF NOT EXISTS form_submission_log_owner_created_idx ON form_submission_log(owner_id, created_at DESC)",
   "CREATE INDEX IF NOT EXISTS form_submission_log_client_created_idx ON form_submission_log(owner_id, client_id, created_at DESC)",
 ];
+// Lead source columns (added 13 Nov 2026). Each lead gets one channel: google_ads | seo | other | unknown.
+export const FORM_SUBMISSION_LOG_SOURCE_COLUMNS = ["channel", "utm_source", "utm_medium", "utm_campaign", "click_id", "referrer"];
 
 let ensured: Promise<void> | null = null;
 export function ensureFormSubmissionLog(db: D1Database) {
-  if (!ensured) ensured = db.batch(FORM_SUBMISSION_LOG_SQL.map((sql) => db.prepare(sql))).then(() => undefined).catch((error) => { ensured = null; throw error; });
+  if (!ensured) ensured = db.batch(FORM_SUBMISSION_LOG_SQL.map((sql) => db.prepare(sql))).then(async () => {
+    const info = await db.prepare("PRAGMA table_info(form_submission_log)").all<{ name: string }>();
+    const have = new Set((info.results || []).map((column) => column.name));
+    for (const column of FORM_SUBMISSION_LOG_SOURCE_COLUMNS) if (!have.has(column)) await db.prepare(`ALTER TABLE form_submission_log ADD COLUMN ${column} TEXT NOT NULL DEFAULT ''`).run().catch(() => undefined);
+  }).catch((error) => { ensured = null; throw error; });
   return ensured;
 }
 
@@ -46,8 +54,10 @@ export async function logFormSubmission(db: D1Database | undefined, entry: FormS
   try {
     await ensureFormSubmissionLog(db);
     const cut = (value: unknown, max: number) => String(value ?? "").trim().slice(0, max);
-    await db.prepare("INSERT OR IGNORE INTO form_submission_log (id, owner_id, client_id, source, form_key, form_name, page_url, page_path, name, email, phone, message, contact_id, created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14)")
-      .bind(entry.id, entry.ownerId, entry.clientId || "", entry.source, cut(entry.formKey, 160), cut(entry.formName, 200), cut(entry.pageUrl, 500), pagePathFromUrl(entry.pageUrl || ""), cut(entry.name, 160), cut(entry.email, 200).toLowerCase(), cut(entry.phone, 60), cut(entry.message, 1000), cut(entry.contactId, 80), entry.createdAt)
+    const touch = entry.touch || {};
+    const channel = classifyLeadChannel(touch);
+    await db.prepare("INSERT OR IGNORE INTO form_submission_log (id, owner_id, client_id, source, form_key, form_name, page_url, page_path, name, email, phone, message, contact_id, created_at, channel, utm_source, utm_medium, utm_campaign, click_id, referrer) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20)")
+      .bind(entry.id, entry.ownerId, entry.clientId || "", entry.source, cut(entry.formKey, 160), cut(entry.formName, 200), cut(entry.pageUrl, 500), pagePathFromUrl(entry.pageUrl || ""), cut(entry.name, 160), cut(entry.email, 200).toLowerCase(), cut(entry.phone, 60), cut(entry.message, 1000), cut(entry.contactId, 80), entry.createdAt, channel, cut(touch.utm_source, 120), cut(touch.utm_medium, 120), cut(touch.utm_campaign, 200), cut(touch.gclid || touch.gbraid || touch.wbraid, 300), cut(touch.referrer, 200))
       .run();
   } catch (error) {
     console.error("Form submission log write failed", error instanceof Error ? error.message : "unknown error");

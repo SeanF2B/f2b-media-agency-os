@@ -338,7 +338,7 @@ export async function POST(request: Request) {
     const summary = summarizeFormAnswers(data.fields || [], values);
     const submittedPage = String(form.get("__f2b_page") || "").slice(0, 500);
     const pageUrl = /^https?:\/\//i.test(submittedPage) ? submittedPage : (request.headers.get("referer") || "");
-    await logFormSubmission(env.DB, { id, ownerId: asset.owner_id, clientId: asset.client_id, source: "os-form", formKey: `asset:${asset.id}`, formName: asset.name, pageUrl, ...summary, contactId: String((complete.crm as { contactId?: string } | undefined)?.contactId || ""), createdAt: now });
+    await logFormSubmission(env.DB, { id, ownerId: asset.owner_id, clientId: asset.client_id, source: "os-form", formKey: `asset:${asset.id}`, formName: asset.name, pageUrl, ...summary, touch: { gclid: attribution.gclid, gbraid: attribution.gbraid, wbraid: attribution.wbraid, utm_source: attribution.utm_source, utm_medium: attribution.utm_medium, utm_campaign: attribution.utm_campaign, referrer: attribution.f2b_ref }, contactId: String((complete.crm as { contactId?: string } | undefined)?.contactId || ""), createdAt: now });
   }
   try { await enqueueMarketingAutomations(env.DB, { ...asset, fields: (data.fields || []).map((field, index) => ({ id: String(field.id || `field-${index + 1}`), label: field.label, type: field.type })) }, { id, owner_id: asset.owner_id, asset_id: asset.id, kind: asset.kind, data: JSON.stringify(complete), created_at: now }); } catch (error) { console.error("Marketing automation enqueue failed", error); }
   const successUrl = new URL(`/api/marketing-public?slug=${encodeURIComponent(asset.slug)}&step=${requestedStep}&submitted=1`, request.url);

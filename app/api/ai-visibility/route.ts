@@ -7,8 +7,8 @@ import { aiHeaders, resolveAiProvider } from "@/lib/ai-provider";
 // and which sites are cited. These are sampled API answers — not a fixed ranking and not the consumer apps.
 export const dynamic = "force-dynamic";
 const respond = (body: Record<string, unknown>, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
-const TABLE = "CREATE TABLE IF NOT EXISTS ai_visibility_checks (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, client_id TEXT NOT NULL, run_id TEXT NOT NULL, created_at TEXT NOT NULL, platform TEXT NOT NULL, model TEXT NOT NULL, prompt TEXT NOT NULL, location TEXT NOT NULL, web_search INTEGER NOT NULL, mentioned INTEGER NOT NULL, position INTEGER, cited INTEGER NOT NULL, competitors_json TEXT NOT NULL, citations_json TEXT NOT NULL, excerpt TEXT NOT NULL, error TEXT)";
-const INDEX = "CREATE INDEX IF NOT EXISTS ai_visibility_checks_client_idx ON ai_visibility_checks (owner_id, client_id, created_at)";
+const TABLE = "CREATE TABLE IF NOT EXISTS ai_visibility_tests (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, client_id TEXT NOT NULL, run_id TEXT NOT NULL, created_at TEXT NOT NULL, platform TEXT NOT NULL, model TEXT NOT NULL, prompt TEXT NOT NULL, location TEXT NOT NULL, web_search INTEGER NOT NULL, mentioned INTEGER NOT NULL, position INTEGER, cited INTEGER NOT NULL, competitors_json TEXT NOT NULL, citations_json TEXT NOT NULL, excerpt TEXT NOT NULL, error TEXT)";
+const INDEX = "CREATE INDEX IF NOT EXISTS ai_visibility_tests_client_idx ON ai_visibility_tests (owner_id, client_id, created_at)";
 const LIMITS = { promptsPerRun: 5, runsPerDay: 20 };
 type Client = { id: string; name: string; company?: string; website?: string; wordpressSiteUrl?: string; seoLocations?: string[] };
 
@@ -50,7 +50,7 @@ export async function GET(request: Request) {
   const ctx = await context(new URL(request.url).searchParams.get("clientId") || "");
   if ("response" in ctx) return ctx.response;
   try {
-    const rows = await ctx.db.prepare("SELECT run_id, created_at, platform, model, prompt, location, web_search, mentioned, position, cited, competitors_json, citations_json, excerpt, error FROM ai_visibility_checks WHERE owner_id = ?1 AND client_id = ?2 ORDER BY created_at DESC LIMIT 120").bind(ctx.ownerId, ctx.client.id).all();
+    const rows = await ctx.db.prepare("SELECT run_id, created_at, platform, model, prompt, location, web_search, mentioned, position, cited, competitors_json, citations_json, excerpt, error FROM ai_visibility_tests WHERE owner_id = ?1 AND client_id = ?2 ORDER BY created_at DESC LIMIT 120").bind(ctx.ownerId, ctx.client.id).all();
     return respond({ checks: (rows.results || []).map((row: any) => ({ ...row, competitors: JSON.parse(row.competitors_json || "[]"), citations: JSON.parse(row.citations_json || "[]") })), limits: LIMITS });
   } catch { return respond({ checks: [], limits: LIMITS }); }
 }
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
   const webSearch = body.webSearch !== false;
   await ctx.db.prepare(TABLE).run(); await ctx.db.prepare(INDEX).run();
   const since = new Date(Date.now() - 86_400_000).toISOString();
-  const today = await ctx.db.prepare("SELECT COUNT(DISTINCT run_id) AS runs FROM ai_visibility_checks WHERE owner_id = ?1 AND created_at >= ?2").bind(ctx.ownerId, since).first<{ runs: number }>();
+  const today = await ctx.db.prepare("SELECT COUNT(DISTINCT run_id) AS runs FROM ai_visibility_tests WHERE owner_id = ?1 AND created_at >= ?2").bind(ctx.ownerId, since).first<{ runs: number }>();
   if (Number(today?.runs || 0) >= LIMITS.runsPerDay) return respond({ error: `Daily limit reached (${LIMITS.runsPerDay} checks in 24 hours).` }, 429);
 
   // Platforms: through OpenRouter both families are available; with a direct OpenAI key only ChatGPT models.
@@ -100,6 +100,6 @@ export async function POST(request: Request) {
       return { platform: platform.key, label: platform.label, model, prompt, mentioned: false, position: null, cited: false, competitors: [] as string[], citations: [] as string[], excerpt: "", error: error instanceof Error ? error.message.slice(0, 200) : "Failed" };
     }
   }));
-  await ctx.db.batch(results.map((r) => ctx.db.prepare("INSERT INTO ai_visibility_checks (id, owner_id, client_id, run_id, created_at, platform, model, prompt, location, web_search, mentioned, position, cited, competitors_json, citations_json, excerpt, error) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)").bind(crypto.randomUUID(), ctx.ownerId, ctx.client.id, runId, at, r.platform, r.model, r.prompt, location, webSearch ? 1 : 0, r.mentioned ? 1 : 0, r.position, r.cited ? 1 : 0, JSON.stringify(r.competitors), JSON.stringify(r.citations), r.excerpt, r.error || null)));
+  await ctx.db.batch(results.map((r) => ctx.db.prepare("INSERT INTO ai_visibility_tests (id, owner_id, client_id, run_id, created_at, platform, model, prompt, location, web_search, mentioned, position, cited, competitors_json, citations_json, excerpt, error) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)").bind(crypto.randomUUID(), ctx.ownerId, ctx.client.id, runId, at, r.platform, r.model, r.prompt, location, webSearch ? 1 : 0, r.mentioned ? 1 : 0, r.position, r.cited ? 1 : 0, JSON.stringify(r.competitors), JSON.stringify(r.citations), r.excerpt, r.error || null)));
   return respond({ runId, location, webSearch, results });
 }

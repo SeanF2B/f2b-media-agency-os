@@ -6,6 +6,7 @@ import { renderPage, renderRaw } from "@/lib/site-content/site-render";
 import { leadToCrm } from "@/lib/conversations/core";
 import { consumeMarketingSubmissionRateLimit } from "@/lib/marketing-public-rate-limit";
 import { logFormSubmission } from "@/lib/form-submission-log";
+import { readSubmittedTouch } from "@/lib/lead-attribution";
 
 export const dynamic = "force-dynamic";
 const CLIENT_RE = /^[\w-]{6,80}$/;
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
   const name = String(form.get("name") || "").slice(0, 120), phone = String(form.get("phone") || "").slice(0, 40), email = String(form.get("email") || "").slice(0, 160), message = String(form.get("message") || "").slice(0, 2000);
   if (!name || !phone) return html("Please add your name and phone number.", 400);
   const owner = await env.DB.prepare("SELECT owner_id FROM workspace_documents WHERE id='f2b-agency'").first<{ owner_id: string }>();
-  if (owner) await logFormSubmission(env.DB, { id: crypto.randomUUID(), ownerId: owner.owner_id, clientId: c, source: "site-lead", formKey: `site:${c}:contact`, formName: String(form.get("form_name") || "Website contact form").slice(0, 120), pageUrl: String(form.get("page") || request.headers.get("referer") || ""), name, email, phone, message, createdAt: new Date().toISOString() });
+  if (owner) await logFormSubmission(env.DB, { id: crypto.randomUUID(), ownerId: owner.owner_id, clientId: c, source: "site-lead", formKey: `site:${c}:contact`, formName: String(form.get("form_name") || "Website contact form").slice(0, 120), pageUrl: String(form.get("page") || request.headers.get("referer") || ""), name, email, phone, message, touch: readSubmittedTouch((key) => String(form.get(key) || "")), createdAt: new Date().toISOString() });
   if (owner) await leadToCrm(owner.owner_id, { clientId: c, channel: "sms", contact: phone, name, firstMessage: `Website enquiry${email ? ` (${email})` : ""}: ${message}` });
   return html("<p style='font:18px system-ui;padding:48px;text-align:center'>Thanks — we'll be in touch shortly.</p>");
 }
@@ -92,7 +93,7 @@ async function siteFormLead(request: Request, c: string) {
     const formSlug = (s("form", 80) || s("form_name", 80) || line("Form") || "book-a-consultation").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     const formName = s("form_name", 120) || formSlug.replace(/-/g, " ").replace(/^./, (char) => char.toUpperCase());
     const cleanAnswers = blob.split(/^Pages viewed/mi)[0].split("\n").filter((row) => !/^(Form|Booked from|Page|Ref):/i.test(row.trim())).join("\n").trim();
-    await logFormSubmission(db, { id: crypto.randomUUID(), ownerId, clientId: c, source: "site-form", formKey: `site:${c}:${formSlug}`, formName, pageUrl: page || line("Booked from") || line("Page") || request.headers.get("referer") || "", name, email, phone, message: cleanAnswers, contactId, createdAt: now });
+    await logFormSubmission(db, { id: crypto.randomUUID(), ownerId, clientId: c, source: "site-form", formKey: `site:${c}:${formSlug}`, formName, pageUrl: page || line("Booked from") || line("Page") || request.headers.get("referer") || "", name, email, phone, message: cleanAnswers, contactId, touch: readSubmittedTouch((key) => String(form.get(key) || "")), createdAt: now });
   }
   return ok();
 }
