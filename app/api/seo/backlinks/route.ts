@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { dataForSeoCredentials, DATAFORSEO_SETUP_MESSAGE } from "@/lib/dataforseo-credentials";
 import { getChatGPTUser } from "../../../chatgpt-auth";
 import { getTeamPermissions } from "@/lib/access-permissions";
 import { compareBacklinkCounts, normalizeBacklinkTarget, parseDataForSeoBacklinkChanges, parseDataForSeoBacklinkItems, parseDataForSeoBacklinkSummary, type DataForSeoBacklinkSummary } from "@/lib/dataforseo-backlinks";
@@ -32,7 +33,7 @@ export async function GET(request: Request) {
   if (!admin) return respond({ status: "forbidden", message: "Only an owner or admin can run backlink research." }, 403);
   let defaultTarget = "";
   try { defaultTarget = client.wordpressSiteUrl ? new URL(client.wordpressSiteUrl).hostname.replace(/^www\./, "") : ""; } catch { /* an invalid saved URL is shown as an empty target */ }
-  const configured = Boolean(env.DATAFORSEO_API_LOGIN && env.DATAFORSEO_API_PASSWORD);
+  const configured = Boolean((await dataForSeoCredentials(db, ownerId)));
   const historyRows = await db.prepare("SELECT target, created_at, result_json, provider_cost_usd FROM seo_backlink_snapshots WHERE owner_id = ?1 AND client_id = ?2 ORDER BY created_at DESC LIMIT 20").bind(ownerId, client.id).all<{ target: string; created_at: string; result_json: string; provider_cost_usd: number | null }>();
   const history = (historyRows.results || []).flatMap((row) => {
     try {
@@ -45,7 +46,7 @@ export async function GET(request: Request) {
   });
   return respond({
     status: configured ? "ready" : "missing_connection",
-    message: configured ? undefined : "Add DATAFORSEO_API_LOGIN and DATAFORSEO_API_PASSWORD as Cloudflare Worker secrets to enable backlink checks.",
+    message: configured ? undefined : DATAFORSEO_SETUP_MESSAGE,
     defaultTarget,
     history,
     dataNote: "Backlink data comes from DataForSEO’s index and may differ from Google Search Console. A check can make up to three billable requests; the response shows the total reported cost when available.",
@@ -62,9 +63,8 @@ export async function POST(request: Request) {
   if (body.acknowledgeProviderCharge !== true) return respond({ status: "confirmation_required", message: "Confirm that this backlink check may use up to three DataForSEO requests and account credits before running it." }, 400);
   const target = normalizeBacklinkTarget(String(body.target || ""));
   if (!target) return respond({ status: "invalid_target", message: "Enter a public domain or web page to check." }, 400);
-  const login = env.DATAFORSEO_API_LOGIN;
-  const password = env.DATAFORSEO_API_PASSWORD;
-  if (!login || !password) return respond({ status: "missing_connection", message: "DataForSEO is not connected yet. Add DATAFORSEO_API_LOGIN and DATAFORSEO_API_PASSWORD as Cloudflare Worker secrets." }, 503);
+  const { login, password } = (await dataForSeoCredentials(db, ownerId)) || { login: "", password: "" };
+  if (!login || !password) return respond({ status: "missing_connection", message: DATAFORSEO_SETUP_MESSAGE }, 503);
   try {
     const auth = `Basic ${btoa(`${login}:${password}`)}`;
     const requestDataForSeo = async (path: string, payload: unknown) => {

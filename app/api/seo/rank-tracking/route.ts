@@ -1,4 +1,6 @@
 import { env } from "cloudflare:workers";
+import { clientWebsite } from "@/lib/client-website";
+import { dataForSeoCredentials, DATAFORSEO_SETUP_MESSAGE } from "@/lib/dataforseo-credentials";
 import { getChatGPTUser } from "../../../chatgpt-auth";
 
 // Google rank tracking (Operations → SEO & competitors → Rank tracking). Location-specific Google SERP positions
@@ -42,7 +44,7 @@ async function list(db: D1Database, ownerId: string, clientId: string) {
 export async function GET(request: Request) {
   const ctx = await context(new URL(request.url).searchParams.get("clientId") || "");
   if ("response" in ctx) return ctx.response;
-  return respond({ keywords: await list(ctx.db, ctx.ownerId, ctx.client.id), limits: LIMITS, clientHost: hostOf(ctx.client.website || ctx.client.wordpressSiteUrl), ready: Boolean(env.DATAFORSEO_API_LOGIN && env.DATAFORSEO_API_PASSWORD) });
+  return respond({ keywords: await list(ctx.db, ctx.ownerId, ctx.client.id), limits: LIMITS, clientHost: hostOf(clientWebsite(ctx.client)), ready: Boolean((await dataForSeoCredentials(ctx.db, ctx.ownerId))) });
 }
 
 export async function POST(request: Request) {
@@ -68,14 +70,14 @@ export async function POST(request: Request) {
     return respond({ keywords: await list(ctx.db, ctx.ownerId, ctx.client.id) });
   }
   if (body.action !== "check") return respond({ error: "Unknown action." }, 400);
-  const login = env.DATAFORSEO_API_LOGIN, password = env.DATAFORSEO_API_PASSWORD;
-  if (!login || !password) return respond({ error: "DataForSEO isn’t connected." }, 503);
+  const { login, password } = (await dataForSeoCredentials(ctx.db, ctx.ownerId)) || { login: "", password: "" };
+  if (!login || !password) return respond({ error: DATAFORSEO_SETUP_MESSAGE }, 503);
   const all = await list(ctx.db, ctx.ownerId, ctx.client.id);
   const dayAgo = Date.now() - 20 * 3_600_000;
   const due = all.filter((kw) => (!body.ids?.length || body.ids.includes(kw.id)) && !(kw.history[0] && !kw.history[0].error && new Date(kw.history[0].at).getTime() > dayAgo));
   if (!due.length) return respond({ error: "These keywords were already checked in the last day." }, 429);
   if (body.acknowledgeCost !== true) return respond({ status: "confirmation_required", count: due.length, message: `This runs ${due.length} paid Google ranking check${due.length === 1 ? "" : "s"} through DataForSEO (about $0.002 each).` }, 409);
-  const host = hostOf(ctx.client.website || ctx.client.wordpressSiteUrl);
+  const host = hostOf(clientWebsite(ctx.client));
   if (!host) return respond({ error: "Add the client’s website in their profile so rankings can be matched." }, 400);
   const competitors = (body.competitors || ctx.client.seoCompetitors || []).map(hostOf).filter(Boolean).slice(0, 5);
   const auth = `Basic ${btoa(`${login}:${password}`)}`;

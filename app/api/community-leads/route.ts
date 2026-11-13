@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { dataForSeoCredentials, DATAFORSEO_SETUP_MESSAGE } from "@/lib/dataforseo-credentials";
 import { getChatGPTUser } from "../../chatgpt-auth";
 
 // Community Lead Discovery (Operations → Local & community). Finds public Reddit / Quora questions through
@@ -44,7 +45,7 @@ function queriesFor(client: Client, custom: string[]) {
 export async function GET(request: Request) {
   const ctx = await context(new URL(request.url).searchParams.get("clientId") || "");
   if ("response" in ctx) return ctx.response;
-  const ready = Boolean(env.DATAFORSEO_API_LOGIN && env.DATAFORSEO_API_PASSWORD);
+  const ready = Boolean((await dataForSeoCredentials(ctx.db, ctx.ownerId)));
   return respond({ ready, limits: LIMITS, usage: await usage(ctx.db, ctx.ownerId, ctx.client.id), queries: queriesFor(ctx.client, []) });
 }
 
@@ -53,8 +54,8 @@ export async function POST(request: Request) {
   try { body = await request.json() as typeof body; } catch { return respond({ error: "Invalid request." }, 400); }
   const ctx = await context(String(body.clientId || ""));
   if ("response" in ctx) return ctx.response;
-  const login = env.DATAFORSEO_API_LOGIN, password = env.DATAFORSEO_API_PASSWORD;
-  if (!login || !password) return respond({ error: "DataForSEO isn’t connected (DATAFORSEO_API_LOGIN / DATAFORSEO_API_PASSWORD)." }, 503);
+  const { login, password } = (await dataForSeoCredentials(ctx.db, ctx.ownerId)) || { login: "", password: "" };
+  if (!login || !password) return respond({ error: DATAFORSEO_SETUP_MESSAGE }, 503);
   const used = await usage(ctx.db, ctx.ownerId, ctx.client.id);
   if (used.lastRun && Date.now() - new Date(used.lastRun).getTime() < LIMITS.daysBetweenRuns * 86_400_000) return respond({ error: `Already searched for ${ctx.client.name} on ${new Date(used.lastRun).toLocaleDateString("en-IE")}. Next search allowed after ${LIMITS.daysBetweenRuns} days.`, usage: used }, 429);
   if (used.clientRuns >= LIMITS.runsPerClientPerMonth) return respond({ error: `Monthly limit reached for ${ctx.client.name} (${LIMITS.runsPerClientPerMonth} searches).`, usage: used }, 429);

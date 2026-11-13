@@ -1,4 +1,6 @@
 import { env } from "cloudflare:workers";
+import { clientWebsite } from "@/lib/client-website";
+import { dataForSeoCredentials, DATAFORSEO_SETUP_MESSAGE } from "@/lib/dataforseo-credentials";
 import { getChatGPTUser } from "../../../chatgpt-auth";
 import { getTeamPermissions, type TeamPermissions } from "@/lib/access-permissions";
 import { parseGoogleMapsLocalRank, type LocalMapsRank } from "@/lib/dataforseo-local-maps";
@@ -42,8 +44,8 @@ export async function GET(request: Request) {
   if (!context.admin) return respond({ status: "forbidden", message: "Only an owner or admin can run paid local rank checks." }, 403);
   const rows = await context.db.prepare("SELECT run_id, created_at, location_name, business_name, domain, results_json, provider_cost_usd FROM seo_local_maps_rank_runs WHERE owner_id = ?1 AND client_id = ?2 ORDER BY created_at DESC LIMIT 20").bind(context.ownerId, context.client.id).all<{ run_id: string; created_at: string; location_name: string; business_name: string; domain: string; results_json: string; provider_cost_usd: number | null }>();
   const history = (rows.results || []).flatMap((row) => { try { return [{ id: row.run_id, createdAt: row.created_at, location: row.location_name, businessName: row.business_name, domain: row.domain, results: JSON.parse(row.results_json) as LocalMapsRank[], costUsd: row.provider_cost_usd }]; } catch { return []; } });
-  const ready = Boolean(env.DATAFORSEO_API_LOGIN && env.DATAFORSEO_API_PASSWORD);
-  return respond({ status: ready ? "ready" : "missing_connection", message: ready ? "Google Maps rank checks are ready. Each keyword check uses paid DataForSEO credits." : "Add DATAFORSEO_API_LOGIN and DATAFORSEO_API_PASSWORD as Cloudflare Worker secrets to enable paid Google Maps rank checks.", history });
+  const ready = Boolean((await dataForSeoCredentials(context.db, context.ownerId)));
+  return respond({ status: ready ? "ready" : "missing_connection", message: ready ? "Google Maps rank checks are ready. Each keyword check uses paid DataForSEO credits." : DATAFORSEO_SETUP_MESSAGE, history });
 }
 
 export async function POST(request: Request) {
@@ -53,12 +55,12 @@ export async function POST(request: Request) {
   if ("response" in context) return context.response;
   if (!context.admin) return respond({ status: "forbidden", message: "Only an owner or admin can run paid local rank checks." }, 403);
   if (body.acknowledgeProviderCharge !== true) return respond({ status: "confirmation_required", message: "This sends one paid Google Maps results request per keyword, up to five keywords. Confirm before running; DataForSEO returns the actual charge afterward." }, 400);
-  const login = env.DATAFORSEO_API_LOGIN, password = env.DATAFORSEO_API_PASSWORD;
-  if (!login || !password) return respond({ status: "missing_connection", message: "DataForSEO is not connected. Add DATAFORSEO_API_LOGIN and DATAFORSEO_API_PASSWORD as Worker secrets." }, 503);
+  const { login, password } = (await dataForSeoCredentials(context.db, context.ownerId)) || { login: "", password: "" };
+  if (!login || !password) return respond({ status: "missing_connection", message: DATAFORSEO_SETUP_MESSAGE }, 503);
   const keywords = Array.isArray(body.keywords) ? [...new Set(body.keywords.map((item) => String(item).trim().replace(/\s+/g, " ")).filter((item) => item.length >= 3 && item.length <= 120))].slice(0, 5) : [];
   const location = String(body.location || "").trim().replace(/\s+/g, " ").slice(0, 120);
   const businessName = String(body.businessName || context.client.name || "").trim().replace(/\s+/g, " ").slice(0, 120);
-  const domainRaw = String(body.domain || context.client.wordpressSiteUrl || context.client.website || "").trim().slice(0, 255);
+  const domainRaw = String(body.domain || clientWebsite(context.client)).trim().slice(0, 255);
   let domain = "";
   if (domainRaw) { try { domain = new URL(domainRaw.includes("://") ? domainRaw : `https://${domainRaw}`).hostname.replace(/^www\./i, "").toLowerCase(); } catch { return respond({ status: "invalid_domain", message: "Enter a valid client website domain, such as example.ie." }, 400); } }
   if (!keywords.length) return respond({ status: "invalid_keywords", message: "Add at least one keyword phrase with three or more characters." }, 400);

@@ -1,4 +1,6 @@
 import { env } from "cloudflare:workers";
+import { clientWebsite } from "@/lib/client-website";
+import { dataForSeoCredentials, DATAFORSEO_SETUP_MESSAGE } from "@/lib/dataforseo-credentials";
 import { getChatGPTUser } from "../../../chatgpt-auth";
 import { getTeamPermissions, type TeamPermissions } from "@/lib/access-permissions";
 import { mergeDataForSeoDifficulty, parseDataForSeoDifficulty, parseDataForSeoIdeas, type DataForSeoKeywordIdea } from "@/lib/dataforseo-keywords";
@@ -40,14 +42,14 @@ export async function GET(request: Request) {
     try { return [{ id: row.run_id, createdAt: row.created_at, location: row.location_name, seeds: JSON.parse(row.seed_keywords_json), costUsd: row.provider_cost_usd, results: JSON.parse(row.results_json) as DataForSeoKeywordIdea[] }]; }
     catch { return []; }
   });
-  const ready = Boolean(env.DATAFORSEO_API_LOGIN && env.DATAFORSEO_API_PASSWORD);
+  const ready = Boolean((await dataForSeoCredentials(context.db, context.ownerId)));
   const competitorRows = await context.db.prepare("SELECT run_id, created_at, location_name, client_domain, request_count, competitors_json, provider_cost_usd FROM seo_competitor_keyword_research_runs WHERE owner_id = ?1 AND client_id = ?2 ORDER BY created_at DESC LIMIT 20")
     .bind(context.ownerId, context.client.id).all<{ run_id: string; created_at: string; location_name: string; client_domain: string; request_count: number; competitors_json: string; provider_cost_usd: number | null }>();
   const competitorHistory = (competitorRows.results || []).flatMap((row) => {
     try { return [{ id: row.run_id, createdAt: row.created_at, location: row.location_name, clientDomain: row.client_domain, requestCount: row.request_count, costUsd: row.provider_cost_usd, competitors: JSON.parse(row.competitors_json) as CompetitorKeywordResult[] }]; }
     catch { return []; }
   });
-  return respond({ status: ready ? "ready" : "missing_connection", message: ready ? undefined : "Add DATAFORSEO_API_LOGIN and DATAFORSEO_API_PASSWORD as Cloudflare Worker secrets to enable keyword ideas, difficulty and competitor keyword gaps.", history, competitorHistory });
+  return respond({ status: ready ? "ready" : "missing_connection", message: ready ? undefined : DATAFORSEO_SETUP_MESSAGE, history, competitorHistory });
 }
 
 async function postDataForSeo(login: string, password: string, endpoint: string, body: unknown) {
@@ -68,12 +70,11 @@ export async function POST(request: Request) {
   if ("response" in context) return context.response;
   if (!context.admin) return respond({ status: "forbidden", message: "Only an owner or admin can run keyword research." }, 403);
   if (body.acknowledgeProviderCharge !== true) return respond({ status: "confirmation_required", message: "Confirm that this research may use paid DataForSEO credits. The actual cost is shown after the request." }, 400);
-  const login = env.DATAFORSEO_API_LOGIN;
-  const password = env.DATAFORSEO_API_PASSWORD;
-  if (!login || !password) return respond({ status: "missing_connection", message: "DataForSEO is not connected yet. Add DATAFORSEO_API_LOGIN and DATAFORSEO_API_PASSWORD as Cloudflare Worker secrets." }, 503);
+  const { login, password } = (await dataForSeoCredentials(context.db, context.ownerId)) || { login: "", password: "" };
+  if (!login || !password) return respond({ status: "missing_connection", message: DATAFORSEO_SETUP_MESSAGE }, 503);
   if (body.action === "competitor_gaps") {
     if (body.acknowledgeProviderCharge !== true) return respond({ status: "confirmation_required", message: "Confirm that each competitor comparison may use one paid DataForSEO request. The actual provider cost will be shown after the check." }, 400);
-    const sourceDomain = normalizePublicDomain(String(context.client.wordpressSiteUrl || context.client.website || ""));
+    const sourceDomain = normalizePublicDomain(clientWebsite(context.client));
     if (!sourceDomain) return respond({ status: "client_domain_missing", message: "Add this client’s public website domain to the client profile before checking competitor keywords." }, 409);
     const location = String(body.location || "").trim().replace(/\s+/g, " ").slice(0, 120);
     if (!location) return respond({ status: "invalid_location", message: "Enter a target location, such as Galway, Ireland." }, 400);
