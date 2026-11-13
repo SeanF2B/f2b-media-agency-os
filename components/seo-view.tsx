@@ -170,7 +170,7 @@ export function SeoView({ initialTab, sections, keywordPart = "all", embedded = 
       groups.set(key, [...(groups.get(key) || []), row]);
     }
     const order = { high: 2, medium: 1, low: 0, unknown: 3 };
-    const sorted = [...groups.entries()].map(([name, list]) => ({ name, list: list.sort((a, b) => (b.avgMonthlySearches || 0) - (a.avgMonthlySearches || 0) || order[level(a)] - order[level(b)]), total: list.reduce((sum, row) => sum + (row.avgMonthlySearches || 0), 0) })).sort((a, b) => b.total - a.total);
+    const sorted = [...groups.entries()].map(([name, list]) => ({ name, list: list.sort((a, b) => (b.avgMonthlySearches || 0) - (a.avgMonthlySearches || 0) || order[level(a)] - order[level(b)]), total: list.reduce((sum, row) => sum + (row.avgMonthlySearches || 0), 0) })).sort((a, b) => Number(a.name === "Other related searches") - Number(b.name === "Other related searches") || b.total - a.total).map((group) => ({ ...group, name: group.name.replace(/^./, (c) => c.toUpperCase()) }));
     const total = rows.reduce((sum, row) => sum + (row.avgMonthlySearches || 0), 0);
     const counts = { low: rows.filter((row) => level(row) === "low").length, medium: rows.filter((row) => level(row) === "medium").length, high: rows.filter((row) => level(row) === "high").length, unknown: rows.filter((row) => level(row) === "unknown").length };
     const bids = rows.filter((row) => row.lowTopOfPageBid != null && row.highTopOfPageBid != null);
