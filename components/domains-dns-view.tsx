@@ -19,7 +19,9 @@ async function api<T>(path: string, init?: { method?: string; body?: unknown }):
   return payload;
 }
 
-export function DomainsDnsView() {
+export function DomainsDnsView({ clientHosts }: { clientHosts?: string[] } = {}) {
+  const scoped = clientHosts !== undefined;
+  const hostsKey = (clientHosts || []).join("|");
   const [connection, setConnection] = useState<ConnectionState | null>(null);
   const [token, setToken] = useState("");
   const [zones, setZones] = useState<Zone[]>([]);
@@ -46,8 +48,10 @@ export function DomainsDnsView() {
     setBusy("zones");
     try {
       const payload = await api<{ zones: Zone[] }>("/api/settings/cloudflare-dns?zones=1");
-      setZones(payload.zones);
-      setZoneId((current) => (payload.zones.some((entry) => entry.id === current) ? current : payload.zones[0]?.id || ""));
+      const hosts = hostsKey ? hostsKey.split("|") : [];
+      const list = scoped ? payload.zones.filter((entry) => hosts.some((host) => host === entry.name || host.endsWith(`.${entry.name}`))) : payload.zones;
+      setZones(list);
+      setZoneId((current) => (list.some((entry) => entry.id === current) ? current : list[0]?.id || ""));
     } catch (error) { say(error instanceof Error ? error.message : "Could not load domains.", true); }
     finally { setBusy(""); }
   }
@@ -70,7 +74,7 @@ export function DomainsDnsView() {
         if (state.connected) await loadZones();
       } catch (error) { say(error instanceof Error ? error.message : "Could not load domain settings.", true); setConnection({ connected: false, source: null, fingerprint: "", secureStorageReady: false }); }
     })();
-  }, []);
+  }, [hostsKey]);
 
   useEffect(() => { setEditingId(""); setShowForm(false); setFilter(""); void loadRecords(zoneId); }, [zoneId]);
 
@@ -146,11 +150,11 @@ export function DomainsDnsView() {
     </form>}
 
     {connected && <>
-      <div className="api-key-saved"><span className="api-key-lock" aria-hidden="true">🔒</span><span><b>{connection?.source === "secret" ? "Token set on the server" : "Token saved"}</b><small>Ending in {connection?.fingerprint}</small></span>{connection?.source === "stored" && <button type="button" className="secondary-button" disabled={busy === "token"} onClick={() => void removeToken()}>Disconnect</button>}</div>
+      {!scoped && <div className="api-key-saved"><span className="api-key-lock" aria-hidden="true">🔒</span><span><b>{connection?.source === "secret" ? "Token set on the server" : "Token saved"}</b><small>Ending in {connection?.fingerprint}</small></span>{connection?.source === "stored" && <button type="button" className="secondary-button" disabled={busy === "token"} onClick={() => void removeToken()}>Disconnect</button>}</div>}
 
       <div className="dns-toolbar">
-        <label className="dns-field"><span>Domain</span><select value={zoneId} onChange={(event) => setZoneId(event.target.value)} disabled={busy === "zones" || zones.length === 0}>{zones.length === 0 && <option value="">{busy === "zones" ? "Loading…" : "No domains yet"}</option>}{zones.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}{entry.status !== "active" ? ` (${entry.status})` : ""}</option>)}</select></label>
-        <form className="dns-add-domain" onSubmit={(event) => void addDomain(event)}><label className="dns-field"><span>Add a domain</span><input value={newDomain} onChange={(event) => setNewDomain(event.target.value)} placeholder="example.com" spellCheck={false} /></label><button type="submit" className="secondary-button" disabled={busy === "add-zone" || !newDomain.trim()}>{busy === "add-zone" ? "Adding…" : "Add domain"}</button></form>
+        <label className="dns-field"><span>Domain</span><select value={zoneId} onChange={(event) => setZoneId(event.target.value)} disabled={busy === "zones" || zones.length === 0}>{zones.length === 0 && <option value="">{busy === "zones" ? "Loading…" : scoped ? "No domain linked to this client" : "No domains yet"}</option>}{zones.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}{entry.status !== "active" ? ` (${entry.status})` : ""}</option>)}</select></label>
+        {!scoped && <form className="dns-add-domain" onSubmit={(event) => void addDomain(event)}><label className="dns-field"><span>Add a domain</span><input value={newDomain} onChange={(event) => setNewDomain(event.target.value)} placeholder="example.com" spellCheck={false} /></label><button type="submit" className="secondary-button" disabled={busy === "add-zone" || !newDomain.trim()}>{busy === "add-zone" ? "Adding…" : "Add domain"}</button></form>}
       </div>
 
       {zone && <>
