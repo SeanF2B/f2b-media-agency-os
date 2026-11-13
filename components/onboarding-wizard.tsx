@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 // Guided client onboarding (Operations → Onboarding). Saves into the existing client record and creates
 // setup checklists in the existing Tasks system — one per selected service, never duplicated.
@@ -35,6 +35,9 @@ export const ONBOARDING_SERVICES: Array<{ key: string; label: string; serviceLin
 ];
 
 const blankAnswers: OnboardingAnswers = { description: "", serviceAreas: "", targetCustomers: "", competitors: "", websiteGoal: "", websitePages: "", websiteStyle: "", websiteReferences: "", websiteNotes: "", services: [] };
+const FREE_MAIL = /(^|\.)(gmail|googlemail|hotmail|outlook|live|yahoo|icloud|me|aol|eircom|proton|protonmail|msn)\./i;
+const websiteFromEmail = (email?: string) => { const domain = String(email || "").split("@")[1]?.trim().toLowerCase() || ""; return domain && domain.includes(".") && !FREE_MAIL.test(domain) ? `https://${domain}` : ""; };
+const servicesSummary = (client?: OnboardingClient) => { const names = [...new Set((client?.services || []).map((service) => service.name).filter(Boolean))]; return names.length ? `Services with us: ${names.join(", ")}` : ""; };
 const STEPS = ["Business", "Branding", "Services", "Website brief", "Connections", "Review"] as const;
 const hex = (value: string, fallback: string) => /^#[0-9a-fA-F]{6}$/.test(value.trim()) ? value.trim().toLowerCase() : fallback;
 const servicesFromClient = (client?: OnboardingClient) => {
@@ -53,14 +56,14 @@ export function OnboardingWizard({ clients, initialClientId = "", existingSetupS
   const [error, setError] = useState("");
   const seed = (client?: OnboardingClient) => ({
     name: client?.name || "", company: client?.company || "", contact: client?.contact || "", email: client?.email || "", phone: client?.phone || "",
-    website: client?.website || client?.wordpressSiteUrl || "", logo: client?.branding?.logo || client?.logo || "",
+    website: client?.website || client?.wordpressSiteUrl || websiteFromEmail(client?.email), logo: client?.branding?.logo || client?.logo || "",
     primary: client?.branding?.primary || client?.color || "#1f2328", secondary: client?.branding?.secondary || "#6b6250",
     googleAdsAccountId: client?.googleAdsAccountId || "", metaAdsAccountId: client?.metaAdsAccountId || "", googleSearchConsoleAccountId: client?.googleSearchConsoleAccountId || "",
     googleAnalyticsAccountId: client?.googleAnalyticsAccountId || "", googleBusinessProfileLocationId: client?.googleBusinessProfileLocationId || "",
   });
   const [form, setForm] = useState(() => seed(existing));
-  const [answers, setAnswers] = useState<OnboardingAnswers>(() => ({ ...blankAnswers, serviceAreas: (existing?.seoLocations || []).join(", "), ...(existing?.onboarding || {}), services: existing?.onboarding?.services?.length ? existing.onboarding.services : servicesFromClient(existing) }));
-  const pickClient = (id: string) => { const next = clients.find((client) => client.id === id); setClientId(id); setForm(seed(next)); setAnswers({ ...blankAnswers, serviceAreas: (next?.seoLocations || []).join(", "), ...(next?.onboarding || {}), services: next?.onboarding?.services?.length ? next.onboarding.services : servicesFromClient(next) }); };
+  const [answers, setAnswers] = useState<OnboardingAnswers>(() => ({ ...blankAnswers, description: servicesSummary(existing), serviceAreas: (existing?.seoLocations || []).join(", "), ...(existing?.onboarding || {}), services: existing?.onboarding?.services?.length ? existing.onboarding.services : servicesFromClient(existing) }));
+  const pickClient = (id: string) => { const next = clients.find((client) => client.id === id); setClientId(id); setForm(seed(next)); setScrape({}); autoReadFor.current = ""; setAnswers({ ...blankAnswers, description: servicesSummary(next), serviceAreas: (next?.seoLocations || []).join(", "), ...(next?.onboarding || {}), services: next?.onboarding?.services?.length ? next.onboarding.services : servicesFromClient(next) }); };
   const set = (key: keyof typeof form) => (event: { target: { value: string } }) => setForm((current) => ({ ...current, [key]: event.target.value }));
   const setA = (key: keyof OnboardingAnswers) => (event: { target: { value: string } }) => setAnswers((current) => ({ ...current, [key]: event.target.value }));
   const already = useMemo(() => new Set(clientId ? existingSetupServices(clientId) : []), [clientId, existingSetupServices]);
@@ -78,8 +81,9 @@ export function OnboardingWizard({ clients, initialClientId = "", existingSetupS
   const fillFromWebsite = async () => {
     if (!form.website.trim()) { setScrape({ error: "Add the current website address first." }); return; }
     setScrape({ busy: true });
+    const controller = new AbortController(); const timer = window.setTimeout(() => controller.abort(), 35_000);
     try {
-      const response = await fetch("/api/onboarding-scrape", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: form.website.trim(), name: form.name }) });
+      const response = await fetch("/api/onboarding-scrape", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: form.website.trim(), name: form.name }), signal: controller.signal });
       const j = await response.json().catch(() => ({})) as Record<string, string | number>;
       if (!response.ok) throw new Error(String(j.error || "Couldn’t read the website."));
       let filled = 0;
@@ -87,8 +91,19 @@ export function OnboardingWizard({ clients, initialClientId = "", existingSetupS
       setForm((current) => ({ ...current, company: pick(current.company, j.company), contact: pick(current.contact, j.contact), email: pick(current.email, j.email), phone: pick(current.phone, j.phone), logo: current.logo || (j.logo ? (filled += 1, String(j.logo)) : ""), primary: j.primaryColour && (!existing?.branding?.primary) ? (filled += 1, String(j.primaryColour)) : current.primary, secondary: j.secondaryColour && (!existing?.branding?.secondary) ? (filled += 1, String(j.secondaryColour)) : current.secondary }));
       setAnswers((current) => ({ ...current, description: pick(current.description, [j.description, j.services ? `Services: ${j.services}` : ""].filter(Boolean).join("\n")), serviceAreas: pick(current.serviceAreas, j.serviceAreas), targetCustomers: pick(current.targetCustomers, j.idealCustomers), websitePages: pick(current.websitePages, j.websitePages) }));
       setScrape({ message: `Read ${j.pagesRead || 1} page${Number(j.pagesRead) === 1 ? "" : "s"} and filled the empty fields. Check everything before saving — existing answers weren’t changed.` });
-    } catch (reason) { setScrape({ error: reason instanceof Error ? reason.message : "Couldn’t read the website." }); }
+    } catch (reason) { setScrape({ error: reason instanceof Error && reason.name === "AbortError" ? "The website took too long to read. Fill the fields in by hand or try again." : reason instanceof Error ? reason.message : "Couldn’t read the website." }); }
+    finally { window.clearTimeout(timer); }
   };
+  // Existing clients: read their website automatically once (only when there's a site and key details are still empty).
+  const autoReadFor = useRef("");
+  useEffect(() => {
+    if (!clientId || !form.website.trim() || scrape.busy || autoReadFor.current === clientId) return;
+    const missing = [form.contact, form.email, form.phone, answers.description.startsWith("Services with us:") ? "" : answers.description, answers.targetCustomers].filter((value) => !String(value || "").trim()).length;
+    if (missing < 2 || existing?.onboarding?.completedAt) return;
+    autoReadFor.current = clientId;
+    void fillFromWebsite();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId, form.website]);
   const stepValid = step === 0 ? form.name.trim().length > 1 : step === 2 ? answers.services.length > 0 : true;
 
   const onLogo = (file?: File) => {
