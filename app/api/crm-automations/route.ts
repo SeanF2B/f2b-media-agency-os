@@ -71,6 +71,8 @@ export async function GET(request: Request) {
     if (id) {
       const row = await raw.prepare("SELECT * FROM crm_automations WHERE id=?1 AND owner_id=?2 AND scope_id=?3").bind(id, ownerId, scope).first<AutomationRow>();
       if (!row) return reply("That automation could not be found.", 404);
+      // Website forms show up here automatically once they've sent a lead (contact source "Website form · <name>").
+      const siteForms = await raw.prepare(`SELECT DISTINCT substr(source, 16) AS name FROM crm_contacts WHERE owner_id=?1 AND ${scope ? "client_id=?2" : "client_id IS NULL"} AND source LIKE 'Website form · %' LIMIT 50`).bind(...(scope ? [ownerId, scope] : [ownerId])).all<{ name: string }>().catch(() => ({ results: [] as Array<{ name: string }> }));
       const [stages, forms, tags, runs] = await Promise.all([
         raw.prepare("SELECT p.id AS pipeline_id, p.name AS pipeline_name, s.id, s.name, s.position FROM crm_pipelines p JOIN crm_pipeline_stages s ON s.owner_id=p.owner_id AND s.pipeline_id=p.id WHERE p.owner_id=?1 AND p.archived=0 ORDER BY p.created_at, s.position LIMIT 300").bind(ownerId).all<{ pipeline_id: string; pipeline_name: string; id: string; name: string }>(),
         raw.prepare(`SELECT name, kind FROM marketing_assets WHERE owner_id=?1 AND kind IN ('form','funnel','survey','calculator') AND ${scope ? "client_id=?2" : "client_id IS NULL"} ORDER BY updated_at DESC LIMIT 100`).bind(...(scope ? [ownerId, scope] : [ownerId])).all<{ name: string; kind: string }>().catch(() => ({ results: [] as Array<{ name: string; kind: string }> })),
@@ -86,7 +88,7 @@ export async function GET(request: Request) {
         automation: { ...listItem(row), definition: JSON.parse(row.definition) },
         options: {
           pipelines: [...pipelines.values()],
-          forms: (forms.results || []).map((form) => ({ name: form.name, kind: form.kind })),
+          forms: [...(forms.results || []).map((form) => ({ name: form.name, kind: form.kind })), ...(siteForms.results || []).filter((f) => f.name && !(forms.results || []).some((m) => m.name === f.name)).map((f) => ({ name: f.name, kind: "website" }))],
           tags: (tags.results || []).map((tag) => tag.tag),
           staff: (workspace.staff || []).map((member) => ({ id: member.id, name: member.name, isBot: Boolean(member.isBot) })),
           emailReady: Boolean(env.RESEND_API_KEY && env.TASK_NOTIFICATION_FROM),
