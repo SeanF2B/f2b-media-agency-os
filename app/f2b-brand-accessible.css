@@ -9106,3 +9106,9 @@ html body .app-shell .sidebar .nav-item.active, html body .app-shell .sidebar .n
 .ai-field-assist-undo { border: 0; background: #fff; border-radius: 999px; padding: 4px 9px; font: inherit; font-size: 12px; font-weight: 600; color: #475569; cursor: pointer; box-shadow: 0 4px 14px rgba(15,23,42,.12); }
 .ai-field-assist-msg { order: -1; font-size: 11px; font-weight: 600; color: #475569; background: #fff; padding: 3px 8px; border-radius: 999px; box-shadow: 0 4px 14px rgba(15,23,42,.1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
 .dark-mode .ai-field-assist-btn, .dark-mode .ai-field-assist-undo, .dark-mode .ai-field-assist-msg, html:has(.app-shell.dark-mode) .ai-field-assist-btn, html:has(.app-shell.dark-mode) .ai-field-assist-undo, html:has(.app-shell.dark-mode) .ai-field-assist-msg { background: #1f262c; color: #edf2f6; border-color: #3a444d; }
+
+/* Operations → SEO & competitors: four clear sections, one client picker; embedded SEO tools drop their own heading/tabs */
+.ops-seo-sections button { font-weight: 700; }
+.ops-embed .seo-view { padding: 0 !important; margin: 0 !important; }
+.ops-embed .seo-view-heading.is-embedded { display: flex; justify-content: flex-end; margin: 0 0 12px; padding: 0; min-height: 0; }
+.ops-embed .seo-view-heading.is-embedded .seo-view-controls { margin: 0; }
