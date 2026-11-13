@@ -1,6 +1,7 @@
 // F2B Agency OS · Invoicing: invoices, recurring invoices and subscriptions. D1 tables are CREATE TABLE IF NOT EXISTS only.
 // Recurring invoices are generated whenever the Invoicing area (or its API) is opened, so no cron change is needed.
 import { env } from "cloudflare:workers";
+import { logSystemEmail } from "@/lib/email-log";
 
 export type Item = { description: string; qty: number; unit: number };
 export type Interval = "weekly" | "monthly" | "quarterly" | "yearly";
@@ -107,4 +108,5 @@ export async function sendInvoiceEmail(inv: any, s: InvSettings, origin: string,
   const html = `<div style="font-family:system-ui,sans-serif;max-width:520px;margin:auto;color:#1c2330"><h2 style="margin:0 0 8px">Invoice ${esc(inv.number)} from ${esc(biz)}</h2><p>Hi ${esc(inv.client_name)},</p><p>Your invoice for <b>${esc(money(inv.total, inv.currency))}</b> is ready. It's due on <b>${esc(inv.due_date)}</b>.</p><p style="margin:24px 0"><a href="${link}" style="background:#2f7de1;color:#fff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:700">View invoice</a></p>${s.bankDetails ? `<p style="white-space:pre-line;color:#475467;font-size:14px"><b>How to pay</b>\n${esc(s.bankDetails)}\nReference: ${esc(inv.number)}</p>` : ""}<p style="color:#667085;font-size:13px">Thank you,<br>${esc(biz)}</p></div>`;
   const res = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json", "Idempotency-Key": `invoice/${inv.id}/${Date.now()}` }, body: JSON.stringify({ from: env.TASK_NOTIFICATION_FROM, to: [inv.client_email], reply_to: s.replyTo || adminEmail || undefined, subject: `Invoice ${inv.number} from ${biz}`, html }) });
   if (!res.ok) throw new Error(`The email could not be sent (HTTP ${res.status}).`);
+  await logSystemEmail(env.DB as never, { ownerId: inv.owner_id, clientId: inv.client_id, to: inv.client_email, name: inv.client_name, subject: `Invoice ${inv.number} from ${biz}`, text: `Hi ${inv.client_name},\n\nYour invoice ${inv.number} is ready.\n\nView and pay: ${link}` });
 }

@@ -1,4 +1,5 @@
 import handler from "vinext/server/fetch-handler";
+import { logSystemEmail } from "../lib/email-log";
 import { processDueAiTasks, processDueFinanceRecurring } from "./scheduled-ai";
 import { processDueMarketingAutomations } from "./marketing-automations";
 import { processCrmAutomations } from "../lib/crm-automations/engine.ts";
@@ -164,7 +165,7 @@ const worker = {
       } }, new Date(controller.scheduledTime)),
       processDueMarketingAutomations(env.DB!, new Date(controller.scheduledTime), async (ownerId, clientId, contactId, method, tag) => {
         await ghlLocationRequest(ownerId, clientId, `/contacts/${encodeURIComponent(contactId)}/tags`, method, { tags: [tag] }, "v3");
-      }, async (_ownerId, recipient, subject, text, idempotencyKey) => {
+      }, async (emailOwnerId, recipient, subject, text, idempotencyKey) => {
         if (!env.RESEND_API_KEY || !env.TASK_NOTIFICATION_FROM) throw new Error("Internal email delivery is unavailable: configure RESEND_API_KEY and TASK_NOTIFICATION_FROM.");
         const response = await fetch("https://api.resend.com/emails", {
           method: "POST",
@@ -176,6 +177,7 @@ const worker = {
           const detail = await response.json().catch(() => null) as { message?: string } | null;
           throw new Error(`Internal email provider returned HTTP ${response.status}: ${detail?.message || "message was not accepted"}.`);
         }
+        await logSystemEmail(env.DB as never, { ownerId: emailOwnerId, to: recipient, subject, text });
       }, async (ownerId, clientId, contactId, payload) => {
         await ghlLocationRequest(ownerId, clientId, `/contacts/${encodeURIComponent(contactId)}`, "PUT", payload, "v3");
       }, async (ownerId, clientId, contactId, nodeType, subject, message) => {

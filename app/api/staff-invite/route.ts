@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { logSystemEmail } from "@/lib/email-log";
 import { getChatGPTUser } from "../../chatgpt-auth";
 import { F2B_MEDIA_MARK_EMAIL_BASE64 } from "@/lib/f2b-media-mark-email";
 import { ensureStaffHasWorkspaceAccess } from "@/lib/cloudflare-access-staff";
@@ -61,6 +62,7 @@ export async function POST(request: Request) {
     });
     const result = await response.json().catch(() => null) as { id?: string; message?: string } | null;
     if (!response.ok || !result?.id) return Response.json({ error: `Email service returned HTTP ${response.status}: ${result?.message || "the email was not accepted"}` }, { status: 502 });
+    await logSystemEmail(env.DB as never, { to: recipient.email, name: String(recipient.name || ""), subject, text });
     return Response.json({ ok: true, accepted: true, email: recipient.email, providerId: result.id });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Could not send the team login email." }, { status: 500 });

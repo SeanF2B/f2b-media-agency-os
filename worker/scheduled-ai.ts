@@ -1,4 +1,5 @@
 import { GOOGLE_ADS_TASK_TEMPLATES, RETIRED_GOOGLE_ADS_TASK_TEMPLATE_IDS, googleAdsTemplateEnabled, nextGoogleAdsTemplateDate } from "../lib/google-ads-task-templates";
+import { logSystemEmail } from "../lib/email-log";
 import { buildGoogleAdsAuditReport } from "../lib/google-ads-audit-report";
 import { aiConfigured, aiEndpoint, aiHeaders, aiModel, resolveAiProvider } from "../lib/ai-provider";
 
@@ -900,6 +901,7 @@ async function deliverGroupedTaskEmail(env: SchedulerEnv, client: any, recipient
     const body = await response.json().catch(() => null) as { id?: string; message?: string } | null;
     if (!response.ok || !body?.id) throw new Error(`Resend returned HTTP ${response.status}: ${body?.message || "email was not accepted"}`);
     await finishGroupedEmail(env, key, true, `Resend accepted ${body.id}`, now);
+    await logSystemEmail(env.DB as never, { clientId: String(client.id || ""), to: String(recipient.email), name: String(recipient.name || ""), subject, text: plain });
     return true;
   } catch (error) {
     const detail = error instanceof Error ? error.message : "Email provider request failed";
