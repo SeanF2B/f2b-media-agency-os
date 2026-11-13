@@ -1,4 +1,5 @@
 "use client";
+import { AiEyesIcon } from "./ai-eyes-icon";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -62,15 +63,15 @@ export function ConversationsView({ scopeClientId, clients }: { scopeClientId: s
         <div className="cv-rows">{shown.length === 0 ? <p className="cv-none">{threads.length === 0 ? "No messages yet. When a customer texts your number, it shows up here." : "Nothing here."}</p> : shown.map((t) => <button type="button" key={t.id} className={`cv-row ${activeId === t.id ? "on" : ""} ${t.unread ? "unread" : ""}`} onClick={() => setActiveId(t.id)}>
           <span className={`cv-avatar ${t.channel}`}>{t.channel === "whatsapp" ? "WA" : "SMS"}</span>
           <span className="cv-row-main"><b>{title(t)}</b><small>{t.last_preview || "…"}</small>{!scopeClientId && t.client_id && <em>{clientName(t.client_id)}</em>}</span>
-          <span className="cv-row-side"><small>{ago(t.last_at)}</small>{t.status === "handoff" ? <i className="cv-pill hand">Needs you</i> : t.unread ? <i className="cv-pill">{t.unread}</i> : t.bot_on ? <i className="cv-bot" title="AI bot is replying">🤖</i> : null}</span></button>)}</div>
+          <span className="cv-row-side"><small>{ago(t.last_at)}</small>{t.status === "handoff" ? <i className="cv-pill hand">Needs you</i> : t.unread ? <i className="cv-pill">{t.unread}</i> : t.bot_on ? <i className="cv-bot" title="AI bot is replying"><AiEyesIcon /></i> : null}</span></button>)}</div>
       </aside>
       <div className="cv-chat">{!active ? <div className="cv-pick"><span>💬</span><p>Choose a conversation</p></div> : <>
         <div className="cv-chat-head"><div><b>{title(active)}</b><small>{active.channel === "whatsapp" ? "WhatsApp" : "SMS"} · {active.contact}{active.client_id ? ` · ${clientName(active.client_id)}` : ""}</small></div>
           <div className="cv-chat-actions">
-            <label className={`cv-switch ${active.bot_on ? "on" : ""}`} title="When on, the AI bot answers new messages"><input type="checkbox" checked={!!active.bot_on} disabled={busy} onChange={(e) => void act({ action: "toggle-bot", id: active.id, on: e.target.checked })} /><span>🤖 Bot {active.bot_on ? "on" : "off"}</span></label>
+            <label className={`cv-switch ${active.bot_on ? "on" : ""}`} title="When on, the AI bot answers new messages"><input type="checkbox" checked={!!active.bot_on} disabled={busy} onChange={(e) => void act({ action: "toggle-bot", id: active.id, on: e.target.checked })} /><span><AiEyesIcon /> Bot {active.bot_on ? "on" : "off"}</span></label>
             {active.status !== "closed" ? <button type="button" className="secondary-button" disabled={busy} onClick={() => void act({ action: "status", id: active.id, status: "closed" })}>✓ Close</button> : <button type="button" className="secondary-button" disabled={busy} onClick={() => void act({ action: "status", id: active.id, status: "open" })}>Reopen</button>}</div></div>
         {active.status === "handoff" && <div className="cv-banner">🙋 The bot handed this one to you. Reply below, or switch the bot back on.</div>}
-        <div className="cv-msgs">{messages.map((m) => <div key={m.id} className={`cv-msg ${m.direction === "in" ? "in" : "out"} ${m.sender}`}><div className="cv-bubble">{m.body}{m.error && <small className="cv-fail">Not delivered: {m.error}</small>}</div><small>{m.sender === "bot" ? "🤖 AI bot" : m.sender === "staff" ? "You" : title(active)} · {new Date(m.created_at).toLocaleString("en-GB", { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}</small></div>)}<div ref={endRef} /></div>
+        <div className="cv-msgs">{messages.map((m) => <div key={m.id} className={`cv-msg ${m.direction === "in" ? "in" : "out"} ${m.sender}`}><div className="cv-bubble">{m.body}{m.error && <small className="cv-fail">Not delivered: {m.error}</small>}</div><small>{m.sender === "bot" ? <><AiEyesIcon /> AI bot</> : m.sender === "staff" ? "You" : title(active)} · {new Date(m.created_at).toLocaleString("en-GB", { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}</small></div>)}<div ref={endRef} /></div>
         <form className="cv-compose" onSubmit={(e) => { e.preventDefault(); void send(); }}>
           <textarea value={text} rows={2} maxLength={1500} placeholder="Write a reply… (Enter to send, Shift+Enter for a new line)" onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }} />
           <div><button type="button" className="secondary-button" disabled={busy} onClick={() => void draft()}>✨ Draft with AI</button><button type="submit" className="primary-button" disabled={busy || !text.trim()}>Send</button></div>

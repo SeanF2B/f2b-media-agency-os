@@ -162,8 +162,13 @@ function jsonError(message: string, status: number) { return Response.json({ err
 
 async function saveNativeCrmSubmission(asset: PublicAsset, fields: Field[], values: MarketingValues, submissionId: string, now: string, capture: unknown) {
   if (!env.DB) throw new Error("The private workspace database is unavailable.");
-  const mapped = buildMarketingContactPayload(fields, values, "", `Website form · ${asset.name}`);
-  if (!mapped) return { status: "skipped", detail: "Add an email or phone field to create a CRM contact." };
+  // Every submission becomes a contact. Forms without an email or phone field
+  // still create one, named from any name-like answer (or the form itself).
+  const mapped: Record<string, string> = buildMarketingContactPayload(fields, values, "", `Website form · ${asset.name}`) || (() => {
+    const answers = fields.map((field) => ({ label: String(field.label || ""), value: typeof values[String(field.id || "")] === "string" ? String(values[String(field.id || "")]).trim() : "" })).filter((item) => item.value && item.value.length <= 120);
+    const named = answers.find((item) => /name/i.test(item.label)) || answers.find((item) => !/@|^\d+$/.test(item.value));
+    return { name: named?.value || `${asset.name} lead`, email: "", phone: "" };
+  })();
   const email = String(mapped.email || "").trim().toLowerCase();
   const phone = String(mapped.phone || "").trim();
   const contact = await env.DB.prepare("SELECT id FROM crm_contacts WHERE owner_id=?1 AND COALESCE(client_id,'')=COALESCE(?2,'') AND ((?3<>'' AND lower(email)=?3) OR (?4<>'' AND phone=?4)) ORDER BY updated_at DESC LIMIT 1").bind(asset.owner_id, asset.client_id, email, phone).first<{ id: string }>();

@@ -21,3 +21,15 @@ export function toWhatsAppNumber(value: string) {
   if (/^0\d{8,10}$/.test(digits)) return `353${digits.slice(1)}`;
   return digits;
 }
+
+export function SmsActionIcon({ className = "" }: { className?: string }) {
+  return <svg className={className} viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M4 3h16a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H8l-4.6 3.45A.9.9 0 0 1 2 20.73V5a2 2 0 0 1 2-2Zm3 6.25a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5Zm5 0a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5Zm5 0a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5Z" /></svg>;
+}
+
+export function EmailActionIcon({ className = "" }: { className?: string }) {
+  return <svg className={className} viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm0 3.2V18h16V7.2l-7.4 5.18a1 1 0 0 1-1.2 0L4 7.2ZM5.3 6l6.7 4.7L18.7 6H5.3Z" /></svg>;
+}
+
+export function toSmsHref(value: string) {
+  return toPhoneHref(value).replace(/^tel:/, "sms:");
+}

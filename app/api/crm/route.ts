@@ -40,6 +40,13 @@ async function ensureOrderTable(db: D1Database) {
   await db.prepare("CREATE TABLE IF NOT EXISTS crm_opportunity_order (owner_id TEXT NOT NULL, opportunity_id TEXT NOT NULL, sort_order REAL NOT NULL, PRIMARY KEY (owner_id, opportunity_id))").run();
 }
 
+// Spam / do-not-disturb flags live in their own small table so no migration is needed.
+const flagTableSql = "CREATE TABLE IF NOT EXISTS crm_flags (owner_id TEXT NOT NULL, kind TEXT NOT NULL, ref_id TEXT NOT NULL, flag TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (owner_id, kind, ref_id, flag))";
+async function readFlags(db: D1Database, ownerId: string) {
+  try { return ((await db.prepare("SELECT kind, ref_id, flag FROM crm_flags WHERE owner_id = ?1").bind(ownerId).all<{ kind: string; ref_id: string; flag: string }>()).results || []); }
+  catch { return []; } // table not created yet — nothing flagged
+}
+
 async function ensurePipeline(db: D1Database, ownerId: string) {
   const existing = await db.prepare("SELECT id FROM crm_pipelines WHERE owner_id = ?1 AND archived = 0 ORDER BY created_at LIMIT 1").bind(ownerId).first<{ id: string }>();
   if (existing) return;
@@ -82,6 +89,7 @@ export async function GET(request: Request) {
       db.prepare(`SELECT o.*, c.first_name, c.last_name, c.email, c.phone, c.company, s.name AS stage_name FROM crm_opportunities o LEFT JOIN crm_contacts c ON c.id = o.contact_id AND c.owner_id = o.owner_id LEFT JOIN crm_pipeline_stages s ON s.id = o.stage_id AND s.owner_id = o.owner_id WHERE o.owner_id = ?1 AND o.pipeline_id IN (SELECT p.id FROM crm_pipelines p WHERE p.owner_id = ?1${pipeWhere}) ORDER BY o.updated_at DESC LIMIT 2000`).bind(...scopeArgs).all<Record<string, unknown>>(),
       db.prepare("SELECT * FROM crm_activities WHERE owner_id = ?1 ORDER BY created_at DESC LIMIT 1000").bind(ownerId).all<Record<string, unknown>>(),
     ]);
+    const flags = await readFlags(db, ownerId);
     const orderRows = await db.prepare("SELECT opportunity_id, sort_order FROM crm_opportunity_order WHERE owner_id = ?1").bind(ownerId).all<{ opportunity_id: string; sort_order: number }>();
     const orderByOpportunity = new Map((orderRows.results || []).map((row) => [row.opportunity_id, row.sort_order] as const));
     const pipelines = new Map<string, PipelineView>();
@@ -91,7 +99,7 @@ export async function GET(request: Request) {
     }
     const visibleOpps = new Set((opportunityRows.results || []).map((row) => String(row.id))), visibleContacts = new Set((contacts.results || []).map((row) => String(row.id)));
     const matches = (item: Record<string, unknown>) => !search || [item.title, item.first_name, item.last_name, item.email, item.company].some((value) => String(value || "").toLowerCase().includes(search));
-    return Response.json({ contacts: contacts.results || [], pipelines: [...pipelines.values()], opportunities: (opportunityRows.results || []).map((row) => ({ ...row, sort_order: orderByOpportunity.has(String(row.id)) ? orderByOpportunity.get(String(row.id)) : null })).filter(matches), activities: (activityRows.results || []).filter((a) => !scope || visibleOpps.has(String(a.opportunity_id)) || visibleContacts.has(String(a.contact_id))), clients: (workspace.clients || []).map((item) => ({ id: String(item.id), name: String(item.name), company: String(item.company || ""), logo: String(item.logo || ""), contact: String(item.contact || ""), email: String(item.email || ""), phone: String(item.phone || "") })), staff: (workspace.staff || []).filter((item) => !item.isBot).map((item) => ({ id: String(item.id), name: String(item.name), avatar: String(item.avatar || "") })) }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json({ flags, contacts: contacts.results || [], pipelines: [...pipelines.values()], opportunities: (opportunityRows.results || []).map((row) => ({ ...row, sort_order: orderByOpportunity.has(String(row.id)) ? orderByOpportunity.get(String(row.id)) : null })).filter(matches), activities: (activityRows.results || []).filter((a) => !scope || visibleOpps.has(String(a.opportunity_id)) || visibleContacts.has(String(a.contact_id))), clients: (workspace.clients || []).map((item) => ({ id: String(item.id), name: String(item.name), company: String(item.company || ""), logo: String(item.logo || ""), contact: String(item.contact || ""), email: String(item.email || ""), phone: String(item.phone || "") })), staff: (workspace.staff || []).filter((item) => !item.isBot).map((item) => ({ id: String(item.id), name: String(item.name), avatar: String(item.avatar || "") })) }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) { return reply(error instanceof Error ? error.message : "Could not load CRM records.", 500); }
 }
 
@@ -138,11 +146,22 @@ export async function POST(request: Request) {
       const id = clean(body.id, 80) || crypto.randomUUID(), email = clean(body.email, 254).toLowerCase();
       const firstName = clean(body.firstName, 100), lastName = clean(body.lastName, 100);
       if (!firstName && !lastName && !email && !clean(body.phone, 40)) return reply("Add at least a name, email, or phone number.");
-      const clientId = clean(body.clientId, 100) || null;
+      // Inside a client sub-account, new contacts belong to that client so they show in its list.
+      const clientId = clean(body.clientId, 100) || (crmScopeFrom(request) as { clientId: string | null } | null)?.clientId || null;
       if (clientId && !(access.workspace.clients || []).some((item) => String(item.id) === clientId)) return reply("Choose a client in this workspace.");
       const sql = "INSERT INTO crm_contacts (id, owner_id, client_id, first_name, last_name, email, phone, company, source, notes, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?11) ON CONFLICT(id) DO UPDATE SET client_id=excluded.client_id, first_name=excluded.first_name, last_name=excluded.last_name, email=excluded.email, phone=excluded.phone, company=excluded.company, notes=excluded.notes, updated_at=excluded.updated_at WHERE crm_contacts.owner_id=excluded.owner_id";
       await db.prepare(sql).bind(id, ownerId, clientId, firstName, lastName, email, clean(body.phone, 40), clean(body.company, 200), clean(body.source, 100) || "manual", clean(body.notes, 4000), now).run();
       return Response.json({ ok: true, id });
+    }
+    if (action === "setFlag") {
+      const kind = clean(body.kind, 20), refId = clean(body.refId, 80), flag = clean(body.flag, 20);
+      if (!["contact", "opportunity"].includes(kind) || !["spam", "dnd"].includes(flag) || !refId) return reply("Choose a contact or card and a flag.");
+      const table = kind === "contact" ? "crm_contacts" : "crm_opportunities";
+      if (!await db.prepare(`SELECT id FROM ${table} WHERE owner_id=?1 AND id=?2`).bind(ownerId, refId).first()) return reply("That record is no longer available.", 404);
+      await db.prepare(flagTableSql).run();
+      if (body.on === false) await db.prepare("DELETE FROM crm_flags WHERE owner_id=?1 AND kind=?2 AND ref_id=?3 AND flag=?4").bind(ownerId, kind, refId, flag).run();
+      else await db.prepare("INSERT OR IGNORE INTO crm_flags (owner_id, kind, ref_id, flag, created_at) VALUES (?1,?2,?3,?4,?5)").bind(ownerId, kind, refId, flag, now).run();
+      return Response.json({ ok: true });
     }
     if (action === "createPipeline") {
       const name = clean(body.name, 120); if (!name) return reply("Enter a pipeline name.");
@@ -275,10 +294,23 @@ export async function POST(request: Request) {
         const pipeline = await db.prepare("SELECT id FROM crm_pipelines WHERE owner_id=?1 AND id=?2 AND archived=0").bind(ownerId, clean(body.pipelineId, 80)).first();
         const stage = await db.prepare("SELECT id FROM crm_pipeline_stages WHERE owner_id=?1 AND pipeline_id=?2 AND id=?3").bind(ownerId, clean(body.pipelineId, 80), clean(body.stageId, 80)).first();
         if (!pipeline || !stage || !clean(body.title, 200)) return reply("Choose a pipeline, stage, and opportunity name.");
-        const contactId = clean(body.contactId, 80) || null;
+        let contactId = clean(body.contactId, 80) || null;
         if (contactId && !await db.prepare("SELECT id FROM crm_contacts WHERE owner_id=?1 AND id=?2").bind(ownerId, contactId).first()) return reply("That contact is not in this workspace.");
-        const clientId = clean(body.clientId, 100) || null;
+        const clientId = clean(body.clientId, 100) || (crmScopeFrom(request) as { clientId: string | null } | null)?.clientId || null;
         if (clientId && !(access.workspace.clients || []).some((item) => String(item.id) === clientId)) return reply("Choose a client in this workspace.");
+        if (!contactId) {
+          // Every manually added opportunity also becomes a contact.
+          const nc = body.newContact && typeof body.newContact === "object" ? body.newContact as Record<string, unknown> : {};
+          const email = clean(nc.email, 254).toLowerCase(), phone = clean(nc.phone, 40);
+          const existing = email || phone ? await db.prepare("SELECT id FROM crm_contacts WHERE owner_id=?1 AND COALESCE(client_id,'')=COALESCE(?2,'') AND ((?3<>'' AND lower(email)=?3) OR (?4<>'' AND phone=?4)) LIMIT 1").bind(ownerId, clientId, email, phone).first<{ id: string }>() : null;
+          if (existing) contactId = existing.id;
+          else {
+            const typed = [clean(nc.firstName, 100), clean(nc.lastName, 100)].filter(Boolean);
+            const parts = typed.length ? typed : clean(body.title, 200).split(/\s+/).filter(Boolean);
+            contactId = crypto.randomUUID();
+            await db.prepare("INSERT INTO crm_contacts (id, owner_id, client_id, first_name, last_name, email, phone, company, source, notes, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'manual', '', ?9, ?9)").bind(contactId, ownerId, clientId, (typed.length ? typed[0] : parts[0] || "").slice(0, 100), (typed.length ? typed.slice(1).join(" ") : parts.slice(1).join(" ")).slice(0, 100), email, phone, clean(nc.company, 200), now).run();
+          }
+        }
         const assignedTo = clean(body.assignedTo, 80) || null;
         if (assignedTo && !(access.workspace.staff || []).some((item) => item.id === assignedTo)) return reply("Choose a teammate in this workspace.");
         await db.prepare("INSERT INTO crm_opportunities (id, owner_id, pipeline_id, stage_id, contact_id, client_id, title, value, currency, assigned_to, expected_close_date, source, notes, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'manual', ?12, ?13, ?13)").bind(id, ownerId, clean(body.pipelineId, 80), clean(body.stageId, 80), contactId, clientId, clean(body.title, 200), Math.max(0, Number(body.value) || 0), clean(body.currency, 3) || "EUR", assignedTo, clean(body.expectedCloseDate, 20) || null, clean(body.notes, 4000), now).run();
@@ -295,9 +327,9 @@ export async function POST(request: Request) {
         const nc = body.newContact && typeof body.newContact === "object" ? body.newContact as Record<string, unknown> : null;
         if (nc && (clean(nc.firstName, 100) || clean(nc.lastName, 100) || clean(nc.email, 254) || clean(nc.phone, 40))) {
           contactId = crypto.randomUUID();
-          await db.prepare("INSERT INTO crm_contacts (id, owner_id, client_id, first_name, last_name, email, phone, company, source, notes, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'manual', '', ?9, ?9)").bind(contactId, ownerId, clean(body.clientId, 100) || null, clean(nc.firstName, 100), clean(nc.lastName, 100), clean(nc.email, 254).toLowerCase(), clean(nc.phone, 40), clean(nc.company, 200), now).run();
+          await db.prepare("INSERT INTO crm_contacts (id, owner_id, client_id, first_name, last_name, email, phone, company, source, notes, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'manual', '', ?9, ?9)").bind(contactId, ownerId, clean(body.clientId, 100) || (crmScopeFrom(request) as { clientId: string | null } | null)?.clientId || null, clean(nc.firstName, 100), clean(nc.lastName, 100), clean(nc.email, 254).toLowerCase(), clean(nc.phone, 40), clean(nc.company, 200), now).run();
         } else if (contactId && !await db.prepare("SELECT id FROM crm_contacts WHERE owner_id=?1 AND id=?2").bind(ownerId, contactId).first()) return reply("That contact is not in this workspace.");
-        const clientId = clean(body.clientId, 100) || null;
+        const clientId = clean(body.clientId, 100) || (crmScopeFrom(request) as { clientId: string | null } | null)?.clientId || null;
         if (clientId && !(access.workspace.clients || []).some((item) => String(item.id) === clientId)) return reply("Choose a client in this workspace.");
         await db.prepare("UPDATE crm_opportunities SET contact_id=?1, client_id=?2 WHERE owner_id=?3 AND id=?4").bind(contactId, clientId, ownerId, id).run();
       }

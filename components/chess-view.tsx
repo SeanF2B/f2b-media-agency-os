@@ -1,4 +1,5 @@
 "use client";
+import { AiIcon } from "./ai-eyes-icon";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Chess, type Square } from "chess.js";
@@ -332,7 +333,7 @@ export function ChessView({ staff, currentUserId, canPlay = true, openInviteId =
   const timeLabel = (game: Game) => game.timeControl === "inf" ? "Infinite time" : game.timeControl === "3d" ? "3 days per player" : game.timeControl;
   const isParticipant = (game: Game) => game.whiteId === currentUserId || game.blackId === currentUserId || game.challengedId === currentUserId;
   const ownTurn = (game: Game) => game.status === "active" && game.whiteId === currentUserId && game.fen.split(" ")[1] === "w" || game.status === "active" && game.blackId === currentUserId && game.fen.split(" ")[1] === "b";
-  const playerAvatar = (id: string, name: string) => { const avatar = people.find((person) => person.id === id)?.avatar || (id === "chess-ai" ? aiAvatar : name.slice(0, 1).toUpperCase()); const image = /^(data:image\/|https:\/\/)/.test(avatar); return <span className="chess-player-avatar" aria-label={`${name} profile`} style={image ? { backgroundImage: `url(${avatar})` } : undefined}>{image ? "" : avatar}</span>; };
+  const playerAvatar = (id: string, name: string) => { const avatar = people.find((person) => person.id === id)?.avatar || (id === "chess-ai" ? aiAvatar : name.slice(0, 1).toUpperCase()); const image = /^(data:image\/|https:\/\/)/.test(avatar); return <span className="chess-player-avatar" aria-label={`${name} profile`} style={image ? { backgroundImage: `url(${avatar})` } : undefined}>{image ? "" : <AiIcon v={avatar} />}</span>; };
   const options = useMemo(() => people.filter((p) => p.id !== currentUserId), [people, currentUserId]);
   useEffect(() => {
     if (!online) return;
