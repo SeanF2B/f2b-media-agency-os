@@ -8569,3 +8569,9 @@ body.task-card-drag-active .bot-live:not(.pipeline-card-drag-preview .bot-live) 
 
 /* AI agent icons: show the whole shape (no round crop, disc, border or ring) wherever an agent icon appears. */
 [style*="data:image/svg+xml;base64"] { border-radius:0!important; border:0!important; box-shadow:none!important; background-color:transparent!important; background-size:contain!important; background-repeat:no-repeat!important; background-position:center!important; overflow:visible!important; }
+
+/* Task cards: never clip the AI agent bot. The name text keeps its own ellipsis; the bot gets room to sway and droop. */
+.app-shell .pipeline-card-footer-identity, .app-shell .pipeline-card-footer-identity .assignee-chip, .app-shell .pipeline-card-footer { overflow:visible !important; }
+.app-shell .assignee-chip > .bot-live { margin:3px 2px 3px 3px; }
+.app-shell .assignee-chip > span:last-child:not(.bot-live) { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+.bot-live, .bot-body { overflow:visible !important; }
