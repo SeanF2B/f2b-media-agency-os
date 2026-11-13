@@ -9169,3 +9169,9 @@ html body .app-shell .sidebar .nav-item.active, html body .app-shell .sidebar .n
 .dark-mode .fsub-date input, .dark-mode .fsub-pager select { background: #1f262c; color: #edf2f6; border-color: #3a444d; }
 .dark-mode .fsub-spark i { background: #3a444d; }
 .dark-mode .fsub-spark i.on { background: var(--brand-primary, #1677c8); }
+.ops-actions a.secondary-button { text-decoration: none; display: inline-flex; align-items: center; }
+.ops-icon-button { display: inline-grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--f2b-border, #d9dee3); border-radius: 8px; background: var(--f2b-white, #fff); color: var(--brand-primary, #1677c8); cursor: pointer; transition: transform .2s ease, border-color .15s ease; }
+.ops-icon-button:hover { border-color: var(--brand-primary, #1677c8); }
+.ops-icon-button:hover svg { transform: rotate(45deg); }
+.ops-icon-button svg { transition: transform .3s ease; }
+.dark-mode .ops-icon-button { background: #1f262c; border-color: #3a444d; color: #edf2f6; }
