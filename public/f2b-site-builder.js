@@ -48,6 +48,7 @@
 .sb-card svg{width:100%;height:auto;display:block;border-radius:6px;background:var(--bg)}.sb-card b{font-size:12.5px}
 .sb-field{display:grid;gap:5px}.sb-field label,.sb-lab{font-weight:700;font-size:12.5px}
 .sb-count{font-size:12px;color:var(--mut);justify-self:end}.sb-count.over{color:var(--danger);font-weight:800}
+.sb-og{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;color:#202124;font-family:Arial,sans-serif}.sb-og img{width:100%;aspect-ratio:1.91/1;object-fit:cover;display:block}.sb-og-empty{aspect-ratio:1.91/1;display:grid;place-items:center;background:#f1f3f4;color:#5f6368;font-size:12px}.sb-og-text{display:grid;gap:2px;padding:8px 10px}.sb-og-text small{color:#5f6368;font-size:11px;text-transform:uppercase}.sb-og-text b{font-size:14px}.sb-og-text span{font-size:12px;color:#5f6368}.sb-suggest{display:grid;gap:8px}.sb-suggest-row{display:flex;gap:8px;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:10px;padding:8px}.sb-suggest-row small{display:block;color:var(--mut);font-size:11px}.sb-suggest-row span{font-size:13px}
 .sb-google{border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff;color:#202124;display:grid;gap:2px;font-family:Arial,sans-serif}
 .sb-google .u{font-size:12px;color:#4d5156;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.sb-google .t{font-size:19px;line-height:1.25;color:#1a0dab}.sb-google .d{font-size:13px;color:#4d5156}
 .sb-checks{display:grid;gap:4px;font-size:12.5px}.sb-checks .ok{color:var(--ok)}.sb-checks .no{color:var(--mut)}
@@ -385,6 +386,27 @@
         const titleIn = bind(seo, 'title', h('input', { value: seo.title || '', disabled, 'aria-label': 'SEO title' }));
         const descIn = bind(seo, 'description', h('textarea', { rows: 4, disabled, 'aria-label': 'SEO description' }, seo.description || ''));
         const kwIn = bind(seo, 'focusKeyword', h('input', { value: seo.focusKeyword || '', disabled, placeholder: 'e.g. roofers galway' }));
+        const canonIn = bind(seo, 'canonical', h('input', { value: seo.canonical || '', disabled, placeholder: 'Leave empty to use this page’s own address', 'aria-label': 'Canonical URL' }));
+        const noindexIn = h('input', { type: 'checkbox', checked: seo.noindex === true, disabled }); noindexIn.addEventListener('change', () => { if (noindexIn.checked) seo.noindex = true; else delete seo.noindex; typed(); updateSeoBits(); });
+        const ogTitleIn = bind(seo, 'ogTitle', h('input', { value: seo.ogTitle || '', disabled, placeholder: 'Defaults to the SEO title', 'aria-label': 'Social sharing title' }));
+        const ogDescIn = bind(seo, 'ogDescription', h('textarea', { rows: 2, disabled, placeholder: 'Defaults to the SEO description', 'aria-label': 'Social sharing description' }, seo.ogDescription || ''));
+        const ogImgIn = bind(seo, 'ogImage', h('input', { value: seo.ogImage || '', disabled, placeholder: 'https://… image, 1200×630 works best', 'aria-label': 'Social sharing image' }));
+        const ogCard = h('div', { class: 'sb-og' });
+        const suggestBtn = h('button', { type: 'button', class: 'sb-btn', disabled }, '✨ Suggest with Grok');
+        suggestBtn.addEventListener('click', async () => {
+          if (!S.page) return;
+          suggestBtn.disabled = true; suggestBtn.textContent = 'Thinking…';
+          try {
+            const text = JSON.stringify(S.page.blocks || []).replace(/"(id|type|image|images|buttonLink|link|side)":"[^"]*"/g, '').replace(/[{}\[\]"]/g, ' ').slice(0, 6000) + ' ' + String(S.page.raw?.body || '').replace(/<[^>]+>/g, ' ').slice(0, 4000);
+            const r = await fetch('/api/seo-suggest', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ clientId, pageTitle: S.page.title, url: S.page.url, focusKeyword: seo.focusKeyword, title: seo.title, description: seo.description, text }) });
+            const j = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(j.error || 'No suggestions');
+            const apply = (label, key, value, input) => value ? h('div', { class: 'sb-suggest-row' }, h('div', {}, h('small', {}, label), h('span', {}, value)), h('button', { type: 'button', class: 'sb-btn', onclick: (e) => { if (key === 'url') { if (S.slug !== 'home') { S.page.url = '/' + value + '/'; addr.value = S.page.url; } } else { seo[key] = value; input.value = value; } typed(); updateSeoBits(); e.target.textContent = 'Applied'; e.target.disabled = true; } }, 'Use')) : null;
+            suggestBox.replaceChildren(h('div', { class: 'sb-lab' }, 'Grok suggestions — nothing changes until you click Use'), apply('SEO title', 'title', j.title, titleIn), apply('SEO description', 'description', j.description, descIn), S.slug !== 'home' ? apply('Page address', 'url', j.slug, addr) : null, apply('Social title', 'ogTitle', j.ogTitle, ogTitleIn), apply('Social description', 'ogDescription', j.ogDescription, ogDescIn), j.note ? h('small', { style: 'color:var(--mut)' }, j.note) : null);
+          } catch (e) { toast(e.message || 'No suggestions', 'err'); }
+          finally { suggestBtn.disabled = disabled; suggestBtn.textContent = '✨ Suggest with Grok'; }
+        });
+        const suggestBox = h('div', { class: 'sb-suggest' });
         const tc = h('span'), dc = h('span'), g = h('div', { class: 'sb-google' }), checks = h('div', { class: 'sb-checks' });
         const host = (S.list.previewUrl || '').replace(/^https?:\/\//, '').replace(/\/$/, '') || 'yourwebsite.com';
         function updateSeoBits() {
@@ -394,6 +416,8 @@
           g.replaceChildren(h('div', { class: 'u' }, host + (pathShown ? ' › ' + pathShown : '')), h('div', { class: 't' }, (seo.title || S.page.title || 'Page title').slice(0, 70) + ((seo.title || '').length > 70 ? '…' : '')), h('div', { class: 'd' }, (seo.description || 'Add a description so people know what to expect.').slice(0, 170)));
           const kw = (seo.focusKeyword || '').trim().toLowerCase(); const c = (ok, text) => h('div', { class: ok ? 'ok' : 'no' }, (ok ? '✓ ' : '○ ') + text);
           checks.replaceChildren(...(kw ? [c((seo.title || '').toLowerCase().includes(kw), 'Keyword is in the SEO title'), c((seo.description || '').toLowerCase().includes(kw), 'Keyword is in the description'), c((S.page.url || '').replace(/-/g, ' ').includes(kw) || (S.page.url || '').includes(kw.replace(/\s+/g, '-')), 'Keyword is in the page address'), c(JSON.stringify(S.page.blocks).toLowerCase().includes(kw), 'Keyword appears on the page')] : [h('div', { class: 'no' }, 'Add a focus keyword to see SEO checks.')]));
+          const imgUrl = (seo.ogImage || '').trim();
+          ogCard.replaceChildren(imgUrl ? h('img', { src: /^https:\/\//.test(imgUrl) ? imgUrl : (S.list.previewUrl || '') + imgUrl, alt: '' }) : h('div', { class: 'sb-og-empty' }, 'No social image'), h('div', { class: 'sb-og-text' }, h('small', {}, host), h('b', {}, (seo.ogTitle || seo.title || S.page.title || 'Page title').slice(0, 70)), h('span', {}, (seo.ogDescription || seo.description || '').slice(0, 120))));
           renderTop();
         }
         pane.append(h('div', { class: 'sb-field' }, h('label', {}, 'Page name (only you see this)'), pageName),
@@ -401,7 +425,15 @@
           h('div', { class: 'sb-field' }, h('div', { style: 'display:flex;justify-content:space-between' }, h('label', {}, 'SEO title'), tc), titleIn),
           h('div', { class: 'sb-field' }, h('div', { style: 'display:flex;justify-content:space-between' }, h('label', {}, 'SEO description'), dc), descIn),
           h('div', { class: 'sb-field' }, h('label', {}, 'Focus keyword'), kwIn),
-          h('div', { class: 'sb-lab' }, 'How it looks on Google'), g, checks);
+          h('div', { class: 'sb-lab' }, 'How it looks on Google'), g, checks, suggestBtn, suggestBox,
+          h('div', { class: 'sb-lab' }, 'Indexing'),
+          h('label', { class: 'sb-check' }, noindexIn, 'Hide this page from Google (noindex)'),
+          h('div', { class: 'sb-field' }, h('label', {}, 'Canonical URL'), canonIn, h('small', { style: 'color:var(--mut)' }, 'Only set this if another page is the main version of this content.')),
+          h('div', { class: 'sb-lab' }, 'Social sharing'),
+          h('div', { class: 'sb-field' }, h('label', {}, 'Share title'), ogTitleIn),
+          h('div', { class: 'sb-field' }, h('label', {}, 'Share description'), ogDescIn),
+          h('div', { class: 'sb-field' }, h('label', {}, 'Share image'), ogImgIn),
+          ogCard);
         updateSeoBits();
       } else if (S.tab === 'style') {
         const c = clone(S.config), t = c.theme;

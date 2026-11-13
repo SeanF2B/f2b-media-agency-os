@@ -49,6 +49,19 @@ export function normalizePage(SiteError, page, slug) {
   if (!page || typeof page !== 'object') throw err(SiteError, 400, 'Send the page content.');
   const seo = page.seo && typeof page.seo === 'object' ? page.seo : {};
   const clean = { title: str(seo.title, 400).trim(), description: str(seo.description, 1000).trim(), focusKeyword: str(seo.focusKeyword, 200).trim() };
+  // Canonical URL, index/noindex and social sharing (Open Graph / Twitter). Optional; validated here so the
+  // OS renderer and Astro client sites can trust them.
+  const canonical = str(seo.canonical, 500).trim();
+  if (canonical && !/^(https:\/\/[a-z0-9.-]+\.[a-z]{2,}(\/[^\s"<>]*)?|\/[a-z0-9\-/]*)$/i.test(canonical)) throw err(SiteError, 400, 'The canonical URL must be a full https:// address or a page path like /roof-repair/.', { field: 'seo.canonical' });
+  if (canonical) clean.canonical = canonical;
+  if (seo.noindex === true) clean.noindex = true;
+  const ogTitle = str(seo.ogTitle, 200).trim(), ogDescription = str(seo.ogDescription, 400).trim(), ogImage = str(seo.ogImage, 1000).trim();
+  if (ogTitle.length > 70) throw err(SiteError, 400, `The social title is ${ogTitle.length} characters. Keep it to 70 or fewer.`, { field: 'seo.ogTitle' });
+  if (ogDescription.length > 200) throw err(SiteError, 400, `The social description is ${ogDescription.length} characters. Keep it to 200 or fewer.`, { field: 'seo.ogDescription' });
+  if (ogImage && !/^(https:\/\/[^\s"<>]+|\/[^\s"<>]+)$/i.test(ogImage)) throw err(SiteError, 400, 'The social image must be an https:// image address or a site path like /images/share.jpg.', { field: 'seo.ogImage' });
+  if (ogTitle) clean.ogTitle = ogTitle;
+  if (ogDescription) clean.ogDescription = ogDescription;
+  if (ogImage) clean.ogImage = ogImage;
   if (clean.title.length > SEO.title) throw err(SiteError, 400, `The SEO title is ${clean.title.length} characters. Keep it to ${SEO.title} or fewer.`, { field: 'seo.title' });
   if (clean.description.length > SEO.description) throw err(SiteError, 400, `The SEO description is ${clean.description.length} characters. Keep it to ${SEO.description} or fewer.`, { field: 'seo.description' });
   if (!Array.isArray(page.blocks)) throw err(SiteError, 400, 'The page needs a list of sections.');
