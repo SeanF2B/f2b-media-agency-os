@@ -8529,7 +8529,7 @@ html body .app-shell.app-shell button[role="tab"] > span:last-child:not(:first-c
 .bot-bubble{position:absolute;top:-7px;right:-4px;font-size:13px;font-weight:700;color:var(--brand-primary,#42baff);letter-spacing:1px;animation:bot-sigh 3.4s ease-in-out infinite;pointer-events:none}
 /* Done: relaxed, slow breathing sway, content closed eyes, soft smile */
 .bot-relax .bot-body{animation:bot-relax 4s ease-in-out infinite}
-.bot-relax .bot-pupil{animation:none;transform:translate(-50%,-10%) scaleY(.3)}
+.bot-relax .bot-pupil{transform:translate(calc(-50% + var(--lx)),calc(-50% + var(--ly)));transform-origin:50% 50%;animation:bot-content 5.2s ease-in-out infinite}
 .bot-relax .bot-mouth{width:20%;height:9%}
 @keyframes bot-blink{0%,92%,100%{scale:1 1}95%{scale:1 .12}}
 @keyframes bot-eager{0%,55%,100%{transform:translateY(0) scale(1)}62%{transform:translateY(-4px) scale(1.04)}70%{transform:translateY(0) scale(.97)}78%{transform:translateY(-2px)}86%{transform:translateY(0)}}
@@ -8539,6 +8539,7 @@ html body .app-shell.app-shell button[role="tab"] > span:last-child:not(:first-c
 @keyframes bot-droop{0%,100%{transform:rotate(0) translateY(0)}35%,65%{transform:rotate(-8deg) translateY(2px)}}
 @keyframes bot-roll{0%,40%,100%{translate:0 0}50%{translate:.9px -1.2px}60%{translate:-.9px -1.2px}70%{translate:0 0}}
 @keyframes bot-sigh{0%,100%{opacity:0;transform:translateY(2px)}40%,70%{opacity:1;transform:translateY(-2px)}}
+@keyframes bot-content{0%,58%,82%,100%{scale:1 1}64%,76%{scale:1 .12}}
 @keyframes bot-relax{0%,100%{transform:translateY(0) rotate(-2deg) scale(1)}50%{transform:translateY(1px) rotate(2deg) scale(1.04)}}
 @media (prefers-reduced-motion:reduce){.bot-live,.bot-live *{animation:none!important}}
 .pipeline-card-drag-preview .bot-live{animation:bot-spin .9s ease-in-out infinite!important}

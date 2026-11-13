@@ -38,6 +38,7 @@ import { estimatePersonalTax, estimateCompanyTax, taxCountry, TAX_COUNTRIES, typ
 import { BusinessSettings } from "@/components/business-settings";
 import { applyBranding, extractLogoColours, useBranding, type Branding } from "@/lib/branding";
 import { approvalEvidenceBlockReason, canCloseAiTask, canResumeAiTaskRun, hasRunnablePendingApproval, isApprovalReady } from "@/lib/ai-task-lifecycle";
+import { agentIconFor, withAgentIcon } from "@/lib/agent-icons";
 import { GOOGLE_ADS_TASK_TEMPLATES, RETIRED_GOOGLE_ADS_TASK_TEMPLATE_IDS, defaultGoogleAdsTaskSettings, googleAdsTemplateEnabled, nextGoogleAdsTemplateDate, type GoogleAdsTaskSettings } from "@/lib/google-ads-task-templates";
 
 type ServiceLine = { name: string; fee: number; mediaSpend: number; campaignName?: string; landingPageUrl?: string; landingPagePlatform?: "WordPress" | "GoHighLevel" | "Other" };
@@ -202,7 +203,7 @@ function withAiTeammates(staff: Staff[], hiddenAiAgentIds: string[] = []) {
       result[existingIndex] = { ...existing, aiModeAccess: [...new Set([...(existing.aiModeAccess || []), ...bot.aiModeAccess || []])] };
     }
   }
-  return result;
+  return result.map(withAgentIcon);
 }
 const aiModes: { name: AiMode; icon: string; description: string }[] = [
   { name: "Google Ads", icon: "📣", description: "Search terms, wasted spend, negatives, ad relevance and CPC caps." },
@@ -309,7 +310,7 @@ function previewWorkspaceForStaff(workspace: Workspace, member: Staff) {
   };
 }
 function StaffProfileAvatar({ member, className = "", fallbackName = "User" }: { member?: Staff; className?: string; fallbackName?: string }) {
-  const avatar = member?.avatar || "";
+  const avatar = (member && agentIconFor(member)) || member?.avatar || "";
   const image = avatar.startsWith("data:image/") || avatar.startsWith("https://");
   return <span className={`avatar ${className} ${member?.isBot && !image ? "ai-avatar" : ""}`} title={member?.name || fallbackName} style={image ? { backgroundImage: `url(${avatar})`, backgroundSize: "cover", color: "transparent" } : undefined}>{image ? "" : member?.isBot ? <AiEyesIcon /> : avatar || initials(member?.name || fallbackName)}</span>;
 }
@@ -610,7 +611,7 @@ function AnimatedBot({ status, member }: { status: string; member: Staff }) {
   const ref = useRef<HTMLSpanElement>(null);
   const [geo, setGeo] = useState<BotGeo | null>(null);
   useEffect(() => {
-    let live = true; const avatar = member.avatar || "";
+    let live = true; const avatar = agentIconFor(member) || member.avatar || "";
     if (avatar.startsWith("data:image/") || avatar.startsWith("https://")) void detectBotEyes(avatar).then((g) => { if (live) setGeo(g); });
     return () => { live = false; };
   }, [member.avatar]);
@@ -2254,8 +2255,9 @@ ${senderName}`, limitClientAccess: String(Array.isArray(member.clientAccessIds))
 }
 
 function StaffAvatar({ member }: { member: Staff }) {
-  const hasImage = member.avatar.startsWith("http") || member.avatar.startsWith("data:image/");
-  return <span className={"staff-select-avatar " + (hasImage ? "has-image" : "")} style={hasImage ? { backgroundImage: "url(" + member.avatar + ")" } : undefined}>{hasImage ? "" : member.avatar || initials(member.name)}</span>;
+  const avatar = agentIconFor(member) || member.avatar || "";
+  const hasImage = avatar.startsWith("http") || avatar.startsWith("data:image/");
+  return <span className={"staff-select-avatar " + (hasImage ? "has-image" : "")} style={hasImage ? { backgroundImage: "url(" + avatar + ")" } : undefined}>{hasImage ? "" : avatar || initials(member.name)}</span>;
 }
 function TeamMemberSelect({ label, value, members, onChange, allowUnassigned = false }: { label: string; value: string; members: Staff[]; onChange: (value: string) => void; allowUnassigned?: boolean }) {
   const selected = members.find((member) => member.id === value);
