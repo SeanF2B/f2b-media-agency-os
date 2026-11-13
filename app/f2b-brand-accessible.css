@@ -9187,3 +9187,29 @@ html body .app-shell .sidebar .nav-item.active, html body .app-shell .sidebar .n
 .dark-mode .crm-card-tag { background: #2c353d; color: #edf2f6; }
 .dark-mode .crm-card-tag.more { background: #252c33; color: #aab6c1; }
 .dark-mode .crm-card-facts .crm-source .crm-ico, .dark-mode .crm-card-tag .crm-ico { color: #8cc4f0; }
+
+/* Client pickers with logos (ClientSelectEnhancer): every client dropdown shows logos */
+select.client-pick-native { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; border: 0 !important; opacity: 0 !important; pointer-events: none !important; }
+.client-pick { display: inline-flex; min-width: 0; max-width: 100%; vertical-align: middle; }
+.client-pick-btn { display: inline-flex; align-items: center; gap: 8px; min-width: 180px; max-width: 100%; min-height: 36px; padding: 5px 10px 5px 6px; border: 1px solid var(--f2b-border, #d9dee3); border-radius: 8px; background: #fff; color: #1c2330; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; text-align: left; }
+.client-pick-btn:hover:not(:disabled), .client-pick-btn[aria-expanded="true"] { border-color: var(--brand-primary, #1677c8); }
+.client-pick-btn:focus-visible { outline: 2px solid var(--brand-primary, #1677c8); outline-offset: 2px; }
+.client-pick-btn:disabled { opacity: .6; cursor: not-allowed; }
+.client-pick-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.client-pick-caret { flex: none; color: #64748b; }
+.client-pick-logo { flex: none; display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; overflow: hidden; background: #fff; border: 1px solid #e3e8ee; font-size: 10px; font-weight: 800; color: #1c2330; }
+.client-pick-logo img { width: 100%; height: 100%; object-fit: contain; }
+.client-pick-logo.initials { border: 0; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.35); }
+.client-pick-logo.generic { background: #eef1f5; border: 0; color: #475569; font-size: 12px; }
+.cm-sort .client-pick-btn, .fsub-preset .client-pick-btn { border: 0; padding: 0; min-height: 0; min-width: 150px; background: transparent; font-size: 13.5px; }
+.client-pick-menu { position: fixed; z-index: 2000; max-width: min(360px, calc(100vw - 16px)); max-height: 360px; display: flex; flex-direction: column; background: #fff; color: #1c2330; border: 1px solid #e3e8ee; border-radius: 12px; box-shadow: 0 16px 36px rgba(15, 23, 42, .18); padding: 6px; }
+.client-pick-search { margin: 2px 2px 6px; padding: 8px 10px; border: 1px solid #e3e8ee; border-radius: 8px; font: inherit; font-size: 14px; color: #1c2330; background: #fff; }
+.client-pick-options { overflow-y: auto; display: grid; gap: 2px; }
+.client-pick-option { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 8px; border: 0; border-radius: 8px; background: transparent; color: #1c2330; font: inherit; font-size: 14px; font-weight: 600; text-align: left; cursor: pointer; }
+.client-pick-option span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.client-pick-option:hover, .client-pick-option:focus-visible { background: #f1f4f8; outline: none; }
+.client-pick-option.on { background: color-mix(in srgb, var(--brand-primary, #1677c8) 12%, #fff); color: #0f172a; }
+.client-pick-empty { margin: 8px; color: #64748b; font-size: 13px; }
+.dark-mode .client-pick-btn { background: #1f262c; color: #edf2f6; border-color: #3a444d; }
+.dark-mode .client-pick-caret { color: #aab6c1; }
+.dark-mode .cm-sort .client-pick-btn { background: transparent; }
