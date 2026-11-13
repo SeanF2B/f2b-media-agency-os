@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "../../chatgpt-auth";
-import { ensureAutomationTables, emitAutomationEvent, firstFireAt, simulateRun, type Db } from "../../../lib/crm-automations/engine.ts";
+import { ensureAutomationTables, emitAutomationEvent, firstFireAt, simulateRun, startRunStatements, type Db } from "../../../lib/crm-automations/engine.ts";
 import { blankDefinition, normalizeTag, readinessProblems, sanitizeDefinition, sendsEmail, triggerOf, type AutomationDefinition } from "../../../lib/crm-automations/model.ts";
 
 export const dynamic = "force-dynamic";
@@ -204,6 +204,26 @@ export async function POST(request: Request) {
       return ok({ ok: true });
     }
 
+    if (action === "enroll") {
+      // Bulk-add contacts to a workflow from the Contacts list. Each contact starts at the first step after the trigger.
+      const current = await load(body.id);
+      if (!current) return reply("That automation could not be found.", 404);
+      if (current.status !== "on") return reply("Switch the automation on before adding contacts to it.");
+      const ids = Array.isArray(body.contactIds) ? [...new Set(body.contactIds.map((x) => clean(x, 120)).filter(Boolean))].slice(0, 200) : [];
+      if (!ids.length) return reply("Select at least one contact.");
+      const allowed: string[] = [];
+      for (let i = 0; i < ids.length; i += 90) {
+        const chunk = ids.slice(i, i + 90);
+        const rows = await raw.prepare(`SELECT id FROM crm_contacts WHERE owner_id=?1 AND COALESCE(client_id,'')=?2 AND id IN (${chunk.map((_, n) => `?${n + 3}`).join(",")})`).bind(ownerId, scope, ...chunk).all<{ id: string }>();
+        (rows.results || []).forEach((row) => allowed.push(row.id));
+      }
+      if (!allowed.length) return reply("None of those contacts belong to this account.");
+      const parsed = JSON.parse(current.definition) as AutomationDefinition;
+      const statements = [];
+      for (const contactId of allowed) statements.push(...await startRunStatements(db, { id: current.id, owner_id: ownerId, scope_id: scope, parsed }, contactId, `manual:${crypto.randomUUID()}`, "Added manually from Contacts", now));
+      for (let i = 0; i < statements.length; i += 90) await raw.batch(statements.slice(i, i + 90) as never);
+      return ok({ ok: true, added: allowed.length, skipped: ids.length - allowed.length });
+    }
     if (action === "testRun") {
       const current = await load(body.id);
       if (!current) return reply("That automation could not be found.", 404);

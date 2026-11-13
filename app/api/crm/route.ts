@@ -57,7 +57,7 @@ async function readSmartLists(db: D1Database, ownerId: string, clientId: string 
   try { return ((await db.prepare("SELECT id, name, filters FROM crm_smart_lists WHERE owner_id = ?1 AND COALESCE(client_id,'') = ?2 ORDER BY created_at").bind(ownerId, clientId || "").all<{ id: string; name: string; filters: string }>()).results || []).map((row) => { let filters: unknown = {}; try { filters = JSON.parse(row.filters); } catch { /* keep empty */ } return { id: row.id, name: row.name, filters }; }); }
   catch { return []; }
 }
-const cleanTag = (value: unknown) => clean(value, 40).replace(/\s+/g, " ").toLowerCase();
+const cleanTag = (value: unknown) => clean(value, 40).replace(/\s+/g, " "); // case kept as typed; matching is case-insensitive
 
 async function ensurePipeline(db: D1Database, ownerId: string) {
   const existing = await db.prepare("SELECT id FROM crm_pipelines WHERE owner_id = ?1 AND archived = 0 ORDER BY created_at LIMIT 1").bind(ownerId).first<{ id: string }>();
@@ -196,8 +196,8 @@ export async function POST(request: Request) {
         const tag = cleanTag(body.tag); if (!tag) return reply("Enter a tag.");
         await db.prepare(tagTableSql).run();
         for (const id of valid) statements.push(body.on === false
-          ? db.prepare("DELETE FROM crm_contact_tags WHERE owner_id=?1 AND contact_id=?2 AND tag=?3").bind(ownerId, id, tag)
-          : db.prepare("INSERT OR IGNORE INTO crm_contact_tags (owner_id, contact_id, tag, created_at) VALUES (?1,?2,?3,?4)").bind(ownerId, id, tag, now));
+          ? db.prepare("DELETE FROM crm_contact_tags WHERE owner_id=?1 AND contact_id=?2 AND lower(tag)=lower(?3)").bind(ownerId, id, tag)
+          : db.prepare("INSERT INTO crm_contact_tags (owner_id, contact_id, tag, created_at) SELECT ?1,?2,?3,?4 WHERE NOT EXISTS (SELECT 1 FROM crm_contact_tags WHERE owner_id=?1 AND contact_id=?2 AND lower(tag)=lower(?3))").bind(ownerId, id, tag, now));
       } else {
         const flag = clean(body.flag, 20); if (!["spam", "dnd"].includes(flag)) return reply("Choose a flag.");
         await db.prepare(flagTableSql).run();

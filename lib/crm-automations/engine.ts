@@ -97,7 +97,7 @@ export async function loadContactFacts(db: Db, ownerId: string, contactId: strin
   return {
     id: String(contact.id), client_id: contact.client_id || null,
     first_name: String(contact.first_name || ""), last_name: String(contact.last_name || ""), email: String(contact.email || ""), phone: String(contact.phone || ""), company: String(contact.company || ""), source: String(contact.source || ""),
-    tags: (tags.results || []).map((row) => row.tag), stageIds: (stages.results || []).map((row) => row.stage_id),
+    tags: (tags.results || []).map((row) => String(row.tag || "").toLowerCase()), stageIds: (stages.results || []).map((row) => row.stage_id),
     notes: String(contact.notes || ""), deal_value: Number(stages.results?.[0]?.value) || 0,
   };
 }
@@ -198,7 +198,7 @@ async function executeStep(ctx: StepContext): Promise<StepResult> {
       if (!has) return { status: "done", detail: `Didn't have tag "${tag}".` };
       contact.tags = contact.tags.filter((item) => item !== tag);
       if (dryRun) return { status: "done", detail: `Would remove tag "${tag}".` };
-      await db.prepare("DELETE FROM crm_contact_tags WHERE owner_id=?1 AND contact_id=?2 AND tag=?3").bind(run.owner_id, contact.id, tag).run();
+      await db.prepare("DELETE FROM crm_contact_tags WHERE owner_id=?1 AND contact_id=?2 AND lower(tag)=?3").bind(run.owner_id, contact.id, tag).run();
       return { status: "done", detail: `Removed tag "${tag}".` };
     }
     case "move_stage": {
