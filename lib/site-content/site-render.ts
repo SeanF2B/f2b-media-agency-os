@@ -115,5 +115,23 @@ function init(f){
 function go(){document.querySelectorAll('form[data-form-job]').forEach(init)}
 go();addEventListener('load',go);setTimeout(go,600);
 })();
+</script><script id="f2b-trust-js">(function(){
+var IC={bolt:'<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',star:'<path d="m12 2.8 2.8 5.8 6.4.9-4.6 4.5 1.1 6.3L12 17.3l-5.7 3 1.1-6.3-4.6-4.5 6.4-.9z"/>',user:'<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/>'};
+var PTS=[['bolt','Fast turnaround'],['star','Top rated'],['user','1 on 1 experience']];
+function run(){document.querySelectorAll('form[data-form-job]').forEach(function(f){
+ var sec=f.closest('section');if(!sec||sec.__trust||sec.querySelector('.f2b-trust'))return;
+ var hits=[].filter.call(sec.querySelectorAll('div,p,a,span'),function(el){return !f.contains(el)&&/on\\s+google/i.test(el.textContent||'')&&(el.textContent||'').length<80});
+ var b=hits.filter(function(el){return !hits.some(function(o){return o!==el&&el.contains(o)})})[0];if(!b)return;
+ var t=b.textContent.trim();while(b.parentElement&&b.parentElement!==sec&&b.parentElement.textContent.trim()===t)b=b.parentElement;
+ sec.__trust=1;
+ var eb=[].filter.call(sec.querySelectorAll('p,span,div'),function(el){return /^founded by/i.test((el.textContent||'').trim())&&el.children.length<3})[0];
+ var gold=eb?getComputedStyle(eb).color:'rgba(255,255,255,.9)';
+ var ul=document.createElement('ul');ul.className='f2b-trust';ul.setAttribute('aria-label','Why choose us');
+ ul.style.cssText='list-style:none;margin:1.1rem 0 0;padding:0;display:flex;flex-wrap:wrap;gap:.6rem 1.5rem;font-size:14px;color:'+getComputedStyle(b).color;
+ ul.innerHTML=PTS.map(function(p){return '<li style="display:inline-flex;align-items:center;gap:.5rem;margin:0"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="'+gold+'" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+IC[p[0]]+'</svg>'+p[1]+'</li>'}).join('');
+ b.parentNode.insertBefore(ul,b.nextSibling);
+})}
+run();addEventListener('load',run);setTimeout(run,600);
+})();
 </script><script id="f2b-pbar-js">(function(){function init(){document.querySelectorAll('form[data-form-job]').forEach(function(f){if(f.__pb)return;f.__pb=1;var isl=f.closest('astro-island')||f,bar=document.createElement('div');bar.className='f2b-pbar';bar.innerHTML='<i></i>';isl.parentNode.insertBefore(bar,isl);function upd(){var t=f.textContent.match(/Step\\s*(\\d+)\\s*of\\s*(\\d+)/i);if(t)bar.firstChild.style.width=(t[1]/t[2]*100)+'%'}upd();new MutationObserver(upd).observe(f,{subtree:true,childList:true,characterData:true})})}init();var n=0,iv=setInterval(function(){init();if(++n>20)clearInterval(iv)},500)})();</script>${ctx.publish ? "" : `<script>${anchors}</script>`}`}</body></html>`;
 }
