@@ -8633,3 +8633,4 @@ body.task-card-drag-active .bot-live:not(.pipeline-card-drag-preview .bot-live) 
 fieldset.crm-new-contact { border:1px solid var(--f2b-border,#d9dee3); border-radius:10px; padding:8px 12px 12px; margin:10px 0; }
 fieldset.crm-new-contact legend { padding:0 6px; font-size:12px; font-weight:700; }
 .crm-estimate-tag { flex: none; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 2px 6px; border-radius: 999px; border: 1px solid currentColor; opacity: .75; white-space: nowrap; }
+.crm-stage-total { font-size: 13px; font-weight: 800; margin: 2px 0 4px; opacity: .85; font-variant-numeric: tabular-nums; }
