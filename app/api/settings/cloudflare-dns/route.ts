@@ -181,6 +181,29 @@ export async function POST(request: Request) {
     return respond({ zone: mapZone(result.result) });
   }
 
+  if (action === "attach-worker-domain" || action === "detach-worker-domain") {
+    const accountId = String(env.F2B_CF_ACCOUNT_ID || "");
+    if (!ID_PATTERN.test(accountId)) return respond({ error: "The Cloudflare account ID is not configured for this app." }, 503);
+    const hostname = String(body?.hostname || "").trim().toLowerCase();
+    if (!DOMAIN_PATTERN.test(hostname)) return respond({ error: "Enter a hostname like www.example.com." }, 400);
+    const service = String(body?.service || "").trim();
+    if (!/^[a-z0-9][a-z0-9-]{0,62}$/.test(service)) return respond({ error: "Invalid worker name." }, 400);
+    if (action === "attach-worker-domain") {
+      const zones = await cf(token.value, `/zones?name=${encodeURIComponent(String(body?.zoneName || hostname.split(".").slice(-2).join(".")))}`);
+      const zone = zones.ok ? (zones.result as any[])?.[0] : null;
+      if (!zone?.id) return respond({ error: "That domain is not on this Cloudflare account yet." }, 404);
+      const result = await cf(token.value, `/accounts/${accountId}/workers/domains`, { method: "PUT", body: { hostname, service, zone_id: zone.id, environment: "production" } });
+      if (!result.ok) return failure(result);
+      return respond({ attached: true, hostname, service });
+    }
+    const list = await cf(token.value, `/accounts/${accountId}/workers/domains?hostname=${encodeURIComponent(hostname)}`);
+    const found = list.ok ? (list.result as any[])?.[0] : null;
+    if (!found?.id) return respond({ error: "That hostname is not attached to a worker." }, 404);
+    const result = await cf(token.value, `/accounts/${accountId}/workers/domains/${found.id}`, { method: "DELETE" });
+    if (!result.ok) return failure(result);
+    return respond({ detached: true, hostname });
+  }
+
   const zoneId = String(body?.zone || "");
   if (!ID_PATTERN.test(zoneId)) return respond({ error: "Choose a domain first." }, 400);
 
