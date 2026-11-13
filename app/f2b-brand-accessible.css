@@ -8553,3 +8553,6 @@ body.task-card-drag-active .bot-live:not(.pipeline-card-drag-preview .bot-live),
 body.task-card-drag-active .bot-live:not(.pipeline-card-drag-preview .bot-live) * { animation-play-state: paused !important; }
 .pipeline-card-drag-preview, .pipeline-card-drag-preview * { transition: none !important; }
 .pipeline-card-drag-preview { will-change: transform; }
+
+/* Sub-account task boards: the client is already known, so no client logo on the cards. */
+.pipeline-client.no-client-mark .task-client-mark { display: none !important; }
