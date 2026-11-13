@@ -113,7 +113,7 @@ export async function GET(request: Request) {
     }
     const visibleOpps = new Set((opportunityRows.results || []).map((row) => String(row.id))), visibleContacts = new Set((contacts.results || []).map((row) => String(row.id)));
     const matches = (item: Record<string, unknown>) => !search || [item.title, item.first_name, item.last_name, item.email, item.company].some((value) => String(value || "").toLowerCase().includes(search));
-    return Response.json({ flags: flags.filter((row) => row.kind === "contact" ? visibleContacts.has(String(row.ref_id)) : visibleOpps.has(String(row.ref_id))), tags: tags.filter((row) => visibleContacts.has(String(row.contact_id))), smartLists, contacts: contacts.results || [], pipelines: [...pipelines.values()], opportunities: (opportunityRows.results || []).map((row) => ({ ...row, sort_order: orderByOpportunity.has(String(row.id)) ? orderByOpportunity.get(String(row.id)) : null })).filter(matches), activities: (activityRows.results || []).filter((a) => !scope || visibleOpps.has(String(a.opportunity_id)) || visibleContacts.has(String(a.contact_id))), clients: (workspace.clients || []).filter((item) => !scope?.clientId || String(item.id) === scope.clientId).map((item) => ({ id: String(item.id), name: String(item.name), company: String(item.company || ""), logo: String(item.logo || ""), contact: String(item.contact || ""), email: String(item.email || ""), phone: String(item.phone || "") })), staff: (workspace.staff || []).filter((item) => !item.isBot).map((item) => ({ id: String(item.id), name: String(item.name), avatar: String(item.avatar || "") })) }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json({ flags: flags.filter((row) => row.kind === "contact" ? visibleContacts.has(String(row.ref_id)) : visibleOpps.has(String(row.ref_id))), tags: tags.filter((row) => visibleContacts.has(String(row.contact_id))), smartLists, contacts: contacts.results || [], pipelines: [...pipelines.values()], opportunities: (opportunityRows.results || []).map((row) => ({ ...row, sort_order: orderByOpportunity.has(String(row.id)) ? orderByOpportunity.get(String(row.id)) : null })).filter(matches), activities: (activityRows.results || []).filter((a) => !scope || visibleOpps.has(String(a.opportunity_id)) || visibleContacts.has(String(a.contact_id))).map((a) => { const by = String(a.created_by || "").toLowerCase(); const person = by ? (workspace.staff || []).find((item: { email?: string; isBot?: boolean }) => !item.isBot && String(item.email || "").toLowerCase() === by) : undefined; return { ...a, created_by_name: person ? String((person as { name?: string }).name || "") : by ? (by === String(user.email || "").toLowerCase() && user.displayName ? String(user.displayName) : by.split("@")[0]) : "API" }; }), clients: (workspace.clients || []).filter((item) => !scope?.clientId || String(item.id) === scope.clientId).map((item) => ({ id: String(item.id), name: String(item.name), company: String(item.company || ""), logo: String(item.logo || ""), contact: String(item.contact || ""), email: String(item.email || ""), phone: String(item.phone || "") })), staff: (workspace.staff || []).filter((item) => !item.isBot).map((item) => ({ id: String(item.id), name: String(item.name), avatar: String(item.avatar || "") })) }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) { return reply(error instanceof Error ? error.message : "Could not load CRM records.", 500); }
 }
 
@@ -409,6 +409,15 @@ export async function POST(request: Request) {
       if (opportunityId && !await db.prepare("SELECT id FROM crm_opportunities WHERE owner_id=?1 AND id=?2").bind(ownerId, opportunityId).first()) return reply("That opportunity is not in this workspace.");
       const id = crypto.randomUUID();
       await db.prepare("INSERT INTO crm_activities (id, owner_id, opportunity_id, contact_id, activity_type, body, created_by, created_at) VALUES (?1, ?2, ?3, ?4, 'note', ?5, ?6, ?7)").bind(id, ownerId, opportunityId, contactId, bodyText, clean(user.email, 254), now).run();
+      return Response.json({ ok: true, id });
+    }
+    if (action === "updateActivity" || action === "deleteActivity") {
+      const id = clean(body.id, 80);
+      if (!id || !await db.prepare("SELECT id FROM crm_activities WHERE owner_id=?1 AND id=?2").bind(ownerId, id).first()) return reply("That note could not be found.", 404);
+      if (action === "deleteActivity") { await db.prepare("DELETE FROM crm_activities WHERE owner_id=?1 AND id=?2").bind(ownerId, id).run(); return Response.json({ ok: true }); }
+      const bodyText = clean(body.body, 4000);
+      if (!bodyText) return reply("A note can't be empty.");
+      await db.prepare("UPDATE crm_activities SET body=?1 WHERE owner_id=?2 AND id=?3").bind(bodyText, ownerId, id).run();
       return Response.json({ ok: true, id });
     }
     if (action === "archivePipeline") {
