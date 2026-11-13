@@ -5,6 +5,7 @@ import { BUILDER_DIR, CONFIG_PATH, DEFAULT_CONFIG, isBuilderPath, normalizeConfi
 import { renderPage, renderRaw } from "@/lib/site-content/site-render";
 import { leadToCrm } from "@/lib/conversations/core";
 import { consumeMarketingSubmissionRateLimit } from "@/lib/marketing-public-rate-limit";
+import { logFormSubmission } from "@/lib/form-submission-log";
 
 export const dynamic = "force-dynamic";
 const CLIENT_RE = /^[\w-]{6,80}$/;
@@ -47,6 +48,7 @@ export async function POST(request: Request) {
   const name = String(form.get("name") || "").slice(0, 120), phone = String(form.get("phone") || "").slice(0, 40), email = String(form.get("email") || "").slice(0, 160), message = String(form.get("message") || "").slice(0, 2000);
   if (!name || !phone) return html("Please add your name and phone number.", 400);
   const owner = await env.DB.prepare("SELECT owner_id FROM workspace_documents WHERE id='f2b-agency'").first<{ owner_id: string }>();
+  if (owner) await logFormSubmission(env.DB, { id: crypto.randomUUID(), ownerId: owner.owner_id, clientId: c, source: "site-lead", formKey: `site:${c}:contact`, formName: String(form.get("form_name") || "Website contact form").slice(0, 120), pageUrl: String(form.get("page") || request.headers.get("referer") || ""), name, email, phone, message, createdAt: new Date().toISOString() });
   if (owner) await leadToCrm(owner.owner_id, { clientId: c, channel: "sms", contact: phone, name, firstMessage: `Website enquiry${email ? ` (${email})` : ""}: ${message}` });
   return html("<p style='font:18px system-ui;padding:48px;text-align:center'>Thanks — we'll be in touch shortly.</p>");
 }
@@ -82,6 +84,7 @@ async function siteFormLead(request: Request, c: string) {
   if (pipeline && stage) stmts.push(db.prepare("INSERT INTO crm_opportunities (id, owner_id, pipeline_id, stage_id, contact_id, client_id, title, value, currency, source, notes, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,'EUR',?9,?10,?11,?11)")
     .bind(crypto.randomUUID(), ownerId, pipeline.id, stage.id, contactId, c, `Consultation · ${name}`.slice(0, 200), estimate, estimate ? WEBSITE_ESTIMATE_SOURCE : source, notes, now));
   await db.batch(stmts);
+  await logFormSubmission(db, { id: crypto.randomUUID(), ownerId, clientId: c, source: "site-form", formKey: `site:${c}:${s("form_name", 80) || "book-a-consultation"}`, formName: s("form_name", 120) || "Book a consultation", pageUrl: page || request.headers.get("referer") || "", name, email, phone, message: [answers, message].filter(Boolean).join("\n"), contactId, createdAt: now });
   return ok();
 }
 

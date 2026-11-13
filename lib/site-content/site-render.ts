@@ -26,7 +26,7 @@ const blocks: Record<string, (p: any, c: RenderCtx) => string> = {
   reviews: (p) => `<section class="sec"><div class="wrap"><h2>${esc(p.title)}</h2><div class="cards">${arr(p.items).map((i) => `<blockquote class="card plain"><div class="stars">${"★".repeat(Math.max(1, Math.min(5, +i.rating || 5)))}</div><p>${esc(i.text)}</p><footer>${esc(i.name)}${i.source ? ` · ${esc(i.source)}` : ""}</footer></blockquote>`).join("")}</div></div></section>`,
   faq: (p) => `<section class="sec alt"><div class="wrap narrow"><h2>${esc(p.title)}</h2>${arr(p.items).map((i) => `<details><summary>${esc(i.q)}</summary><p>${esc(i.a)}</p></details>`).join("")}</div></section>`,
   cta: (p, c) => `<section class="cta"><div class="wrap"><h2>${esc(p.title)}</h2><p>${esc(p.text)}</p><a class="btn light" href="${href(c, p.buttonLink)}">${esc(p.buttonText)}</a></div></section>`,
-  contact: (p, c) => `<section class="sec" id="contact"><div class="wrap narrow"><h2>${esc(p.title)}</h2><p>${esc(p.text)}</p><form method="post" action="${esc(c.base)}?c=${encodeURIComponent(c.clientId)}&lead=1" class="form"><input name="name" placeholder="Your name" required><input name="phone" placeholder="Phone" required><input name="email" type="email" placeholder="Email"><textarea name="message" rows="4" placeholder="How can we help?"></textarea><input name="website" class="hp" tabindex="-1" autocomplete="off"><button class="btn" type="submit">${esc(p.buttonText || "Send message")}</button></form></div></section>`,
+  contact: (p, c) => `<section class="sec" id="contact"><div class="wrap narrow"><h2>${esc(p.title)}</h2><p>${esc(p.text)}</p><form method="post" action="${esc(c.base)}?c=${encodeURIComponent(c.clientId)}&lead=1" class="form"><input name="name" placeholder="Your name" required><input name="phone" placeholder="Phone" required><input name="email" type="email" placeholder="Email"><textarea name="message" rows="4" placeholder="How can we help?"></textarea><input type="hidden" name="page" value=""><input name="website" class="hp" tabindex="-1" autocomplete="off"><button class="btn" type="submit">${esc(p.buttonText || "Send message")}</button></form></div></section>`,
 };
 
 /** SEO head tags from builder fields: canonical, robots and Open Graph / Twitter sharing. */
@@ -86,7 +86,7 @@ export function renderPage(page: any, ctx: RenderCtx): string {
 footer.site{background:#10161d;color:#b9c4d0;padding:28px 0;font-size:14px;text-align:center}
 ${luxCss}</style></head><body><header class="top"><div class="wrap"><b>${esc(t.name || "")}</b><nav>${nav}</nav>${ctx.phone ? `<a class="call" href="tel:${esc(ctx.phone.replace(/[^+\d]/g, ""))}">${esc(ctx.phone)}</a>` : ""}</div></header>
 ${body}
-<footer class="site"><div class="wrap">© ${new Date().getFullYear()} ${esc(t.name || "")}</div></footer></body></html>`;
+<footer class="site"><div class="wrap">© ${new Date().getFullYear()} ${esc(t.name || "")}</div></footer><script>document.querySelectorAll('input[name="page"]').forEach(function(i){if(!i.value)i.value=location.href})</script></body></html>`;
 }
 
 const EDIT_SCRIPT = `(function(){var S='h1,h2,h3,h4,h5,h6,p,li,span,a,button,label,small,strong,em,b,i,figcaption,blockquote,dt,dd,td,th,div,summary';
