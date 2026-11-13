@@ -8698,3 +8698,7 @@ fieldset.crm-new-contact legend { padding:0 6px; font-size:12px; font-weight:700
 .ad-report-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 12px; }
 .ad-report-head h3 { margin: 0; white-space: nowrap; }
 .ad-report-head .ad-campaign-select { margin-left: auto; min-width: 0; max-width: 60%; }
+.cv-msgs .cv-email { max-width: none; width: 100%; }
+.cv-email-compose { display: grid; gap: 8px; }
+.cv-email-compose input { font: inherit; padding: 8px 10px; border: 1px solid rgba(127,127,127,.3); border-radius: 8px; background: transparent; color: inherit; }
+.cv-email-compose > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; }

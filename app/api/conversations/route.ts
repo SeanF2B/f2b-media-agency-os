@@ -44,6 +44,23 @@ export async function POST(request: Request) {
     const id = String(b.id || "");
     const thread = id ? await env.DB!.prepare("SELECT * FROM conv_threads WHERE id=?1 AND owner_id=?2").bind(id, auth.ownerId).first<any>() : null;
     if (!thread) return respond({ error: "That conversation could not be found." }, 404);
+    if (action === "send" && thread.channel === "email") {
+      // Email reply from the inbox: sent from the system sender, replies come back to the person who wrote it.
+      const text = String(b.body || "").trim().slice(0, 10000);
+      const subject = String(b.subject || "").trim().slice(0, 200) || "Re: your enquiry";
+      if (!text) return respond({ error: "Write your email first." }, 400);
+      if (!env.RESEND_API_KEY || !env.TASK_NOTIFICATION_FROM) return respond({ error: "Email sending isn't set up on the server yet." }, 503);
+      const replyTo = String(b.replyTo || "").trim();
+      const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#22272b">${text.split(/\n{2,}/).map((p) => `<p style="margin:0 0 14px">${p.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" } as Record<string, string>)[c]).replace(/\n/g, "<br>")}</p>`).join("")}</div>`;
+      let error = "";
+      try {
+        const r = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json", "Idempotency-Key": `conv-email/${id}/${crypto.randomUUID()}` }, body: JSON.stringify({ from: env.TASK_NOTIFICATION_FROM, to: [thread.contact], subject, text, html, ...(/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(replyTo) ? { reply_to: replyTo } : {}) }), signal: AbortSignal.timeout(15_000) });
+        if (!r.ok) error = `The email service returned HTTP ${r.status}.`;
+      } catch (e) { error = e instanceof Error ? e.message : "Could not send."; }
+      const m = await addMessage(auth.ownerId, id, { direction: "out", sender: "staff", body: `Subject: ${subject}\n\n${text}`, error });
+      if (error) return respond({ error, messageId: m.id }, 502);
+      return respond({ ok: true, messageId: m.id });
+    }
     if (action === "send") {
       const text = String(b.body || "").trim().slice(0, 1500);
       if (!text) return respond({ error: "Type a message first." }, 400);
