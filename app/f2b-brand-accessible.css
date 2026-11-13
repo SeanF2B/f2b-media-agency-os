@@ -9008,3 +9008,20 @@ html body .app-shell .sidebar .nav-item .nav-icon svg.lucide-nav-icon * { stroke
 /* Selected sidebar item: solid brand colour with white text and icon, always visible (glass on, light/dark sidebars) */
 html body .app-shell .sidebar .nav-item.active, html body .app-shell.dark-mode .sidebar .nav-item.active, html.f2b-glass body .app-shell .sidebar .nav-item.active { background: var(--brand-primary, #3b82f6) !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; box-shadow: 0 4px 12px color-mix(in srgb, var(--brand-primary, #3b82f6) 35%, transparent) !important; opacity: 1 !important; }
 html body .app-shell .sidebar .nav-item.active, html body .app-shell .sidebar .nav-item.active *, html body .app-shell .sidebar .nav-item.active .nav-icon svg.lucide-nav-icon, html body .app-shell .sidebar .nav-item.active .nav-icon svg.lucide-nav-icon * { color: #fff !important; -webkit-text-fill-color: #fff !important; stroke: #fff !important; }
+
+/* Timesheets → Time by task */
+.app-shell .timesheet-task-summary { margin: 16px 0; padding: 18px 20px; }
+.app-shell .timesheet-task-summary .panel-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+.app-shell .timesheet-task-summary .panel-heading h2 { margin: 0; font-size: 18px; }
+.app-shell .timesheet-task-summary .panel-heading p { margin: 4px 0 0; font-size: 13px; opacity: .7; }
+.app-shell .timesheet-task-list { display: grid; gap: 0; max-height: 520px; overflow-y: auto; }
+.app-shell .timesheet-task-row { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px 4px; border-top: 1px solid var(--f2b-border, #e3e8ee); }
+.app-shell .timesheet-task-row:first-child { border-top: 0; }
+.app-shell .timesheet-task-icon { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: color-mix(in srgb, var(--brand-primary, #1677c8) 12%, transparent); color: var(--brand-primary, #1677c8); }
+.app-shell .timesheet-task-info { display: grid; gap: 2px; min-width: 0; }
+.app-shell .timesheet-task-info b { font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-shell .timesheet-task-info small { font-size: 12px; opacity: .7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-shell .timesheet-task-row strong { font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; padding: 4px 10px; border-radius: 999px; background: rgba(127,127,127,.1); }
+.app-shell .timesheet-task-empty { margin: 0; opacity: .7; font-size: 13px; }
+.app-shell.dark-mode .timesheet-task-icon { color: color-mix(in srgb, var(--brand-primary, #1677c8) 55%, #fff); }
+@media (max-width: 640px) { .app-shell .timesheet-task-info b { white-space: normal; } }
