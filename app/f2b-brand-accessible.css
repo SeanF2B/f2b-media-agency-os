@@ -8730,3 +8730,6 @@ fieldset.crm-new-contact legend { padding:0 6px; font-size:12px; font-weight:700
 .app-shell.dark-mode .crm-tag-pop { background: #1f2329; }
 .crm-bulk-workflow { min-height: 34px; padding: 0 8px; border-radius: 8px; border: 0; font: inherit; font-size: 13px; }
 .crm-kanban article { position: relative; }
+.crm-card-answers { margin: 6px 0 4px; font-size: 12px; }
+.crm-card-answers summary { cursor: pointer; font-weight: 700; }
+.crm-card-answers pre { margin: 6px 0 0; white-space: pre-wrap; font: inherit; font-size: 12px; line-height: 1.5; max-height: 220px; overflow: auto; padding: 8px; border-radius: 8px; background: rgba(127,127,127,.08); }

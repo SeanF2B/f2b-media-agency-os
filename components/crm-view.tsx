@@ -488,6 +488,7 @@ export function CrmView({ onOpenClient, scopeClientId = "" }: { onOpenClient: (c
         {item.expected_close_date && <div><dt>Target:</dt><dd>{item.expected_close_date.slice(0, 10)}</dd></div>}
         <div className="crm-card-stage-row"><dt>Stage:</dt><dd><select className="crm-card-stage-select" aria-label={`Move ${item.title} to stage`} value={item.stage_id} onChange={(event) => void moveOpportunity(item.id, event.target.value)}>{pipeline!.stages.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}</select></dd></div>
       </dl>
+      {item.notes && <details className="crm-card-answers" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()}><summary>📝 Form answers & website visit</summary><pre>{item.notes}</pre></details>}
       <div className="crm-card-icons">
         <QuickContactActions name={contact && contact !== "No contact linked" ? contact : companyName || item.title} email={email} phone={phoneValue} subject={`Following up: ${item.title}`} dnd={dnd} onClearDnd={() => void markDnd(item, false)} />
         {!dnd && !email && !phoneValue && <button type="button" className="crm-card-icon crm-quick-missing" title="Add a phone or email to call, text, email or WhatsApp" aria-label={`Add contact details for ${item.title}`} onClick={() => { setEditingOpp(item); setModal("opportunity-edit"); }}>＋📞</button>}
