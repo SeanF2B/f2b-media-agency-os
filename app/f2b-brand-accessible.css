@@ -9025,3 +9025,9 @@ html body .app-shell .sidebar .nav-item.active, html body .app-shell .sidebar .n
 .app-shell .timesheet-task-empty { margin: 0; opacity: .7; font-size: 13px; }
 .app-shell.dark-mode .timesheet-task-icon { color: color-mix(in srgb, var(--brand-primary, #1677c8) 55%, #fff); }
 @media (max-width: 640px) { .app-shell .timesheet-task-info b { white-space: normal; } }
+
+/* Revenue by service type: fixed columns so every bar starts and ends in the same place */
+.app-shell .distribution-panel .service-bar-row { display: grid !important; grid-template-columns: 10px minmax(150px, 210px) minmax(0, 1fr) 70px !important; align-items: center; gap: 10px; }
+.app-shell .distribution-panel .service-bar-row .service-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-shell .distribution-panel .service-bar-row .bar-track { width: 100% !important; margin: 0 !important; }
+.app-shell .distribution-panel .service-bar-row > :last-child { text-align: right; }
