@@ -47,6 +47,18 @@ async function readFlags(db: D1Database, ownerId: string) {
   catch { return []; } // table not created yet — nothing flagged
 }
 
+const tagTableSql = "CREATE TABLE IF NOT EXISTS crm_contact_tags (owner_id TEXT NOT NULL, contact_id TEXT NOT NULL, tag TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (owner_id, contact_id, tag))";
+const smartListTableSql = "CREATE TABLE IF NOT EXISTS crm_smart_lists (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, client_id TEXT, name TEXT NOT NULL, filters TEXT NOT NULL, created_at TEXT NOT NULL)";
+async function readTags(db: D1Database, ownerId: string) {
+  try { return ((await db.prepare("SELECT contact_id, tag FROM crm_contact_tags WHERE owner_id = ?1").bind(ownerId).all<{ contact_id: string; tag: string }>()).results || []); }
+  catch { return []; }
+}
+async function readSmartLists(db: D1Database, ownerId: string, clientId: string | null) {
+  try { return ((await db.prepare("SELECT id, name, filters FROM crm_smart_lists WHERE owner_id = ?1 AND COALESCE(client_id,'') = ?2 ORDER BY created_at").bind(ownerId, clientId || "").all<{ id: string; name: string; filters: string }>()).results || []).map((row) => { let filters: unknown = {}; try { filters = JSON.parse(row.filters); } catch { /* keep empty */ } return { id: row.id, name: row.name, filters }; }); }
+  catch { return []; }
+}
+const cleanTag = (value: unknown) => clean(value, 40).replace(/\s+/g, " ").toLowerCase();
+
 async function ensurePipeline(db: D1Database, ownerId: string) {
   const existing = await db.prepare("SELECT id FROM crm_pipelines WHERE owner_id = ?1 AND archived = 0 ORDER BY created_at LIMIT 1").bind(ownerId).first<{ id: string }>();
   if (existing) return;
@@ -89,7 +101,7 @@ export async function GET(request: Request) {
       db.prepare(`SELECT o.*, c.first_name, c.last_name, c.email, c.phone, c.company, s.name AS stage_name FROM crm_opportunities o LEFT JOIN crm_contacts c ON c.id = o.contact_id AND c.owner_id = o.owner_id LEFT JOIN crm_pipeline_stages s ON s.id = o.stage_id AND s.owner_id = o.owner_id WHERE o.owner_id = ?1 AND o.pipeline_id IN (SELECT p.id FROM crm_pipelines p WHERE p.owner_id = ?1${pipeWhere}) ORDER BY o.updated_at DESC LIMIT 2000`).bind(...scopeArgs).all<Record<string, unknown>>(),
       db.prepare("SELECT * FROM crm_activities WHERE owner_id = ?1 ORDER BY created_at DESC LIMIT 1000").bind(ownerId).all<Record<string, unknown>>(),
     ]);
-    const flags = await readFlags(db, ownerId);
+    const [flags, tags, smartLists] = await Promise.all([readFlags(db, ownerId), readTags(db, ownerId), readSmartLists(db, ownerId, scope?.clientId || null)]);
     const orderRows = await db.prepare("SELECT opportunity_id, sort_order FROM crm_opportunity_order WHERE owner_id = ?1").bind(ownerId).all<{ opportunity_id: string; sort_order: number }>();
     const orderByOpportunity = new Map((orderRows.results || []).map((row) => [row.opportunity_id, row.sort_order] as const));
     const pipelines = new Map<string, PipelineView>();
@@ -99,7 +111,7 @@ export async function GET(request: Request) {
     }
     const visibleOpps = new Set((opportunityRows.results || []).map((row) => String(row.id))), visibleContacts = new Set((contacts.results || []).map((row) => String(row.id)));
     const matches = (item: Record<string, unknown>) => !search || [item.title, item.first_name, item.last_name, item.email, item.company].some((value) => String(value || "").toLowerCase().includes(search));
-    return Response.json({ flags, contacts: contacts.results || [], pipelines: [...pipelines.values()], opportunities: (opportunityRows.results || []).map((row) => ({ ...row, sort_order: orderByOpportunity.has(String(row.id)) ? orderByOpportunity.get(String(row.id)) : null })).filter(matches), activities: (activityRows.results || []).filter((a) => !scope || visibleOpps.has(String(a.opportunity_id)) || visibleContacts.has(String(a.contact_id))), clients: (workspace.clients || []).map((item) => ({ id: String(item.id), name: String(item.name), company: String(item.company || ""), logo: String(item.logo || ""), contact: String(item.contact || ""), email: String(item.email || ""), phone: String(item.phone || "") })), staff: (workspace.staff || []).filter((item) => !item.isBot).map((item) => ({ id: String(item.id), name: String(item.name), avatar: String(item.avatar || "") })) }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json({ flags, tags: tags.filter((row) => visibleContacts.has(String(row.contact_id))), smartLists, contacts: contacts.results || [], pipelines: [...pipelines.values()], opportunities: (opportunityRows.results || []).map((row) => ({ ...row, sort_order: orderByOpportunity.has(String(row.id)) ? orderByOpportunity.get(String(row.id)) : null })).filter(matches), activities: (activityRows.results || []).filter((a) => !scope || visibleOpps.has(String(a.opportunity_id)) || visibleContacts.has(String(a.contact_id))), clients: (workspace.clients || []).map((item) => ({ id: String(item.id), name: String(item.name), company: String(item.company || ""), logo: String(item.logo || ""), contact: String(item.contact || ""), email: String(item.email || ""), phone: String(item.phone || "") })), staff: (workspace.staff || []).filter((item) => !item.isBot).map((item) => ({ id: String(item.id), name: String(item.name), avatar: String(item.avatar || "") })) }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) { return reply(error instanceof Error ? error.message : "Could not load CRM records.", 500); }
 }
 
@@ -151,6 +163,58 @@ export async function POST(request: Request) {
       if (clientId && !(access.workspace.clients || []).some((item) => String(item.id) === clientId)) return reply("Choose a client in this workspace.");
       const sql = "INSERT INTO crm_contacts (id, owner_id, client_id, first_name, last_name, email, phone, company, source, notes, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?11) ON CONFLICT(id) DO UPDATE SET client_id=excluded.client_id, first_name=excluded.first_name, last_name=excluded.last_name, email=excluded.email, phone=excluded.phone, company=excluded.company, notes=excluded.notes, updated_at=excluded.updated_at WHERE crm_contacts.owner_id=excluded.owner_id";
       await db.prepare(sql).bind(id, ownerId, clientId, firstName, lastName, email, clean(body.phone, 40), clean(body.company, 200), clean(body.source, 100) || "manual", clean(body.notes, 4000), now).run();
+      if (Array.isArray(body.tags)) {
+        const tags = [...new Set(body.tags.map(cleanTag).filter(Boolean))].slice(0, 30);
+        await db.prepare(tagTableSql).run();
+        await db.batch([db.prepare("DELETE FROM crm_contact_tags WHERE owner_id=?1 AND contact_id=?2").bind(ownerId, id), ...tags.map((tag) => db.prepare("INSERT OR IGNORE INTO crm_contact_tags (owner_id, contact_id, tag, created_at) VALUES (?1,?2,?3,?4)").bind(ownerId, id, tag, now))]);
+      }
+      return Response.json({ ok: true, id });
+    }
+    if (action === "deleteContacts" || action === "tagContacts" || action === "flagContacts") {
+      const ids = Array.isArray(body.ids) ? [...new Set(body.ids.map((x: unknown) => clean(x, 80)).filter(Boolean))].slice(0, 500) : [];
+      if (!ids.length) return reply("Select at least one contact.");
+      const owned = new Set<string>();
+      for (let i = 0; i < ids.length; i += 90) {
+        const chunk = ids.slice(i, i + 90);
+        const rows = await db.prepare(`SELECT id FROM crm_contacts WHERE owner_id=?1 AND id IN (${chunk.map((_, n) => `?${n + 2}`).join(",")})`).bind(ownerId, ...chunk).all<{ id: string }>();
+        (rows.results || []).forEach((row) => owned.add(row.id));
+      }
+      const valid = ids.filter((id) => owned.has(id));
+      if (!valid.length) return reply("Those contacts are no longer available.", 404);
+      const statements: D1PreparedStatement[] = [];
+      if (action === "deleteContacts") {
+        await db.prepare(tagTableSql).run(); await db.prepare(flagTableSql).run();
+        for (const id of valid) statements.push(
+          db.prepare("UPDATE crm_opportunities SET contact_id=NULL, updated_at=?3 WHERE owner_id=?1 AND contact_id=?2").bind(ownerId, id, now),
+          db.prepare("DELETE FROM crm_activities WHERE owner_id=?1 AND contact_id=?2").bind(ownerId, id),
+          db.prepare("DELETE FROM crm_contact_tags WHERE owner_id=?1 AND contact_id=?2").bind(ownerId, id),
+          db.prepare("DELETE FROM crm_flags WHERE owner_id=?1 AND kind='contact' AND ref_id=?2").bind(ownerId, id),
+          db.prepare("DELETE FROM crm_contacts WHERE owner_id=?1 AND id=?2").bind(ownerId, id));
+      } else if (action === "tagContacts") {
+        const tag = cleanTag(body.tag); if (!tag) return reply("Enter a tag.");
+        await db.prepare(tagTableSql).run();
+        for (const id of valid) statements.push(body.on === false
+          ? db.prepare("DELETE FROM crm_contact_tags WHERE owner_id=?1 AND contact_id=?2 AND tag=?3").bind(ownerId, id, tag)
+          : db.prepare("INSERT OR IGNORE INTO crm_contact_tags (owner_id, contact_id, tag, created_at) VALUES (?1,?2,?3,?4)").bind(ownerId, id, tag, now));
+      } else {
+        const flag = clean(body.flag, 20); if (!["spam", "dnd"].includes(flag)) return reply("Choose a flag.");
+        await db.prepare(flagTableSql).run();
+        for (const id of valid) statements.push(body.on === false
+          ? db.prepare("DELETE FROM crm_flags WHERE owner_id=?1 AND kind='contact' AND ref_id=?2 AND flag=?3").bind(ownerId, id, flag)
+          : db.prepare("INSERT OR IGNORE INTO crm_flags (owner_id, kind, ref_id, flag, created_at) VALUES (?1,'contact',?2,?3,?4)").bind(ownerId, id, flag, now));
+      }
+      for (let i = 0; i < statements.length; i += 50) await db.batch(statements.slice(i, i + 50));
+      return Response.json({ ok: true, count: valid.length });
+    }
+    if (action === "saveSmartList" || action === "deleteSmartList") {
+      await db.prepare(smartListTableSql).run();
+      const scopeClient = (crmScopeFrom(request) as { clientId: string | null } | null)?.clientId || null;
+      if (action === "deleteSmartList") { await db.prepare("DELETE FROM crm_smart_lists WHERE owner_id=?1 AND id=?2").bind(ownerId, clean(body.id, 80)).run(); return Response.json({ ok: true }); }
+      const name = clean(body.name, 80); if (!name) return reply("Name the smart list.");
+      const f = body.filters && typeof body.filters === "object" ? body.filters as Record<string, unknown> : {};
+      const filters = { search: clean(f.search, 120), tags: Array.isArray(f.tags) ? f.tags.map(cleanTag).filter(Boolean).slice(0, 20) : [], tagMode: f.tagMode === "all" ? "all" : "any", source: clean(f.source, 100), dnd: ["only", "exclude"].includes(String(f.dnd)) ? String(f.dnd) : "", spam: ["only", "exclude"].includes(String(f.spam)) ? String(f.spam) : "", hasEmail: f.hasEmail === true, hasPhone: f.hasPhone === true };
+      const id = clean(body.id, 80) || crypto.randomUUID();
+      await db.prepare("INSERT INTO crm_smart_lists (id, owner_id, client_id, name, filters, created_at) VALUES (?1,?2,?3,?4,?5,?6) ON CONFLICT(id) DO UPDATE SET name=excluded.name, filters=excluded.filters WHERE crm_smart_lists.owner_id=excluded.owner_id").bind(id, ownerId, scopeClient, name, JSON.stringify(filters), now).run();
       return Response.json({ ok: true, id });
     }
     if (action === "setFlag") {

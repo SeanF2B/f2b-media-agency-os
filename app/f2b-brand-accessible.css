@@ -8634,3 +8634,29 @@ fieldset.crm-new-contact { border:1px solid var(--f2b-border,#d9dee3); border-ra
 fieldset.crm-new-contact legend { padding:0 6px; font-size:12px; font-weight:700; }
 .crm-estimate-tag { flex: none; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 2px 6px; border-radius: 999px; border: 1px solid currentColor; opacity: .75; white-space: nowrap; }
 .crm-stage-total { font-size: 13px; font-weight: 800; margin: 2px 0 4px; opacity: .85; font-variant-numeric: tabular-nums; }
+
+/* CRM contacts: smart lists, filters, bulk actions, tags */
+.crm-smart-lists { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:0 0 10px; }
+.crm-smart-lists > button, .crm-smart-list-chip > button:first-child { display:inline-flex; align-items:center; gap:6px; min-height:34px; padding:0 12px; border:1px solid var(--f2b-border,#d9dee3); border-radius:999px; background:var(--f2b-white,#fff); color:var(--f2b-ink,#1f2328); font-size:13px; font-weight:700; cursor:pointer; }
+.crm-smart-lists > button.active, .crm-smart-list-chip.active > button:first-child { background:var(--brand-primary,#6b6250); border-color:var(--brand-primary,#6b6250); color:#fff; }
+.crm-smart-lists > button span { font-size:11px; opacity:.8; }
+.crm-smart-list-chip { display:inline-flex; align-items:center; gap:2px; }
+.crm-smart-list-delete { width:26px; height:26px; border:0; border-radius:50%; background:transparent; color:var(--f2b-muted,#5b6470); cursor:pointer; font-size:16px; }
+.crm-smart-lists > button.crm-smart-list-save { border-style:dashed; }
+.crm-smart-lists > button.crm-smart-list-save:disabled { opacity:.55; cursor:not-allowed; }
+.crm-contact-filters { display:flex; flex-wrap:wrap; align-items:flex-end; gap:10px; margin:0 0 12px; padding:10px 12px; border:1px solid var(--f2b-border,#d9dee3); border-radius:12px; background:var(--f2b-white,#fff); }
+.crm-contact-filters label { display:grid; gap:4px; font-size:12px; font-weight:700; color:var(--f2b-ink,#1f2328); }
+.crm-contact-filters input:not([type=checkbox]), .crm-contact-filters select, .crm-bulk-bar input { min-height:34px; padding:0 10px; border:1px solid var(--f2b-border,#d9dee3); border-radius:8px; background:var(--f2b-white,#fff); color:var(--f2b-ink,#1f2328); font:inherit; font-size:13px; }
+.crm-contact-filters label.crm-check { display:inline-flex; align-items:center; gap:6px; min-height:34px; }
+.crm-bulk-bar { position:sticky; top:8px; z-index:5; display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:0 0 12px; padding:10px 12px; border-radius:12px; background:var(--brand-primary,#6b6250); color:#fff; box-shadow:0 8px 20px rgba(0,0,0,.14); }
+.crm-bulk-bar b { margin-right:6px; }
+.crm-bulk-bar .text-button { color:#fff; }
+.crm-select-cell { width:36px; }
+.crm-table tr.is-selected td { background:color-mix(in srgb,var(--brand-primary,#6b6250) 8%,transparent); }
+.crm-row-actions { display:flex; align-items:center; gap:6px; justify-content:flex-end; }
+.crm-tag-list { display:inline-flex; flex-wrap:wrap; gap:5px; margin:4px 0; }
+.crm-tag { display:inline-flex; align-items:center; gap:4px; padding:1px 4px 1px 9px; border-radius:999px; background:color-mix(in srgb,var(--brand-primary,#6b6250) 14%,#fff); color:var(--f2b-ink,#1f2328); font-size:11px; font-weight:700; }
+.crm-tag button { width:18px; height:18px; border:0; border-radius:50%; background:transparent; color:inherit; cursor:pointer; line-height:1; }
+.app-shell.dark-mode .crm-smart-lists > button:not(.active), .app-shell.dark-mode .crm-smart-list-chip:not(.active) > button:first-child, .app-shell.dark-mode .crm-contact-filters, .app-shell.dark-mode .crm-contact-filters input:not([type=checkbox]), .app-shell.dark-mode .crm-contact-filters select { background:#1f1e22; border-color:#3a393d; color:#fff; }
+.app-shell.dark-mode .crm-contact-filters label { color:#fff; }
+.app-shell.dark-mode .crm-tag { background:color-mix(in srgb,var(--brand-primary,#6b6250) 40%,#1f1e22); color:#fff; }
