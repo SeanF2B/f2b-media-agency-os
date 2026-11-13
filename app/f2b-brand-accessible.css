@@ -9004,3 +9004,7 @@ html body .app-shell .sidebar .nav-item .nav-icon svg.lucide-nav-icon * { stroke
 .team-agency-toggle small { font-weight: 700; padding: 1px 7px; border-radius: 999px; background: rgba(127,127,127,.15); }
 .team-card.is-agency-member { opacity: .78; }
 .dark-mode .team-scope-bar { background: #1f262c; border-color: #3a444d; color: #edf2f6; }
+
+/* Selected sidebar item: solid brand colour with white text and icon, always visible (glass on, light/dark sidebars) */
+html body .app-shell .sidebar .nav-item.active, html body .app-shell.dark-mode .sidebar .nav-item.active, html.f2b-glass body .app-shell .sidebar .nav-item.active { background: var(--brand-primary, #3b82f6) !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; box-shadow: 0 4px 12px color-mix(in srgb, var(--brand-primary, #3b82f6) 35%, transparent) !important; opacity: 1 !important; }
+html body .app-shell .sidebar .nav-item.active, html body .app-shell .sidebar .nav-item.active *, html body .app-shell .sidebar .nav-item.active .nav-icon svg.lucide-nav-icon, html body .app-shell .sidebar .nav-item.active .nav-icon svg.lucide-nav-icon * { color: #fff !important; -webkit-text-fill-color: #fff !important; stroke: #fff !important; }

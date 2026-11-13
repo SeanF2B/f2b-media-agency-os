@@ -46,7 +46,7 @@
 .f2b-glass .app-shell .panel, .f2b-glass .app-shell .metric-card, .f2b-glass .app-shell .pipeline-card, .f2b-glass .app-shell .modal { border-radius:18px !important; }
 /* Sidebar keeps the client's colour; glass adds the sheen and edge only. */
 .f2b-glass .app-shell .sidebar { box-shadow:inset 0 1px 0 rgba(255,255,255,.22), inset 1px 0 0 rgba(255,255,255,.08), 0 12px 40px rgba(0,0,0,.18) !important; }
-.f2b-glass .app-shell .nav-item.active { background:rgba(255,255,255,.16) !important; -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px); box-shadow:inset 0 1px 0 rgba(255,255,255,.3); }
+/* active sidebar item keeps the solid brand colour (see f2b-brand-accessible.css) */
 .f2b-glass .app-shell button.primary-button, .f2b-glass .app-shell .secondary-button { box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 4px 14px rgba(0,0,0,.08); }
 .f2b-glass-toggle { position:fixed; right:14px; bottom:14px; z-index:9999; display:inline-flex; align-items:center; gap:7px; padding:7px 12px; border-radius:999px; font:600 12px/1 inherit;
   color:#22272b; background:rgba(255,255,255,.6); border:1px solid rgba(255,255,255,.7); -webkit-backdrop-filter:blur(14px) saturate(170%); backdrop-filter:blur(14px) saturate(170%);
