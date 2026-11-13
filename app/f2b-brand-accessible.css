@@ -8695,3 +8695,6 @@ fieldset.crm-new-contact legend { padding:0 6px; font-size:12px; font-weight:700
 .cv-email-body { padding: 16px 18px; white-space: pre-wrap; font-size: 14px; line-height: 1.6; }
 .app-shell.dark-mode .cv-email { background: #1d2126; color: #f2f4f6; }
 .app-shell.dark-mode .cv-email dt { color: #a7b0ba; }
+.ad-report-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 12px; }
+.ad-report-head h3 { margin: 0; white-space: nowrap; }
+.ad-report-head .ad-campaign-select { margin-left: auto; min-width: 0; max-width: 60%; }
