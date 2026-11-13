@@ -8983,3 +8983,11 @@ html body .app-shell .sidebar .nav-item .nav-icon svg.lucide-nav-icon * { stroke
 .app-shell .overview-adspend-panel .ad-report-stats { gap:12px; }
 .app-shell .overview-adspend-panel .ad-report-off h3 { margin:0 0 8px; }
 .app-shell.dark-mode .overview-adspend-panel .ad-report-card { background:transparent; }
+.rank { display:grid; gap:12px; }
+.rank-actions { display:flex; gap:8px; align-items:center; grid-column:1 / -1; }
+.aiv-form select { min-height:38px; padding:0 10px; border:1px solid var(--f2b-border,#d9dee3); border-radius:9px; background:var(--f2b-white,#fff); color:var(--f2b-ink,#1f2328); font:inherit; font-weight:400; }
+.rank-spark { display:inline-flex; align-items:flex-end; gap:2px; height:22px; width:80px; }
+.rank-spark i { flex:1; border-radius:2px; background:var(--brand-primary,#6b6250); opacity:.8; }
+.rank-url { max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
+.rank-alert { color:#b45309; font-weight:700; }
+.ops-table td small.muted { display:block; font-size:11px; }

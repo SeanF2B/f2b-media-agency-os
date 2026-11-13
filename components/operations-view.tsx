@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AiVisibilityPanel } from "./ai-visibility-panel";
+import { RankTrackingPanel } from "./rank-tracking-panel";
 
 // Operations Centre: one admin-only page that reuses existing features (SEO, Google Ads, Websites,
 // Domains & DNS, Reports, Tasks). It reads the workspace already loaded in the app, so the
@@ -59,6 +60,7 @@ export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenW
   renderTool?: (tool: "keywords" | "audits" | "reports" | "media" | "ads", clientId: string) => React.ReactNode;
 }) {
   const [toolClientId, setToolClientId] = useState("");
+  const [seoMode, setSeoMode] = useState<"research" | "ranks">("research");
   const [community, setCommunity] = useState<Record<string, { busy?: boolean; error?: string; results?: CommunityResult[]; cost?: number | null; note?: string; usage?: { clientRuns: number; lastRun: string | null; workspaceRuns: number; monthCostUsd: number } }>>({});
   const [notice, setNotice] = useState("");
   const findQuestions = async (client: OpsClient) => {
@@ -166,9 +168,10 @@ export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenW
       const auditTab = tab === "audits" || tab === "reports";
       return <>
         <div className="ops-toolbar"><label className="ops-client-pick"><span>Client</span><select value={selected?.id || ""} onChange={(event) => setToolClientId(event.target.value)}>{active.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></label>
+          {tab === "keywords" && <span className="ops-seg" role="tablist"><button type="button" role="tab" aria-selected={seoMode === "research"} className={seoMode === "research" ? "active" : ""} onClick={() => setSeoMode("research")}>Research</button><button type="button" role="tab" aria-selected={seoMode === "ranks"} className={seoMode === "ranks" ? "active" : ""} onClick={() => setSeoMode("ranks")}>Rank tracking</button></span>}
           {auditTab && <span className="ops-seg" role="tablist"><button type="button" role="tab" aria-selected={tab === "audits"} className={tab === "audits" ? "active" : ""} onClick={() => onTab("audits")}>Audits</button><button type="button" role="tab" aria-selected={tab === "reports"} className={tab === "reports" ? "active" : ""} onClick={() => onTab("reports")}>Reports</button></span>}
           <span className="muted">{tab === "keywords" ? "Keyword research (Google Keyword Planner / DataForSEO), competitor gaps, rankings, backlinks and technical checks — saved per client." : tab === "ads" ? "Google Ads performance, search terms and audit for the selected client." : tab === "ai" ? "Is this client recommended when people ask ChatGPT or Claude?" : tab === "audits" ? "Full marketing audit across Ads, SEO, tracking and the website." : "Branded client reports from your templates, with PDF export."}</span></div>
-        {selected ? <div className="ops-embed" key={`${tab}-${selected.id}`}>{tab === "ai" ? <AiVisibilityPanel clientId={selected.id} clientName={selected.name} area={((selected as OpsClient & { seoLocations?: string[] }).seoLocations || [])[0] || "Ireland"} services={(selected.services || []).map((service) => service.name).concat((selected as OpsClient & { seoServices?: string[] }).seoServices || [])} /> : renderTool!(tab as "keywords" | "audits" | "reports" | "ads", selected.id)}</div> : <p className="ops-empty">No active clients.</p>}
+        {selected ? <div className="ops-embed" key={`${tab}-${selected.id}`}>{tab === "keywords" && seoMode === "ranks" ? <RankTrackingPanel clientId={selected.id} clientName={selected.name} defaultLocation={((selected as OpsClient & { seoLocations?: string[] }).seoLocations || [])[0] || "Ireland"} /> : tab === "ai" ? <AiVisibilityPanel clientId={selected.id} clientName={selected.name} area={((selected as OpsClient & { seoLocations?: string[] }).seoLocations || [])[0] || "Ireland"} services={(selected.services || []).map((service) => service.name).concat((selected as OpsClient & { seoServices?: string[] }).seoServices || [])} /> : renderTool!(tab as "keywords" | "audits" | "reports" | "ads", selected.id)}</div> : <p className="ops-empty">No active clients.</p>}
       </>;
     })()}
 
