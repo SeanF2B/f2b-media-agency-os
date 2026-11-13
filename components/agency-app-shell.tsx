@@ -1,6 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { EmojiIcons } from "./emoji-icons";
+import { LiquidGlass } from "./liquid-glass";
 
 const AgencyApp = dynamic(() => import("./agency-app").then((module) => module.AgencyApp), {
   ssr: false,
@@ -8,5 +10,5 @@ const AgencyApp = dynamic(() => import("./agency-app").then((module) => module.A
 });
 
 export function AgencyAppShell() {
-  return <AgencyApp />;
+  return <><AgencyApp /><EmojiIcons /><LiquidGlass /></>;
 }

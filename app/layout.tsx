@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "./f2b-brand-accessible.css";
 import "./ai-history.css";
+import "./f2b-icons-glass.css";
 
 export const metadata: Metadata = {
   title: "F2B Media Agency OS",
