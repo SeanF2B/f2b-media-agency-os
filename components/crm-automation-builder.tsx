@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  ArrowLeft, Bell, CalendarClock, CircleCheck, Columns3, Copy, FileInput, FlaskConical, GitBranch, History, Hourglass, ListTodo,
+  ArrowLeft, Bell, Euro, CalendarClock, CircleCheck, Columns3, Copy, FileInput, FlaskConical, GitBranch, History, Hourglass, ListTodo,
   Mail, Maximize, MessageSquare, Minus, Plus, Search, Tag, Trash2, X, Zap,
 } from "lucide-react";
 import {
@@ -16,7 +16,7 @@ type RunRow = { id: string; status: string; dry_run: number; trigger_summary: st
 type StepRow = { node_id: string; title: string; status: string; detail: string; created_at: string; updated_at: string };
 type Loaded = { automation: { id: string; name: string; status: "on" | "off"; sendsEmail: boolean; definition: AutomationDefinition }; options: Options; runs: RunRow[] };
 
-const ICONS: Record<string, typeof Mail> = { FileInput, Tag, Columns3, CircleCheck, CalendarClock, Mail, Bell, Hourglass, GitBranch, MessageSquare, ListTodo, TagRemove: Tag };
+const ICONS: Record<string, typeof Mail> = { Euro, FileInput, Tag, Columns3, CircleCheck, CalendarClock, Mail, Bell, Hourglass, GitBranch, MessageSquare, ListTodo, TagRemove: Tag };
 const iconFor = (node: AutomationNode) => {
   if (node.type === "trigger") return ICONS[TRIGGERS.find((item) => item.type === node.config?.type)?.icon || ""] || Zap;
   if (node.type === "remove_tag") return Tag;
@@ -325,9 +325,15 @@ function StepPanel({ node, options, onSave, onCancel, onDelete, onDuplicate }: {
   } else if (node.type === "send_email") {
     body = <>
       {!options.emailReady && <p className="ca-note">Email sending isn&apos;t set up yet, so this step can be built and tested but won&apos;t send until RESEND_API_KEY and TASK_NOTIFICATION_FROM are added.</p>}
+      <Field label="Send to"><select value={str("to") || "contact"} onChange={(event) => set({ to: event.target.value })}><option value="contact">The contact</option><option value="custom">Someone else (e.g. the client or your team)</option></select></Field>
+      {config.to === "custom" && <Field label="Email address" hint="Separate several with commas."><input value={str("toEmails")} onChange={(event) => set({ toEmails: event.target.value })} placeholder="e.g. hello@yourclient.ie" maxLength={500} /></Field>}
       <Field label="Subject"><input value={str("subject")} onChange={(event) => set({ subject: event.target.value })} placeholder="e.g. Thanks for getting in touch, {{contact.first_name}}" maxLength={200} /></Field>
       <Field label="Message" hint="Plain text. Leave a blank line between paragraphs."><textarea ref={bodyRef} rows={9} value={str("body")} onChange={(event) => set({ body: event.target.value })} placeholder={"Hi {{contact.first_name}},\n\nThanks for your enquiry. We'll be in touch shortly.\n\nThe F2B Media team"} /></Field>
       <div className="ca-chips" aria-label="Insert a personal detail">{MERGE_FIELDS.map((field) => <button key={field.token} type="button" onClick={() => insertMerge(field.token)}>+ {field.label}</button>)}</div>
+    </>;
+  } else if (node.type === "set_value") {
+    body = <>
+      <Field label="Prices" hint={'One per line. "Answer = 15000" sets the value when the lead picked that answer. "Answer = +15%" adjusts it. Only replaces values nobody has typed in by hand; the CRM shows them as an Estimate.'}><textarea rows={14} value={str("table")} onChange={(event) => set({ table: event.target.value })} placeholder={"Design only = 3000\nDesign and delivery = 15000\nNeed trades sourced = +15%"} /></Field>
     </>;
   } else if (node.type === "add_tag" || node.type === "remove_tag") {
     body = <Field label="Tag" hint={node.type === "add_tag" ? "Adding a tag can start other automations." : undefined}><input list="ca-tags" value={str("tag")} onChange={(event) => set({ tag: event.target.value })} placeholder="e.g. booked call" maxLength={60} />{tagList}</Field>;

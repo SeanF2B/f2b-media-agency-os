@@ -2,7 +2,7 @@
 // Only erasable TypeScript syntax is used so `node --test` can load this file directly.
 
 export type TriggerType = "form_lead" | "tag_added" | "stage_changed" | "task_completed" | "schedule";
-export type ActionType = "send_email" | "add_tag" | "remove_tag" | "move_stage" | "create_task" | "notify" | "wait" | "if_else";
+export type ActionType = "send_email" | "set_value" | "add_tag" | "remove_tag" | "move_stage" | "create_task" | "notify" | "wait" | "if_else";
 export type NodeType = "trigger" | ActionType;
 export type Branch = "yes" | "no";
 
@@ -15,7 +15,7 @@ export type ConditionSet = { match: "all" | "any"; rules: ConditionRule[] };
 
 export type ContactFacts = {
   id: string; first_name: string; last_name: string; email: string; phone: string; company: string; source: string; client_id: string | null;
-  tags: string[]; stageIds: string[];
+  tags: string[]; stageIds: string[]; notes?: string; deal_value?: number;
 };
 
 export const TRIGGERS: Array<{ type: TriggerType; label: string; help: string; icon: string }> = [
@@ -28,6 +28,7 @@ export const TRIGGERS: Array<{ type: TriggerType; label: string; help: string; i
 
 export const ACTIONS: Array<{ type: ActionType | "sms"; label: string; help: string; icon: string; comingSoon?: boolean }> = [
   { type: "send_email", label: "Send email", help: "Email the contact.", icon: "Mail" },
+  { type: "set_value", label: "Update opportunity value", help: "Set the deal value from the form answers.", icon: "Euro" },
   { type: "add_tag", label: "Add tag", help: "Label the contact with a tag.", icon: "Tag" },
   { type: "remove_tag", label: "Remove tag", help: "Take a tag off the contact.", icon: "TagOff" },
   { type: "move_stage", label: "Move pipeline stage", help: "Move the contact's deal to a stage.", icon: "Columns3" },
@@ -63,6 +64,8 @@ export const MERGE_FIELDS = [
   { token: "{{contact.email}}", label: "Email" },
   { token: "{{contact.phone}}", label: "Phone" },
   { token: "{{contact.company}}", label: "Company" },
+  { token: "{{contact.notes}}", label: "Form answers" },
+  { token: "{{contact.deal_value}}", label: "Deal value" },
 ];
 
 export const MAX_NODES = 60;
@@ -173,6 +176,8 @@ export function readinessProblems(def: AutomationDefinition): string[] {
   for (const node of def.nodes) {
     const c = node.config || {}; const name = actionLabel(node.type);
     if (node.type === "send_email" && (!text(c.subject) || !text(c.body, 20000))) problems.push(`${name}: add a subject and a message.`);
+    if (node.type === "send_email" && c.to === "custom" && !parseEmailList(String(c.toEmails || "")).length) problems.push(`${name}: add the email address to send to.`);
+    if (node.type === "set_value" && !parsePriceTable(String(c.table || "")).prices.length) problems.push(`${name}: add at least one price.`);
     if ((node.type === "add_tag" || node.type === "remove_tag") && !text(c.tag)) problems.push(`${name}: choose a tag.`);
     if (node.type === "move_stage" && (!text(c.pipelineId) || !text(c.stageId))) problems.push(`${name}: choose a pipeline and stage.`);
     if (node.type === "create_task" && !text(c.title)) problems.push(`${name}: give the task a title.`);
@@ -209,7 +214,8 @@ export function nodeSummary(node: AutomationNode, lookup: Lookup = {}): string {
       if (c.type === "task_completed") return c.match === "automation" ? "Tasks made by automations" : c.match === "title" && text(c.titleContains) ? `Title contains "${text(c.titleContains, 40)}"` : "Any task";
       if (c.type === "schedule") return c.mode === "recurring" ? `Every ${c.repeat === "weekly" ? "week" : c.repeat === "monthly" ? "month" : "day"} at ${text(c.time) || "09:00"}` : text(c.at) ? `Once · ${text(c.at).replace("T", " at ")}` : "Choose a date and time";
       return "Click to choose what starts this automation";
-    case "send_email": return text(c.subject) ? `Send email · ${text(c.subject, 60)}` : "Write the email";
+    case "send_email": return text(c.subject) ? `${c.to === "custom" && text(c.toEmails) ? `Email ${text(c.toEmails, 40)}` : "Send email"} · ${text(c.subject, 60)}` : "Write the email";
+    case "set_value": { const n = parsePriceTable(String(c.table || "")).prices.length; return n ? `Set value from ${n} price${n === 1 ? "" : "s"}` : "Add prices"; }
     case "add_tag": return text(c.tag) ? `Add tag · ${text(c.tag)}` : "Choose a tag";
     case "remove_tag": return text(c.tag) ? `Remove tag · ${text(c.tag)}` : "Choose a tag";
     case "move_stage": return c.stageId ? `Move to · ${stage(c.stageId)}` : "Choose a stage";
@@ -237,6 +243,7 @@ export function renderMerge(template: string, contact: Partial<ContactFacts>) {
     first_name: contact.first_name || "", last_name: contact.last_name || "",
     full_name: [contact.first_name, contact.last_name].filter(Boolean).join(" "),
     email: contact.email || "", phone: contact.phone || "", company: contact.company || "",
+    notes: contact.notes || "", deal_value: contact.deal_value ? `€${Math.round(contact.deal_value).toLocaleString("en-IE")}` : "",
   };
   return String(template || "").replace(/\{\{\s*contact\.(\w+)\s*\}\}/g, (_match, key: string) => fields[key] ?? "");
 }
@@ -309,4 +316,36 @@ export function waitUntil(config: Record<string, unknown>, from: Date): Date | n
   const ms = unit === "minutes" ? 60_000 : unit === "hours" ? 3_600_000 : 86_400_000;
   const capped = Math.min(amount * ms, MAX_WAIT_DAYS * 86_400_000);
   return capped > 0 ? new Date(from.getTime() + capped) : null;
+}
+
+// ---------- opportunity value from form answers ----------
+/** Price table, one rule per line: "Design only = 3000" sets the base; "Need trades sourced = +15%" adjusts it. */
+export function parsePriceTable(table: string) {
+  const prices: Array<{ answer: string; amount: number }> = [], factors: Array<{ answer: string; percent: number }> = [];
+  for (const raw of String(table || "").split("\n")) {
+    const m = raw.match(/^\s*(.+?)\s*=\s*([+-]?)\s*€?\s*([\d.,]+)\s*(%?)\s*$/);
+    if (!m) continue;
+    const answer = m[1].trim(), n = Number(m[3].replace(/,/g, ""));
+    if (!answer || !Number.isFinite(n)) continue;
+    if (m[4] === "%") factors.push({ answer, percent: (m[2] === "-" ? -1 : 1) * n });
+    else prices.push({ answer, amount: n });
+  }
+  return { prices, factors };
+}
+/** Estimate from the lead's answers ("Question? Answer" lines). First matching price is the base; % rules adjust it. Rounded to €100. */
+export function estimateFromTable(table: string, answersText: string) {
+  const { prices, factors } = parsePriceTable(table);
+  const lines = String(answersText || "").split("\n").map((line) => line.trim()).filter(Boolean);
+  const hit = (answer: string) => lines.some((line) => line === answer || line.endsWith(` ${answer}`) || line.endsWith(`: ${answer}`));
+  let base = 0;
+  for (const line of lines) {
+    const p = prices.filter((item) => line === item.answer || line.endsWith(` ${item.answer}`)).sort((a, b) => b.answer.length - a.answer.length)[0];
+    if (p) { base = p.amount; break; }
+  }
+  if (!base) return 0;
+  const total = factors.filter((f) => hit(f.answer)).reduce((sum, f) => sum * (1 + f.percent / 100), base);
+  return Math.max(0, Math.round(total / 100) * 100);
+}
+export function parseEmailList(value: string) {
+  return String(value || "").split(/[,;\s]+/).map((item) => item.trim().toLowerCase()).filter((item) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(item)).slice(0, 10);
 }

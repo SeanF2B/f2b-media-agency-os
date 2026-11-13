@@ -12,7 +12,7 @@
 
 import {
   type AutomationDefinition, type AutomationNode, type Branch, type ConditionSet, type ContactFacts,
-  evaluateConditions, nextNodeId, nextScheduleFire, nodeById, nodeSummary, nodeTitle, normalizeTag, renderMerge, triggerOf, waitUntil, zonedToUtc,
+  estimateFromTable, evaluateConditions, nextNodeId, parseEmailList, nextScheduleFire, nodeById, nodeSummary, nodeTitle, normalizeTag, renderMerge, triggerOf, waitUntil, zonedToUtc,
 } from "./model.ts";
 import { AUTOMATION_SCHEMA_SQL } from "./schema-sql.ts";
 
@@ -88,16 +88,17 @@ export function triggerMatches(automation: { id: string; scope_id: string; trigg
 
 // ---------- contact facts ----------
 export async function loadContactFacts(db: Db, ownerId: string, contactId: string): Promise<ContactFacts | null> {
-  const contact = await db.prepare("SELECT id, client_id, first_name, last_name, email, phone, company, source FROM crm_contacts WHERE id=?1 AND owner_id=?2").bind(contactId, ownerId).first<Record<string, string | null>>();
+  const contact = await db.prepare("SELECT id, client_id, first_name, last_name, email, phone, company, source, notes FROM crm_contacts WHERE id=?1 AND owner_id=?2").bind(contactId, ownerId).first<Record<string, string | null>>();
   if (!contact) return null;
   const [tags, stages] = await Promise.all([
     db.prepare("SELECT tag FROM crm_contact_tags WHERE owner_id=?1 AND contact_id=?2 LIMIT 200").bind(ownerId, contactId).all<{ tag: string }>(),
-    db.prepare("SELECT stage_id FROM crm_opportunities WHERE owner_id=?1 AND contact_id=?2 ORDER BY updated_at DESC LIMIT 50").bind(ownerId, contactId).all<{ stage_id: string }>(),
+    db.prepare("SELECT stage_id, value FROM crm_opportunities WHERE owner_id=?1 AND contact_id=?2 ORDER BY updated_at DESC LIMIT 50").bind(ownerId, contactId).all<{ stage_id: string; value: number }>(),
   ]);
   return {
     id: String(contact.id), client_id: contact.client_id || null,
     first_name: String(contact.first_name || ""), last_name: String(contact.last_name || ""), email: String(contact.email || ""), phone: String(contact.phone || ""), company: String(contact.company || ""), source: String(contact.source || ""),
     tags: (tags.results || []).map((row) => row.tag), stageIds: (stages.results || []).map((row) => row.stage_id),
+    notes: String(contact.notes || ""), deal_value: Number(stages.results?.[0]?.value) || 0,
   };
 }
 
@@ -129,6 +130,24 @@ function htmlEmail(text: string) {
   return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#22272b">${text.split(/\n{2,}/).map((paragraph) => `<p style="margin:0 0 14px">${escapeHtml(paragraph).replace(/\n/g, "<br>")}</p>`).join("")}</div>`;
 }
 
+// Every email the system sends is copied into Conversations (channel "email") so the team can see it.
+async function logSentEmail(db: Db, ownerId: string, clientId: string, to: string, name: string, subject: string, body: string) {
+  try {
+    const now = new Date().toISOString(), preview = `${subject} — ${body}`.replace(/\s+/g, " ").slice(0, 120);
+    await db.prepare("CREATE TABLE IF NOT EXISTS conv_threads (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, client_id TEXT NOT NULL DEFAULT '', channel TEXT NOT NULL, our_number TEXT NOT NULL, contact TEXT NOT NULL, contact_name TEXT NOT NULL DEFAULT '', bot_on INTEGER NOT NULL DEFAULT 1, status TEXT NOT NULL DEFAULT 'open', unread INTEGER NOT NULL DEFAULT 0, last_at TEXT NOT NULL, last_preview TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL)").run();
+    await db.prepare("CREATE TABLE IF NOT EXISTS conv_messages (id TEXT PRIMARY KEY, thread_id TEXT NOT NULL, owner_id TEXT NOT NULL, direction TEXT NOT NULL, sender TEXT NOT NULL, body TEXT NOT NULL, twilio_sid TEXT NOT NULL DEFAULT '', error TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL)").run();
+    let thread = await db.prepare("SELECT id FROM conv_threads WHERE owner_id=?1 AND channel='email' AND our_number='email' AND contact=?2").bind(ownerId, to).first<{ id: string }>();
+    if (!thread) {
+      thread = { id: crypto.randomUUID() };
+      await db.prepare("INSERT INTO conv_threads (id, owner_id, client_id, channel, our_number, contact, contact_name, bot_on, status, unread, last_at, last_preview, created_at) VALUES (?1,?2,?3,'email','email',?4,?5,0,'open',0,?6,?7,?6)").bind(thread.id, ownerId, clientId, to, name.slice(0, 80), now, preview).run();
+    }
+    await db.batch([
+      db.prepare("INSERT INTO conv_messages (id, thread_id, owner_id, direction, sender, body, twilio_sid, error, created_at) VALUES (?1,?2,?3,'out','bot',?4,'','',?5)").bind(crypto.randomUUID(), thread.id, ownerId, `Subject: ${subject}\n\n${body}`.slice(0, 4000), now),
+      db.prepare("UPDATE conv_threads SET last_at=?2, last_preview=?3 WHERE id=?1").bind(thread.id, now, preview),
+    ]);
+  } catch (error) { console.error("logSentEmail", error); }
+}
+
 // ---------- step execution ----------
 type StepResult = { status: "done" | "skipped" | "waiting"; detail: string; branch?: Branch; resumeAt?: Date };
 type StepContext = { db: Db; run: RunRow; node: AutomationNode; contact: ContactFacts; now: Date; effects: Effects; dryRun: boolean; workspace: () => Promise<Workspace | null>; lookups: Lookups; events: AutomationEvent[] };
@@ -140,13 +159,29 @@ async function executeStep(ctx: StepContext): Promise<StepResult> {
   const key = `crm-auto-${run.id}-${node.id}`;
   switch (node.type) {
     case "send_email": {
-      if (!contact.email) return { status: "skipped", detail: "Skipped: this contact has no email address." };
+      const custom = c.to === "custom";
+      const recipients = custom ? parseEmailList(renderMerge(String(c.toEmails || ""), contact)) : contact.email ? [contact.email] : [];
+      if (!recipients.length) return { status: "skipped", detail: custom ? "Skipped: no valid email address to send to." : "Skipped: this contact has no email address." };
       const subject = renderMerge(String(c.subject || ""), contact).slice(0, 200);
       const body = renderMerge(String(c.body || ""), contact).slice(0, 20_000);
-      if (dryRun) return { status: "done", detail: `Would email ${contact.email}\nSubject: ${subject}\n\n${body.slice(0, 600)}${body.length > 600 ? "…" : ""}` };
+      if (dryRun) return { status: "done", detail: `Would email ${recipients.join(", ")}\nSubject: ${subject}\n\n${body.slice(0, 600)}${body.length > 600 ? "…" : ""}` };
       if (!effects.sendEmail) throw new Error("Email isn't set up yet. Add RESEND_API_KEY and TASK_NOTIFICATION_FROM to the Worker.");
-      await effects.sendEmail({ to: contact.email, subject, text: body, html: htmlEmail(body), idempotencyKey: key });
-      return { status: "done", detail: `Emailed ${contact.email} · "${subject}"` };
+      for (const [i, to] of recipients.entries()) {
+        await effects.sendEmail({ to, subject, text: body, html: htmlEmail(body), idempotencyKey: i ? `${key}-${i}` : key });
+        await logSentEmail(db, run.owner_id, run.scope_id || contact.client_id || "", to, custom ? "" : contactName(contact), subject, body);
+      }
+      return { status: "done", detail: `Emailed ${recipients.join(", ")} · "${subject}"` };
+    }
+    case "set_value": {
+      const deal = await db.prepare("SELECT id, value, source, notes FROM crm_opportunities WHERE owner_id=?1 AND contact_id=?2 ORDER BY updated_at DESC LIMIT 1").bind(run.owner_id, contact.id).first<{ id: string; value: number; source: string; notes: string }>();
+      if (!deal) return { status: "skipped", detail: "Skipped: this contact has no opportunity yet." };
+      if (Number(deal.value) > 0 && deal.source !== "website estimate") return { status: "skipped", detail: "Skipped: the value was already entered by hand." };
+      const value = estimateFromTable(String(c.table || ""), `${deal.notes || ""}\n${contact.notes || ""}`);
+      if (!value) return { status: "skipped", detail: "No price matched the form answers, so the value was left as it is." };
+      contact.deal_value = value;
+      if (dryRun) return { status: "done", detail: `Would set the opportunity value to €${value.toLocaleString("en-IE")} (shown as an estimate).` };
+      await db.prepare("UPDATE crm_opportunities SET value=?1, source='website estimate', updated_at=?2 WHERE owner_id=?3 AND id=?4").bind(value, iso(now), run.owner_id, deal.id).run();
+      return { status: "done", detail: `Set the opportunity value to €${value.toLocaleString("en-IE")} (estimate).` };
     }
     case "add_tag": case "remove_tag": {
       const tag = normalizeTag(c.tag);
@@ -221,6 +256,7 @@ async function executeStep(ctx: StepContext): Promise<StepResult> {
       if (c.email !== false && fallback.length) {
         if (!effects.sendEmail) emailed = " Email alerts aren't set up yet (RESEND_API_KEY / TASK_NOTIFICATION_FROM).";
         else {
+          for (const member of fallback) await logSentEmail(db, run.owner_id, run.scope_id || contact.client_id || "", String(member.email), member.name || "", `Automation alert: ${message}`.slice(0, 200), `${message}\n\nContact: ${contactName(contact)}`);
           for (const member of fallback) await effects.sendEmail({ to: String(member.email), subject: `Automation alert: ${message}`.slice(0, 200), text: `${message}\n\nContact: ${contactName(contact)}${contact.email ? ` (${contact.email})` : ""}`, html: htmlEmail(`${message}\n\nContact: ${contactName(contact)}${contact.email ? ` (${contact.email})` : ""}`), idempotencyKey: `${key}-${member.id}` });
           emailed = ` Emailed ${fallback.map((member) => member.name).join(", ")}.`;
         }
