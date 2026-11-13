@@ -204,6 +204,28 @@ export async function POST(request: Request) {
     return respond({ detached: true, hostname });
   }
 
+  if (action === "set-redirect-rules") {
+    const zone = String(body?.zone || "");
+    if (!ID_PATTERN.test(zone)) return respond({ error: "Choose a domain first." }, 400);
+    const input = Array.isArray(body?.rules) ? body.rules.slice(0, 50) : [];
+    const mine: any[] = [];
+    for (const rule of input) {
+      const expression = String(rule?.expression || "").slice(0, 1000);
+      const target = String(rule?.target || "").slice(0, 500);
+      const dynamic = Boolean(rule?.dynamic);
+      const status = [301, 302, 307, 308].includes(Number(rule?.status)) ? Number(rule.status) : 301;
+      if (!expression || !target) return respond({ error: "Each rule needs a match and a target." }, 400);
+      mine.push({ action: "redirect", expression, description: `f2b: ${String(rule?.description || target).slice(0, 80)}`, enabled: true,
+        action_parameters: { from_value: { status_code: status, target_url: dynamic ? { expression: target } : { value: target }, preserve_query_string: true } } });
+    }
+    const current = await cf(token.value, `/zones/${zone}/rulesets/phases/http_request_dynamic_redirect/entrypoint`);
+    const existing: any[] = current.ok ? ((current.result as any)?.rules || []) : [];
+    const kept = existing.filter((rule) => !String(rule?.description || "").startsWith("f2b:")).map((rule) => { const { id: _id, version: _v, last_updated: _l, ref: _r, categories: _c, ...rest } = rule; return rest; });
+    const result = await cf(token.value, `/zones/${zone}/rulesets/phases/http_request_dynamic_redirect/entrypoint`, { method: "PUT", body: { rules: [...kept, ...mine] } });
+    if (!result.ok) return failure(result);
+    return respond({ saved: mine.length, kept: kept.length });
+  }
+
   const zoneId = String(body?.zone || "");
   if (!ID_PATTERN.test(zoneId)) return respond({ error: "Choose a domain first." }, 400);
 
