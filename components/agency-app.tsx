@@ -1,6 +1,7 @@
 "use client";
 import { AiEyesIcon, AiIcon } from "./ai-eyes-icon";
 import type { OnboardingResult } from "./onboarding-wizard";
+import { buildSetupTasks, recurringTaskIdsToPause, servicesToPause, taskServicesForRemovedLines } from "@/lib/onboarding-setup";
 
 import { Component, Fragment, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type Dispatch, type PointerEvent as ReactPointerEvent, type ReactNode, type SetStateAction } from "react";
 import { fullTeamPermissions, getMemberPermissions, getTeamPermissions, type TeamPermissions } from "@/lib/access-permissions";
@@ -211,16 +212,6 @@ function withAiTeammates(staff: Staff[], hiddenAiAgentIds: string[] = []) {
   return result.map(withAgentIcon);
 }
 const ASSISTANT_SERVICES: AiMode[] = ["Google Ads", "SEO"];
-// Onboarding: setup checklist per service (created once per client; matched to an account-level AI employee).
-const ONBOARDING_SETUPS: Record<string, { service: string; aiMode?: AiMode; agent: RegExp; title: string; checklist: string[] }> = {
-  "Google Ads": { service: "Google Ads", aiMode: "Google Ads", agent: /google[\s-]*ads|ppc/i, title: "Google Ads setup", checklist: ["Confirm Ads account access and billing", "Research keywords and competitors for each service area", "Plan campaigns, budgets, locations and conversion goals for approval", "Build campaigns and ad groups (paused until approved)", "Write ads and assets; check keyword → ad → landing page relevance", "Set up conversion tracking and verify it", "Get approval and launch"] },
-  SEO: { service: "SEO", aiMode: "SEO", agent: /\bseo\b/i, title: "SEO setup", checklist: ["Confirm Search Console and GA4 access", "Run technical SEO audit and list fixes", "Keyword research per service and service area", "Map keywords to pages; plan new pages", "Optimise titles, descriptions and on-page content", "Set up local citations and internal linking", "Baseline report for the client"] },
-  Website: { service: "Sites", aiMode: "Sites", agent: /developer/i, title: "Website build", checklist: ["Review the website brief, branding and references", "Plan the sitemap and page structure", "Write page copy for each service and area", "Build pages in the website builder using the client branding", "Set SEO titles, descriptions, canonical URLs and social images", "Set up forms, call tracking and analytics", "Client review and approval", "Connect domain and go live (needs approval)"] },
-  "Google Business Profile": { service: "SEO", aiMode: "SEO", agent: /\bseo\b/i, title: "Google Business Profile setup", checklist: ["Confirm Business Profile access", "Complete categories, services, areas and hours", "Add photos and logo", "Draft the first posts for approval", "Set up review request process and reply drafts"] },
-  "Meta Ads": { service: "Meta Ads", aiMode: "Meta Ads", agent: /meta|facebook|creative/i, title: "Meta Ads setup", checklist: ["Confirm ad account and Page access", "Install and verify the Meta pixel / conversions", "Define audiences per service area", "Prepare creatives and copy for approval", "Launch campaigns after approval"] },
-  "Email Marketing": { service: "Email Marketing", agent: /email/i, title: "Email marketing setup", checklist: ["Confirm sending domain and list", "Plan the nurture sequence", "Draft emails for approval", "Set up the automation and test", "Plan the monthly newsletter"] },
-};
-
 // AI bots are either agency-admin level (only visible in the Agency view) or account level (also in client sub-accounts).
 function isAdminBot(member: { id: string; isBot?: boolean; botLevel?: string; name?: string }) {
   if (!member.isBot) return false;
@@ -1350,6 +1341,7 @@ export function AgencyApp() {
   }, [baseViewWorkspace, activeScopeId, hideAgencyOnlyAgents]);
   const viewHasClientScope = previewMember ? Array.isArray(previewMember.clientAccessIds) : hasClientScope;
   const viewIsAdmin = previewMember ? false : isAdmin;
+  useEffect(() => { if (page === "Operations" && (activeScopeId || !viewIsAdmin)) setPage("Overview"); }, [page, activeScopeId, viewIsAdmin]);
   const viewAccess = previewMember ? previewPermissions : access;
   const canViewActivity = viewAccess.overview || viewAccess.clientActivity || viewAccess.allActivity;
   const recentActivityPreview = (viewWorkspace.activity || []).slice().sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime()).slice(0, 4);
@@ -1396,7 +1388,11 @@ export function AgencyApp() {
     const nextClient: Client = { id: oldClient?.id || uid(), name: form.name?.trim() || "", company: form.company || "", contact: form.contact || "", email: form.email || "", phone: form.phone || "", status: oldClient?.status || "Active", color: oldClient?.color || ["#d6edeb", "#f8e5d7", "#e5e0f5", "#dce9fa"][workspace.clients.length % 4], logo: form.logo || "", services, seoServices: parseLines(form.seoServices), seoLocations: parseLines(form.seoLocations), codexUrl: oldClient?.codexUrl || "", serviceChats: oldClient?.serviceChats || {}, monthlyBudget: form.monthlyBudget === undefined ? Number(oldClient?.monthlyBudget || 0) : Number(form.monthlyBudget || 0), billingDay, campaigns: oldClient?.campaigns || [], googleAdsAccountId: form.googleAdsAccountId?.replace(/\s/g, "") || "", metaAdsAccountId: form.metaAdsAccountId?.trim().replace(/^act_/i, "").replace(/\D/g, "") || "", googleSearchConsoleAccountId: form.googleSearchConsoleAccountId?.trim() || "", googleAnalyticsAccountId: form.googleAnalyticsAccountId?.trim() || "", googleBusinessProfileAccountId: form.googleBusinessProfileAccountId?.trim() || "", googleBusinessProfileLocationId: form.googleBusinessProfileLocationId?.trim() || "", wordpressSiteUrl: form.wordpressSiteUrl?.trim().replace(/\/$/, "") || "" };
     if (!nextClient.name) return;
     if (oldClient) {
-      persist({ ...workspace, clients: workspace.clients.map((client) => client.id === oldClient.id ? nextClient : client) }, "Client updated");
+      // Removing a service stops that client's recurring / scheduled tasks for it (paused, not deleted).
+      const pauseIds = new Set(recurringTaskIdsToPause(workspace.tasks, oldClient.id, taskServicesForRemovedLines((oldClient.services || []).map((line) => line.name), (nextClient.services || []).map((line) => line.name))));
+      const pausedAt = new Date().toISOString();
+      const tasks = pauseIds.size ? workspace.tasks.map((task) => pauseIds.has(task.id) ? { ...task, paused: true, pausedAt, ...(task.aiRunState === "scheduled" ? { aiRunState: "paused" as const, pausedFromRunState: "scheduled" } : {}) } : task) : workspace.tasks;
+      persist({ ...workspace, clients: workspace.clients.map((client) => client.id === oldClient.id ? nextClient : client), tasks }, pauseIds.size ? `Client updated · ${pauseIds.size} recurring task${pauseIds.size === 1 ? "" : "s"} paused for removed services` : "Client updated");
       setModal("");
       return;
     }
@@ -1716,15 +1712,17 @@ ${senderName}`, limitClientAccess: String(Array.isArray(member.clientAccessIds))
     const bots = live.staff.filter((member) => member.isBot && !isAdminBot(member));
     const brief = [result.answers.description && `Business: ${result.answers.description}`, result.answers.serviceAreas && `Service areas: ${result.answers.serviceAreas}`, result.answers.targetCustomers && `Ideal customers: ${result.answers.targetCustomers}`, result.answers.competitors && `Competitors: ${result.answers.competitors}`].filter(Boolean).join("\n");
     const websiteBrief = [result.answers.websiteGoal && `Goal: ${result.answers.websiteGoal}`, result.answers.websitePages && `Pages: ${result.answers.websitePages}`, result.answers.websiteStyle && `Style: ${result.answers.websiteStyle}`, result.answers.websiteReferences && `References: ${result.answers.websiteReferences}`, result.answers.websiteNotes && `Notes: ${result.answers.websiteNotes}`].filter(Boolean).join("\n");
-    const newTasks: Task[] = result.servicesToSetUp.flatMap((key) => {
-      const setup = ONBOARDING_SETUPS[key];
-      if (!setup || live.tasks.some((task) => (task as Task & { onboardingKey?: string }).onboardingKey === `${clientId}:${key}`)) return [];
-      const agent = bots.find((member) => setup.agent.test(`${member.name} ${member.role} ${member.id}`));
-      const notes = [`Onboarding setup for ${c.name}.`, brief, key === "Website" ? websiteBrief : ""].filter(Boolean).join("\n\n").slice(0, 3800);
-      return [{ id: uid(), clientId, projectId: "", title: `${c.name} · ${setup.title}`, assigneeId: agent?.id || "", status: "To do", priority: "High", service: setup.service, estimate: 0, due: "", createdAt: now, createdById: sessionUser.id, notes, checklist: setup.checklist.map((text) => ({ id: uid(), text, done: false })), repeat: "None", ...(agent && setup.aiMode ? { aiMode: setup.aiMode, aiInstructions: notes } : {}), onboardingKey: `${clientId}:${key}` } as Task];
+    const existingKeys = new Set(live.tasks.map((task) => (task as Task & { onboardingKey?: string }).onboardingKey || "").filter(Boolean));
+    const newTasks: Task[] = buildSetupTasks(clientId, c.name, result.servicesToSetUp, existingKeys, bots).map((draft) => {
+      const notes = [`Onboarding setup for ${c.name}.`, brief, draft.key === "Website" ? websiteBrief : "", "Each step lists what it needs, the evidence to record when done, and whether it must wait for approval."].filter(Boolean).join("\n\n").slice(0, 3800);
+      return { id: uid(), clientId, projectId: "", title: draft.title, assigneeId: draft.assigneeId, status: "To do", priority: "High", service: draft.service, estimate: 0, due: "", createdAt: now, createdById: sessionUser.id, notes, checklist: draft.checklist.map((text) => ({ id: uid(), text, done: false })), repeat: "None", ...(draft.aiMode ? { aiMode: draft.aiMode as AiMode, aiInstructions: notes } : {}), onboardingKey: draft.onboardingKey } as Task;
     });
+    // Services switched off here stop their recurring / scheduled tasks (paused, never deleted).
+    const pauseIds = new Set(existing ? recurringTaskIdsToPause(live.tasks, clientId, servicesToPause((existing as Client & { onboarding?: { services?: string[] } }).onboarding?.services || [], result.answers.services)) : []);
+    const pausedAt = now;
+    const keptTasks = live.tasks.map((task) => pauseIds.has(task.id) ? { ...task, paused: true, pausedAt, ...(task.aiRunState === "scheduled" ? { aiRunState: "paused" as const, pausedFromRunState: "scheduled" } : {}) } : task);
     const clients = existing ? live.clients.map((item) => item.id === clientId ? nextClient : item) : [...live.clients, nextClient];
-    const ok = await persist({ ...live, clients, tasks: [...newTasks, ...live.tasks] }, existing ? `Onboarding saved for ${c.name}${newTasks.length ? ` · ${newTasks.length} setup checklist${newTasks.length === 1 ? "" : "s"} added` : ""}` : `Client ${c.name} onboarded${newTasks.length ? ` · ${newTasks.length} setup checklist${newTasks.length === 1 ? "" : "s"} added` : ""}`);
+    const ok = await persist({ ...live, clients, tasks: [...newTasks, ...keptTasks] }, existing ? `Onboarding saved for ${c.name}${newTasks.length ? ` · ${newTasks.length} setup checklist${newTasks.length === 1 ? "" : "s"} added` : ""}${pauseIds.size ? ` · ${pauseIds.size} recurring task${pauseIds.size === 1 ? "" : "s"} paused` : ""}` : `Client ${c.name} onboarded${newTasks.length ? ` · ${newTasks.length} setup checklist${newTasks.length === 1 ? "" : "s"} added` : ""}`);
     return ok !== false;
   };
   const onboardingServicesFor = (clientId: string) => workspace.tasks.map((task) => (task as Task & { onboardingKey?: string }).onboardingKey || "").filter((key) => key.startsWith(`${clientId}:`)).map((key) => key.slice(clientId.length + 1));

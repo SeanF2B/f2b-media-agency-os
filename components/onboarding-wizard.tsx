@@ -65,6 +65,7 @@ export function OnboardingWizard({ clients, initialClientId = "", existingSetupS
   const setA = (key: keyof OnboardingAnswers) => (event: { target: { value: string } }) => setAnswers((current) => ({ ...current, [key]: event.target.value }));
   const already = useMemo(() => new Set(clientId ? existingSetupServices(clientId) : []), [clientId, existingSetupServices]);
   const newSetups = answers.services.filter((service) => !already.has(service));
+  const removedServices = (existing?.onboarding?.services || []).filter((service) => !answers.services.includes(service));
   const wantsWebsite = answers.services.includes("Website");
   const connections = [
     { key: "googleAdsAccountId", label: "Google Ads customer ID", needed: answers.services.includes("Google Ads"), placeholder: "123-456-7890" },
@@ -147,6 +148,7 @@ export function OnboardingWizard({ clients, initialClientId = "", existingSetupS
         <div><small>Client</small><b>{form.name || "—"}</b><span>{clientId ? "Existing client — details will be updated" : "New client will be created"}</span></div>
         <div><small>Services</small><b>{answers.services.join(", ") || "—"}</b></div>
         <div><small>Setup checklists to create</small><b>{newSetups.length ? newSetups.join(", ") : "None — already set up"}</b><span>Added to Tasks in To do, assigned to the matching AI employee. Nothing runs until you start it.</span></div>
+        {removedServices.length > 0 && <div><small>Services switched off</small><b>{removedServices.join(", ")}</b><span>Their recurring and scheduled tasks will be paused (not deleted). Fees in the client profile are unchanged.</span></div>}
         <div><small>Missing connections</small><b>{connections.filter((item) => item.needed && !form[item.key]).map((item) => item.label).join(", ") || "None"}</b></div>
       </div>}
     </div>
