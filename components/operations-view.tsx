@@ -103,20 +103,6 @@ export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenW
     return { client, openTasks: openTasks.length, approvals, checks, missing: checks.filter((check) => !check.ok) };
   });
   const issues = rows.reduce((sum, row) => sum + row.missing.length, 0);
-  const [focusClient, setFocusClient] = useState("");
-  const today = new Date().toISOString().slice(0, 10);
-  const scopedTasks = tasks.filter((task) => !task.aiDismissedAt && task.status !== "Done" && task.status !== "Cancelled" && (!focusClient || task.clientId === focusClient) && active.some((client) => client.id === task.clientId));
-  const nameOf = (id: string) => active.find((client) => client.id === id)?.name || "";
-  const attention = [
-    { key: "overdue", label: "Overdue", items: scopedTasks.filter((task) => (task.dueAt || task.due || "9999") .slice(0, 10) < today) },
-    { key: "blocked", label: "Pending / blocked", items: scopedTasks.filter((task) => task.status === "Blocked" || task.status === "Pending") },
-    { key: "approvals", label: "Waiting for approval", items: scopedTasks.filter((task) => (task.aiApprovals || []).some((item) => item.status === "pending") || task.aiRunState === "needs_review") },
-    { key: "failed", label: "Failed AI jobs", items: scopedTasks.filter((task) => task.aiRunState === "failed" || task.aiRunState === "needs_connection") },
-  ];
-  const recurring = scopedTasks.filter((task) => (task.repeat && task.repeat !== "None") || task.aiRunState === "scheduled" || task.aiRunState === "paused");
-  const nextRun = recurring.filter((task) => !task.paused && task.aiRunState === "scheduled").map((task) => task.dueAt || task.due || "").filter(Boolean).sort()[0];
-  const lastRun = tasks.filter((task) => (!focusClient || task.clientId === focusClient) && task.aiRunState === "completed").map((task) => task.completedAt || task.aiRunAt || "").filter(Boolean).sort().pop();
-  const fmt = (value?: string) => value ? new Date(value.length === 10 ? `${value}T09:00:00` : value).toLocaleString("en-IE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
   const totalApprovals = rows.reduce((sum, row) => sum + row.approvals, 0);
 
   return <section className="ops-centre">
@@ -132,10 +118,6 @@ export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenW
         <button type="button" onClick={() => onOpenPage("Tasks")}><b>{rows.reduce((sum, row) => sum + row.openTasks, 0)}</b><span>Open tasks</span></button>
         <button type="button" onClick={() => onOpenPage("Tasks")}><b>{totalApprovals}</b><span>Waiting for review</span></button>
         <div className={issues ? "warn" : ""}><b>{issues}</b><span>Missing connections</span></div>
-      </div>
-      <div className="ops-attention">
-        <div className="ops-attention-head"><b>Needs attention</b><select value={focusClient} onChange={(event) => setFocusClient(event.target.value)} aria-label="Filter by client"><option value="">All clients</option>{active.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select><span className="muted">Recurring: {recurring.filter((task) => !task.paused).length} active · {recurring.filter((task) => task.paused).length} paused · next run {fmt(nextRun)} · last AI run {fmt(lastRun)}</span></div>
-        <div className="ops-attention-grid">{attention.map((group) => <details key={group.key} className={group.items.length ? "has" : ""}><summary><b>{group.items.length}</b> {group.label}</summary>{group.items.length ? <ul>{group.items.slice(0, 12).map((task) => <li key={task.id}><button type="button" className="text-button" onClick={() => onOpenPage("Tasks")}>{task.title || "Task"}</button><small>{nameOf(task.clientId)}</small></li>)}{group.items.length > 12 && <li className="muted">+{group.items.length - 12} more in Tasks</li>}</ul> : <p className="muted">Nothing here.</p>}</details>)}</div>
       </div>
       <div className="ops-toolbar"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search clients…" aria-label="Search clients" /></div>
       <div className="ops-table-wrap"><table className="ops-table">
