@@ -1,7 +1,8 @@
 import type { LucideIcon } from "lucide-react";
+import { getDisplayCurrency } from "@/lib/display-currency";
 import {
   CircleCheck, Compass, Crown, FileText, Globe, History, Image, LayoutDashboard, Mail, Megaphone,
-  MessageCircle, Receipt, Rocket, Search, Send, Settings, Smartphone, SquareKanban, TrendingUp, UserCog, Users, Zap,
+  MessageCircle, Receipt, ReceiptEuro, ReceiptPoundSterling, ReceiptText, Rocket, Search, Send, Settings, Smartphone, SquareKanban, TrendingUp, UserCog, Users, Zap,
 } from "lucide-react";
 
 // Line icons used in place of emojis across the app shell (sidebar, settings link, tool tabs).
@@ -33,7 +34,9 @@ const icons: Record<string, LucideIcon> = {
 };
 
 export function NavIcon({ name, fallback, size = 17 }: { name: string; fallback?: string; size?: number }) {
-  const Icon = icons[name];
+  // Invoicing shows a receipt with the sub-account's own currency sign.
+  const currency = name === "Invoicing" ? getDisplayCurrency() : "";
+  const Icon = currency === "EUR" ? ReceiptEuro : currency === "GBP" ? ReceiptPoundSterling : currency === "USD" ? Receipt : currency ? ReceiptText : icons[name];
   if (!Icon) return <>{fallback}</>;
   return <Icon className="lucide-nav-icon" size={size} strokeWidth={1.9} aria-hidden="true" />;
 }
