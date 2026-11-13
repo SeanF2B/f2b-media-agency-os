@@ -8566,3 +8566,6 @@ body.task-card-drag-active .bot-live:not(.pipeline-card-drag-preview .bot-live) 
   .app-shell .sidebar-bottom { margin-top: 0 !important; }
   .app-shell .sidebar nav { max-height: none !important; }
 }
+
+/* AI agent icons: show the whole shape (no round crop, disc, border or ring) wherever an agent icon appears. */
+[style*="data:image/svg+xml;base64"] { border-radius:0!important; border:0!important; box-shadow:none!important; background-color:transparent!important; background-size:contain!important; background-repeat:no-repeat!important; background-position:center!important; overflow:visible!important; }

@@ -66,15 +66,24 @@ shapes = {
     "triangle": ("#f4b740", P(rounded_poly(reg_poly(3, 66, -100, 64, 70), 22))),
 }
 
-def svg(color, path, ex=0, ey=0):
+def svg(color, path, ex=0, ey=0, k=1.0, rot=-24):
     eyes = "".join(
-        f'<rect x="{fmt(x - 4.5)}" y="{fmt(y - 10.5)}" width="9" height="21" rx="4.5" transform="rotate(-24 {fmt(x)} {fmt(y)})" fill="{EYE}"/>'
-        for x, y in [(55 + ex, 58 + ey), (74 + ex, 55 + ey)])
+        f'<rect x="{fmt(x - 4.5*k)}" y="{fmt(y - 10.5*k)}" width="{fmt(9*k)}" height="{fmt(21*k)}" rx="{fmt(4.5*k)}" transform="rotate({rot} {fmt(x)} {fmt(y)})" fill="{EYE}"/>'
+        for x, y in [(64 + ex - 9.5*k*(1.2 if rot < -30 else 1), 56.5 + ey + 1.5*k), (64 + ex + 9.5*k*(1.2 if rot < -30 else 1), 56.5 + ey - 1.5*k*(3 if rot < -30 else 1))])
     return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><g fill="{color}">{path}</g>{eyes}</svg>'
 
 out = {}
 for k, (color, path) in shapes.items():
-    ex, ey = (8, -8) if k == "circle" else (0, 0)
-    out[k] = svg(color, path, ex, ey)
+    ex, ey = (14, -18) if k == "circle" else (0, 0)
+    out[k] = svg(color, path, ex, ey, 1.35 if k == "circle" else 1.0, -34 if k == "circle" else -24)
+    open(f"scripts/agent-icons/{k}.svg", "w").write(out[k])
+import subprocess
+from PIL import Image
+for k in list(out):
+    open('/tmp/fit.svg','w').write(out[k]); subprocess.run(['rsvg-convert','-w','512','-h','512','/tmp/fit.svg','-o','/tmp/fit.png'])
+    x0,y0,x1,y1 = Image.open('/tmp/fit.png').getchannel('A').getbbox(); x0,y0,x1,y1 = [v/4 for v in (x0,y0,x1,y1)]
+    sc = 112 / max(x1-x0, y1-y0); tx = 64 - sc*(x0+x1)/2; ty = 64 - sc*(y0+y1)/2
+    body = out[k].split('128 128">',1)[1].rsplit('</svg>',1)[0]
+    out[k] = f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><g transform="translate({fmt(tx)} {fmt(ty)}) scale({sc:.4f})">{body}</g></svg>'
     open(f"scripts/agent-icons/{k}.svg", "w").write(out[k])
 json.dump(out, open("scripts/agent-icons/all.json", "w"))
