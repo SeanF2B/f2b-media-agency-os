@@ -14,7 +14,8 @@ type OpsClient = {
 };
 type OpsTask = { id: string; clientId: string; status: string; aiDismissedAt?: string; aiApprovals?: Array<{ status?: string }>; aiRunState?: string };
 type SiteRow = { clientId: string; backend: string; previewUrl: string; repo: string; branch: string; updatedAt: string };
-export type OperationsTab = "overview" | "websites" | "onboarding";
+export type OperationsTab = "overview" | "websites" | "onboarding" | "local";
+export type CommunityResult = { url: string; title: string; snippet: string; platform: string };
 type Check = { label: string; ok: boolean; page?: string };
 
 const SERVICE_ALIASES: Record<string, string> = { "Web Design & Development": "Website", Sites: "Website" };
@@ -36,11 +37,29 @@ function connectionChecks(client: OpsClient, hasSite: boolean): Check[] {
 
 const hostOf = (value?: string) => { try { return value ? new URL(/^https?:\/\//.test(value) ? value : `https://${value}`).hostname : ""; } catch { return ""; } };
 
-export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenWebsite, onOpenDns, onStartOnboarding, onboarding }: {
+export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenWebsite, onOpenDns, onStartOnboarding, onboarding, onCreateGbpTask, onCreateCommunityTask }: {
   clients: OpsClient[]; tasks: OpsTask[]; tab: OperationsTab; onTab: (tab: OperationsTab) => void;
   onOpenPage: (page: string, clientId?: string) => void; onOpenWebsite: (client: OpsClient) => void; onOpenDns: () => void;
   onStartOnboarding?: (clientId: string) => void; onboarding?: React.ReactNode;
+  onCreateGbpTask?: (clientId: string) => string; onCreateCommunityTask?: (clientId: string, results: CommunityResult[]) => string;
 }) {
+  const [community, setCommunity] = useState<Record<string, { busy?: boolean; error?: string; results?: CommunityResult[]; cost?: number | null; note?: string; usage?: { clientRuns: number; lastRun: string | null; workspaceRuns: number; monthCostUsd: number } }>>({});
+  const [notice, setNotice] = useState("");
+  const findQuestions = async (client: OpsClient) => {
+    const set = (patch: Record<string, unknown>) => setCommunity((current) => ({ ...current, [client.id]: { ...current[client.id], ...patch } }));
+    set({ busy: true, error: "", note: "" });
+    try {
+      const first = await fetch("/api/community-leads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId: client.id }) });
+      const preview = await first.json().catch(() => ({})) as { status?: string; queries?: string[]; message?: string; error?: string; usage?: never };
+      if (first.status === 409 && preview.status === "confirmation_required") {
+        if (!window.confirm(`${preview.message}\n\nSearches:\n${(preview.queries || []).join("\n")}`)) { set({ busy: false }); return; }
+      } else if (!first.ok) throw Object.assign(new Error(preview.error || "Search unavailable."), { usage: preview.usage });
+      const response = await fetch("/api/community-leads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId: client.id, acknowledgeCost: true }) });
+      const json = await response.json().catch(() => ({})) as { results?: CommunityResult[]; costUsd?: number | null; error?: string; usage?: never; failed?: string[] };
+      if (!response.ok) throw Object.assign(new Error(json.error || "Search failed."), { usage: json.usage });
+      set({ busy: false, results: json.results || [], cost: json.costUsd ?? null, usage: json.usage, note: json.failed?.length ? `${json.failed.length} search(es) failed.` : "" });
+    } catch (reason) { set({ busy: false, error: reason instanceof Error ? reason.message : "Search failed.", ...((reason as { usage?: unknown })?.usage ? { usage: (reason as { usage: never }).usage } : {}) }); }
+  };
   const [sites, setSites] = useState<SiteRow[] | null>(null);
   const [siteError, setSiteError] = useState("");
   const [query, setQuery] = useState("");
@@ -66,7 +85,7 @@ export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenW
   return <section className="ops-centre">
     <div className="page-heading"><div><p className="eyebrow">Agency</p><h1>Operations</h1><p className="muted">Client services, connections and websites in one place. Everything opens the existing tools.</p></div></div>
     <div className="ops-tabs" role="tablist" aria-label="Operations sections">
-      {([["overview", "Overview"], ["onboarding", "Onboarding"], ["websites", "Websites & Domains"]] as Array<[OperationsTab, string]>).filter(([key]) => key !== "onboarding" || onboarding).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? "active" : ""} onClick={() => onTab(key)}>{label}</button>)}
+      {([["overview", "Overview"], ["onboarding", "Onboarding"], ["websites", "Websites & Domains"], ["local", "Local & community"]] as Array<[OperationsTab, string]>).filter(([key]) => key !== "onboarding" || onboarding).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? "active" : ""} onClick={() => onTab(key)}>{label}</button>)}
     </div>
 
     {tab === "overview" && <>
@@ -105,5 +124,21 @@ export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenW
     </>}
 
     {tab === "onboarding" && onboarding}
+
+    {tab === "local" && <>
+      <p className="muted ops-hint">Grok drafts Google Business posts, review replies and helpful Reddit / Quora answers as tasks. Everything waits for approval and is posted by you — nothing is published automatically. Community searches use DataForSEO (max 1 search a week per client).</p>
+      {notice && <p className="ops-notice" role="status">{notice}</p>}
+      <div className="ops-toolbar"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search clients…" aria-label="Search clients" /></div>
+      <div className="ops-table-wrap"><table className="ops-table">
+        <thead><tr><th>Client</th><th>Business Profile</th><th>Community questions</th><th></th></tr></thead>
+        <tbody>{rows.map(({ client }) => { const c = community[client.id] || {}; const gbp = Boolean(client.googleBusinessProfileLocationId || client.googleBusinessProfileAccountId); return <tr key={client.id}>
+          <td><span className="ops-client">{client.logo ? <img src={client.logo} alt="" /> : <i style={{ background: client.color || "#d9dee3" }} />}<b>{client.name}</b></span></td>
+          <td><span className="ops-checks"><button type="button" className={gbp ? "ok" : "missing"} onClick={() => onOpenPage("SEO", client.id)}>{gbp ? "✓ Linked (read-only)" : "! Not linked"}</button></span>{onCreateGbpTask && <button type="button" className="text-button" onClick={() => setNotice(onCreateGbpTask(client.id))}>Draft posts & replies</button>}</td>
+          <td>{c.busy ? <span className="muted">Searching…</span> : c.error ? <span className="ops-error">{c.error}</span> : c.results ? <span>{c.results.length} found{c.cost != null ? ` · $${c.cost.toFixed(3)}` : ""}{c.note ? ` · ${c.note}` : ""}</span> : <span className="muted">{c.usage?.lastRun ? `Last search ${new Date(c.usage.lastRun).toLocaleDateString("en-IE")}` : "—"}</span>}
+            {c.results && c.results.length > 0 && <details className="ops-results"><summary>View questions</summary><ul>{c.results.map((item) => <li key={item.url}><a href={item.url} target="_blank" rel="noreferrer">{item.platform}: {item.title}</a></li>)}</ul></details>}</td>
+          <td className="ops-actions"><button type="button" className="secondary-button" disabled={c.busy} onClick={() => void findQuestions(client)}>Find questions</button>{c.results && c.results.length > 0 && onCreateCommunityTask && <button type="button" className="primary-button" onClick={() => { setNotice(onCreateCommunityTask(client.id, c.results || [])); setCommunity((current) => ({ ...current, [client.id]: { ...current[client.id], results: [] } })); }}>Send to Grok</button>}</td>
+        </tr>; })}</tbody>
+      </table></div>
+    </>}
   </section>;
 }

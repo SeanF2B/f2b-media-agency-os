@@ -8830,3 +8830,9 @@ fieldset.crm-new-contact legend { padding:0 6px; font-size:12px; font-weight:700
 .app-shell.dark-mode .onb, .app-shell.dark-mode .onb-field input:not([type=color]):not([type=file]), .app-shell.dark-mode .onb-field textarea, .app-shell.dark-mode .onb-field select { background:#1f1e22; border-color:#3a393d; color:#fff; }
 .app-shell.dark-mode .onb-services label, .app-shell.dark-mode .onb-review > div { border-color:#3a393d; }
 .app-shell.dark-mode .onb-steps li.done button { color:#fff; }
+.ops-hint { margin:0; font-size:13px; }
+.ops-notice { margin:0; padding:10px 12px; border-radius:10px; background:#e7f6ec; color:#14532d; font-size:13px; }
+.ops-error { color:#b42318; font-size:12px; }
+.ops-results summary { cursor:pointer; font-size:12px; }
+.ops-results ul { margin:6px 0 0; padding-left:16px; font-size:12px; }
+.app-shell.dark-mode .ops-notice { background:#14532d; color:#fff; }
