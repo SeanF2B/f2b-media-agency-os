@@ -629,6 +629,8 @@ function detectBotEyes(src: string): Promise<BotGeo | null> {
   });
   botGeoCache.set(src, job); return job;
 }
+let taskCardDragActive = false;
+const blockDragSelection = (event: Event) => event.preventDefault();
 const botEls = new Set<HTMLElement>();
 let botMouseOn = false;
 function ensureBotMouse() {
@@ -636,7 +638,7 @@ function ensureBotMouse() {
   let raf = 0, mx = 0, my = 0;
   const run = () => {
     raf = 0;
-    if (document.body.classList.contains("task-card-drag-active")) return;
+    if (taskCardDragActive) return;
     const vh = window.innerHeight;
     botEls.forEach((el) => {
       const box = el.getBoundingClientRect(); if (box.bottom < -40 || box.top > vh + 40) return;
@@ -1105,6 +1107,13 @@ export function AgencyApp() {
   }, [ready, page]);
 
   useEffect(() => { setDarkMode(window.localStorage.getItem("f2b-dark-mode") === "true"); }, []);
+  // Dark mode is flagged on <html>/<body> directly instead of CSS "body:has(.app-shell.dark-mode)".
+  // A :has() on <body> made every DOM insertion re-style the whole page (the drag/pick-up lag).
+  useEffect(() => {
+    document.documentElement.classList.toggle("f2b-dark", darkMode);
+    document.body.classList.toggle("f2b-dark", darkMode);
+    return () => { document.documentElement.classList.remove("f2b-dark"); document.body.classList.remove("f2b-dark"); };
+  }, [darkMode]);
   useEffect(() => {
     void navigator.serviceWorker?.register("/sw.js").catch(() => undefined);
     const onInstall = (event: Event) => {
@@ -1345,6 +1354,7 @@ export function AgencyApp() {
   useEffect(() => { let live = true; setAutoColours(null); if (clientLogo && !/^#[0-9a-fA-F]{6}$/.test(String(scopedClient?.branding?.secondary || ""))) void extractLogoColours(clientLogo).then((colours) => { if (live && colours) setAutoColours({ logo: clientLogo, ...colours }); }); return () => { live = false; }; /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clientLogo, scopedClient?.id, scopedClient?.branding?.secondary]);
   const validHex = (value?: string) => /^#[0-9a-fA-F]{6}$/.test(String(value || ""));
   const scopedBranding: Partial<Branding> | undefined = scopedClient ? (scopedClient.branding ? { ...scopedClient.branding, ...(!validHex(scopedClient.branding.primary) && autoColours ? { primary: autoColours.primary } : {}), ...(!validHex(scopedClient.branding.secondary) && autoColours ? { secondary: autoColours.secondary } : {}), ...(!scopedClient.branding.logo && clientLogo ? { logo: clientLogo } : {}) } : (clientLogo ? { ...(autoColours ? { primary: autoColours.primary, secondary: autoColours.secondary } : scopedClient.color && /^#[0-9a-fA-F]{6}$/.test(scopedClient.color) ? { primary: scopedClient.color } : {}), logo: clientLogo } : undefined)) : undefined;
+  useEffect(() => { document.documentElement.classList.toggle("f2b-chess", page === "Chess"); return () => document.documentElement.classList.remove("f2b-chess"); }, [page]);
   useEffect(() => { if (page === "Chess" && scopedClient && !/^agency$/i.test(scopedClient.name.trim())) setPage("Overview"); }, [page, scopedClient?.id]);
   useEffect(() => { const own = scopedBranding && (scopedBranding.primary || scopedBranding.secondary || scopedBranding.logo); applyBranding(own ? { ...workspace.settings?.branding, ...scopedBranding } : workspace.settings?.branding); }, [workspace.settings?.branding, JSON.stringify(scopedBranding)]);
   const setClientScope = (id: string) => { setClientScopeState(id); try { document.cookie = `f2b_client=${encodeURIComponent(id || "agency")}; Path=/; Max-Age=31536000; SameSite=Lax; Secure`; window.dispatchEvent(new CustomEvent("f2b-scope", { detail: id })); } catch { /* cookie unavailable */ } try { if (id) window.localStorage.setItem("f2b-client-scope", id); else window.localStorage.removeItem("f2b-client-scope"); } catch { /* storage unavailable */ } if (id) setSelectedClient(id); else setSelectedClient(""); if (id && page === "Lead Factory") setPage("Overview"); };
@@ -4446,8 +4456,8 @@ function TasksView({ scopeClientId = "", workspace, activeTimer, timerNow, curre
       document.querySelectorAll<HTMLElement>(".pipeline-card-drag-shell,.pipeline-card-drag-preview").forEach((card) => card.remove());
       document.querySelectorAll<HTMLElement>(".pipeline-card.is-dragging").forEach((card) => card.classList.remove("is-dragging"));
       document.querySelectorAll<HTMLElement>(".pipeline-column.is-drop-target").forEach((column) => column.classList.remove("is-drop-target"));
-      document.body.classList.remove("task-card-drag-active");
-      document.body.classList.remove("agency-card-drag-active");
+      taskCardDragActive = false;
+      document.removeEventListener("selectstart", blockDragSelection, true);
       pointerTaskDragRef.current = null;
       setDraggingId("");
     };
@@ -4847,6 +4857,7 @@ The app will check the live account first and only restore the previous value if
       for (let node = source.parentElement; node && node !== document.body && node !== document.documentElement; node = node.parentElement) chain.unshift(node);
       const root = document.createElement("div");
       root.className = "pipeline-card-drag-shell";
+      root.setAttribute("data-f2b-ico", "drag");
       root.setAttribute("aria-hidden", "true");
       root.style.setProperty("display", "contents", "important");
       let mount: HTMLElement = root;
@@ -4907,8 +4918,9 @@ The app will check the live account first and only restore the previous value if
         // is reached. Clear that range before cloning the card so the blue
         // selection cannot remain visible on the source or drag preview.
         window.getSelection()?.removeAllRanges();
-        document.body.classList.add("task-card-drag-active");
-        document.body.classList.add("agency-card-drag-active");
+        // No <body> class here: toggling one re-styles the whole page (~200ms+) on pick-up and drop.
+        taskCardDragActive = true;
+        document.addEventListener("selectstart", blockDragSelection, true);
         const preview = drag.source.cloneNode(true) as HTMLElement;
         preview.classList.remove("is-dragging", "is-just-dropped");
         preview.classList.add("pipeline-card-drag-preview");
@@ -4990,8 +5002,8 @@ The app will check the live account first and only restore the previous value if
       drag.preview?.remove();
       drag.source.classList.remove("is-dragging");
       drag.overColumn?.classList.remove("is-drop-target");
-      document.body.classList.remove("task-card-drag-active");
-      document.body.classList.remove("agency-card-drag-active");
+      taskCardDragActive = false;
+      document.removeEventListener("selectstart", blockDragSelection, true);
       setDraggingId("");
     };
     const cancelPointerTaskDrag = (event: TaskDragPointerEvent) => {
@@ -5005,8 +5017,8 @@ The app will check the live account first and only restore the previous value if
       drag.preview?.remove();
       drag.source.classList.remove("is-dragging");
       drag.overColumn?.classList.remove("is-drop-target");
-      document.body.classList.remove("task-card-drag-active");
-      document.body.classList.remove("agency-card-drag-active");
+      taskCardDragActive = false;
+      document.removeEventListener("selectstart", blockDragSelection, true);
       setDraggingId("");
     };
     return <article id={`task-${task.id}`} className={`pipeline-card ${draggingId === task.id ? "is-dragging" : ""} ${droppedId === task.id ? "is-just-dropped" : ""}`} key={task.id} draggable={false} role="button" tabIndex={0} aria-label={`Expand checklist and details for ${task.title}`} onPointerDown={beginPointerTaskDrag} onClick={(event) => { if (suppressTaskCardClickRef.current === task.id) { suppressTaskCardClickRef.current = ""; event.preventDefault(); event.stopPropagation(); return; } if ((event.target as HTMLElement).closest("button,select,a,input,label,details,summary")) return; if (task.status === "Pending" || task.status === "Blocked") { openPendingReason(task); return; } const details = event.currentTarget.querySelector<HTMLDetailsElement>(".pipeline-card-details"); if (details) details.open = !details.open; }} onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); if (task.status === "Pending" || task.status === "Blocked") { openPendingReason(task); return; } const details = event.currentTarget.querySelector<HTMLDetailsElement>(".pipeline-card-details"); if (details) details.open = !details.open; } }}>

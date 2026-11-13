@@ -6,6 +6,7 @@ import { ArrowUpDown, Ban, BellOff, Building2, Columns3, Filter, Mail, MessageSq
 import { CrmNotesPanel, type CrmNote } from "@/components/crm-notes-panel";
 import { currencySymbol, getDisplayCurrency } from "@/lib/display-currency";
 import { EmailActionIcon, PhoneActionIcon, SmsActionIcon, toPhoneHref, toSmsHref, toWhatsAppNumber, WhatsAppActionIcon } from "@/components/contact-action-icons";
+const blockCrmDragSelection = (event: Event) => event.preventDefault();
 
 const timeAgo = (iso: string) => { const diff = Date.now() - Date.parse(iso); if (!Number.isFinite(diff)) return ""; const m = Math.round(diff / 60000), h = Math.round(diff / 3600000), d = Math.round(diff / 86400000); if (m < 1) return "just now"; if (m < 60) return `${m} min${m === 1 ? "" : "s"} ago`; if (h < 24) return `${h} hour${h === 1 ? "" : "s"} ago`; if (d < 7) return `${d} day${d === 1 ? "" : "s"} ago`; if (d < 30) { const w = Math.round(d / 7); return `${w} week${w === 1 ? "" : "s"} ago`; } const mo = Math.round(d / 30); if (mo < 12) return `${mo} month${mo === 1 ? "" : "s"} ago`; const y = Math.round(d / 365); return `${y} year${y === 1 ? "" : "s"} ago`; };
 const Ico = ({ icon: C, size = 15 }: { icon: LucideIcon; size?: number }) => <C className="crm-ico" size={size} strokeWidth={1.9} aria-hidden="true" />;
@@ -89,7 +90,7 @@ export function CrmView({ onOpenClient, scopeClientId = "" }: { onOpenClient: (c
   const dragRef = useRef<OpportunityDrag | null>(null);
   const stageDragRef = useRef<StageDrag | null>(null);
   useEffect(() => {
-    const clearDragSelection = () => document.body.classList.remove("agency-card-drag-active");
+    const clearDragSelection = () => document.removeEventListener("selectstart", blockCrmDragSelection, true);
     window.addEventListener("blur", clearDragSelection);
     document.addEventListener("pointercancel", clearDragSelection, true);
     return () => {
@@ -364,8 +365,9 @@ export function CrmView({ onOpenClient, scopeClientId = "" }: { onOpenClient: (c
     if (!drag.moved) {
       drag.moved = true;
       window.getSelection()?.removeAllRanges();
-      document.body.classList.add("agency-card-drag-active");
+      document.addEventListener("selectstart", blockCrmDragSelection, true);
       const preview = drag.source.cloneNode(true) as HTMLElement;
+      preview.setAttribute("data-f2b-ico", "drag");
       preview.classList.remove("is-dragging", "is-just-dropped");
       preview.classList.add("crm-opportunity-drag-preview");
       preview.removeAttribute("draggable");
@@ -445,7 +447,7 @@ export function CrmView({ onOpenClient, scopeClientId = "" }: { onOpenClient: (c
     drag.preview?.remove();
     drag.source.classList.remove("is-dragging");
     drag.overStage?.classList.remove("is-drop-target");
-    document.body.classList.remove("agency-card-drag-active");
+    document.removeEventListener("selectstart", blockCrmDragSelection, true);
     setDraggingId("");
   };
   const cancelDrag = (event: DragPointEvent) => {
@@ -457,7 +459,7 @@ export function CrmView({ onOpenClient, scopeClientId = "" }: { onOpenClient: (c
     drag.preview?.remove();
     drag.source.classList.remove("is-dragging");
     drag.overStage?.classList.remove("is-drop-target");
-    document.body.classList.remove("agency-card-drag-active");
+    document.removeEventListener("selectstart", blockCrmDragSelection, true);
     setDraggingId("");
     setDropAction("");
   };

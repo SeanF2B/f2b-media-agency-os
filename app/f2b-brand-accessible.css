@@ -156,7 +156,7 @@ h3 { font-size: 17px !important; line-height: 1.35 !important; font-weight: 700 
 
 /* Readable dark mode and consistent Poppins typography */
 *, *::before, *::after { font-family: 'Poppins', sans-serif !important; }
-body:has(.app-shell.dark-mode) { background:#222124 !important; }
+body.f2b-dark { background:#222124 !important; }
 .app-shell.dark-mode .main-area,.app-shell.dark-mode .page-content { background:#222124 !important; }
 .app-shell.dark-mode .topbar { background:#1e252b !important; border-color:#343e46 !important; }
 .app-shell.dark-mode .modal { background:#202a31 !important; color:color-mix(in srgb, var(--brand-primary,#edf3f6) 8%, #fff) !important; border-color:#3c4850 !important; }
@@ -173,12 +173,12 @@ body:has(.app-shell.dark-mode) { background:#222124 !important; }
 .app-shell.dark-mode .modal .security-callout p { color:#b8c4cb !important; }
 
 /* Dark mode uses white text across the full workspace for clear readability. */
-body:has(.app-shell.dark-mode),
-body:has(.app-shell.dark-mode) :is(*, #f2b-white-text-override):not(.marketing-live-page):not(.marketing-live-page *) { color: #fff !important; }
-body:has(.app-shell.dark-mode) :is(input, textarea, #f2b-white-text-override)::placeholder { color: #fff !important; opacity: 1; }
-body:has(.app-shell.dark-mode) { color-scheme: dark; }
+body.f2b-dark,
+body.f2b-dark :is(*, #f2b-white-text-override):not(.marketing-live-page):not(.marketing-live-page *) { color: #fff !important; }
+body.f2b-dark :is(input, textarea, #f2b-white-text-override)::placeholder { color: #fff !important; opacity: 1; }
+body.f2b-dark { color-scheme: dark; }
 /* The global dark-mode white-text rule also reaches the completion banner. */
-body:has(.app-shell.dark-mode) .confetti-message { background: #222124 !important; border: 1px solid #545258 !important; color: #fff !important; }
+body.f2b-dark .confetti-message { background: #222124 !important; border: 1px solid #545258 !important; color: #fff !important; }
 
 /* Dark theme: F2B charcoal surfaces sit against a lighter charcoal canvas. */
 .app-shell.dark-mode {
@@ -187,7 +187,7 @@ body:has(.app-shell.dark-mode) .confetti-message { background: #222124 !importan
   --dark-panel-2: #29282b;
   --dark-border: #3a393d;
 }
-body:has(.app-shell.dark-mode) { background: #2b2a2d !important; }
+body.f2b-dark { background: #2b2a2d !important; }
 .app-shell.dark-mode .main-area,
 .app-shell.dark-mode .page-content { background: #2b2a2d !important; }
 .app-shell.dark-mode .sidebar,
@@ -1439,7 +1439,7 @@ body:has(.app-shell.dark-mode) { background: #2b2a2d !important; }
 .chess-offline-status { margin:0 0 12px; padding:10px 12px; border:1px solid #a77830; border-radius:8px; background:#473718; color:#fff0ca; }
 .chess-status-toasts { position:fixed; top:72px; right:16px; z-index:300; display:grid; gap:8px; width:min(440px,calc(100vw - 32px)); pointer-events:none; }
 .chess-status-toasts .chess-error,.chess-status-toasts .chess-offline-status,.chess-status-toasts .chess-invite-notice { box-sizing:border-box; margin:0; box-shadow:0 8px 24px #0003; }
-html:has(.app-shell .chess-page),body:has(.app-shell .chess-page) { overflow-anchor:none; }
+html.f2b-chess,html.f2b-chess body { overflow-anchor:none; }
 .offline-chess-screen { min-height:100vh; padding:16px; background:var(--f2b-bg); }
 .offline-chess-banner { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:0 auto 16px; max-width:1200px; padding:12px 14px; border:1px solid #a77830; border-radius:10px; background:#473718; color:#fff0ca; }
 .offline-chess-banner span { flex:1 1 260px; }
@@ -2700,8 +2700,8 @@ html:has(.app-shell .chess-page),body:has(.app-shell .chess-page) { overflow-anc
 .app-shell .ai-task-filter-disclosure>summary::-webkit-details-marker { display:none; }
 .app-shell .ai-task-filter-disclosure>summary span { color:var(--f2b-muted); font-size:10px; font-weight:700; }
 .app-shell .ai-task-filter-disclosure[open] .pipeline-toolbar-filters { margin-top:8px; }
-body:has(.app-shell.dark-mode) .app-shell .ai-task-filter-disclosure>summary { background:#2a3036 !important; border-color:#46515a !important; color:color-mix(in srgb, var(--brand-primary,#f2f6f8) 8%, #fff) !important; }
-body:has(.app-shell.dark-mode) .app-shell .ai-task-filter-disclosure>summary span { color:#b8c4cb !important; }
+body.f2b-dark .app-shell .ai-task-filter-disclosure>summary { background:#2a3036 !important; border-color:#46515a !important; color:color-mix(in srgb, var(--brand-primary,#f2f6f8) 8%, #fff) !important; }
+body.f2b-dark .app-shell .ai-task-filter-disclosure>summary span { color:#b8c4cb !important; }
 .app-shell .ai-review-queue:not(.is-clear) { gap:10px; margin:0 0 18px; padding:0; border:0; border-radius:0; background:transparent; color:var(--f2b-text); }
 .app-shell.dark-mode .ai-review-queue:not(.is-clear) { background:transparent; }
 .app-shell .ai-review-queue:not(.is-clear) .ai-review-queue-heading { min-width:0; padding:12px 14px; border:1px solid var(--f2b-border); border-radius:15px; background:var(--f2b-white); }
@@ -3128,7 +3128,7 @@ body:has(.app-shell.dark-mode) .app-shell .ai-task-filter-disclosure>summary spa
 .app-shell:not(.dark-mode) .google-ads-view :is(.google-ads-view-controls select,.google-ads-view-controls input,.google-ads-campaign-filter select,.google-ads-direct-mapping select){background-color:#fff!important;color:#22272b!important;color-scheme:light}
 .app-shell:not(.dark-mode) .google-ads-view select option{background-color:#fff;color:#22272b}
 .app-shell:not(.dark-mode) .google-ads-view select option:disabled{color:#68737b;opacity:1}
-body:has(.app-shell.dark-mode) .google-ads-view :is(.google-ads-view-controls label,.google-ads-campaign-filter label,.google-ads-status p,.google-ads-metric>span,.google-ads-metric>small,.google-ads-panel-heading p,.google-ads-panel-heading>span,.google-ads-secondary-metrics,.google-ads-chart-labels,.google-ads-table th,.google-ads-table td:first-child small,.google-ads-empty,.google-ads-data-note,.google-ads-direct-copy>p,.google-ads-direct-mapping label,.google-ads-direct-mapping>small,#f2b-white-text-override){color:#c3cbd1!important}
+body.f2b-dark .google-ads-view :is(.google-ads-view-controls label,.google-ads-campaign-filter label,.google-ads-status p,.google-ads-metric>span,.google-ads-metric>small,.google-ads-panel-heading p,.google-ads-panel-heading>span,.google-ads-secondary-metrics,.google-ads-chart-labels,.google-ads-table th,.google-ads-table td:first-child small,.google-ads-empty,.google-ads-data-note,.google-ads-direct-copy>p,.google-ads-direct-mapping label,.google-ads-direct-mapping>small,#f2b-white-text-override){color:#c3cbd1!important}
 .app-shell.dark-mode .google-ads-view :is(.google-ads-view-controls select,.google-ads-view-controls input,.google-ads-campaign-filter select,.google-ads-direct-mapping select){background-color:#29282b!important;color:#fff!important;color-scheme:dark}
 .app-shell.dark-mode .google-ads-view select option{background-color:#29282b;color:#fff}
 .app-shell.dark-mode .google-ads-view select option:disabled{color:#c3cbd1;opacity:1}
@@ -4066,7 +4066,7 @@ h3 { font-size: 17px !important; line-height: 1.35 !important; font-weight: 700 
 
 /* Readable dark mode and consistent Poppins typography */
 *, *::before, *::after { font-family: 'Poppins', sans-serif !important; }
-body:has(.app-shell.dark-mode) { background:#222124 !important; }
+body.f2b-dark { background:#222124 !important; }
 .app-shell.dark-mode .main-area,.app-shell.dark-mode .page-content { background:#222124 !important; }
 .app-shell.dark-mode .topbar { background:#1e252b !important; border-color:#343e46 !important; }
 .app-shell.dark-mode .modal { background:#202a31 !important; color:color-mix(in srgb, var(--brand-primary,#edf3f6) 8%, #fff) !important; border-color:#3c4850 !important; }
@@ -4083,12 +4083,12 @@ body:has(.app-shell.dark-mode) { background:#222124 !important; }
 .app-shell.dark-mode .modal .security-callout p { color:#b8c4cb !important; }
 
 /* Dark mode uses white text across the full workspace for clear readability. */
-body:has(.app-shell.dark-mode),
-body:has(.app-shell.dark-mode) :is(*, #f2b-white-text-override):not(.marketing-live-page):not(.marketing-live-page *) { color: #fff !important; }
-body:has(.app-shell.dark-mode) :is(input, textarea, #f2b-white-text-override)::placeholder { color: #fff !important; opacity: 1; }
-body:has(.app-shell.dark-mode) { color-scheme: dark; }
+body.f2b-dark,
+body.f2b-dark :is(*, #f2b-white-text-override):not(.marketing-live-page):not(.marketing-live-page *) { color: #fff !important; }
+body.f2b-dark :is(input, textarea, #f2b-white-text-override)::placeholder { color: #fff !important; opacity: 1; }
+body.f2b-dark { color-scheme: dark; }
 /* The global dark-mode white-text rule also reaches the completion banner. */
-body:has(.app-shell.dark-mode) .confetti-message { background: #222124 !important; border: 1px solid #545258 !important; color: #fff !important; }
+body.f2b-dark .confetti-message { background: #222124 !important; border: 1px solid #545258 !important; color: #fff !important; }
 
 /* Dark theme: F2B charcoal surfaces sit against a lighter charcoal canvas. */
 .app-shell.dark-mode {
@@ -4097,7 +4097,7 @@ body:has(.app-shell.dark-mode) .confetti-message { background: #222124 !importan
   --dark-panel-2: #29282b;
   --dark-border: #3a393d;
 }
-body:has(.app-shell.dark-mode) { background: #2b2a2d !important; }
+body.f2b-dark { background: #2b2a2d !important; }
 .app-shell.dark-mode .main-area,
 .app-shell.dark-mode .page-content { background: #2b2a2d !important; }
 .app-shell.dark-mode .sidebar,
@@ -5349,7 +5349,7 @@ body:has(.app-shell.dark-mode) { background: #2b2a2d !important; }
 .chess-offline-status { margin:0 0 12px; padding:10px 12px; border:1px solid #a77830; border-radius:8px; background:#473718; color:#fff0ca; }
 .chess-status-toasts { position:fixed; top:72px; right:16px; z-index:300; display:grid; gap:8px; width:min(440px,calc(100vw - 32px)); pointer-events:none; }
 .chess-status-toasts .chess-error,.chess-status-toasts .chess-offline-status,.chess-status-toasts .chess-invite-notice { box-sizing:border-box; margin:0; box-shadow:0 8px 24px #0003; }
-html:has(.app-shell .chess-page),body:has(.app-shell .chess-page) { overflow-anchor:none; }
+html.f2b-chess,html.f2b-chess body { overflow-anchor:none; }
 .offline-chess-screen { min-height:100vh; padding:16px; background:var(--f2b-bg); }
 .offline-chess-banner { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:0 auto 16px; max-width:1200px; padding:12px 14px; border:1px solid #a77830; border-radius:10px; background:#473718; color:#fff0ca; }
 .offline-chess-banner span { flex:1 1 260px; }
@@ -6610,8 +6610,8 @@ html:has(.app-shell .chess-page),body:has(.app-shell .chess-page) { overflow-anc
 .app-shell .ai-task-filter-disclosure>summary::-webkit-details-marker { display:none; }
 .app-shell .ai-task-filter-disclosure>summary span { color:var(--f2b-muted); font-size:10px; font-weight:700; }
 .app-shell .ai-task-filter-disclosure[open] .pipeline-toolbar-filters { margin-top:8px; }
-body:has(.app-shell.dark-mode) .app-shell .ai-task-filter-disclosure>summary { background:#2a3036 !important; border-color:#46515a !important; color:color-mix(in srgb, var(--brand-primary,#f2f6f8) 8%, #fff) !important; }
-body:has(.app-shell.dark-mode) .app-shell .ai-task-filter-disclosure>summary span { color:#b8c4cb !important; }
+body.f2b-dark .app-shell .ai-task-filter-disclosure>summary { background:#2a3036 !important; border-color:#46515a !important; color:color-mix(in srgb, var(--brand-primary,#f2f6f8) 8%, #fff) !important; }
+body.f2b-dark .app-shell .ai-task-filter-disclosure>summary span { color:#b8c4cb !important; }
 .app-shell .ai-review-queue:not(.is-clear) { gap:10px; margin:0 0 18px; padding:0; border:0; border-radius:0; background:transparent; color:var(--f2b-text); }
 .app-shell.dark-mode .ai-review-queue:not(.is-clear) { background:transparent; }
 .app-shell .ai-review-queue:not(.is-clear) .ai-review-queue-heading { min-width:0; padding:12px 14px; border:1px solid var(--f2b-border); border-radius:15px; background:var(--f2b-white); }
@@ -7038,7 +7038,7 @@ body:has(.app-shell.dark-mode) .app-shell .ai-task-filter-disclosure>summary spa
 .app-shell:not(.dark-mode) .google-ads-view :is(.google-ads-view-controls select,.google-ads-view-controls input,.google-ads-campaign-filter select,.google-ads-direct-mapping select){background-color:#fff!important;color:#22272b!important;color-scheme:light}
 .app-shell:not(.dark-mode) .google-ads-view select option{background-color:#fff;color:#22272b}
 .app-shell:not(.dark-mode) .google-ads-view select option:disabled{color:#68737b;opacity:1}
-body:has(.app-shell.dark-mode) .google-ads-view :is(.google-ads-view-controls label,.google-ads-campaign-filter label,.google-ads-status p,.google-ads-metric>span,.google-ads-metric>small,.google-ads-panel-heading p,.google-ads-panel-heading>span,.google-ads-secondary-metrics,.google-ads-chart-labels,.google-ads-table th,.google-ads-table td:first-child small,.google-ads-empty,.google-ads-data-note,.google-ads-direct-copy>p,.google-ads-direct-mapping label,.google-ads-direct-mapping>small,#f2b-white-text-override){color:#c3cbd1!important}
+body.f2b-dark .google-ads-view :is(.google-ads-view-controls label,.google-ads-campaign-filter label,.google-ads-status p,.google-ads-metric>span,.google-ads-metric>small,.google-ads-panel-heading p,.google-ads-panel-heading>span,.google-ads-secondary-metrics,.google-ads-chart-labels,.google-ads-table th,.google-ads-table td:first-child small,.google-ads-empty,.google-ads-data-note,.google-ads-direct-copy>p,.google-ads-direct-mapping label,.google-ads-direct-mapping>small,#f2b-white-text-override){color:#c3cbd1!important}
 .app-shell.dark-mode .google-ads-view :is(.google-ads-view-controls select,.google-ads-view-controls input,.google-ads-campaign-filter select,.google-ads-direct-mapping select){background-color:#29282b!important;color:#fff!important;color-scheme:dark}
 .app-shell.dark-mode .google-ads-view select option{background-color:#29282b;color:#fff}
 .app-shell.dark-mode .google-ads-view select option:disabled{color:#c3cbd1;opacity:1}
@@ -9105,7 +9105,7 @@ html body .app-shell .sidebar .nav-item.active, html body .app-shell .sidebar .n
 .ai-field-assist-btn:disabled { opacity: .75; cursor: progress; }
 .ai-field-assist-undo { border: 0; background: #fff; border-radius: 999px; padding: 4px 9px; font: inherit; font-size: 12px; font-weight: 600; color: #475569; cursor: pointer; box-shadow: 0 4px 14px rgba(15,23,42,.12); }
 .ai-field-assist-msg { order: -1; font-size: 11px; font-weight: 600; color: #475569; background: #fff; padding: 3px 8px; border-radius: 999px; box-shadow: 0 4px 14px rgba(15,23,42,.1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
-.dark-mode .ai-field-assist-btn, .dark-mode .ai-field-assist-undo, .dark-mode .ai-field-assist-msg, html:has(.app-shell.dark-mode) .ai-field-assist-btn, html:has(.app-shell.dark-mode) .ai-field-assist-undo, html:has(.app-shell.dark-mode) .ai-field-assist-msg { background: #1f262c; color: #edf2f6; border-color: #3a444d; }
+.dark-mode .ai-field-assist-btn, .dark-mode .ai-field-assist-undo, .dark-mode .ai-field-assist-msg, html.f2b-dark .ai-field-assist-btn, html.f2b-dark .ai-field-assist-undo, html.f2b-dark .ai-field-assist-msg { background: #1f262c; color: #edf2f6; border-color: #3a444d; }
 
 /* Operations → SEO & competitors: four clear sections, one client picker; embedded SEO tools drop their own heading/tabs */
 .ops-seo-sections button { font-weight: 700; }
