@@ -28,6 +28,7 @@ export function ClientSelectEnhancer({ clients }: { clients: PickClient[] }) {
         const logo = safeLogo(client.logo);
         return logo ? `<span class="client-pick-logo"><img src="${esc(logo)}" alt="" loading="lazy"></span>` : `<span class="client-pick-logo initials" style="background:${esc(client.color || "#d9dee3")}">${esc(initials(client.name))}</span>`;
       }
+      if (/^\s*[+＋]|^\s*new\b/i.test(label)) return ""; // "+ New client" etc. is an action, not a client — no logo box
       const isAgency = /agency|f2b/i.test(label) && value !== "";
       return `<span class="client-pick-logo generic">${isAgency ? "★" : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>'}</span>`;
     };

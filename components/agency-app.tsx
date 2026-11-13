@@ -1,6 +1,7 @@
 "use client";
 import { FormSubmissionsView } from "./form-submissions-view";
 import { ClientSelectEnhancer } from "./client-select-enhancer";
+import { ContrastGuard } from "./contrast-guard";
 import { ClientReportsView } from "./client-reports-view";
 import { ReportGeneratingAnimation } from "./report-generating-animation";
 import { AiEyesIcon, AiIcon } from "./ai-eyes-icon";
@@ -2394,6 +2395,7 @@ ${senderName}`, limitClientAccess: String(Array.isArray(member.clientAccessIds))
         {page === "Team" && pageAllowed && <TeamView workspace={viewWorkspace} scopeClientId={activeScopeId} scopeClientName={scopedClient?.name || ""} onAdd={() => openModal("staff", activeScopeId ? { limitClientAccess: "true", clientAccessIds: JSON.stringify([activeScopeId]) } : undefined)} onAddAi={() => openModal("staff", { isAiProfile: "true", name: "", aiMode: "Google Ads", agentPrompt: "", limitClientAccess: activeScopeId ? "true" : "false", clientAccessIds: activeScopeId ? JSON.stringify([activeScopeId]) : "[]" })} onEdit={editStaff} onRemoveAi={removeAiTeammate} onRemoveStaff={removeStaffMember} currentUserId={selfProfile?.id || sessionUser.id} onRestoreAi={restoreAiTeammate} />}
       </div>
       <ClientSelectEnhancer clients={workspace.clients} />
+      <ContrastGuard />
     </main>
     {chessInvitePopup && <section className="chess-invite-popup" role="alertdialog" aria-label="Chess challenge invitation" aria-live="assertive"><span className="chess-invite-popup-icon" aria-hidden="true">♟</span><div><b>Chess challenge</b><p>{chessInvitePopup.challenger} invited you to play.</p><div className="chess-invite-popup-actions"><button type="button" onClick={() => { setChessInviteOpenId(chessInvitePopup.id); setChessInvitePopup(null); setSelectedClient(""); setPage("Chess"); }}>View and accept</button><button type="button" className="secondary-button" onClick={() => setChessInvitePopup(null)}>Dismiss</button></div></div><button type="button" className="chess-invite-popup-close" aria-label="Dismiss chess invitation" onClick={() => setChessInvitePopup(null)}>×</button></section>}
     {globalErrors.length > 0 && <section className="global-error-stack" aria-label="App service notices" aria-live="polite">{globalErrors.map((item) => <article className="global-error-card" role="status" key={item.id}><span className="global-error-icon" aria-hidden="true">!</span><div className="global-error-copy"><b>{item.requiresSignIn ? "Sign-in needed" : "Temporary service issue"}</b><p>{item.message}</p>{item.requiresSignIn && <button type="button" className="global-error-signin" onClick={() => window.location.reload()}>Sign in again</button>}</div><button type="button" aria-label={`Dismiss ${item.source} notice`} onClick={() => setGlobalErrors((current) => current.filter((entry) => entry.id !== item.id))}>×</button></article>)}<button type="button" className="global-error-dismiss-all" onClick={() => setGlobalErrors([])}>Dismiss</button></section>}

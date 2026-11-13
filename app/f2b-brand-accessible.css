@@ -9294,3 +9294,18 @@ select.client-pick-native { position: absolute !important; width: 1px !important
 @media (max-width: 640px) { .rga { flex-direction: column; text-align: center; } .rga-progress { margin: 0 auto; width: 100%; } }
 .dark-mode .rga { background: linear-gradient(135deg, #1f262c, #1d2a24); border-color: #3a444d; color: #edf2f6; }
 .dark-mode .rga-step { color: #c9d3dc; }
+
+/* CRM contacts: dark-mode readability fix (dark mode forces white text, so every surface here must be dark) */
+:is(body.f2b-dark, .dark-mode) .cm-table tbody tr.is-selected td { background: color-mix(in srgb, var(--brand-primary, #1677c8) 22%, #1f262c) !important; }
+:is(body.f2b-dark, .dark-mode) .cm-table tbody tr.is-selected:hover td { background: color-mix(in srgb, var(--brand-primary, #1677c8) 30%, #1f262c) !important; }
+:is(body.f2b-dark, .dark-mode) .cm-count { background: color-mix(in srgb, var(--brand-primary, #1677c8) 35%, #1f262c) !important; }
+:is(body.f2b-dark, .dark-mode) .crm-bulk-bar input,
+:is(body.f2b-dark, .dark-mode) .crm-bulk-bar select { background: rgba(0,0,0,.28) !important; border: 1px solid rgba(255,255,255,.35) !important; }
+:is(body.f2b-dark, .dark-mode) .crm-bulk-bar input::placeholder { color: rgba(255,255,255,.7) !important; }
+:is(body.f2b-dark, .dark-mode) .crm-bulk-bar select option { background: #1f262c; }
+:is(body.f2b-dark, .dark-mode) .crm-bulk-bar .danger-button { background: #b42318 !important; }
+.crm-bulk-bar .crm-bulk-workflow { min-height: 34px; padding: 0 10px; border-radius: 8px; font: inherit; font-size: 13px; }
+.crm-bulk-bar button:disabled { opacity: .55; cursor: not-allowed; }
+.cm-list-add:disabled { opacity: 1; cursor: pointer; }
+/* Contrast guard (components/contrast-guard.tsx): placeholders on light fields stay readable in dark mode */
+html body.f2b-dark .f2b-on-light:is(input, textarea, #f2b-white-text-override)::placeholder { color: #64748b !important; }
