@@ -226,6 +226,42 @@ export async function POST(request: Request) {
     return respond({ saved: mine.length, kept: kept.length });
   }
 
+  if (action === "go-live-seo") {
+    const zone = String(body?.zone || "");
+    if (!ID_PATTERN.test(zone)) return respond({ error: "Choose a domain first." }, 400);
+    const accountId = String(env.F2B_CF_ACCOUNT_ID || "");
+    if (!ID_PATTERN.test(accountId)) return respond({ error: "The Cloudflare account ID is not configured for this app." }, 503);
+    const host = String(body?.host || "").trim().toLowerCase();
+    if (!DOMAIN_PATTERN.test(host)) return respond({ error: "Enter the site's main domain." }, 400);
+    const steps: Record<string, unknown> = {};
+    const headersPath = `/zones/${zone}/rulesets/phases/http_response_headers_transform/entrypoint`;
+    const currentHeaders = await cf(token.value, headersPath);
+    const existingHeaders: any[] = currentHeaders.ok ? ((currentHeaders.result as any)?.rules || []) : [];
+    const keptHeaders = existingHeaders.filter((rule) => !String(rule?.description || "").startsWith("f2b:")).map((rule) => { const { id: _i, version: _v, last_updated: _l, ref: _r, categories: _c, ...rest } = rule; return rest; });
+    const headerResult = await cf(token.value, headersPath, { method: "PUT", body: { rules: [...keptHeaders, { action: "rewrite", expression: "true", description: "f2b: allow indexing (remove noindex header)", enabled: true, action_parameters: { headers: { "x-robots-tag": { operation: "remove" } } } }] } });
+    steps.noindexHeader = headerResult.ok ? "removed" : (headerResult.error || "failed");
+    const script = `export default { fetch(request) { const url = new URL(request.url); const host = url.hostname.replace(/^www\\./, ""); return new Response("User-agent: *\\nAllow: /\\n\\nSitemap: https://" + host + "/sitemap-index.xml\\n", { headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "public, max-age=300" } }); } };`;
+    const name = `f2b-robots-${host.replace(/[^a-z0-9]+/g, "-")}`.slice(0, 60).replace(/-+$/, "");
+    const form = new FormData();
+    form.append("metadata", JSON.stringify({ main_module: "worker.js", compatibility_date: "2025-01-01" }));
+    form.append("worker.js", new Blob([script], { type: "application/javascript+module" }), "worker.js");
+    const upload = await fetch(`${CF_API}/accounts/${accountId}/workers/scripts/${name}`, { method: "PUT", headers: { Authorization: `Bearer ${token.value}` }, body: form });
+    const uploadJson: any = await upload.json().catch(() => ({}));
+    steps.robotsWorker = upload.ok ? "deployed" : (uploadJson?.errors?.[0]?.message || `failed ${upload.status}`);
+    if (upload.ok) {
+      const routes = await cf(token.value, `/zones/${zone}/workers/routes`);
+      const have = new Set(routes.ok ? (routes.result as any[]).map((route) => route.pattern) : []);
+      const routeResults: string[] = [];
+      for (const pattern of [`${host}/robots.txt`, `www.${host}/robots.txt`]) {
+        if (have.has(pattern)) { routeResults.push(`${pattern}: exists`); continue; }
+        const created = await cf(token.value, `/zones/${zone}/workers/routes`, { method: "POST", body: { pattern, script: name } });
+        routeResults.push(`${pattern}: ${created.ok ? "added" : created.error || "failed"}`);
+      }
+      steps.robotsRoutes = routeResults;
+    }
+    return respond({ steps });
+  }
+
   const zoneId = String(body?.zone || "");
   if (!ID_PATTERN.test(zoneId)) return respond({ error: "Choose a domain first." }, 400);
 
