@@ -147,7 +147,7 @@ export function EmojiIcons() {
     };
 
     let queued = new Set<Node>();
-    let frame = 0;
+    let frame = 0; // setTimeout, not requestAnimationFrame: rAF pauses in background panes and tabs
     const flush = () => {
       frame = 0;
       const batch = queued; queued = new Set();
@@ -155,7 +155,7 @@ export function EmojiIcons() {
       // Drop icons whose text React has since removed from the page.
       ownedNodes.forEach((text) => { if (!text.isConnected) clearOwned(text); });
     };
-    const queue = (node: Node) => { queued.add(node); if (!frame) frame = window.requestAnimationFrame(flush); };
+    const queue = (node: Node) => { queued.add(node); if (!frame) frame = window.setTimeout(flush, 30); };
 
     const observer = new MutationObserver((records) => {
       for (const record of records) {
@@ -170,7 +170,7 @@ export function EmojiIcons() {
     processTree(document.body);
     if (document.title) document.title = document.title.replace(EMOJI, (match) => isKept(match) ? match : "").trim();
     observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["title", "placeholder", "aria-label"] });
-    return () => { observer.disconnect(); if (frame) window.cancelAnimationFrame(frame); };
+    return () => { observer.disconnect(); if (frame) window.clearTimeout(frame); };
   }, []);
 
   return <div ref={templateRef} hidden aria-hidden="true" data-f2b-ico="templates">
