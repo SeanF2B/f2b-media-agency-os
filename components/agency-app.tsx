@@ -629,7 +629,6 @@ function detectBotEyes(src: string): Promise<BotGeo | null> {
   });
   botGeoCache.set(src, job); return job;
 }
-const DRAG_COPY_PROPS = ["display", "position", "box-sizing", "width", "height", "min-width", "min-height", "max-width", "margin", "padding", "border", "border-radius", "background", "background-color", "background-image", "background-size", "background-position", "color", "font", "letter-spacing", "line-height", "text-align", "text-transform", "white-space", "overflow", "text-overflow", "flex", "flex-direction", "flex-wrap", "align-items", "justify-content", "gap", "grid-template-columns", "opacity", "box-shadow", "object-fit", "fill", "stroke", "stroke-width", "visibility"];
 const botEls = new Set<HTMLElement>();
 let botMouseOn = false;
 function ensureBotMouse() {
@@ -1162,6 +1161,26 @@ export function AgencyApp() {
     } catch (e) { setError(e instanceof Error ? e.message : "Could not save the change."); return false; }
     finally { setSaving(false); }
   }, [previewMemberId]);
+
+  // Self-heal a stale timer: if the timed task was moved out of In progress by
+  // anything other than the board (AI agent, server cron, another device) or
+  // was deleted, save the tracked time and stop the timer so it never runs
+  // without a card in In progress.
+  const healedTimerRef = useRef("");
+  useEffect(() => {
+    const timer = workspace.activeTimer;
+    if (!ready || !timer || previewMemberId) return;
+    const task = workspace.tasks.find((item) => item.id === timer.taskId);
+    if (task && task.status === "In progress") return;
+    const key = `${timer.taskId}:${timer.startedAt}`;
+    if (healedTimerRef.current === key) return;
+    healedTimerRef.current = key;
+    const nowIso = new Date().toISOString();
+    const seconds = Math.max(1, Math.floor((Date.now() - new Date(timer.startedAt).getTime()) / 1000));
+    const where = task ? (task.status === "Blocked" ? "Pending" : task.status) : "deleted";
+    const entries = [{ id: uid(), taskId: timer.taskId, clientId: task?.clientId || "", staffId: timer.staffId, startAt: timer.startedAt, endAt: nowIso, seconds, note: `Timer stopped automatically — task is ${where}`, billable: true }, ...workspace.entries];
+    void persist({ ...workspace, entries, activeTimer: null }, task ? `Timer stopped · ${task.title} is ${where}` : "Timer stopped · task no longer exists");
+  }, [ready, previewMemberId, workspace, persist]);
 
   const updateApprovalFeedback = useCallback((taskId: string, approvalId: string, feedback: string) => {
     if (previewMemberId || !isAdmin) return;
@@ -4424,7 +4443,7 @@ function TasksView({ scopeClientId = "", workspace, activeTimer, timerNow, curre
   useEffect(() => {
     const clearFloatingTaskCards = () => {
       pointerTaskDragRef.current?.removeListeners?.();
-      document.querySelectorAll<HTMLElement>(".pipeline-card-drag-preview").forEach((card) => card.remove());
+      document.querySelectorAll<HTMLElement>(".pipeline-card-drag-shell,.pipeline-card-drag-preview").forEach((card) => card.remove());
       document.querySelectorAll<HTMLElement>(".pipeline-card.is-dragging").forEach((card) => card.classList.remove("is-dragging"));
       document.querySelectorAll<HTMLElement>(".pipeline-column.is-drop-target").forEach((column) => column.classList.remove("is-drop-target"));
       document.body.classList.remove("task-card-drag-active");
@@ -4818,18 +4837,31 @@ The app will check the live account first and only restore the previous value if
     const taskAttachments = task.attachments || [];
     const canAttachTaskFiles = canManageStaffReviews || (canSubmitStaffReviews && task.assigneeId === currentStaffId);
     const aiStage = isAiAssignedTask(task) ? getAiTaskStage(task) : null;
-    const copyCardStyles = (source: HTMLElement, target: HTMLElement) => {
-      const sourceNodes = [source, ...Array.from(source.querySelectorAll<HTMLElement>("*"))];
-      const targetNodes = [target, ...Array.from(target.querySelectorAll<HTMLElement>("*"))];
-      sourceNodes.forEach((node, index) => {
-        // Hidden parts (collapsed details, closed menus) don't show in the drag preview — skip the costly style read.
-        if (index > 0 && node.getClientRects().length === 0) { targetNodes[index]?.style.setProperty("display", "none"); return; }
-        const rendered = window.getComputedStyle(node);
-        const clone = targetNodes[index];
-        if (!clone) return;
-        for (const property of DRAG_COPY_PROPS) clone.style.setProperty(property, rendered.getPropertyValue(property));
-      });
-
+    // Build an invisible copy of the card's ancestor chain (display:contents,
+    // same classes/data attributes) and mount the preview inside it. The
+    // stylesheet then styles the clone exactly like the real card, so we no
+    // longer read getComputedStyle() for every node on pick-up — that was
+    // the delay before the card lifted.
+    const buildDragShell = (source: HTMLElement) => {
+      const chain: HTMLElement[] = [];
+      for (let node = source.parentElement; node && node !== document.body && node !== document.documentElement; node = node.parentElement) chain.unshift(node);
+      const root = document.createElement("div");
+      root.className = "pipeline-card-drag-shell";
+      root.setAttribute("aria-hidden", "true");
+      root.style.setProperty("display", "contents", "important");
+      let mount: HTMLElement = root;
+      for (const ancestor of chain) {
+        const copy = document.createElement(ancestor.tagName === "SECTION" || ancestor.tagName === "ARTICLE" || ancestor.tagName === "MAIN" ? ancestor.tagName.toLowerCase() : "div");
+        if (ancestor.className && typeof ancestor.className === "string") copy.className = ancestor.className.replace(/\bis-drop-target\b/g, "");
+        for (const attr of Array.from(ancestor.attributes)) if (attr.name.startsWith("data-") && attr.name !== "data-task-drop-stage") copy.setAttribute(attr.name, attr.value);
+        const inlineVars = ancestor.getAttribute("style");
+        if (inlineVars && inlineVars.includes("--")) copy.setAttribute("style", inlineVars);
+        copy.classList.add("drag-shell-node");
+        copy.style.setProperty("display", "contents", "important");
+        mount.appendChild(copy);
+        mount = copy;
+      }
+      return { root, mount };
     };
     type TaskDragPointerEvent = Pick<PointerEvent, "pointerId" | "clientX" | "clientY" | "preventDefault" | "stopPropagation">;
     const initializeTaskDrag = (card: HTMLElement, pointerId: number, clientX: number, clientY: number) => {
@@ -4867,7 +4899,7 @@ The app will check the live account first and only restore the previous value if
     const movePointerTaskDrag = (event: TaskDragPointerEvent) => {
       const drag = pointerTaskDragRef.current;
       if (!drag || drag.taskId !== task.id || drag.pointerId !== event.pointerId) return;
-      if (!drag.moved && Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) < 7) return;
+      if (!drag.moved && Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) < 5) return;
       event.preventDefault();
       if (!drag.moved) {
         drag.moved = true;
@@ -4884,11 +4916,6 @@ The app will check the live account first and only restore the previous value if
         preview.removeAttribute("tabindex");
         preview.setAttribute("aria-hidden", "true");
         preview.querySelectorAll<HTMLElement>("[id]").forEach((node) => node.removeAttribute("id"));
-        // Copy styles while the source is still visible. Copying after adding
-        // is-dragging copies visibility:hidden to every descendant and creates
-        // an empty drag ghost.
-        copyCardStyles(drag.source, preview);
-        // Mark the source card directly — re-rendering the whole board on pick-up made dragging stutter.
         drag.source.classList.add("is-dragging");
         preview.style.position = "fixed";
         preview.style.left = `${event.clientX - drag.offsetX}px`;
@@ -4900,7 +4927,9 @@ The app will check the live account first and only restore the previous value if
         preview.style.opacity = "1";
         // Lifted card: tilts the way it is moved and leaves a shadow slot in
         // the column where it will land (see lib/card-drag-fx.ts).
-        document.body.appendChild(preview);
+        const shell = buildDragShell(drag.source);
+        shell.mount.appendChild(preview);
+        document.body.appendChild(shell.root);
         drag.preview = preview;
         try { drag.fx = createCardDragFx(preview, drag.source, { x: drag.offsetX, y: drag.offsetY }, { cardSelector: ".pipeline-card" }); } catch (error) { showFxError(error); }
       }
@@ -4957,6 +4986,7 @@ The app will check the live account first and only restore the previous value if
         }
       }
       drag.removeListeners?.();
+      drag.preview?.closest(".pipeline-card-drag-shell")?.remove();
       drag.preview?.remove();
       drag.source.classList.remove("is-dragging");
       drag.overColumn?.classList.remove("is-drop-target");
@@ -4971,6 +5001,7 @@ The app will check the live account first and only restore the previous value if
       const pendingFrame = (drag as typeof drag & { frame?: number }).frame; if (pendingFrame) window.cancelAnimationFrame(pendingFrame);
       drag.fx?.end();
       drag.removeListeners?.();
+      drag.preview?.closest(".pipeline-card-drag-shell")?.remove();
       drag.preview?.remove();
       drag.source.classList.remove("is-dragging");
       drag.overColumn?.classList.remove("is-drop-target");
@@ -5080,7 +5111,7 @@ The app will check the live account first and only restore the previous value if
     <div className="ai-completed-inbox-filters"><label>🔎 Search<input type="search" value={completedChangeSearch} onChange={(event) => setCompletedChangeSearch(event.target.value)} placeholder="Search client, task or change" /></label><label>Campaign<select aria-label="Filter history by campaign" value={completedChangeCampaign} onChange={(event) => setCompletedChangeCampaign(event.target.value)}><option value="all">All campaigns</option>{Array.from(new Set(verifiedApprovalItems.map(({ task, approval }) => approval.campaignName || task.campaignName || "").filter(Boolean))).sort().map((campaign) => <option key={campaign} value={campaign}>{campaign}</option>)}{verifiedApprovalItems.some(({ task, approval }) => !(approval.campaignName || task.campaignName)) && <option value="none">No campaign</option>}</select></label><label>Type<select aria-label="Filter history by change type" value={completedChangeCategory} onChange={(event) => setCompletedChangeCategory(event.target.value)}><option value="all">All changes</option>{Array.from(new Set(verifiedApprovalItems.map(({ approval }) => approvalGroupLabel(approval.actionType)))).sort().map((category) => <option key={category} value={category}>{category}</option>)}</select></label><span>{completedApprovalItems.length} shown</span></div>
     {!completedApprovalItems.length && <p className="ai-completed-inbox-empty">No changes match these filters.</p>}
   </section>;  return <>
-    <div className="page-heading task-page-heading"><div><p className="eyebrow">{selectedTaskView === "ai" ? <><AiEyesIcon /> AI · AI DELIVERY</> : "🧲 YOUR AGENCY TASKS"}</p><h1>Tasks</h1><p className="muted">{selectedTaskView === "ai" ? "Follow AI work, handle approvals and review task history." : "Tap a task to open its checklist. Drag it to move it between stages."}</p>{selectedTaskView === "ai" && liveTaskUpdatesUnavailable && <p className="ai-task-live-status" role="status"><span aria-hidden="true">↻</span> Live updates are reconnecting. Your saved tasks are still available.</p>}</div><div className="task-heading-actions">{selectedTaskView === "pipeline" && activeTimer && selectedTasks.some((task) => task.id === activeTimer.taskId) && <div className="active-timer-banner task-timer-inline"><span className="pulse"/><div><b>Timer running</b><small>{workspace.tasks.find((t) => t.id === activeTimer.taskId)?.title}</small></div><strong>{timerClock(elapsed)}</strong><button className="pause-button" onClick={() => changeTaskStatus(activeTimer.taskId, "Blocked")}><span aria-hidden="true">⏸</span> Pause · Pending</button></div>}{onSetTasksPaused && <button type="button" className="task-sound-toggle" aria-expanded={taskManagerOpen} onClick={() => setTaskManagerOpen((open) => !open)}>🗂 Task manager</button>}{canManageGoogleAdsTasks && <button type="button" className="task-sound-toggle" aria-expanded={quickTaskSetupOpen} onClick={() => setQuickTaskSetupOpen((open) => !open)}>⚡ Quick task setup</button>}<button type="button" className="task-sound-toggle" aria-pressed={taskSoundsEnabled} onClick={toggleTaskSounds} title={taskSoundsEnabled ? "Turn task sounds off" : "Turn task sounds on"}>{taskSoundsEnabled ? "🔊 Sounds on" : "🔇 Sounds off"}</button><button className="primary-button" onClick={onAdd}>＋ New task</button></div></div>
+    <div className="page-heading task-page-heading"><div><p className="eyebrow">{selectedTaskView === "ai" ? <><AiEyesIcon /> AI · AI DELIVERY</> : "🧲 YOUR AGENCY TASKS"}</p><h1>Tasks</h1><p className="muted">{selectedTaskView === "ai" ? "Follow AI work, handle approvals and review task history." : "Tap a task to open its checklist. Drag it to move it between stages."}</p>{selectedTaskView === "ai" && liveTaskUpdatesUnavailable && <p className="ai-task-live-status" role="status"><span aria-hidden="true">↻</span> Live updates are reconnecting. Your saved tasks are still available.</p>}</div><div className="task-heading-actions">{selectedTaskView === "pipeline" && activeTimer && selectedTasks.some((task) => task.id === activeTimer.taskId && task.status === "In progress") && <div className="active-timer-banner task-timer-inline"><span className="pulse"/><div><b>Timer running</b><small>{workspace.tasks.find((t) => t.id === activeTimer.taskId)?.title}</small></div><strong>{timerClock(elapsed)}</strong><button className="pause-button" onClick={() => changeTaskStatus(activeTimer.taskId, "Blocked")}><span aria-hidden="true">⏸</span> Pause · Pending</button></div>}{onSetTasksPaused && <button type="button" className="task-sound-toggle" aria-expanded={taskManagerOpen} onClick={() => setTaskManagerOpen((open) => !open)}>🗂 Task manager</button>}{canManageGoogleAdsTasks && <button type="button" className="task-sound-toggle" aria-expanded={quickTaskSetupOpen} onClick={() => setQuickTaskSetupOpen((open) => !open)}>⚡ Quick task setup</button>}<button type="button" className="task-sound-toggle" aria-pressed={taskSoundsEnabled} onClick={toggleTaskSounds} title={taskSoundsEnabled ? "Turn task sounds off" : "Turn task sounds on"}>{taskSoundsEnabled ? "🔊 Sounds on" : "🔇 Sounds off"}</button><button className="primary-button" onClick={onAdd}>＋ New task</button></div></div>
     {taskManagerOpen && onSetTasksPaused && <TaskManagerPanel workspace={workspace} scopeClientId={scopeClientId} onClose={() => setTaskManagerOpen(false)} onSetPaused={onSetTasksPaused} onOpenTask={(task) => onEdit(task)} />}
     {canManageGoogleAdsTasks && quickTaskSetupOpen && <section className="quick-task-setup-menu" aria-label="Quick task setup"><b>What would you like to set up?</b><button type="button" className="secondary-button" onClick={() => { setQuickTaskSetupOpen(false); onAdd(); }}>＋ Create a task</button><button type="button" className="secondary-button" onClick={() => { setQuickTaskSetupOpen(false); setGoogleAdsSetupOpen(true); setGoogleAdsSetupNotice(""); }}>📣 Weekly Google Ads review</button></section>}
     {canManageGoogleAdsTasks && googleAdsSetupOpen && <section className="google-ads-task-setup" aria-label="Google Ads task setup"><header><div><p className="eyebrow">ONE REVIEW · PER CLIENT</p><h2>Google Ads review</h2><p>One weekly review checks performance and sends only the strongest findings to Recommendations. Exact Ads changes wait in To approve.</p></div><button type="button" className="text-button" onClick={() => setGoogleAdsSetupOpen(false)}>Close</button></header><div className="google-ads-task-setup-toolbar"><label className="field"><span>Client</span><select value={googleAdsSetupClientId} onChange={(event) => { setGoogleAdsSetupClientId(event.target.value); setGoogleAdsSetupNotice(""); }}><option value="">Choose a client</option>{workspace.clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></label><div className="google-ads-task-setup-status" role="status">{googleAdsSetupClient ? <><b>{googleAdsSetupReady ? "✅ Ready" : "⚠️ Needs a connection"}</b><span>{googleAdsSetupClient.googleAdsAccountId ? `Google Ads · ${googleAdsSetupClient.googleAdsAccountId}` : "Link a Google Ads account in the client profile"}{googleAdsSetupAgent ? " · the AI ready" : " · Google Ads agent unavailable"}{existingWeeklyGoogleAdsReview ? " · Weekly review set up" : ""}</span></> : <span>Choose a client to check setup.</span>}</div></div><footer><button type="button" className="primary-button" disabled={!googleAdsSetupReady || googleAdsSetupSaving} onClick={async () => { setGoogleAdsSetupSaving(true); const result = await onSetupGoogleAdsTasks(googleAdsSetupClientId, defaultGoogleAdsTaskSettings()); setGoogleAdsSetupNotice(result.message); setGoogleAdsSetupSaving(false); }}>{googleAdsSetupSaving ? "Setting up…" : existingWeeklyGoogleAdsReview ? "Check weekly setup" : "Set up weekly review"}</button><button type="button" className="secondary-button" disabled={!googleAdsSetupReady || googleAdsSetupSaving} onClick={async () => { setGoogleAdsSetupSaving(true); const result = await onRunGoogleAdsTest(googleAdsSetupClientId); setGoogleAdsSetupNotice(result ? "Test audit started. It is on the Tasks board with AI tasks switched on." : "The test could not start. Check the connection notice and try again."); if (result) { setShowAiTasks(true); setPriorityOnly(false); if (canSeePipeline) { setTaskView("pipeline"); setWorkflowTab("board"); } else { setTaskView("ai"); setAiClientFilter(googleAdsSetupClientId); setAiServiceFilter("all"); setAiStaffFilter("all"); changeAiTaskTab("board"); } setGoogleAdsSetupOpen(false); } setGoogleAdsSetupSaving(false); }}>{googleAdsSetupSaving ? "Starting…" : "▶ Run test audit now"}</button></footer>{googleAdsSetupNotice && <p className="google-ads-task-setup-notice" role="status">{googleAdsSetupNotice}</p>}<small className="google-ads-task-setup-note">The test reads Google Ads data only. The AI will save a full report, up to three quality recommendations, and any exact edits in To approve. Nothing is changed automatically.</small></section>}    {canSeePipeline && <div className="task-view-switch-row"><label className={`task-ai-toggle task-staff-toggle ${showStaffTasks ? "is-on" : ""}`}><input type="checkbox" role="switch" checked={showStaffTasks} onChange={(event) => { setTaskView("pipeline"); setShowStaffTasks(event.target.checked); if (!event.target.checked && !showAiTasks) setShowAiTasks(true); setPriorityOnly(false); }} /><span className="task-ai-toggle-track" aria-hidden="true"><span className="task-ai-toggle-thumb" /></span><span aria-hidden="true">👥</span> <b>Staff tasks</b> <span className="task-ai-toggle-count" title="Staff tasks in To do">{workspace.tasks.filter((task) => !isAiAssignedTask(task) && task.status === "To do").length}</span></label>{canSeeAiTasks && <label className={`task-ai-toggle ${showAiTasks ? "is-on" : ""}`}><input type="checkbox" role="switch" checked={showAiTasks} onChange={(event) => { setTaskView("pipeline"); setShowAiTasks(event.target.checked); if (!event.target.checked && !showStaffTasks) setShowStaffTasks(true); setPriorityOnly(false); }} /><span className="task-ai-toggle-track" aria-hidden="true"><span className="task-ai-toggle-thumb" /></span><AiEyesIcon /> <b>AI tasks</b> <span className="task-ai-toggle-count" title="AI tasks in To do">{aiAssignedTasks.filter((task) => task.status === "To do").length}</span></label>}</div>}

@@ -9112,3 +9112,8 @@ html body .app-shell .sidebar .nav-item.active, html body .app-shell .sidebar .n
 .ops-embed .seo-view { padding: 0 !important; margin: 0 !important; }
 .ops-embed .seo-view-heading.is-embedded { display: flex; justify-content: flex-end; margin: 0 0 12px; padding: 0; min-height: 0; }
 .ops-embed .seo-view-heading.is-embedded .seo-view-controls { margin: 0; }
+
+/* Task card drag: preview is mounted in a display:contents shell that mirrors its column, so the stylesheet styles it directly (no per-node style copying). */
+.pipeline-card-drag-shell,.pipeline-card-drag-shell .drag-shell-node{display:contents!important;pointer-events:none!important}
+.pipeline-card-drag-shell .drag-shell-node::before,.pipeline-card-drag-shell .drag-shell-node::after{content:none!important;display:none!important}
+.pipeline-card-drag-preview,.pipeline-card-drag-preview *{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;pointer-events:none!important}
