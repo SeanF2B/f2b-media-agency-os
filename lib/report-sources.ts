@@ -1,9 +1,9 @@
 // Shared read-only data readers for client reporting (Report Studio and the visual SEO / Google Ads reports).
 // Moved unchanged from app/api/studio/route.ts: direct Google API first, Windsor fallback.
 import { env } from "cloudflare:workers";
-import { googleAdsReportCampaignFilter } from "@/lib/google-ads-report";
-import { getGoogleAdsCampaignMetrics, googleAdsConnectionReady } from "@/lib/google-ads-direct";
-import { hasGoogleSearchConsoleConnection, readGoogleSearchConsoleRows } from "@/lib/google-search-console-direct";
+import { googleAdsReportCampaignFilter } from "./google-ads-report";
+import { getGoogleAdsCampaignMetrics, googleAdsConnectionReady } from "./google-ads-direct";
+import { hasGoogleSearchConsoleConnection, readGoogleSearchConsoleRows } from "./google-search-console-direct";
 
 export async function googleAds(accountId: string, window: { start: string; end: string }, ownerId: string, campaignId?: string) {
   if (await googleAdsConnectionReady(ownerId)) {
