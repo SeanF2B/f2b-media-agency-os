@@ -31,7 +31,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="antialiased">{children}<script src="/f2b-client-switcher.js" defer /></body>
+      <body className="antialiased">{children}<script src="/f2b-client-switcher.js" defer /><script src="/f2b-auto-update.js" defer /></body>
     </html>
   );
 }
