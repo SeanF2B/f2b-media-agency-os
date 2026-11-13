@@ -41,6 +41,8 @@ export function ContrastGuard() {
     const scan = () => {
       running = true;
       const dark = document.body.classList.contains("f2b-dark");
+      // Light mode with nothing to undo: skip the full-page walk (it reads styles for every element).
+      if (!dark && !document.querySelector("[data-f2b-on-light]")) { observer.takeRecords(); running = false; return; }
       const cache = new Map<Element, boolean>(); // element -> is its effective background light?
       const isLight = (el: Element | null): boolean => {
         if (!el || el === document.documentElement) return false;
