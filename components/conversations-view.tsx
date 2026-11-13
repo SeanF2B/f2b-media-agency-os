@@ -53,14 +53,14 @@ export function ConversationsView({ scopeClientId, clients }: { scopeClientId: s
   const needs = threads.filter((t) => t.status === "handoff").length, unread = threads.reduce((n, t) => n + (t.unread > 0 ? 1 : 0), 0);
 
   return <section className="cv" aria-label="Conversations">
-    <header className="cv-head"><div><p className="eyebrow">💬 CONVERSATIONS{scopeClientId ? ` · ${clientName(scopeClientId).toUpperCase()}` : ""}</p><h1>Customer conversations</h1><p>SMS and WhatsApp in one inbox. The AI bot answers first and hands over to you when needed.</p></div>
+    <header className="cv-head"><div><p className="eyebrow">💬 CONVERSATIONS{scopeClientId ? ` · ${clientName(scopeClientId).toUpperCase()}` : ""}</p><h1>Customer conversations</h1><p>SMS, WhatsApp and every email the system sends, in one inbox.</p></div>
       <button type="button" className="secondary-button" onClick={() => setSettingsOpen(true)}>⚙️ Conversation settings</button></header>
     {error && <div className="cv-error" role="alert">{error}</div>}
-    {loading ? <div className="empty-state" role="status">Loading conversations…</div> : !configured && threads.length === 0 ? <div className="cv-setup"><div className="cv-setup-icon">💬</div><h2>Connect Twilio to start</h2><p>Add your Twilio Account SID, Auth Token and the phone or WhatsApp numbers you want to use. It takes about five minutes and the settings screen walks you through it.</p><button type="button" className="primary-button" onClick={() => setSettingsOpen(true)}>Connect Twilio</button></div> :
+    {loading ? <div className="empty-state" role="status">Loading conversations…</div> : <>{!configured && <div className="cv-banner">💬 Emails the system sends show here already. To also text and WhatsApp customers, <button type="button" className="text-button" onClick={() => setSettingsOpen(true)}>connect Twilio</button>.</div>}
     <div className="cv-grid">
       <aside className="cv-list" aria-label="Conversation list">
         <div className="cv-filters" role="tablist">{([["all", "Open"], ["unread", `Unread${unread ? ` (${unread})` : ""}`], ["handoff", `Needs you${needs ? ` (${needs})` : ""}`]] as const).map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={filter === k} className={filter === k ? "on" : ""} onClick={() => setFilter(k)}>{l}</button>)}</div>
-        <div className="cv-rows">{shown.length === 0 ? <p className="cv-none">{threads.length === 0 ? "No messages yet. When a customer texts your number, it shows up here." : "Nothing here."}</p> : shown.map((t) => <button type="button" key={t.id} className={`cv-row ${activeId === t.id ? "on" : ""} ${t.unread ? "unread" : ""}`} onClick={() => setActiveId(t.id)}>
+        <div className="cv-rows">{shown.length === 0 ? <p className="cv-none">{threads.length === 0 ? "Nothing yet. Emails the system sends, and customer texts, show up here." : "Nothing here."}</p> : shown.map((t) => <button type="button" key={t.id} className={`cv-row ${activeId === t.id ? "on" : ""} ${t.unread ? "unread" : ""}`} onClick={() => setActiveId(t.id)}>
           <span className={`cv-avatar ${t.channel}`}>{t.channel === "whatsapp" ? "WA" : t.channel === "email" ? "✉" : "SMS"}</span>
           <span className="cv-row-main"><b>{title(t)}</b><small>{t.last_preview || "…"}</small>{!scopeClientId && t.client_id && <em>{clientName(t.client_id)}</em>}</span>
           <span className="cv-row-side"><small>{ago(t.last_at)}</small>{t.status === "handoff" ? <i className="cv-pill hand">Needs you</i> : t.unread ? <i className="cv-pill">{t.unread}</i> : t.bot_on ? <i className="cv-bot" title="AI bot is replying"><AiEyesIcon /></i> : null}</span></button>)}</div>
@@ -78,7 +78,7 @@ export function ConversationsView({ scopeClientId, clients }: { scopeClientId: s
         </form>
         <p className="cv-note">Sending a reply turns the bot off for this customer so you don’t talk over each other.</p></>}</>}
       </div>
-    </div>}
+    </div></>}
     {settingsOpen && <ConversationSettings clients={clients} onClose={() => { setSettingsOpen(false); void loadThreads(); }} />}
   </section>;
 }
