@@ -153,21 +153,56 @@ export function SeoView({ initialTab, sections, keywordPart = "all", embedded = 
   const openKeywordReport = () => {
     const rows = keywordReportRows(); if (!rows.length || !client || !keywordIdeas) return;
     const esc = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
-    const total = rows.reduce((sum, row) => sum + (row.avgMonthlySearches || 0), 0);
-    const bids = rows.filter((row) => row.lowTopOfPageBid != null && row.highTopOfPageBid != null);
-    const avgLow = bids.length ? bids.reduce((sum, row) => sum + (row.lowTopOfPageBid || 0), 0) / bids.length : null;
-    const avgHigh = bids.length ? bids.reduce((sum, row) => sum + (row.highTopOfPageBid || 0), 0) / bids.length : null;
-    const bands = { high: rows.filter((row) => /high/i.test(String(row.competition))).length, medium: rows.filter((row) => /medium/i.test(String(row.competition))).length, low: rows.filter((row) => /low/i.test(String(row.competition))).length };
-    const top = rows.slice(0, 5).map((row) => esc(row.keyword)).join(", ");
     const dfs = keywordIdeas.source === "DataForSEO";
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(client.name)} · Keyword research report</title><style>
-body{font-family:Poppins,system-ui,sans-serif;color:#1f2328;margin:0;padding:40px;max-width:960px;margin:auto}header{display:flex;align-items:center;gap:18px;border-bottom:2px solid #eee;padding-bottom:18px;margin-bottom:24px}header img{max-width:160px;max-height:64px}h1{font-size:26px;margin:0}small,.muted{color:#6b7280}.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:20px 0}.kpis div{border:1px solid #e5e7eb;border-radius:10px;padding:14px}.kpis b{display:block;font-size:22px}table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;font-size:11px;text-transform:uppercase;color:#6b7280;border-bottom:1px solid #e5e7eb;padding:8px}td{padding:8px;border-bottom:1px solid #f1f1f1}td.n{text-align:right}th.n{text-align:right}.note{font-size:12px;color:#6b7280;margin-top:20px}.print{position:fixed;top:16px;right:16px;padding:10px 16px;border:0;border-radius:8px;background:#0b77b0;color:#fff;font-weight:600;cursor:pointer}@media print{.print{display:none}body{padding:0}}
-</style></head><body><button class="print" onclick="print()">Save as PDF / Print</button>
-<header>${client.logo ? `<img src="${esc(client.logo)}" alt="">` : ""}<div><h1>Keyword research report</h1><small>${esc(client.name)} · ${esc(keywordIdeas.location)} · ${new Date().toLocaleDateString("en-IE", { day: "numeric", month: "long", year: "numeric" })}</small></div></header>
-<h2 style="font-size:16px">Summary</h2><p>We reviewed ${rows.length} keyword${rows.length === 1 ? "" : "s"} with a combined ${total.toLocaleString("en-IE")} estimated searches a month in ${esc(keywordIdeas.location)}. The biggest opportunities by volume are ${top}.${avgLow != null ? ` Advertisers typically pay between ${avgLow.toFixed(2)} and ${avgHigh!.toFixed(2)} per click for top-of-page positions on these terms.` : ""}</p>
-<div class="kpis"><div><b>${rows.length}</b><small>Keywords</small></div><div><b>${total.toLocaleString("en-IE")}</b><small>Monthly searches</small></div><div><b>${avgLow != null ? `${avgLow.toFixed(2)}–${avgHigh!.toFixed(2)}` : "—"}</b><small>Avg top-of-page bid</small></div><div><b>${bands.low}/${bands.medium}/${bands.high}</b><small>Low / medium / high competition</small></div></div>
-<table><thead><tr><th>Keyword</th><th class="n">Monthly searches</th>${dfs ? `<th class="n">Organic difficulty</th>` : ""}<th>Competition</th><th class="n">Top-of-page bid</th></tr></thead><tbody>${rows.map((row) => `<tr><td>${esc(row.keyword)}</td><td class="n">${(row.avgMonthlySearches || 0).toLocaleString("en-IE")}</td>${dfs ? `<td class="n">${row.difficulty == null ? "—" : `${row.difficulty}/100`}</td>` : ""}<td>${esc(String(row.competition || "—").toLowerCase())}${row.competitionIndex == null ? "" : ` · ${esc(row.competitionIndex)}/100`}</td><td class="n">${row.lowTopOfPageBid == null || row.highTopOfPageBid == null ? "—" : `${row.lowTopOfPageBid.toFixed(2)}–${row.highTopOfPageBid.toFixed(2)}`}</td></tr>`).join("")}</tbody></table>
-<p class="note">Source: ${esc(keywordIdeas.source)}. Search volumes and bids are estimates for ${esc(keywordIdeas.location)}, not guaranteed traffic or rankings.</p></body></html>`;
+    const cur = dfs ? "$" : "€";
+    const level = (row: KeywordIdea) => { const c = String(row.competition || "").toLowerCase(); return c.includes("high") ? "high" : c.includes("medium") ? "medium" : c.includes("low") ? "low" : "unknown"; };
+    const label = { high: "High", medium: "Medium", low: "Low", unknown: "Unknown" } as const;
+    // Organise: group each keyword under the seed phrase it shares the most words with.
+    const stop = new Set(["near", "me", "the", "a", "for", "in", "of", "and", "best", "ireland", ...(client.seoLocations || []).map((item) => item.toLowerCase())]);
+    const words = (text: string) => text.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length > 2 && !stop.has(word));
+    const seeds = keywordSeeds.split(/[\n,]+/).map((item) => item.trim()).filter(Boolean).slice(0, 10);
+    const groups = new Map<string, KeywordIdea[]>();
+    for (const row of rows) {
+      const kw = new Set(words(row.keyword));
+      let best = "", score = 0;
+      for (const seed of seeds) { const hit = words(seed).filter((word) => kw.has(word) || [...kw].some((k) => k.startsWith(word.slice(0, 5)))).length; if (hit > score) { best = seed; score = hit; } }
+      const key = best || "Other related searches";
+      groups.set(key, [...(groups.get(key) || []), row]);
+    }
+    const order = { high: 2, medium: 1, low: 0, unknown: 3 };
+    const sorted = [...groups.entries()].map(([name, list]) => ({ name, list: list.sort((a, b) => (b.avgMonthlySearches || 0) - (a.avgMonthlySearches || 0) || order[level(a)] - order[level(b)]), total: list.reduce((sum, row) => sum + (row.avgMonthlySearches || 0), 0) })).sort((a, b) => b.total - a.total);
+    const total = rows.reduce((sum, row) => sum + (row.avgMonthlySearches || 0), 0);
+    const counts = { low: rows.filter((row) => level(row) === "low").length, medium: rows.filter((row) => level(row) === "medium").length, high: rows.filter((row) => level(row) === "high").length, unknown: rows.filter((row) => level(row) === "unknown").length };
+    const bids = rows.filter((row) => row.lowTopOfPageBid != null && row.highTopOfPageBid != null);
+    const avg = (pick: (row: KeywordIdea) => number) => bids.length ? bids.reduce((sum, row) => sum + pick(row), 0) / bids.length : null;
+    const avgLow = avg((row) => row.lowTopOfPageBid || 0), avgHigh = avg((row) => row.highTopOfPageBid || 0);
+    const date = new Date().toLocaleDateString("en-IE", { day: "numeric", month: "long", year: "numeric" });
+    const money = (value: number | null) => value == null ? "N/A" : `${cur}${value.toFixed(2)}`;
+    const letter = (index: number) => String.fromCharCode(65 + index);
+    const quickWins = rows.filter((row) => level(row) === "low" && (row.avgMonthlySearches || 0) > 0).slice(0, 8);
+    const table = (list: KeywordIdea[]) => `<table class="kw"><thead><tr><th>Keyword</th><th>Avg. searches<br>/ month</th>${dfs ? "<th>Organic<br>difficulty</th>" : ""}<th>Ads<br>competition</th><th>Bid low<br>(${dfs ? "USD" : "EUR"})</th><th>Bid high<br>(${dfs ? "USD" : "EUR"})</th></tr></thead><tbody>${list.map((row) => `<tr class="${level(row)}"><td>${esc(row.keyword)}</td><td>${row.avgMonthlySearches == null ? "N/A" : row.avgMonthlySearches.toLocaleString("en-IE")}</td>${dfs ? `<td>${row.difficulty == null ? "N/A" : `${row.difficulty}/100`}</td>` : ""}<td><b>${label[level(row)]}</b></td><td>${money(row.lowTopOfPageBid)}</td><td>${money(row.highTopOfPageBid)}</td></tr>`).join("")}</tbody></table>`;
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(client.name)} Keyword Research ${new Date().toISOString().slice(0, 10)}</title><style>
+@page{size:A4;margin:16mm 14mm 18mm}*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#2b3440;margin:0;font-size:12.5px;line-height:1.45}.wrap{max-width:820px;margin:0 auto;padding:36px 28px}
+.navy{color:#1d3a63}.teal{color:#127a86}h1{font-size:34px;line-height:1.08;margin:0;color:#1d3a63;letter-spacing:.3px;text-transform:uppercase}h2{font-size:22px;color:#1d3a63;margin:22px 0 6px}h3{font-size:15px;color:#127a86;margin:16px 0 4px}p{margin:4px 0 8px}
+.cover{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}.cover img{max-width:220px;max-height:90px;object-fit:contain}.sub{color:#6b7280;margin-top:6px}
+.running{font-size:11px;font-weight:700;color:#1d3a63;letter-spacing:.4px;text-transform:uppercase;border-bottom:1px solid #dfe5ee;padding-bottom:8px;margin-bottom:6px}
+table{width:100%;border-collapse:collapse;margin:8px 0}th{background:#1d3a63;color:#fff;text-align:left;font-size:11px;font-weight:700;padding:6px 7px;border:1px solid #1d3a63}td{padding:5px 7px;border:1px solid #d9dee6;font-size:11.5px}
+tr.low td{background:#d9ecd5}tr.medium td{background:#fcefb9}tr.high td{background:#f5d3d3}tr.unknown td{background:#e6e8ec}
+.summary td:first-child{font-weight:700}.strong{font-weight:700;color:#1d3a63}.small{font-size:10.5px;color:#6b7280}.legend span{display:inline-block;padding:2px 9px;border-radius:4px;margin-right:6px;font-weight:700;font-size:11px}
+.page{page-break-before:always;break-before:page}.foot{margin-top:28px;border-top:1px solid #dfe5ee;padding-top:6px;font-size:10.5px;color:#6b7280}
+.print{position:fixed;top:14px;right:14px;padding:10px 16px;border:0;border-radius:8px;background:#1d3a63;color:#fff;font-weight:700;cursor:pointer;z-index:9}@media print{.print{display:none}.wrap{padding:0;max-width:none}}
+</style></head><body><button class="print" onclick="print()">Save as PDF / Print</button><div class="wrap">
+<div class="cover"><div><h1>Your keyword<br>research plan</h1><div class="sub">${esc(client.name)} | Prepared for you | ${date}</div></div>${client.logo ? `<img src="${esc(client.logo)}" alt="${esc(client.name)}">` : ""}</div>
+<h3>Your research settings</h3><p>Source: ${esc(keywordIdeas.source)} | ${esc(keywordIdeas.location)} | English${dfs ? "" : " | Google Search | EUR"}<br>Checked: ${date} | ${rows.length} keywords selected from ${keywordIdeas.results.length} ideas</p>
+<h2>Keyword groups</h2><table class="summary"><thead><tr><th>Group</th><th>Theme</th><th>Keywords</th><th>Searches / month</th><th>Low / Med / High</th></tr></thead><tbody>${sorted.map((group, index) => `<tr><td>${letter(index)}</td><td>${esc(group.name)}</td><td>${group.list.length}</td><td>${group.total.toLocaleString("en-IE")}</td><td>${group.list.filter((row) => level(row) === "low").length} / ${group.list.filter((row) => level(row) === "medium").length} / ${group.list.filter((row) => level(row) === "high").length}</td></tr>`).join("")}</tbody></table>
+<p class="strong">${total.toLocaleString("en-IE")} estimated searches a month across ${rows.length} keywords.${avgLow != null ? ` Typical top-of-page bids: ${money(avgLow)} – ${money(avgHigh)} per click.` : ""}</p>
+<h3>Competition at a glance</h3><p class="legend"><span style="background:#d9ecd5">Low ${counts.low}</span><span style="background:#fcefb9">Medium ${counts.medium}</span><span style="background:#f5d3d3">High ${counts.high}</span><span style="background:#e6e8ec">Unknown ${counts.unknown}</span></p>
+${quickWins.length ? `<h3>Quick wins</h3><p>Low-competition terms with real search demand: ${quickWins.map((row) => `<b>${esc(row.keyword)}</b> (${(row.avgMonthlySearches || 0).toLocaleString("en-IE")})`).join(", ")}.</p>` : ""}
+<h3>What to expect</h3><p>Average monthly searches show demand, not clicks or leads. Top-of-page bids are historical estimates, not actual cost per click. N/A means no figure was available; it is not zero.</p>
+${sorted.map((group, index) => `<section class="page"><div class="running">${esc(client.name)} | Keyword research</div><h2>Group ${letter(index)} | ${esc(group.name.replace(/^./, (c) => c.toUpperCase()))}</h2><p>${group.list.length} keyword${group.list.length === 1 ? "" : "s"} · ${group.total.toLocaleString("en-IE")} searches a month. Sorted by search volume.</p>${table(group.list)}</section>`).join("")}
+<h3>Competition colours</h3><p class="small">Low = green | Medium = yellow | High = red | Unknown or N/A = grey. ${dfs ? "Ads competition is paid-search competition; organic difficulty is shown separately." : "These are Google Ads auction ratings, not SEO difficulty."}</p>
+<p class="small">Source: ${esc(keywordIdeas.source)}, ${esc(keywordIdeas.location)}, checked ${date}. Read-only research: no campaigns, budgets, bids or keywords were changed.</p>
+<div class="foot">Prepared ${date} | Read-only research</div></div></body></html>`;
     const win = window.open("", "_blank"); if (!win) { setKeywordError("Allow pop-ups for this site to open the report."); return; }
     win.document.open(); win.document.write(html); win.document.close();
   };
