@@ -115,6 +115,8 @@ export function CrmView({ onOpenClient, scopeClientId = "" }: { onOpenClient: (c
   const markSpam = async (item: Opportunity, on: boolean) => {
     const ok = await setFlag("opportunity", item.id, "spam", on);
     if (ok && item.contact_id) await setFlag("contact", item.contact_id, "spam", on);
+    // Spam always switches do-not-disturb on (undo switches it back off).
+    if (ok) await setFlag(item.contact_id ? "contact" : "opportunity", item.contact_id || item.id, "dnd", on);
     if (ok && on) setNotice({ text: `“${item.title}” marked as spam and removed from the pipeline.`, undo: () => { setNotice(null); void markSpam(item, false); } });
   };
   const markDnd = async (item: Opportunity, on: boolean) => {
