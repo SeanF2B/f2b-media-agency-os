@@ -8790,3 +8790,43 @@ fieldset.crm-new-contact legend { padding:0 6px; font-size:12px; font-weight:700
 .app-shell.dark-mode .ops-summary span, .app-shell.dark-mode .ops-table th { color:#c9c7cf; }
 .app-shell.dark-mode .ops-checks .ok { background:#14532d; color:#fff; }
 .app-shell.dark-mode .ops-checks .missing { background:#4a1c19; color:#fff; }
+
+/* Operations → Onboarding wizard */
+.onb { display:grid; gap:16px; padding:18px 20px; border:1px solid var(--f2b-border,#d9dee3); border-radius:14px; background:var(--f2b-white,#fff); color:var(--f2b-ink,#1f2328); }
+.onb-head { display:flex; flex-wrap:wrap; gap:16px; align-items:flex-end; justify-content:space-between; }
+.onb-client { min-width:240px; }
+.onb-steps { display:flex; flex-wrap:wrap; gap:6px; margin:0; padding:0; list-style:none; }
+.onb-steps button { display:inline-flex; align-items:center; gap:6px; border:0; padding:6px 10px; border-radius:999px; background:transparent; color:var(--f2b-muted,#5b6470); font:inherit; font-size:12px; font-weight:800; cursor:pointer; }
+.onb-steps button span { font-weight:700; }
+.onb-steps li.active button { background:var(--brand-primary,#6b6250); color:#fff; }
+.onb-steps li.done button { color:var(--f2b-ink,#1f2328); }
+.onb-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px 16px; }
+.onb-grid .wide { grid-column:1 / -1; }
+.onb-field { display:grid; gap:5px; font-size:13px; font-weight:700; }
+.onb-field input:not([type=color]):not([type=file]), .onb-field textarea, .onb-field select { width:100%; min-height:38px; padding:8px 10px; border:1px solid var(--f2b-border,#d9dee3); border-radius:9px; background:var(--f2b-white,#fff); color:var(--f2b-ink,#1f2328); font:inherit; font-weight:400; }
+.onb-field em { font-style:normal; font-size:11px; margin-left:6px; padding:1px 7px; border-radius:999px; }
+.onb-field em.ok { background:#e7f6ec; color:#14532d; } .onb-field em.missing { background:#fdecea; color:#7a1c16; }
+.onb-logo { display:flex; align-items:center; gap:12px; }
+.onb-logo img { width:72px; height:72px; object-fit:contain; border:1px solid var(--f2b-border,#d9dee3); border-radius:12px; background:#fff; }
+.onb-logo i { display:grid; place-items:center; width:72px; height:72px; border:1px dashed var(--f2b-border,#d9dee3); border-radius:12px; font-size:11px; color:var(--f2b-muted,#5b6470); }
+.onb-colour { display:flex; gap:8px; align-items:center; }
+.onb-colour input[type=color] { width:42px; height:38px; padding:2px; border:1px solid var(--f2b-border,#d9dee3); border-radius:9px; background:#fff; }
+.onb-brand-preview { display:flex; justify-content:space-between; align-items:center; padding:14px 16px; border-radius:12px; color:#fff; }
+.onb-brand-preview span { display:flex; align-items:center; gap:10px; } .onb-brand-preview img { height:28px; background:#fff; border-radius:6px; padding:2px; }
+.onb-brand-preview em { font-style:normal; font-weight:800; font-size:13px; padding:8px 14px; border-radius:9px; color:#fff; }
+.onb-services { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; }
+.onb-services label { display:grid; grid-template-columns:auto 1fr; gap:2px 10px; align-items:center; padding:12px 14px; border:1px solid var(--f2b-border,#d9dee3); border-radius:12px; cursor:pointer; }
+.onb-services label.on { border-color:var(--brand-primary,#6b6250); box-shadow:inset 0 0 0 1px var(--brand-primary,#6b6250); }
+.onb-services input { grid-row:span 2; }
+.onb-services small { color:var(--f2b-muted,#5b6470); font-size:12px; }
+.onb-services em { grid-column:2; font-style:normal; font-size:11px; color:#14532d; }
+.onb-review { display:grid; gap:10px; }
+.onb-review > div { display:grid; gap:2px; padding:10px 12px; border:1px solid var(--f2b-border,#e6e9ec); border-radius:10px; }
+.onb-review small, .onb-review span { color:var(--f2b-muted,#5b6470); font-size:12px; }
+.onb-note { margin:0; color:var(--f2b-muted,#5b6470); font-size:13px; }
+.onb-error { margin:0; color:#b42318; font-size:13px; }
+.onb-foot { display:flex; gap:8px; align-items:center; } .onb-foot > span { flex:1; }
+@media (max-width:700px) { .onb-grid { grid-template-columns:1fr; } }
+.app-shell.dark-mode .onb, .app-shell.dark-mode .onb-field input:not([type=color]):not([type=file]), .app-shell.dark-mode .onb-field textarea, .app-shell.dark-mode .onb-field select { background:#1f1e22; border-color:#3a393d; color:#fff; }
+.app-shell.dark-mode .onb-services label, .app-shell.dark-mode .onb-review > div { border-color:#3a393d; }
+.app-shell.dark-mode .onb-steps li.done button { color:#fff; }
