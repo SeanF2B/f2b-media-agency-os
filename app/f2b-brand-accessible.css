@@ -8909,3 +8909,11 @@ html body .app-shell .sidebar .nav-item .nav-icon svg.lucide-nav-icon * { stroke
 /* Task attachments: non-image files show a file-type tile */
 .app-shell .ai-completed-screenshot .ai-attachment-file { display: grid; place-items: center; aspect-ratio: 4 / 3; width: 100%; border-radius: 8px; background: color-mix(in srgb, var(--brand-primary, #1677c8) 12%, #fff); color: var(--brand-primary, #1677c8); font-style: normal; font-weight: 800; font-size: 13px; letter-spacing: .06em; }
 .app-shell.dark-mode .ai-completed-screenshot .ai-attachment-file { background: color-mix(in srgb, var(--brand-primary, #1677c8) 24%, #1d2329); color: #fff; }
+
+/* Line icons in the CRM (replacing emojis): inherit the text colour so they stay readable on any background */
+.crm-ico { display: inline-block; vertical-align: -2px; flex: none; color: currentColor; stroke: currentColor; }
+.crm-card-icon .crm-ico { vertical-align: middle; }
+.approval-inbox-subtabs button { display: inline-flex; align-items: center; gap: 6px; }
+.crm-card-notes-open { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; border: 0; background: none; padding: 2px 0; font: inherit; font-size: 12px; font-weight: 700; color: var(--brand-primary, #1677c8); cursor: pointer; }
+.crm-card-notes-open:hover { text-decoration: underline; }
+.dark-mode .crm-card-notes-open { color: color-mix(in srgb, var(--brand-primary, #1677c8) 55%, #fff); }
