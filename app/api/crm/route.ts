@@ -274,7 +274,7 @@ export async function POST(request: Request) {
       if (!Number.isFinite(value) || value < 0 || value > 1_000_000_000) return reply("Enter a valid amount.");
       const current = await db.prepare("SELECT id FROM crm_opportunities WHERE owner_id=?1 AND id=?2").bind(ownerId, id).first();
       if (!current) return reply("That opportunity is no longer available.", 404);
-      await db.prepare("UPDATE crm_opportunities SET value=?1, updated_at=?2 WHERE owner_id=?3 AND id=?4").bind(value, now, ownerId, id).run();
+      await db.prepare("UPDATE crm_opportunities SET value=?1, source=CASE WHEN source='website estimate' THEN 'website form' ELSE source END, updated_at=?2 WHERE owner_id=?3 AND id=?4").bind(value, now, ownerId, id).run();
       return Response.json({ ok: true, id, value });
     }
     if (action === "updateOpportunityMeta") {
@@ -333,7 +333,7 @@ export async function POST(request: Request) {
         if (clientId && !(access.workspace.clients || []).some((item) => String(item.id) === clientId)) return reply("Choose a client in this workspace.");
         await db.prepare("UPDATE crm_opportunities SET contact_id=?1, client_id=?2 WHERE owner_id=?3 AND id=?4").bind(contactId, clientId, ownerId, id).run();
       }
-      if (action === "updateOpportunity") await db.prepare("UPDATE crm_opportunities SET title=?1, value=?2, notes=?3, assigned_to=?4, expected_close_date=?5, updated_at=?6 WHERE owner_id=?7 AND id=?8").bind(clean(body.title, 200) || "Untitled opportunity", Math.max(0, Number(body.value) || 0), clean(body.notes, 4000), clean(body.assignedTo, 80) || null, clean(body.expectedCloseDate, 20) || null, now, ownerId, id).run();
+      if (action === "updateOpportunity") await db.prepare("UPDATE crm_opportunities SET title=?1, source=CASE WHEN source='website estimate' AND value<>?2 THEN 'website form' ELSE source END, value=?2, notes=?3, assigned_to=?4, expected_close_date=?5, updated_at=?6 WHERE owner_id=?7 AND id=?8").bind(clean(body.title, 200) || "Untitled opportunity", Math.max(0, Number(body.value) || 0), clean(body.notes, 4000), clean(body.assignedTo, 80) || null, clean(body.expectedCloseDate, 20) || null, now, ownerId, id).run();
       return Response.json({ ok: true, id });
     }
     if (action === "addActivity") {

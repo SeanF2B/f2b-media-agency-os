@@ -71,15 +71,40 @@ async function siteFormLead(request: Request, c: string) {
   if (!(await consumeMarketingSubmissionRateLimit(db, ownerId, `site-lead:${c}`))) return ok(429);
   const now = new Date().toISOString(), source = "Website form · Book a consultation";
   const parts = name.split(/\s+/), first = parts[0] || name, last = parts.slice(1).join(" ");
-  const notes = [answers, message && `Notes: ${message}`, page && `Page: ${page}`].filter(Boolean).join("\n").slice(0, 2000);
+  const estimate = estimateFromAnswers(answers);
+  const notes = [estimate ? `Website estimate: €${estimate.toLocaleString("en-IE")}` : "", answers, message && `Notes: ${message}`, page && `Page: ${page}`].filter(Boolean).join("\n").slice(0, 2000);
   const existing = await db.prepare("SELECT id FROM crm_contacts WHERE owner_id=?1 AND client_id=?2 AND ((?3<>'' AND lower(email)=?3) OR phone=?4) ORDER BY updated_at DESC LIMIT 1").bind(ownerId, c, email, phone).first<{ id: string }>();
   const contactId = existing?.id || crypto.randomUUID();
   const pipeline = await db.prepare("SELECT id FROM crm_pipelines WHERE owner_id=?1 AND client_id=?2 AND archived=0 ORDER BY created_at LIMIT 1").bind(ownerId, c).first<{ id: string }>();
   const stage = pipeline ? await db.prepare("SELECT id FROM crm_pipeline_stages WHERE owner_id=?1 AND pipeline_id=?2 AND category='open' ORDER BY position LIMIT 1").bind(ownerId, pipeline.id).first<{ id: string }>() : null;
   const stmts = [db.prepare("INSERT INTO crm_contacts (id, owner_id, client_id, first_name, last_name, email, phone, company, source, notes, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,'',?8,?9,?10,?10) ON CONFLICT(id) DO UPDATE SET email=CASE WHEN excluded.email<>'' THEN excluded.email ELSE crm_contacts.email END, phone=excluded.phone, source=excluded.source, updated_at=excluded.updated_at WHERE crm_contacts.owner_id=excluded.owner_id")
     .bind(contactId, ownerId, c, first, last, email, phone, source, notes, now)];
-  if (pipeline && stage) stmts.push(db.prepare("INSERT INTO crm_opportunities (id, owner_id, pipeline_id, stage_id, contact_id, client_id, title, value, currency, source, notes, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,0,'EUR',?8,?9,?10,?10)")
-    .bind(crypto.randomUUID(), ownerId, pipeline.id, stage.id, contactId, c, `Consultation · ${name}`.slice(0, 200), source, notes, now));
+  if (pipeline && stage) stmts.push(db.prepare("INSERT INTO crm_opportunities (id, owner_id, pipeline_id, stage_id, contact_id, client_id, title, value, currency, source, notes, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,'EUR',?9,?10,?11,?11)")
+    .bind(crypto.randomUUID(), ownerId, pipeline.id, stage.id, contactId, c, `Consultation · ${name}`.slice(0, 200), estimate, estimate ? WEBSITE_ESTIMATE_SOURCE : source, notes, now));
   await db.batch(stmts);
   return ok();
+}
+
+// Rough job price from the website form answers. Opportunities created with an estimate get
+// source WEBSITE_ESTIMATE_SOURCE; the CRM shows an "Estimate" tag beside the value until someone edits it.
+// Starter figures (EUR): adjust here when Red Island confirm their real ranges.
+const WEBSITE_ESTIMATE_SOURCE = "website estimate";
+const ESTIMATE_BASE: Record<string, number> = {
+  "Design only": 3000, "Design and delivery": 15000, "Not sure yet": 6000,
+  "One-off self-build": 20000, "Bought off-plan": 10000,
+  "Whole house": 25000, "Main living spaces": 12000, "Joinery and storage": 8000,
+  "Kitchen & living": 12000, "Bedrooms & bathrooms": 8000, "The whole home": 25000,
+  "Kitchen and living": 12000, "Bedroom suite": 8000, "Both": 18000,
+  "Full renovation": 15000, "Interior revamp": 6000, "Extension build": 10000,
+  "Interior design": 6000, "Renovation / extension": 15000, "New build": 20000,
+  "Every room": 20000, "Key living areas": 10000, "Ground floor": 12000,
+  "Full house renovation": 20000, "Refurbishment": 8000, "Reconfiguration": 12000,
+};
+const ESTIMATE_FACTOR: Record<string, number> = { "Need trades sourced": 1.15 };
+function estimateFromAnswers(answers: string) {
+  const picked = answers.split("\n").map((line) => line.trim()).filter(Boolean)
+    .map((line) => Object.keys({ ...ESTIMATE_BASE, ...ESTIMATE_FACTOR }).filter((opt) => line.endsWith(` ${opt}`)).sort((a, b) => b.length - a.length)[0]).filter(Boolean) as string[];
+  const base = picked.map((opt) => ESTIMATE_BASE[opt] || 0).find((v) => v > 0) || 0;
+  if (!base) return 0;
+  return Math.round(picked.reduce((total, opt) => total * (ESTIMATE_FACTOR[opt] || 1), base) / 100) * 100;
 }

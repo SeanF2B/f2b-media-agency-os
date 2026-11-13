@@ -167,13 +167,13 @@ export function CrmView({ onOpenClient, scopeClientId = "" }: { onOpenClient: (c
     if (!Number.isFinite(parsed) || parsed < 0 || parsed === Number(item.value || 0)) return;
     const previous = item.value;
     setError("");
-    setData((current) => ({ ...current, opportunities: current.opportunities.map((entry) => entry.id === item.id ? { ...entry, value: parsed, updated_at: new Date().toISOString() } : entry) }));
+    setData((current) => ({ ...current, opportunities: current.opportunities.map((entry) => entry.id === item.id ? { ...entry, value: parsed, source: entry.source === "website estimate" ? "website form" : entry.source, updated_at: new Date().toISOString() } : entry) }));
     try {
       const response = await fetch("/api/crm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "updateOpportunityValue", id: item.id, value: parsed }) });
       const result = await response.json() as { error?: string };
       if (!response.ok) throw new Error(result.error || "Could not update the value.");
     } catch (reason) {
-      setData((current) => ({ ...current, opportunities: current.opportunities.map((entry) => entry.id === item.id ? { ...entry, value: previous } : entry) }));
+      setData((current) => ({ ...current, opportunities: current.opportunities.map((entry) => entry.id === item.id ? { ...entry, value: previous, source: item.source } : entry) }));
       setError(reason instanceof Error ? reason.message : "Could not update the value.");
     }
   };
@@ -408,7 +408,7 @@ export function CrmView({ onOpenClient, scopeClientId = "" }: { onOpenClient: (c
       <dl className="crm-card-facts">
         <div><dt>Source:</dt><dd title={sourceLabel(item.source)}>{sourceLabel(item.source)}</dd></div>
         {(() => { const person = contact && contact !== "No contact linked" ? contact : ""; const shown = person || companyName; return <div><dt>{person ? "Contact:" : "Company:"}</dt><dd title={shown}>{shown || "—"}{!person && <> <button type="button" className="text-button crm-add-contact" onClick={() => { setEditingOpp(item); setModal("opportunity-edit"); }}>＋ Add contact</button></>}</dd></div>; })()}
-        <div className="crm-opportunity-value"><dt>Value:</dt><dd className="crm-value-field"><span aria-hidden="true">{currencySymbol()}</span><input className="crm-opportunity-value-input" type="text" inputMode="decimal" autoComplete="off" placeholder="Add value" aria-label={`Value for ${item.title}`} value={commaNumber(valueEditId === item.id ? valueDraft : (item.value ? String(item.value) : ""))} onFocus={() => { setValueEditId(item.id); setValueDraft(item.value ? String(item.value) : ""); }} onChange={(event) => setValueDraft(event.target.value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1"))} onBlur={() => void saveOpportunityValue(item)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur(); } else if (event.key === "Escape") { event.preventDefault(); setValueEditId(""); event.currentTarget.blur(); } }} /></dd></div>
+        <div className="crm-opportunity-value"><dt>Value:</dt><dd className="crm-value-field"><span aria-hidden="true">{currencySymbol()}</span><input className="crm-opportunity-value-input" type="text" inputMode="decimal" autoComplete="off" placeholder="Add value" aria-label={`Value for ${item.title}`} value={commaNumber(valueEditId === item.id ? valueDraft : (item.value ? String(item.value) : ""))} onFocus={() => { setValueEditId(item.id); setValueDraft(item.value ? String(item.value) : ""); }} onChange={(event) => setValueDraft(event.target.value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1"))} onBlur={() => void saveOpportunityValue(item)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur(); } else if (event.key === "Escape") { event.preventDefault(); setValueEditId(""); event.currentTarget.blur(); } }} />{item.source === "website estimate" && valueEditId !== item.id && <span className="crm-estimate-tag" title="Rough estimate from the website form. Enter a value to replace it.">Estimate</span>}</dd></div>
         {item.expected_close_date && <div><dt>Target:</dt><dd>{item.expected_close_date.slice(0, 10)}</dd></div>}
         <div className="crm-card-stage-row"><dt>Stage:</dt><dd><select className="crm-card-stage-select" aria-label={`Move ${item.title} to stage`} value={item.stage_id} onChange={(event) => void moveOpportunity(item.id, event.target.value)}>{pipeline!.stages.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}</select></dd></div>
       </dl>
