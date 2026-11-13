@@ -55,7 +55,7 @@ function change(current: number | null | undefined, previous: number | null | un
   return `${delta > 0 ? "+" : ""}${delta.toFixed(1)}% ${inverse ? (delta < 0 ? "↑ better" : delta > 0 ? "↓ worse" : "same") : "vs prior period"}`;
 }
 
-export function SeoView({ clients, active, selectedClientId, canOpenSites, canManageMappings, onMapSearchConsole, onMapAnalytics, onMapBusinessProfile, onCreateTask, onOpenSites, auditRuns = [], canRunAudit, onSaveAudit, onCreateAuditTask, agents = [], onOpenTaskList }: { clients: Client[]; active: boolean; selectedClientId?: string; canOpenSites: boolean; canManageMappings: boolean; onMapSearchConsole: (clientId: string, propertyId: string) => Promise<boolean>; onMapAnalytics: (clientId: string, propertyId: string) => Promise<boolean>; onMapBusinessProfile: (clientId: string, accountId: string, locationId: string) => Promise<boolean>; onCreateTask: (clientId: string, title: string, notes: string, checklist: string) => void; onOpenSites: () => void; auditRuns?: MarketingAuditRun[]; canRunAudit: boolean; onSaveAudit: (run: MarketingAuditRun) => Promise<boolean>; onCreateAuditTask: (clientId: string, title: string, notes: string) => void; agents?: Array<{ id: string; name: string; isBot?: boolean; avatar?: string }>; onOpenTaskList: () => void }) {
+export function SeoView({ initialTab, clients, active, selectedClientId, canOpenSites, canManageMappings, onMapSearchConsole, onMapAnalytics, onMapBusinessProfile, onCreateTask, onOpenSites, auditRuns = [], canRunAudit, onSaveAudit, onCreateAuditTask, agents = [], onOpenTaskList }: { initialTab?: "Keyword ideas"; clients: Client[]; active: boolean; selectedClientId?: string; canOpenSites: boolean; canManageMappings: boolean; onMapSearchConsole: (clientId: string, propertyId: string) => Promise<boolean>; onMapAnalytics: (clientId: string, propertyId: string) => Promise<boolean>; onMapBusinessProfile: (clientId: string, accountId: string, locationId: string) => Promise<boolean>; onCreateTask: (clientId: string, title: string, notes: string, checklist: string) => void; onOpenSites: () => void; auditRuns?: MarketingAuditRun[]; canRunAudit: boolean; onSaveAudit: (run: MarketingAuditRun) => Promise<boolean>; onCreateAuditTask: (clientId: string, title: string, notes: string) => void; agents?: Array<{ id: string; name: string; isBot?: boolean; avatar?: string }>; onOpenTaskList: () => void }) {
   const available = useMemo(() => clients, [clients]);
   const [clientId, setClientId] = useState(available[0]?.id || clients[0]?.id || "");
   useEffect(() => { if (clients.length && !clients.some((item) => item.id === clientId)) setClientId(clients[0].id); }, [clients, clientId]);
@@ -64,7 +64,7 @@ export function SeoView({ clients, active, selectedClientId, canOpenSites, canMa
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const customDatesReady = Boolean(customFrom && customTo && customFrom <= customTo);
-  const [tab, setTab] = useState<Tab>("Performance");
+  const [tab, setTab] = useState<Tab>(initialTab || "Performance");
   const [search, setSearch] = useState<SeoPayload | null>(null);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [properties, setProperties] = useState<SearchProperty[]>([]);

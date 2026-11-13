@@ -8917,3 +8917,7 @@ html body .app-shell .sidebar .nav-item .nav-icon svg.lucide-nav-icon * { stroke
 .crm-card-notes-open { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; border: 0; background: none; padding: 2px 0; font: inherit; font-size: 12px; font-weight: 700; color: var(--brand-primary, #1677c8); cursor: pointer; }
 .crm-card-notes-open:hover { text-decoration: underline; }
 .dark-mode .crm-card-notes-open { color: color-mix(in srgb, var(--brand-primary, #1677c8) 55%, #fff); }
+.ops-client-pick { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; }
+.ops-client-pick select { min-height:38px; padding:0 10px; border:1px solid var(--f2b-border,#d9dee3); border-radius:10px; background:var(--f2b-white,#fff); color:var(--f2b-ink,#1f2328); font:inherit; min-width:220px; }
+.ops-embed { min-width:0; }
+.app-shell.dark-mode .ops-client-pick select { background:#1f1e22; border-color:#3a393d; color:#fff; }

@@ -14,7 +14,7 @@ type OpsClient = {
 };
 type OpsTask = { id: string; clientId: string; status: string; aiDismissedAt?: string; aiApprovals?: Array<{ status?: string }>; aiRunState?: string };
 type SiteRow = { clientId: string; backend: string; previewUrl: string; repo: string; branch: string; updatedAt: string };
-export type OperationsTab = "overview" | "websites" | "onboarding" | "local";
+export type OperationsTab = "overview" | "websites" | "onboarding" | "local" | "keywords" | "audits" | "reports";
 export type CommunityResult = { url: string; title: string; snippet: string; platform: string };
 type Check = { label: string; ok: boolean; page?: string };
 
@@ -37,12 +37,14 @@ function connectionChecks(client: OpsClient, hasSite: boolean): Check[] {
 
 const hostOf = (value?: string) => { try { return value ? new URL(/^https?:\/\//.test(value) ? value : `https://${value}`).hostname : ""; } catch { return ""; } };
 
-export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenWebsite, onOpenDns, onStartOnboarding, onboarding, onCreateGbpTask, onCreateCommunityTask }: {
+export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenWebsite, onOpenDns, onStartOnboarding, onboarding, onCreateGbpTask, onCreateCommunityTask, renderTool }: {
   clients: OpsClient[]; tasks: OpsTask[]; tab: OperationsTab; onTab: (tab: OperationsTab) => void;
   onOpenPage: (page: string, clientId?: string) => void; onOpenWebsite: (client: OpsClient) => void; onOpenDns: () => void;
   onStartOnboarding?: (clientId: string) => void; onboarding?: React.ReactNode;
   onCreateGbpTask?: (clientId: string) => string; onCreateCommunityTask?: (clientId: string, results: CommunityResult[]) => string;
+  renderTool?: (tool: "keywords" | "audits" | "reports", clientId: string) => React.ReactNode;
 }) {
+  const [toolClientId, setToolClientId] = useState("");
   const [community, setCommunity] = useState<Record<string, { busy?: boolean; error?: string; results?: CommunityResult[]; cost?: number | null; note?: string; usage?: { clientRuns: number; lastRun: string | null; workspaceRuns: number; monthCostUsd: number } }>>({});
   const [notice, setNotice] = useState("");
   const findQuestions = async (client: OpsClient) => {
@@ -85,7 +87,7 @@ export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenW
   return <section className="ops-centre">
     <div className="page-heading"><div><p className="eyebrow">Agency</p><h1>Operations</h1><p className="muted">Client services, connections and websites in one place. Everything opens the existing tools.</p></div></div>
     <div className="ops-tabs" role="tablist" aria-label="Operations sections">
-      {([["overview", "Overview"], ["onboarding", "Onboarding"], ["websites", "Websites & Domains"], ["local", "Local & community"]] as Array<[OperationsTab, string]>).filter(([key]) => key !== "onboarding" || onboarding).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? "active" : ""} onClick={() => onTab(key)}>{label}</button>)}
+      {([["overview", "Overview"], ["onboarding", "Onboarding"], ["websites", "Websites & Domains"], ["keywords", "Keyword planner"], ["audits", "Audits"], ["reports", "Reports"], ["local", "Local & community"]] as Array<[OperationsTab, string]>).filter(([key]) => (key !== "onboarding" || onboarding) && (!["keywords", "audits", "reports"].includes(key) || renderTool)).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? "active" : ""} onClick={() => onTab(key)}>{label}</button>)}
     </div>
 
     {tab === "overview" && <>
@@ -124,6 +126,14 @@ export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenW
     </>}
 
     {tab === "onboarding" && onboarding}
+
+    {(tab === "keywords" || tab === "audits" || tab === "reports") && renderTool && (() => {
+      const selected = active.find((client) => client.id === toolClientId) || active[0];
+      return <>
+        <div className="ops-toolbar"><label className="ops-client-pick"><span>Client</span><select value={selected?.id || ""} onChange={(event) => setToolClientId(event.target.value)}>{active.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></label><span className="muted">{tab === "keywords" ? "Google Keyword Planner and DataForSEO ideas, saved per client." : tab === "audits" ? "Full marketing audit across Ads, SEO, tracking and the website." : "Client reports from your saved templates."}</span></div>
+        {selected ? <div className="ops-embed" key={`${tab}-${selected.id}`}>{renderTool(tab, selected.id)}</div> : <p className="ops-empty">No active clients.</p>}
+      </>;
+    })()}
 
     {tab === "local" && <>
       <p className="muted ops-hint">Grok drafts Google Business posts, review replies and helpful Reddit / Quora answers as tasks. Everything waits for approval and is posted by you — nothing is published automatically. Community searches use DataForSEO (max 1 search a week per client).</p>
