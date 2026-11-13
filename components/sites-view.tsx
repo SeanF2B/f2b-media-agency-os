@@ -62,15 +62,16 @@ function livePageUrl(siteUrl?: string, slug?: string) {
 }
 
 
-async function openBuilder(clientId: string, name: string) {
+export async function openBuilder(clientId: string, name: string) {
   const w = window as unknown as { f2bSiteBuilder?: { open: (o: { clientId: string; name: string }) => void } };
   if (!w.f2bSiteBuilder) await new Promise<void>((ok, bad) => { const el = document.createElement("script"); el.src = "/f2b-site-builder.js"; el.onload = () => ok(); el.onerror = () => bad(new Error("Could not load the builder")); document.head.appendChild(el); });
   w.f2bSiteBuilder?.open({ clientId, name });
 }
-export function SitesView({ clients, active, initialSection = "website", hideSectionTabs = false, vaultEntries, vaultUnlocked, pageMetadata = [], landingDomainChecks = [], onUnlockVault, onSavePageMetadata, onSaveLandingDomainCheck, onCreateTask }: { clients: ClientSite[]; active: boolean; initialSection?: "website" | "landing"; hideSectionTabs?: boolean; vaultEntries: SavedLogin[]; vaultUnlocked: boolean; pageMetadata?: SitePageMetadata[]; landingDomainChecks?: SiteLandingDomainCheck[]; onUnlockVault: () => void; onSavePageMetadata: (metadata: SitePageMetadata) => void; onSaveLandingDomainCheck: (check: SiteLandingDomainCheck) => void; onCreateTask: (clientId: string, title: string, notes: string, checklist: string, service?: string, sitePagePlan?: SitePagePlan) => void }) {
+export function SitesView({ focusClientId = "", clients, active, initialSection = "website", hideSectionTabs = false, vaultEntries, vaultUnlocked, pageMetadata = [], landingDomainChecks = [], onUnlockVault, onSavePageMetadata, onSaveLandingDomainCheck, onCreateTask }: { clients: ClientSite[]; active: boolean; initialSection?: "website" | "landing"; hideSectionTabs?: boolean; vaultEntries: SavedLogin[]; vaultUnlocked: boolean; pageMetadata?: SitePageMetadata[]; landingDomainChecks?: SiteLandingDomainCheck[]; onUnlockVault: () => void; onSavePageMetadata: (metadata: SitePageMetadata) => void; onSaveLandingDomainCheck: (check: SiteLandingDomainCheck) => void; onCreateTask: (clientId: string, title: string, notes: string, checklist: string, service?: string, sitePagePlan?: SitePagePlan) => void; focusClientId?: string }) {
   const available = useMemo(() => clients.filter((client) => client.wordpressSiteUrl), [clients]);
   const [clientId, setClientId] = useState(available[0]?.id || clients[0]?.id || "");
   useEffect(() => { if (clients.length && !clients.some((item) => item.id === clientId)) setClientId(clients[0].id); }, [clients, clientId]);
+  useEffect(() => { if (focusClientId && clients.some((item) => item.id === focusClientId)) setClientId(focusClientId); }, [focusClientId, clients]);
   const [site, setSite] = useState<SiteData>({});
   const [wordpressAccount, setWordPressAccount] = useState<WordPressAccount>({ connected: false, sites: [] });
   const [selectedId, setSelectedId] = useState<number | null>(null);

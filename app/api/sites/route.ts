@@ -415,6 +415,11 @@ export async function GET(request: Request) {
   const access = await adminContext(user);
   if (!access) return respond("Only an agency owner or admin can manage connected WordPress pages.", 403);
   const params = new URL(request.url).searchParams;
+  if (params.get("siteRegistry") === "1") {
+    // Operations Centre → Websites & Domains: which clients have a builder site (one small indexed table).
+    const rows = await env.DB.prepare("SELECT client_id, backend, preview_url, repo, branch, updated_at FROM site_content_sites").all<{ client_id: string; backend: string; preview_url: string; repo: string; branch: string; updated_at: string }>().catch(() => ({ results: [] as Array<{ client_id: string; backend: string; preview_url: string; repo: string; branch: string; updated_at: string }> }));
+    return Response.json({ sites: (rows.results || []).map((row) => ({ clientId: row.client_id, backend: row.backend, previewUrl: row.preview_url, repo: row.repo, branch: row.branch, updatedAt: row.updated_at })) }, { headers: { "Cache-Control": "no-store" } });
+  }
   const client = access.data.clients?.find((item: Client) => item.id === params.get("clientId"));
   if (!client) return respond("Choose a client in this workspace.", 404);
   if (!client.wordpressSiteUrl) return respond("Add the WordPress website URL in this client’s profile first.", 422);
