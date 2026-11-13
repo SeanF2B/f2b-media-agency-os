@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     const where = scope === "agency" ? "owner_id=?1" : "owner_id=?1 AND client_id=?2";
     const stmt = env.DB!.prepare(`SELECT * FROM conv_threads WHERE ${where} ORDER BY last_at DESC LIMIT 200`);
     const threads = (await (scope === "agency" ? stmt.bind(auth.ownerId) : stmt.bind(auth.ownerId, scope)).all()).results || [];
-    return respond({ threads, configured: settings.hasToken && Boolean(settings.accountSid) && settings.numbers.length > 0, botEnabled: settings.botEnabled });
+    return respond({ threads, configured: settings.hasToken && Boolean(settings.accountSid) && settings.numbers.length > 0, botEnabled: settings.botEnabled, emailFrom: String(env.TASK_NOTIFICATION_FROM || "") });
   } catch (e) { console.error("conversations GET", e); return respond({ error: "Could not load conversations." }, 503); }
 }
 

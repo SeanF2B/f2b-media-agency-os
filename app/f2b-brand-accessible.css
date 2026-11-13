@@ -8687,3 +8687,11 @@ fieldset.crm-new-contact legend { padding:0 6px; font-size:12px; font-weight:700
 .ad-report-off p { margin: 0; font-size: 13px; }
 .ai-dashboard-merged { margin-bottom: 15px; }
 .ai-dashboard-merged .ai-dashboard-list { max-height: 520px; overflow: auto; }
+.cv-email { background: #fff; color: #1f2328; border: 1px solid rgba(127,127,127,.25); border-radius: 10px; margin: 0 0 14px; max-width: 760px; box-shadow: 0 2px 8px rgba(0,0,0,.04); }
+.cv-email header { padding: 14px 18px; border-bottom: 1px solid rgba(127,127,127,.18); }
+.cv-email h3 { margin: 0 0 8px; font-size: 16px; }
+.cv-email dl { margin: 0; display: grid; gap: 2px; font-size: 12.5px; }
+.cv-email dl div { display: flex; gap: 8px; } .cv-email dt { width: 42px; color: #6b7280; flex: none; } .cv-email dd { margin: 0; word-break: break-all; }
+.cv-email-body { padding: 16px 18px; white-space: pre-wrap; font-size: 14px; line-height: 1.6; }
+.app-shell.dark-mode .cv-email { background: #1d2126; color: #f2f4f6; }
+.app-shell.dark-mode .cv-email dt { color: #a7b0ba; }

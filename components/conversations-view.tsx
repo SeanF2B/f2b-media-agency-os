@@ -27,6 +27,7 @@ export function ConversationsView({ scopeClientId, clients }: { scopeClientId: s
   const [activeId, setActiveId] = useState("");
   const [active, setActive] = useState<Thread | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
+  const [emailFrom, setEmailFrom] = useState("");
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -34,7 +35,7 @@ export function ConversationsView({ scopeClientId, clients }: { scopeClientId: s
   const clientName = (id: string) => clients.find((c) => c.id === id)?.name || "";
 
   const loadThreads = useCallback(async () => {
-    try { const r = await call<{ threads: Thread[]; configured: boolean }>(`/api/conversations?view=threads&clientId=${encodeURIComponent(scopeClientId || "agency")}`); setThreads(r.threads); setConfigured(r.configured); setError(""); }
+    try { const r = await call<{ threads: Thread[]; configured: boolean; emailFrom?: string }>(`/api/conversations?view=threads&clientId=${encodeURIComponent(scopeClientId || "agency")}`); setThreads(r.threads); setConfigured(r.configured); setEmailFrom(r.emailFrom || ""); setError(""); }
     catch (e) { setError(e instanceof Error ? e.message : "Could not load conversations."); } finally { setLoading(false); }
   }, [scopeClientId]);
   const loadThread = useCallback(async (id: string) => {
@@ -71,7 +72,7 @@ export function ConversationsView({ scopeClientId, clients }: { scopeClientId: s
             <label className={`cv-switch ${active.bot_on ? "on" : ""}`} title="When on, the AI bot answers new messages"><input type="checkbox" checked={!!active.bot_on} disabled={busy} onChange={(e) => void act({ action: "toggle-bot", id: active.id, on: e.target.checked })} /><span><AiEyesIcon /> Bot {active.bot_on ? "on" : "off"}</span></label>
             {active.status !== "closed" ? <button type="button" className="secondary-button" disabled={busy} onClick={() => void act({ action: "status", id: active.id, status: "closed" })}>✓ Close</button> : <button type="button" className="secondary-button" disabled={busy} onClick={() => void act({ action: "status", id: active.id, status: "open" })}>Reopen</button>}</div>}</div>
         {active.status === "handoff" && <div className="cv-banner">🙋 The bot handed this one to you. Reply below, or switch the bot back on.</div>}
-        <div className="cv-msgs">{messages.map((m) => <div key={m.id} className={`cv-msg ${m.direction === "in" ? "in" : "out"} ${m.sender}`}><div className="cv-bubble">{m.body}{m.error && <small className="cv-fail">Not delivered: {m.error}</small>}</div><small>{m.sender === "bot" && active.channel === "email" ? "Sent automatically" : m.sender === "bot" ? <><AiEyesIcon /> AI bot</> : m.sender === "staff" ? "You" : title(active)} · {new Date(m.created_at).toLocaleString("en-GB", { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}</small></div>)}<div ref={endRef} /></div>
+        <div className="cv-msgs">{active.channel === "email" ? messages.map((m) => { const subject = (m.body.match(/^Subject: (.*)$/m) || [])[1] || "(no subject)"; const body = m.body.replace(/^Subject: .*\n\n?/, ""); return <article className="cv-email" key={m.id}><header><h3>{subject}</h3><dl><div><dt>From</dt><dd>{emailFrom || "System sender"}</dd></div><div><dt>To</dt><dd>{active.contact_name ? `${active.contact_name} <${active.contact}>` : active.contact}</dd></div><div><dt>Sent</dt><dd>{new Date(m.created_at).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</dd></div></dl></header><div className="cv-email-body">{body}</div>{m.error && <small className="cv-fail">Not delivered: {m.error}</small>}</article>; }) : messages.map((m) => <div key={m.id} className={`cv-msg ${m.direction === "in" ? "in" : "out"} ${m.sender}`}><div className="cv-bubble">{m.body}{m.error && <small className="cv-fail">Not delivered: {m.error}</small>}</div><small>{m.sender === "bot" && active.channel === "email" ? "Sent automatically" : m.sender === "bot" ? <><AiEyesIcon /> AI bot</> : m.sender === "staff" ? "You" : title(active)} · {new Date(m.created_at).toLocaleString("en-GB", { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}</small></div>)}<div ref={endRef} /></div>
 {active.channel === "email" ? <p className="cv-note">This is a copy of an email the system sent automatically. Replies go to the sender\u2019s inbox, not here.</p> : <>        <form className="cv-compose" onSubmit={(e) => { e.preventDefault(); void send(); }}>
           <textarea value={text} rows={2} maxLength={1500} placeholder="Write a reply… (Enter to send, Shift+Enter for a new line)" onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }} />
           <div><button type="button" className="secondary-button" disabled={busy} onClick={() => void draft()}>✨ Draft with AI</button><button type="submit" className="primary-button" disabled={busy || !text.trim()}>Send</button></div>
