@@ -8836,3 +8836,5 @@ fieldset.crm-new-contact legend { padding:0 6px; font-size:12px; font-weight:700
 .ops-results summary { cursor:pointer; font-size:12px; }
 .ops-results ul { margin:6px 0 0; padding-left:16px; font-size:12px; }
 .app-shell.dark-mode .ops-notice { background:#14532d; color:#fff; }
+.ai-card-actions { display:inline-flex; gap:6px; align-items:center; }
+.onb-scrape { display:flex; gap:8px; } .onb-scrape input { flex:1; } .onb-scrape button { white-space:nowrap; }

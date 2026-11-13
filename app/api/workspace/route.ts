@@ -254,12 +254,24 @@ export async function PUT(request: Request) {
         // The browser can keep an older workspace snapshot open while the AI
         // writes progress or a completed report. Never let that stale snapshot
         // roll back the AI run, its evidence, or its completion state.
-        if (baseline && runtimeIsNewer) {
+        // Tasks the AI never ran (staff tasks) have nothing to protect — the browser's edit wins.
+        const aiTask = Boolean(prior.aiRunState || prior.aiRunAttempt || task.aiRunState || task.aiRunAttempt);
+        if (baseline && runtimeIsNewer && aiTask) {
           for (const field of aiRuntimeFields) {
             if (Object.prototype.hasOwnProperty.call(prior, field)) merged[field] = prior[field];
             else delete merged[field];
           }
           if (prior.aiRunState || prior.aiRunAttempt) merged.status = prior.status;
+          // Edits the person just made still win over the server copy:
+          // a newer pending reason, and a cancel / start-now request the server doesn't have yet.
+          if (Date.parse(String(task.pendingReasonAt || "")) > Date.parse(String(prior.pendingReasonAt || "")) || (task.pendingReason && !prior.pendingReasonAt && task.pendingReason !== prior.pendingReason)) {
+            merged.pendingReason = task.pendingReason; merged.pendingReasonBy = task.pendingReasonBy; merged.pendingReasonAt = task.pendingReasonAt;
+          }
+          if (task.aiCancelRequestedAt && !prior.aiCancelRequestedAt && !prior.aiCancelledAt) {
+            merged.aiCancelRequestedAt = task.aiCancelRequestedAt; merged.aiCancelRequestedBy = task.aiCancelRequestedBy;
+            if (task.aiRunState === "cancelled" || task.aiCancelledAt) { merged.aiRunState = task.aiRunState; merged.aiCancelledAt = task.aiCancelledAt; merged.aiCancelledBy = task.aiCancelledBy; merged.status = task.status; }
+          }
+          if (task.aiStartNowRequestedAt && !prior.aiStartNowRequestedAt && prior.aiRunState !== "running") merged.aiStartNowRequestedAt = task.aiStartNowRequestedAt;
         }
         return merged;
       });

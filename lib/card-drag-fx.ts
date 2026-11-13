@@ -93,42 +93,65 @@ export function createCardDragFx(preview: HTMLElement, source: HTMLElement, grab
     slot = null;
     clearShift();
     target = null;
+    layout = null;
+    lastIndex = -1;
   };
 
-  const placeSlot = (clientY: number, column: HTMLElement) => {
+  // Card positions are measured once per column (and again after scrolling), not on every pointer move,
+  // and the DOM is only touched when the landing position actually changes. This keeps dragging smooth
+  // even with hundreds of cards on the board.
+  let layout: { column: HTMLElement; colScroll: number; colLeft: number; cards: HTMLElement[]; tops: number[]; heights: number[]; gap: number; left: number; width: number; colTop: number; slotHeight: number } | null = null;
+  let lastIndex = -1;
+  const measure = (column: HTMLElement) => {
+    clearShift(); lastIndex = -1;
     const cards = Array.from(column.querySelectorAll<HTMLElement>(options.cardSelector)).filter((card) => card !== source && card !== preview && !card.classList.contains("is-dragging") && !preview.contains(card) && card.getClientRects().length > 0);
-    // Natural (un-shifted) top of each card, so the maths is stable while cards are sliding.
-    const natural = (card: HTMLElement) => {
-      const match = /translateY\((-?[\d.]+)px\)/.exec(card.style.transform || "");
-      return card.getBoundingClientRect().top - (match ? Number(match[1]) : 0);
-    };
-    const before = cards.find((card) => clientY < natural(card) + card.offsetHeight / 2) || null;
-    const slotHeight = Math.max(48, preview.offsetHeight || source.offsetHeight);
-    const gap = cards.length > 1 ? Math.max(0, natural(cards[1]) - (natural(cards[0]) + cards[0].offsetHeight)) : 10;
-    const first = cards[0];
+    const rects = cards.map((card) => card.getBoundingClientRect());
     const colRect = column.getBoundingClientRect();
-    const left = first ? first.getBoundingClientRect().left : colRect.left + 10;
-    const width = first ? first.getBoundingClientRect().width : Math.max(120, colRect.width - 20);
-    const last = cards[cards.length - 1];
-    const slotTop = before ? natural(before) : last ? natural(last) + last.offsetHeight + gap : colRect.top + 70;
-    const element = ensureSlot();
-    element.style.cssText = `position:fixed;left:${left}px;top:${slotTop - (before ? 0 : 0)}px;width:${width}px;height:${slotHeight}px;box-sizing:border-box;z-index:2147482000;pointer-events:none;transition:top 150ms ease-out;`;
+    const tops = rects.map((rect) => rect.top), heights = rects.map((rect) => rect.height);
+    layout = {
+      column, colScroll: column.scrollTop, colLeft: colRect.left, cards, tops, heights,
+      gap: cards.length > 1 ? Math.max(0, tops[1] - (tops[0] + heights[0])) : 10,
+      left: rects[0] ? rects[0].left : colRect.left + 10, width: rects[0] ? rects[0].width : Math.max(120, colRect.width - 20), colTop: colRect.top,
+      slotHeight: Math.max(48, preview.offsetHeight || source.offsetHeight),
+    };
     const accent = getComputedStyle(column).getPropertyValue("--stage-color").trim() || "#3b82f6";
+    const element = ensureSlot();
+    element.style.cssText = `position:fixed;left:${layout.left}px;top:0;width:${layout.width}px;height:${layout.slotHeight}px;box-sizing:border-box;z-index:2147482000;pointer-events:none;will-change:transform;transition:transform 150ms ease-out;`;
     element.style.setProperty("border", `2px dashed ${accent}`, "important");
     element.style.setProperty("border-radius", "14px", "important");
     element.style.setProperty("background", `color-mix(in srgb, ${accent} 16%, transparent)`, "important");
     element.style.setProperty("box-shadow", "inset 0 6px 18px rgba(0,0,0,.28), 0 8px 20px rgba(0,0,0,.22)", "important");
+  };
+  // After auto-scroll, shift the cached positions instead of re-measuring (no flicker, no layout reads per card).
+  const followScroll = () => {
+    if (!layout) return;
+    const rect = layout.column.getBoundingClientRect();
+    const dy = (rect.top - layout.colTop) - (layout.column.scrollTop - layout.colScroll), dx = rect.left - layout.colLeft;
+    if (!dy && !dx) return;
+    layout.tops = layout.tops.map((top) => top + dy);
+    layout.colTop = rect.top; layout.colScroll = layout.column.scrollTop; layout.colLeft = rect.left; layout.left += dx;
+    if (slot) slot.style.left = `${layout.left}px`;
+    lastIndex = -1;
+  };
+  const placeSlot = (clientY: number, column: HTMLElement, scrolled = false) => {
+    if (!layout || layout.column !== column) measure(column);
+    else if (scrolled) followScroll();
+    const L = layout!;
+    const index = (() => { for (let i = 0; i < L.tops.length; i += 1) if (clientY < L.tops[i] + L.heights[i] / 2) return i; return L.tops.length; })();
+    target = { column, beforeCard: L.cards[index] || null };
+    if (index === lastIndex) return;
+    lastIndex = index;
+    const last = L.tops.length - 1;
+    const slotTop = index < L.tops.length ? L.tops[index] : last >= 0 ? L.tops[last] + L.heights[last] + L.gap : L.colTop + 70;
+    ensureSlot().style.transform = `translate3d(0, ${slotTop}px, 0)`;
     // Cards at and after the slot slide down to make room (Trello-style).
-    const index = before ? cards.indexOf(before) : cards.length;
-    const push = slotHeight + gap;
+    const push = L.slotHeight + L.gap;
     const nextShifted: HTMLElement[] = [];
-    cards.forEach((card, position) => {
-      if (position >= index) { card.style.setProperty("transition", "transform 150ms cubic-bezier(.2,.75,.25,1)", "important"); card.style.setProperty("transform", `translateY(${push}px)`, "important"); nextShifted.push(card); }
-      else { card.style.removeProperty("transform"); card.style.removeProperty("transition"); }
+    L.cards.forEach((card, position) => {
+      if (position >= index) { if (!shifted.includes(card)) { card.style.setProperty("transition", "transform 150ms cubic-bezier(.2,.75,.25,1)", "important"); card.style.setProperty("transform", `translate3d(0, ${push}px, 0)`, "important"); } nextShifted.push(card); }
     });
-    shifted.filter((card) => !nextShifted.includes(card)).forEach((card) => { card.style.removeProperty("transform"); card.style.removeProperty("transition"); });
+    shifted.filter((card) => !nextShifted.includes(card)).forEach((card) => { card.style.removeProperty("transform"); });
     shifted = nextShifted;
-    target = { column, beforeCard: before };
   };
 
   // Trello-style: dragging near the top or bottom edge of a long column scrolls it.
@@ -173,7 +196,7 @@ export function createCardDragFx(preview: HTMLElement, source: HTMLElement, grab
       if (sideScroller) sideScroller.scrollLeft += sideStep; else window.scrollBy(sideStep, 0);
       moved = true;
     }
-    if (moved && column) placeSlot(lastY, column);
+    if (moved && column) placeSlot(lastY, column, true);
     if (dragging) scrollFrame = window.requestAnimationFrame(autoScroll);
   };
   let dragging = true;

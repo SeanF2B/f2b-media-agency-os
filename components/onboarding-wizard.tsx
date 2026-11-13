@@ -74,6 +74,21 @@ export function OnboardingWizard({ clients, initialClientId = "", existingSetupS
     { key: "googleAnalyticsAccountId", label: "GA4 property ID", needed: answers.services.includes("SEO") || wantsWebsite, placeholder: "properties/123456789" },
     { key: "googleBusinessProfileLocationId", label: "Business Profile location", needed: answers.services.includes("Google Business Profile") || answers.services.includes("SEO"), placeholder: "locations/123…" },
   ] as const;
+  const [scrape, setScrape] = useState<{ busy?: boolean; message?: string; error?: string }>({});
+  const fillFromWebsite = async () => {
+    if (!form.website.trim()) { setScrape({ error: "Add the current website address first." }); return; }
+    setScrape({ busy: true });
+    try {
+      const response = await fetch("/api/onboarding-scrape", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: form.website.trim(), name: form.name }) });
+      const j = await response.json().catch(() => ({})) as Record<string, string | number>;
+      if (!response.ok) throw new Error(String(j.error || "Couldn’t read the website."));
+      let filled = 0;
+      const pick = (current: string, next: unknown) => { const value = String(next || "").trim(); if (!current.trim() && value) { filled += 1; return value; } return current; };
+      setForm((current) => ({ ...current, company: pick(current.company, j.company), contact: pick(current.contact, j.contact), email: pick(current.email, j.email), phone: pick(current.phone, j.phone), logo: current.logo || (j.logo ? (filled += 1, String(j.logo)) : ""), primary: j.primaryColour && (!existing?.branding?.primary) ? (filled += 1, String(j.primaryColour)) : current.primary, secondary: j.secondaryColour && (!existing?.branding?.secondary) ? (filled += 1, String(j.secondaryColour)) : current.secondary }));
+      setAnswers((current) => ({ ...current, description: pick(current.description, [j.description, j.services ? `Services: ${j.services}` : ""].filter(Boolean).join("\n")), serviceAreas: pick(current.serviceAreas, j.serviceAreas), targetCustomers: pick(current.targetCustomers, j.idealCustomers), websitePages: pick(current.websitePages, j.websitePages) }));
+      setScrape({ message: `Read ${j.pagesRead || 1} page${Number(j.pagesRead) === 1 ? "" : "s"} and filled the empty fields. Check everything before saving — existing answers weren’t changed.` });
+    } catch (reason) { setScrape({ error: reason instanceof Error ? reason.message : "Couldn’t read the website." }); }
+  };
   const stepValid = step === 0 ? form.name.trim().length > 1 : step === 2 ? answers.services.length > 0 : true;
 
   const onLogo = (file?: File) => {
@@ -114,7 +129,8 @@ export function OnboardingWizard({ clients, initialClientId = "", existingSetupS
         <label className="onb-field"><span>Contact person</span><input value={form.contact} onChange={set("contact")} /></label>
         <label className="onb-field"><span>Email</span><input type="email" value={form.email} onChange={set("email")} /></label>
         <label className="onb-field"><span>Phone</span><input value={form.phone} onChange={set("phone")} /></label>
-        <label className="onb-field"><span>Current website</span><input value={form.website} onChange={set("website")} placeholder="https://" /></label>
+        <label className="onb-field"><span>Current website</span><span className="onb-scrape"><input value={form.website} onChange={set("website")} placeholder="https://" /><button type="button" className="secondary-button" disabled={scrape.busy} onClick={() => void fillFromWebsite()}>{scrape.busy ? "Reading site…" : "✨ Fill from website"}</button></span></label>
+        {(scrape.message || scrape.error) && <p className={`onb-note wide ${scrape.error ? "onb-error" : ""}`} role="status">{scrape.error || scrape.message}</p>}
         <label className="onb-field wide"><span>What the business does</span><textarea rows={3} value={answers.description} onChange={setA("description")} placeholder="Services, specialities, what makes them different" /></label>
         <label className="onb-field wide"><span>Service areas</span><input value={answers.serviceAreas} onChange={setA("serviceAreas")} placeholder="Galway, Mayo, Clare" /></label>
         <label className="onb-field"><span>Ideal customers</span><input value={answers.targetCustomers} onChange={setA("targetCustomers")} /></label>
