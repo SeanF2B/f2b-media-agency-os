@@ -37,7 +37,7 @@ function NoteCard({ note, onSave, onDelete }: { note: CrmNote; onSave: (body: st
   </article>;
 }
 
-export function CrmNotesPanel({ title, formAnswers, formDate, notes, onClose, onChanged }: { title: string; formAnswers?: string; formDate?: string; notes: CrmNote[]; onClose: () => void; onChanged: (payload: Record<string, unknown>) => Promise<boolean> }) {
+export function CrmNotesPanel({ title, subtitle = "Notes and follow-ups for this opportunity.", formAnswers, formDate, notes, onClose, onChanged }: { title: string; subtitle?: string; formAnswers?: string; formDate?: string; notes: CrmNote[]; onClose: () => void; onChanged: (payload: Record<string, unknown>) => Promise<boolean> }) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<"newest" | "oldest">("newest");
   const [adding, setAdding] = useState(false);
@@ -53,7 +53,7 @@ export function CrmNotesPanel({ title, formAnswers, formDate, notes, onClose, on
   const run = async (payload: Record<string, unknown>) => { setBusy(true); try { return await onChanged(payload); } finally { setBusy(false); } };
   return <div className="crm-drawer-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
     <aside className="crm-drawer" role="dialog" aria-modal="true" aria-label={`Notes for ${title}`}>
-      <header className="crm-drawer-head"><div><h2>Edit “{title}”</h2><p>Notes and follow-ups for this opportunity.</p></div><button type="button" className="crm-drawer-close" aria-label="Close notes" onClick={onClose}>›</button></header>
+      <header className="crm-drawer-head"><div><h2>{title}</h2><p>{subtitle}</p></div><button type="button" className="crm-drawer-close" aria-label="Close notes" onClick={onClose}>›</button></header>
       <div className="crm-notes-toolbar">
         <h3>Notes</h3>
         <button type="button" className="crm-note-sort" title={sort === "newest" ? "Newest first" : "Oldest first"} aria-label="Change sort order" onClick={() => setSort((s) => s === "newest" ? "oldest" : "newest")}>{sort === "newest" ? "↓ Newest" : "↑ Oldest"}</button>
