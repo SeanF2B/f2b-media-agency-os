@@ -482,7 +482,7 @@ export async function mutateGoogleAdsKeyword(ownerId: string, customerId: string
   return { customerId: cleanCustomerId, adGroupId, keyword, matchType: input.matchType, negative: input.negative, removed: input.remove, resourceName };
 }
 
-export async function generateGoogleAdsKeywordIdeas(ownerId: string, customerId: string, input: { keywords: string[]; url?: string; geoTargetConstant?: string }) {
+export async function generateGoogleAdsKeywordIdeas(ownerId: string, customerId: string, input: { keywords: string[]; url?: string; geoTargetConstant?: string; locationName?: string }) {
   const keywords = input.keywords.map((value) => value.trim()).filter(Boolean).slice(0, 10);
   const url = (input.url || "").trim();
   if (!keywords.length && !url) throw new Error("Provide at least one seed phrase or a landing page URL.");
@@ -513,7 +513,7 @@ export async function generateGoogleAdsKeywordIdeas(ownerId: string, customerId:
     };
   }).sort((a: any, b: any) => b.avgMonthlySearches - a.avgMonthlySearches).slice(0, 100);
   const knownLocations: Record<string, string> = { "2372": "Ireland", "2826": "United Kingdom", "2840": "United States" };
-  return { source: "Google Ads Keyword Planner API", customerId: cleanCustomerId, language: "English", location: knownLocations[geoId] || `Google Ads location ${geoId}`, geoTargetConstant: geoId, count: results.length, results };
+  return { source: "Google Ads Keyword Planner API", customerId: cleanCustomerId, language: "English", location: input.locationName || knownLocations[geoId] || `Google Ads location ${geoId}`, geoTargetConstant: geoId, count: results.length, results };
 }
 
 export async function updateGoogleAdsCampaignBudget(ownerId: string, customerId: string, budgetResourceName: string, amountMicros: number) {
@@ -540,4 +540,40 @@ export async function getGoogleAdsAccountWebsite(ownerId: string, customerId: st
   for (const row of rows) for (const url of row.adGroupAd?.ad?.finalUrls || []) { try { const host = new URL(url).hostname.replace(/^www\./, ""); counts.set(host, (counts.get(host) || 0) + 1); } catch { /* skip */ } }
   const host = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || "";
   return { name: rows[0]?.customer?.descriptiveName || "", website: host ? `https://${host}` : "" };
+}
+
+/** Google Ads location search (countries, regions, counties, cities) for Keyword Planner targeting. */
+export async function suggestGoogleAdsGeoTargets(ownerId: string, query: string, countryCode?: string) {
+  const name = query.trim().slice(0, 80);
+  if (name.length < 2) return [];
+  const accessToken = await getGoogleAdsAccessToken(ownerId);
+  const response = await fetch(`https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/geoTargetConstants:suggest`, {
+    method: "POST", headers: googleAdsHeaders(accessToken), signal: AbortSignal.timeout(15000),
+    body: JSON.stringify({ locale: "en", ...(countryCode && /^[A-Z]{2}$/.test(countryCode) ? { countryCode } : {}), locationNames: { names: [name] } }),
+  });
+  const payload = await response.json().catch(() => null) as { geoTargetConstantSuggestions?: Array<{ geoTargetConstant?: { id?: string; name?: string; canonicalName?: string; targetType?: string; status?: string; countryCode?: string } }>; error?: { message?: string } } | null;
+  if (!response.ok) throw new Error(`Google Ads location search failed (HTTP ${response.status}). ${payload?.error?.message || ""}`.trim());
+  return (payload?.geoTargetConstantSuggestions || []).map((item) => item.geoTargetConstant).filter((item): item is NonNullable<typeof item> => Boolean(item?.id && item.status !== "REMOVAL_PLANNED"))
+    .slice(0, 12).map((item) => ({ id: String(item.id), name: String(item.name || ""), canonicalName: String(item.canonicalName || item.name || ""), type: String(item.targetType || ""), countryCode: String(item.countryCode || "") }));
+}
+
+/** Exact Keyword Planner metrics for keywords already saved (used by "Refresh metrics"). */
+export async function getGoogleAdsKeywordHistoricalMetrics(ownerId: string, customerId: string, keywords: string[], geoTargetConstant: string) {
+  const list = [...new Set(keywords.map((value) => value.trim()).filter((value) => value && value.length <= 80))].slice(0, 200);
+  if (!list.length) return [];
+  const geoId = String(geoTargetConstant || "2372").replace(/\D/g, "");
+  if (!/^\d{1,12}$/.test(geoId)) throw new Error("Choose a valid Google Ads location.");
+  const { payload } = await googleAdsPost(ownerId, customerId, ":generateKeywordHistoricalMetrics", {
+    keywords: list, language: "languageConstants/1000", geoTargetConstants: [`geoTargetConstants/${geoId}`], keywordPlanNetwork: "GOOGLE_SEARCH", includeAdultKeywords: false,
+  });
+  return ((payload?.results || []) as Array<any>).map((item) => {
+    const metrics = item.keywordMetrics || {};
+    return {
+      keyword: String(item.text || ""), closeVariants: Array.isArray(item.closeVariants) ? item.closeVariants.map(String) : [],
+      avgMonthlySearches: metrics.avgMonthlySearches == null ? null : Number(metrics.avgMonthlySearches),
+      competition: String(metrics.competition || "UNSPECIFIED"), competitionIndex: metrics.competitionIndex == null ? null : Number(metrics.competitionIndex),
+      lowTopOfPageBid: metrics.lowTopOfPageBidMicros == null ? null : Number(metrics.lowTopOfPageBidMicros) / 1_000_000,
+      highTopOfPageBid: metrics.highTopOfPageBidMicros == null ? null : Number(metrics.highTopOfPageBidMicros) / 1_000_000,
+    };
+  });
 }

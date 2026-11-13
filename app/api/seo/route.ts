@@ -104,7 +104,7 @@ export async function POST(request: Request) {
   const profile = (workspace.staff || []).find((item: any) => !item.isBot && (item.id === user.userId || item.email?.toLowerCase() === user.email.toLowerCase()));
   const admin = workspace.ownerId === user.userId || ["Owner", "Admin"].includes(profile?.role || "");
   if (!admin) return respond("Only an owner or admin can run Google Ads Keyword Planner research.", 403);
-  let body: { clientId?: string; seeds?: string[]; url?: string; geo?: string };
+  let body: { clientId?: string; seeds?: string[]; url?: string; geo?: string; locationName?: string };
   try { body = await request.json() as typeof body; } catch { return respond("The keyword research request is not valid."); }
   const clientId = String(body.clientId || "");
   const client = (workspace.clients || []).find((item: any) => item.id === clientId && item.googleAdsAccountId);
@@ -115,6 +115,7 @@ export async function POST(request: Request) {
       keywords: seeds,
       url: String(body.url || "").trim(),
       geoTargetConstant: String(body.geo || "2372"),
+      locationName: String(body.locationName || "").slice(0, 120) || undefined,
     });
     return Response.json({ ...ideas, clientId, clientName: client.name, updatedAt: new Date().toISOString(), dataNote: "Google Ads Keyword Planner estimates for the selected location and English language. Search volumes and bid ranges are estimates, not rankings or guaranteed traffic. Keyword difficulty is not provided by this source." }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

@@ -65,12 +65,14 @@ async function readDirectBreakdown(ownerId: string, accountId: string, window: {
 }
 
 async function readWorkspaceRows<T>(direct: boolean, readDirect: () => Promise<T>, readWindsor: () => Promise<T>, label: string) {
-  if (!direct) return { rows: await readWindsor(), source: "Windsor.ai Google Ads connector · read-only" };
-  try { return { rows: await readDirect(), source: "Google Ads API · read-only performance" }; }
+  if (!direct) return { rows: await readWindsor(), source: "Windsor.ai Google Ads connector · read-only", fallbackReason: "" };
+  try { return { rows: await readDirect(), source: "Google Ads API · read-only performance", fallbackReason: "" }; }
   catch (error) {
     if (!env.WINDSOR_API_KEY) throw error;
-    console.warn(`Google Ads ${label} direct read failed; trying Windsor`, { reason: error instanceof Error ? error.message : "unknown error" });
-    return { rows: await readWindsor(), source: "Windsor.ai Google Ads connector · read-only" };
+    const reason = error instanceof Error ? error.message : "unknown error";
+    console.warn(`Google Ads ${label} direct read failed; trying Windsor`, { reason });
+    // Surface the direct-API failure: an empty Windsor result must not look like "connected, no activity".
+    return { rows: await readWindsor(), source: "Windsor.ai Google Ads connector · read-only", fallbackReason: reason.slice(0, 300) };
   }
 }
 
@@ -135,6 +137,7 @@ export async function GET(request: Request) {
         dateWindow: { current: currentWindow },
         rows,
         sourceRows: breakdownRows.length,
+        fallbackReason: result.fallbackReason,
         mayBeLimited: breakdownRows.length >= 1000,
         dataNote: `${result.source.startsWith("Google Ads API") ? "Rows come directly from the Google Ads API." : "Rows come from the connected account through Windsor."} Google may omit low-volume or privacy-protected search terms, and recent conversion data can change after the report is loaded.`,
         updatedAt: new Date().toISOString(),
@@ -149,14 +152,21 @@ export async function GET(request: Request) {
     const current = summarizeGoogleAdsRows(currentRows.rows);
     const previous = summarizeGoogleAdsRows(previousRows.rows);
     const source = currentRows.source === previousRows.source ? currentRows.source : "Google Ads API + Windsor fallback · read-only performance";
+    const fallbackReason = currentRows.fallbackReason || previousRows.fallbackReason || "";
     const status = currentRows.rows.length ? "connected" : "no_data";
     let activityDiagnosis = "";
     if (!currentRows.rows.length && useDirectApi) {
       try {
         const campaigns = await listGoogleAdsCampaigns(cacheScope.ownerId, accountId);
         const paused = campaigns.filter((campaign) => campaign.status === "PAUSED");
-        if (campaigns.length > 0 && paused.length === campaigns.length) {
+        const enabled = campaigns.filter((campaign) => campaign.status === "ENABLED");
+        const readable = (value: string) => value.toLowerCase().replace(/_/g, " ");
+        if (!campaigns.length) activityDiagnosis = "This Google Ads account has no campaigns yet (or the connected login can’t see them). Check the account ID saved on the client.";
+        else if (paused.length === campaigns.length) {
           activityDiagnosis = ` All ${campaigns.length} campaigns in this account are paused, so no recent campaign activity is expected. Choose a longer reporting period to check earlier results.`;
+        } else if (enabled.length) {
+          // Enabled but no rows: explain why Google isn't serving (primary status + reasons).
+          activityDiagnosis = `${enabled.length} enabled campaign${enabled.length === 1 ? "" : "s"} returned no impressions in these dates. Google reports: ${enabled.slice(0, 5).map((campaign) => `“${campaign.name}” — ${readable(campaign.primaryStatus)}${campaign.primaryStatusReasons.length ? ` (${campaign.primaryStatusReasons.slice(0, 3).map(readable).join(", ")})` : ""}${campaign.budgetMicros ? ` · budget ${(campaign.budgetMicros / 1_000_000).toFixed(2)}/day` : ""}`).join("; ")}.`;
         }
       } catch (diagnosisError) {
         console.warn("Google Ads empty-report diagnosis failed", diagnosisError instanceof Error ? diagnosisError.message : "unknown error");
@@ -177,7 +187,8 @@ export async function GET(request: Request) {
       previous: { totals: previous.totals, campaigns: previous.campaigns },
       changes: compareGoogleAdsTotals(current.totals, previous.totals),
       snapshots,
-      activityDiagnosis: activityDiagnosis.trim(),
+      activityDiagnosis: (fallbackReason && !currentRows.rows.length ? `The direct Google Ads read failed (${fallbackReason}), and the Windsor fallback returned no rows — this is a connection problem, not a lack of activity. ` : "") + activityDiagnosis.trim(),
+      fallbackReason,
       dataNote: `${source === "Google Ads API · read-only performance" ? "Metrics come directly from the connected Google Ads account." : source === "Windsor.ai Google Ads connector · read-only" ? "Metrics come from the connected Google Ads account through Windsor." : "Current and comparison periods came from different connected sources."} Google may revise recent conversion data after the report is loaded. Daily history tracks a consistent rolling 30-day window and updates automatically in the background.`,
       updatedAt: fetchedAt.toISOString(),
     }, { headers: { "Cache-Control": "no-store" } });

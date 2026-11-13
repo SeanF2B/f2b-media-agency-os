@@ -9,6 +9,7 @@ import { compareSearchConsoleQueryPositions } from "@/lib/seo-performance";
 import { inspectSeoContentPage, type SeoContentPage } from "@/lib/seo-content-audit";
 import { suggestSeoPageOpportunities } from "@/lib/seo-page-opportunities";
 import { MarketingSetupWizard } from "@/components/marketing-setup-wizard";
+import { SavedKeywordsPanel, competitionLabel, competitionLevel, type SavedKeywordData } from "@/components/saved-keywords-panel";
 
 type Client = { id: string; name: string; logo?: string; website?: string; services?: Array<{ name?: string; campaignName?: string }>; seoServices?: string[]; seoLocations?: string[]; googleAdsAccountId?: string; googleSearchConsoleAccountId?: string; googleAnalyticsAccountId?: string; googleBusinessProfileAccountId?: string; googleBusinessProfileLocationId?: string; wordpressSiteUrl?: string };
 type SeoRow = { name: string; clicks: number; impressions: number; ctr: number | null; averagePosition: number | null };
@@ -23,6 +24,9 @@ type SeoPayload = { status: "connected" | "no_data" | "not_mapped" | "missing_co
 type Analytics = { status: string; message?: string; dataNote?: string; range?: string; accountName?: string; snapshots?: MarketingHistorySnapshot[]; dateWindow?: { current: { start: string; end: string }; previous: { start: string; end: string } } | null; updatedAt?: string; totals?: Record<string, number | null>; previousTotals?: Record<string, number | null> | null; organicTotals?: { sessions: number | null; conversions: number | null; sourceRows: number } | null; previousOrganicTotals?: { sessions: number | null; conversions: number | null; sourceRows: number } | null };
 type SearchProperty = { id: string; name: string; status: string };
 type KeywordIdea = { keyword: string; avgMonthlySearches: number | null; competition: string; competitionIndex: number | null; lowTopOfPageBid: number | null; highTopOfPageBid: number | null; difficulty?: number | null };
+type ResearchRow = KeywordIdea & { key: string; location: string; geo: string; source: string; checkedAt: string };
+type GeoOption = { id: string; name: string; canonicalName: string; type: string; countryCode: string };
+const COUNTRIES: Array<[string, string, string]> = [["2372", "Ireland", "IE"], ["2826", "United Kingdom", "GB"], ["2840", "United States", "US"], ["2036", "Australia", "AU"], ["2124", "Canada", "CA"]];
 type KeywordIdeasPayload = { source: string; location: string; count: number; results: KeywordIdea[]; dataNote: string; providerCostUsd?: number | null; costs?: { keywordIdeasUsd: number | null; keywordDifficultyUsd: number | null }; updatedAt?: string; historyId?: string };
 type KeywordResearchHistory = { id: string; createdAt: string; location: string; seeds: string[]; costUsd: number | null; results: KeywordIdea[] };
 type CompetitorKeyword = { keyword: string; monthlySearches: number | null; difficulty: number | null; competitorPosition: number | null; competitorUrl: string | null };
@@ -125,6 +129,20 @@ export function SeoView({ initialTab, sections, keywordPart = "all", embedded = 
   const [keywordIdeas, setKeywordIdeas] = useState<KeywordIdeasPayload | null>(null);
   const [pickedKeywords, setPickedKeywords] = useState<Set<string>>(new Set());
   const [showAllKeywordIdeas, setShowAllKeywordIdeas] = useState(false);
+  const [kwMode, setKwMode] = useState<"research" | "saved">("research");
+  const [kwRows, setKwRows] = useState<ResearchRow[]>([]);
+  const [kwRegion, setKwRegion] = useState<GeoOption | null>(null);
+  const [kwRegionQuery, setKwRegionQuery] = useState("");
+  const [kwRegionOptions, setKwRegionOptions] = useState<GeoOption[]>([]);
+  const [kwMin, setKwMin] = useState("");
+  const [kwMaxCpc, setKwMaxCpc] = useState("");
+  const [kwComp, setKwComp] = useState("");
+  const [kwText, setKwText] = useState("");
+  const [kwSort, setKwSort] = useState<"volume" | "cpc" | "competition" | "keyword">("volume");
+  const [saved, setSaved] = useState<SavedKeywordData | null>(null);
+  const [savedBusy, setSavedBusy] = useState(false);
+  const [savedMsg, setSavedMsg] = useState("");
+  const [saveGroupId, setSaveGroupId] = useState("");
   const [contentInventory, setContentInventory] = useState<SeoInventory | null>(null);
   const [contentInventoryLoading, setContentInventoryLoading] = useState(false);
   const [contentInventoryError, setContentInventoryError] = useState("");
@@ -141,10 +159,10 @@ export function SeoView({ initialTab, sections, keywordPart = "all", embedded = 
     const base = [...new Set([...(client.seoServices || []), ...fromCampaigns].map((item) => item.toLowerCase()))].slice(0, 8);
     setKeywordSeeds(base.map((item) => area && !item.includes(area) ? `${item} ${area}` : item).join(", "));
     setKeywordUrl(clientWebsite(client));
-    setKeywordIdeas(null); setPickedKeywords(new Set());
+    setKeywordIdeas(null); setPickedKeywords(new Set()); setKwRows([]); setSaved(null); setSavedMsg(""); setSaveGroupId(""); setKwRegion(null); setKwRegionQuery("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client?.id]);
-  const keywordReportRows = () => (keywordIdeas?.results || []).filter((row) => pickedKeywords.has(row.keyword)).sort((a, b) => (b.avgMonthlySearches || 0) - (a.avgMonthlySearches || 0));
+  const keywordReportRows = () => kwRows.filter((row) => pickedKeywords.has(row.key)).sort((a, b) => (b.avgMonthlySearches || 0) - (a.avgMonthlySearches || 0));
   const downloadKeywordCsv = () => {
     const rows = keywordReportRows(); if (!rows.length || !client) return;
     const q = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
@@ -412,18 +430,64 @@ ${sorted.map((group, index) => `<section class="page"><div class="running">${esc
     } finally { setBusinessSaving(false); }
   }
 
+  useEffect(() => {
+    if (!active || !client || !vis("Keyword ideas") || !canManageMappings || keywordPart === "competitors") return;
+    let cancelled = false;
+    void fetch(`/api/seo/saved-keywords?clientId=${encodeURIComponent(client.id)}`, { cache: "no-store" }).then(async (response) => {
+      const json = await response.json().catch(() => ({})) as SavedKeywordData & { error?: string };
+      if (!response.ok) throw new Error(json.error || "Saved keywords are unavailable.");
+      if (!cancelled) setSaved(json);
+    }).catch((reason) => { if (!cancelled) { setSaved({ groups: [], keywords: [], tags: [] }); setSavedMsg(reason instanceof Error ? reason.message : "Saved keywords are unavailable."); } });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, client?.id, visKey, canManageMappings, keywordPart]);
+  useEffect(() => {
+    const q = kwRegionQuery.trim();
+    if (keywordSource !== "google" || q.length < 2 || (kwRegion && q === kwRegion.canonicalName)) { setKwRegionOptions([]); return; }
+    const country = COUNTRIES.find(([id]) => id === keywordGeo)?.[2] || "";
+    const timer = window.setTimeout(() => { void fetch(`/api/seo/saved-keywords?geoSuggest=${encodeURIComponent(q)}&country=${country}`, { cache: "no-store" }).then((response) => response.json()).then((json: { locations?: GeoOption[] }) => setKwRegionOptions((json.locations || []).filter((item) => item.type !== "Country"))).catch(() => setKwRegionOptions([])); }, 300);
+    return () => window.clearTimeout(timer);
+  }, [kwRegionQuery, keywordGeo, keywordSource, kwRegion]);
+  const callSaved = async (body: Record<string, unknown>) => {
+    if (!client) return false;
+    setSavedBusy(true); setSavedMsg("");
+    try {
+      const response = await fetch("/api/seo/saved-keywords", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId: client.id, ...body }) });
+      const json = await response.json().catch(() => ({})) as SavedKeywordData & { message?: string; error?: string };
+      if (!response.ok) throw new Error(json.error || "That change couldn’t be saved.");
+      setSaved({ groups: json.groups, keywords: json.keywords, tags: json.tags }); setSavedMsg(json.message || "");
+      return true;
+    } catch (reason) { setSavedMsg(reason instanceof Error ? reason.message : "That change couldn’t be saved."); return false; }
+    finally { setSavedBusy(false); }
+  };
+  const savedKeys = useMemo(() => new Set((saved?.keywords || []).map((item) => `${item.keyword.toLowerCase()}|${item.location}`)), [saved]);
+  const saveResearchRows = async (rows: ResearchRow[]) => {
+    if (!rows.length) return;
+    const ok = await callSaved({ action: "save", groupId: saveGroupId, keywords: rows.map((row) => ({ keyword: row.keyword, location: row.location, geo: row.geo, language: "English", avgMonthlySearches: row.avgMonthlySearches, competition: row.competition, competitionIndex: row.competitionIndex, lowTopOfPageBid: row.lowTopOfPageBid, highTopOfPageBid: row.highTopOfPageBid, difficulty: row.difficulty ?? null, source: row.source === "DataForSEO" ? "DataForSEO" : "Google Keyword Planner", checkedAt: row.checkedAt })) });
+    if (ok) setPickedKeywords(new Set());
+  };
+  function makeBatchKeywordTask(rows: ResearchRow[]) {
+    if (!client || !rows.length) return;
+    const lines = rows.map((row) => `- ${row.keyword} · ${row.location} · ${row.avgMonthlySearches == null ? "—" : row.avgMonthlySearches.toLocaleString("en-IE")}/mo · CPC ${row.lowTopOfPageBid == null || row.highTopOfPageBid == null ? "—" : `${row.lowTopOfPageBid.toFixed(2)}–${row.highTopOfPageBid.toFixed(2)}`} · ${competitionLabel[competitionLevel(row.competition)]} competition${row.difficulty == null ? "" : ` · SEO difficulty ${row.difficulty}/100`}`);
+    onCreateTask(client.id, `Review ${rows.length} keyword${rows.length === 1 ? "" : "s"} for ${client.name}`, `Client: ${client.name}\nSources: ${[...new Set(rows.map((row) => row.source))].join(", ")}\nKeywords (${rows.length}):\n${lines.join("\n")}\n\nSearch volumes and bids are estimates, not rankings or guaranteed traffic.`, "Check each keyword fits the client’s services and target area\nReview existing pages and Search Console evidence\nRecommend a specific next step with evidence\nGet approval before changing the site or ads");
+  }
+
   async function runKeywordResearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!client || keywordLoading) return;
-    setKeywordLoading(true); setKeywordError(""); setKeywordIdeas(null);
+    setKeywordLoading(true); setKeywordError("");
     try {
       const seeds = keywordSeeds.split(/[\n,]+/).map((item) => item.trim()).filter(Boolean).slice(0, 10);
       const response = keywordSource === "dataforseo"
         ? await fetch("/api/seo/keywords", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId: client.id, seeds, location: keywordLocation, acknowledgeProviderCharge: keywordChargeConsent }) })
-        : await fetch("/api/seo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId: client.id, seeds, url: keywordUrl, geo: keywordGeo }) });
+        : await fetch("/api/seo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId: client.id, seeds, url: keywordUrl, geo: kwRegion?.id || keywordGeo, locationName: kwRegion ? kwRegion.canonicalName.replace(/,/g, ", ") : COUNTRIES.find(([id]) => id === keywordGeo)?.[1] }) });
       const payload = await response.json() as KeywordIdeasPayload & { error?: string; message?: string; status?: string; history?: KeywordResearchHistory[] };
       if (!response.ok) throw new Error(payload.error || payload.message || "Keyword research could not be completed.");
-      setKeywordIdeas(payload); setShowAllKeywordIdeas(false); setPickedKeywords(new Set());
+      // New ideas are added to the current results; earlier results and ticked keywords are kept.
+      setKeywordIdeas(payload); setShowAllKeywordIdeas(false);
+      const checkedAt = payload.updatedAt || new Date().toISOString();
+      const geo = keywordSource === "google" ? (kwRegion?.id || keywordGeo) : "";
+      setKwRows((current) => { const map = new Map(current.map((row) => [row.key, row])); for (const row of payload.results) { const key = `${row.keyword.toLowerCase()}|${payload.location}`; map.set(key, { ...row, key, location: payload.location, geo, source: payload.source, checkedAt }); } return [...map.values()]; });
       if (keywordSource === "dataforseo") setKeywordResearchHistory((current) => [{ id: payload.historyId || crypto.randomUUID(), createdAt: payload.updatedAt || new Date().toISOString(), location: payload.location, seeds, costUsd: payload.providerCostUsd ?? null, results: payload.results }, ...current].slice(0, 20));
     } catch (reason) { setKeywordError(reason instanceof Error ? reason.message : "Keyword research could not be completed."); }
     finally { setKeywordLoading(false); }
@@ -512,11 +576,7 @@ ${sorted.map((group, index) => `<section class="page"><div class="running">${esc
     onCreateTask(client.id, `Review backlink profile: ${item.target}`, notes, "Check the referring pages are relevant and legitimate\nReview broken backlinks and the pages they point to\nIdentify one useful recovery or partnership opportunity\nDo not buy links or mass-submit directories\nBring any outreach or website changes back for approval");
   }
 
-  function makeKeywordTask(row: KeywordIdea) {
-    if (!client || !keywordIdeas) return;
-    const context = `Client: ${client.name}\nSource: ${keywordIdeas.source}\nLocation: ${keywordIdeas.location}\nKeyword: ${row.keyword}\nAverage monthly searches: ${row.avgMonthlySearches == null ? "not supplied" : row.avgMonthlySearches.toLocaleString("en-IE")}\nPaid competition: ${row.competition}${row.competitionIndex == null ? "" : ` (${row.competitionIndex}/100)`}\nOrganic SEO difficulty: ${row.difficulty == null ? "not supplied" : `${row.difficulty}/100`}\n${row.lowTopOfPageBid == null || row.highTopOfPageBid == null ? "Top of page bid: not supplied" : `Top of page bid estimate: ${row.lowTopOfPageBid.toFixed(2)}–${row.highTopOfPageBid.toFixed(2)}`}\n\nThese are provider estimates, not actual rankings or guaranteed traffic. Review relevance to the client’s services before recommending a page or campaign change.`;
-    onCreateTask(client.id, `Review SEO keyword: ${row.keyword}`, context, "Check the keyword fits the client’s services and target area\nReview existing pages and Search Console evidence\nRecommend a specific next step with evidence\nGet approval before changing the site or ads");
-  }
+
 
   const current = search?.current;
   const prior = search?.previous?.totals;
@@ -564,15 +624,73 @@ ${sorted.map((group, index) => `<section class="page"><div class="running">${esc
         {current?.topQueries.length ? <div className="seo-table-wrap"><table className="seo-data-table"><thead><tr><th>Search query</th><th>Clicks</th><th>Impressions</th><th>CTR</th><th>Avg position</th><th></th></tr></thead><tbody>{current.topQueries.map((row) => <tr key={row.name}><td>{row.name}</td><td>{number(row.clicks)}</td><td>{number(row.impressions)}</td><td>{row.ctr == null ? "—" : (row.ctr * 100).toFixed(2) + "%"}</td><td>{number(row.averagePosition)}</td><td><button className="secondary-button" type="button" onClick={() => makeTask("query", row)}>＋ Task</button></td></tr>)}</tbody></table></div> : <p className="seo-data-message">{search?.message || "No Search Console query data is available for this range."}</p>}</section>}
       {!loading && !error && vis("Keyword ideas") && <section className="seo-data-panel"><div className="seo-data-heading"><div><h2>{keywordPart === "competitors" ? "Competitor keyword gaps" : "Keyword research"}</h2><p>{keywordPart === "competitors" ? "Compare this client’s organic keywords against up to three competitor websites." : "Check estimated search demand and organic difficulty for a client’s services and target area."}</p></div><span className={`seo-connection-state ${keywordSource === "google" ? (client.googleAdsAccountId ? "connected" : "") : dataForSeoKeywordStatus === "ready" ? "connected" : ""}`}>{keywordSource === "google" ? (client.googleAdsAccountId ? "Google Ads mapped" : "Account not mapped") : dataForSeoKeywordStatus === "ready" ? "DataForSEO ready" : "DataForSEO setup needed"}</span></div>
         {keywordPart !== "competitors" && <>
-        {!canManageMappings ? <p className="seo-data-message">Keyword research is currently limited to workspace owners and admins.</p> : <form className="seo-keyword-form seo-kw-research" onSubmit={(event) => void runKeywordResearch(event)}>
-          <label className="kw-source"><span>Research source</span><select value={keywordSource} onChange={(event) => { setKeywordSource(event.target.value as "google" | "dataforseo"); setKeywordIdeas(null); setKeywordError(""); }}><option value="google">Google Ads Keyword Planner · paid-search estimates</option><option value="dataforseo">DataForSEO · SEO ideas and organic difficulty</option></select></label>
-          <label className="kw-seeds"><span>Seed phrases (up to 10, comma or new line)</span><textarea value={keywordSeeds} onChange={(event) => setKeywordSeeds(event.target.value)} placeholder="e.g. interior designer dublin, kitchen renovation" rows={2} /></label>
-          {keywordSource === "google" ? <><label className="kw-url"><span>Landing page URL (optional)</span><input type="url" value={keywordUrl} onChange={(event) => setKeywordUrl(event.target.value)} placeholder={client.wordpressSiteUrl || "https://example.com/service-page"} /></label><label className="kw-geo"><span>Country</span><select value={keywordGeo} onChange={(event) => setKeywordGeo(event.target.value)}><option value="2372">Ireland</option><option value="2826">United Kingdom</option><option value="2840">United States</option></select></label></> : <><label className="kw-geo"><span>City, region, or country</span><input value={keywordLocation} onChange={(event) => setKeywordLocation(event.target.value)} placeholder={client.seoLocations?.[0] || "Galway, Ireland"} /></label><p className="seo-data-footnote">{dataForSeoKeywordStatus || "DataForSEO keyword research setup is checking."}</p><label className="seo-report-charge-ack"><input type="checkbox" checked={keywordChargeConsent} onChange={(event) => setKeywordChargeConsent(event.target.checked)} /><span>This may use up to two paid DataForSEO requests. I’m okay using this account’s credits for this research; show me the actual cost afterward.</span></label></>}
-          <button type="submit" className="primary-button kw-go" disabled={keywordLoading || (keywordSource === "google" ? !client.googleAdsAccountId : dataForSeoKeywordStatus !== "ready" || !keywordChargeConsent || !keywordLocation.trim())}>{keywordLoading ? "Researching…" : "Find keyword ideas"}</button>
-        </form>}
-        {keywordSource === "google" && !client.googleAdsAccountId && <p className="seo-data-message">Add the client’s Google Ads customer ID in Clients and connect the owner’s Google Ads access first.</p>}{keywordSource === "dataforseo" && dataForSeoKeywordStatus && dataForSeoKeywordStatus !== "ready" && <p className="seo-data-message">{dataForSeoKeywordStatus}</p>}{keywordError && <p className="seo-data-message" role="alert">{keywordError}</p>}
-        {keywordIdeas && <><p className="seo-data-footnote">{keywordIdeas.count} ideas · {keywordIdeas.location} · English · {keywordIdeas.source}. {keywordIdeas.dataNote}{keywordIdeas.providerCostUsd == null ? "" : ` Reported provider cost: $${keywordIdeas.providerCostUsd.toFixed(4)}.`}</p>{keywordIdeas.results.length ? <><div className="seo-kw-bulk"><span>{pickedKeywords.size ? `${pickedKeywords.size} selected` : "Tick keywords to build a report"}</span><button type="button" className="primary-button" disabled={!pickedKeywords.size} onClick={openKeywordReport}>Generate report</button><button type="button" className="secondary-button" disabled={!pickedKeywords.size} onClick={downloadKeywordCsv}>Download CSV</button><button type="button" className="text-button" onClick={() => setPickedKeywords(new Set(keywordIdeas.results.map((row) => row.keyword)))}>Select all {keywordIdeas.results.length}</button>{pickedKeywords.size > 0 && <button type="button" className="text-button" onClick={() => setPickedKeywords(new Set())}>Clear</button>}</div><div className="seo-table-wrap"><table className="seo-data-table"><thead><tr><th className="seo-kw-check"><input type="checkbox" aria-label="Select shown keywords" checked={keywordIdeas.results.slice(0, showAllKeywordIdeas ? undefined : 20).every((row) => pickedKeywords.has(row.keyword))} onChange={(event) => { const shown = keywordIdeas.results.slice(0, showAllKeywordIdeas ? undefined : 20).map((row) => row.keyword); setPickedKeywords((current) => { const next = new Set(current); shown.forEach((keyword) => event.target.checked ? next.add(keyword) : next.delete(keyword)); return next; }); }} /></th><th>Keyword idea</th><th>Avg monthly searches</th>{keywordIdeas.source === "DataForSEO" ? <><th>Organic difficulty</th><th>Paid competition</th><th>Top bid · USD</th></> : <><th>Paid competition</th><th>Top of page bid · account currency</th></>}<th></th></tr></thead><tbody>{keywordIdeas.results.slice(0, showAllKeywordIdeas ? undefined : 20).map((row) => <tr key={row.keyword} className={pickedKeywords.has(row.keyword) ? "picked" : ""}><td className="seo-kw-check"><input type="checkbox" aria-label={`Select ${row.keyword}`} checked={pickedKeywords.has(row.keyword)} onChange={() => setPickedKeywords((current) => { const next = new Set(current); if (next.has(row.keyword)) next.delete(row.keyword); else next.add(row.keyword); return next; })} /></td><td>{row.keyword}</td><td>{number(row.avgMonthlySearches)}</td>{keywordIdeas.source === "DataForSEO" ? <><td>{row.difficulty == null ? "—" : `${row.difficulty}/100`}</td><td>{row.competition || "—"}</td><td>{row.lowTopOfPageBid == null || row.highTopOfPageBid == null ? "—" : `${row.lowTopOfPageBid.toFixed(2)}–${row.highTopOfPageBid.toFixed(2)}`}</td></> : <><td>{row.competition.toLowerCase()}{row.competitionIndex == null ? "" : ` · ${row.competitionIndex}/100`}</td><td>{row.lowTopOfPageBid == null || row.highTopOfPageBid == null ? "—" : `${row.lowTopOfPageBid.toFixed(2)}–${row.highTopOfPageBid.toFixed(2)}`}</td></>}<td><button className="secondary-button" type="button" onClick={() => makeKeywordTask(row)}>＋ Create review task</button></td></tr>)}</tbody></table></div>{keywordIdeas.results.length > 20 && <button className="secondary-button seo-keyword-more" type="button" onClick={() => setShowAllKeywordIdeas(!showAllKeywordIdeas)}>{showAllKeywordIdeas ? "Show top 20" : `Show all ${keywordIdeas.results.length} ideas`}</button>}</> : <p className="seo-data-message">No keyword ideas were returned for this location and those seed phrases. Try a city or nearby service area.</p>}</>}
-        {keywordSource === "dataforseo" && keywordResearchHistory.length > 0 && <details className="seo-keyword-history"><summary>Saved DataForSEO research · {keywordResearchHistory.length}</summary><ul>{keywordResearchHistory.map((run) => <li key={run.id}><span><b>{run.location}</b><small>{run.seeds.join(", ")} · {new Date(run.createdAt).toLocaleString("en-IE")}</small></span><span>{run.results.length} ideas · {run.costUsd == null ? "cost unavailable" : `$${run.costUsd.toFixed(4)}`}</span></li>)}</ul></details>}
+        {!canManageMappings ? <p className="seo-data-message">Keyword research is currently limited to workspace owners and admins.</p> : <>
+        <div className="kw-mode" role="tablist" aria-label="Keyword research"><button type="button" role="tab" aria-selected={kwMode === "research"} className={kwMode === "research" ? "active" : ""} onClick={() => setKwMode("research")}>Research</button><button type="button" role="tab" aria-selected={kwMode === "saved"} className={kwMode === "saved" ? "active" : ""} onClick={() => setKwMode("saved")}>Saved keywords{saved?.keywords.length ? <b>{saved.keywords.length}</b> : null}</button></div>
+        {kwMode === "saved" && <SavedKeywordsPanel clientId={client.id} clientName={client.name} data={saved} busy={savedBusy} message={savedMsg} call={callSaved} onCreateTask={(title, notes, checklist) => onCreateTask(client.id, title, notes, checklist)} />}
+        {kwMode === "research" && <>
+        <form className="kw-research-form" onSubmit={(event) => void runKeywordResearch(event)}>
+          <label className="kw-f-seeds"><span>Seed keywords</span><input value={keywordSeeds} onChange={(event) => setKeywordSeeds(event.target.value)} placeholder="interior designer dublin, kitchen renovation" aria-label="Seed keywords, comma separated (up to 10)" /></label>
+          <label className="kw-f-source"><span>Source</span><select value={keywordSource} onChange={(event) => { setKeywordSource(event.target.value as "google" | "dataforseo"); setKeywordError(""); }}><option value="google">Google Keyword Planner</option><option value="dataforseo">DataForSEO (SEO difficulty)</option></select></label>
+          {keywordSource === "google" ? <>
+            <label className="kw-f-country"><span>Country</span><select value={keywordGeo} onChange={(event) => { setKeywordGeo(event.target.value); setKwRegion(null); setKwRegionQuery(""); }}>{COUNTRIES.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>
+            <label className="kw-f-region"><span>Region / city</span><input value={kwRegionQuery} onChange={(event) => { setKwRegionQuery(event.target.value); if (kwRegion) setKwRegion(null); }} placeholder="Whole country" aria-label="Region or city (optional)" />{kwRegion && <button type="button" className="kw-f-clear" aria-label="Clear region" onClick={() => { setKwRegion(null); setKwRegionQuery(""); }}>×</button>}{kwRegionOptions.length > 0 && <ul className="kw-f-suggest" role="listbox">{kwRegionOptions.map((option) => <li key={option.id}><button type="button" onClick={() => { setKwRegion(option); setKwRegionQuery(option.canonicalName); setKwRegionOptions([]); }}><b>{option.name}</b><small>{option.type} · {option.canonicalName}</small></button></li>)}</ul>}</label>
+          </> : <label className="kw-f-region"><span>Location</span><input value={keywordLocation} onChange={(event) => setKeywordLocation(event.target.value)} placeholder={client.seoLocations?.[0] || "Galway, Ireland"} /></label>}
+          <button type="submit" className="primary-button kw-f-go" disabled={keywordLoading || (keywordSource === "google" ? !client.googleAdsAccountId : dataForSeoKeywordStatus !== "ready" || !keywordChargeConsent || !keywordLocation.trim())}>{keywordLoading ? "Researching…" : kwRows.length ? "Find more ideas" : "Find ideas"}</button>
+          <details className="kw-f-more"><summary>More options</summary>
+            {keywordSource === "google" ? <label><span>Landing page URL (optional)</span><input type="url" value={keywordUrl} onChange={(event) => setKeywordUrl(event.target.value)} placeholder={client.wordpressSiteUrl || "https://example.com/service-page"} /></label>
+              : <label className="seo-report-charge-ack"><input type="checkbox" checked={keywordChargeConsent} onChange={(event) => setKeywordChargeConsent(event.target.checked)} /><span>Uses up to two paid DataForSEO requests. Show me the cost afterwards.</span></label>}
+            <p className="seo-data-footnote">Language: English · Google Search network.{keywordSource === "dataforseo" && dataForSeoKeywordStatus && dataForSeoKeywordStatus !== "ready" ? ` ${dataForSeoKeywordStatus}` : ""}</p>
+          </details>
+        </form>
+        {keywordSource === "dataforseo" && !keywordChargeConsent && <p className="seo-data-footnote">Tick the cost confirmation under “More options” to run DataForSEO research.</p>}
+        {keywordSource === "google" && !client.googleAdsAccountId && <p className="seo-data-message">Link this client’s Google Ads account to use Keyword Planner.</p>}{keywordError && <p className="seo-data-message" role="alert">{keywordError}</p>}
+        {kwRows.length > 0 && (() => {
+          const order = { low: 0, medium: 1, high: 2, unknown: 3 } as const;
+          const min = Number(kwMin) || 0; const max = kwMaxCpc === "" ? Infinity : Number(kwMaxCpc); const text = kwText.trim().toLowerCase();
+          const rows = kwRows.filter((row) => (row.avgMonthlySearches || 0) >= min && (max === Infinity || (row.highTopOfPageBid ?? 0) <= max) && (!kwComp || competitionLevel(row.competition) === kwComp) && (!text || row.keyword.toLowerCase().includes(text)))
+            .sort((a, b) => kwSort === "keyword" ? a.keyword.localeCompare(b.keyword) : kwSort === "cpc" ? (b.highTopOfPageBid || 0) - (a.highTopOfPageBid || 0) : kwSort === "competition" ? order[competitionLevel(a.competition)] - order[competitionLevel(b.competition)] : (b.avgMonthlySearches || 0) - (a.avgMonthlySearches || 0));
+          const shown = rows.slice(0, showAllKeywordIdeas ? undefined : 50);
+          const pickedRows = kwRows.filter((row) => pickedKeywords.has(row.key));
+          const anyDfs = kwRows.some((row) => row.source === "DataForSEO");
+          const sortHead = (key: typeof kwSort, label: string) => <button type="button" className={`kw-sort ${kwSort === key ? "active" : ""}`} onClick={() => setKwSort(key)}>{label}{kwSort === key ? " ↓" : ""}</button>;
+          return <>
+            <div className="kw-filters">
+              <input value={kwText} onChange={(event) => setKwText(event.target.value)} placeholder="Filter results" aria-label="Filter keyword results" />
+              <label><span>Min. volume</span><input type="number" min={0} value={kwMin} onChange={(event) => setKwMin(event.target.value)} placeholder="0" /></label>
+              <label><span>Max. CPC</span><input type="number" min={0} step="0.1" value={kwMaxCpc} onChange={(event) => setKwMaxCpc(event.target.value)} placeholder="Any" /></label>
+              <label><span>Competition</span><select value={kwComp} onChange={(event) => setKwComp(event.target.value)}><option value="">Any</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
+              <span className="kw-count">{rows.length} of {kwRows.length} ideas{keywordIdeas?.providerCostUsd != null ? ` · last run $${keywordIdeas.providerCostUsd.toFixed(4)}` : ""}</span>
+              <button type="button" className="text-button" onClick={() => { if (window.confirm("Clear all research results? Saved keywords are not affected.")) { setKwRows([]); setPickedKeywords(new Set()); setKeywordIdeas(null); } }}>Clear results</button>
+            </div>
+            <div className="kw-bulk" role="toolbar" aria-label="Bulk actions">
+              <b>{pickedKeywords.size ? `${pickedKeywords.size} selected` : "Tick keywords to save or report"}</b>
+              <span className="kw-bulk-group"><select aria-label="Save to group" value={saveGroupId} onChange={(event) => setSaveGroupId(event.target.value)}><option value="">Save to: Ungrouped</option>{(saved?.groups || []).map((group) => <option key={group.id} value={group.id}>Save to: {group.name}</option>)}</select><button type="button" className="primary-button" disabled={!pickedKeywords.size || savedBusy} onClick={() => void saveResearchRows(pickedRows)}>Save</button></span>
+              <button type="button" className="secondary-button" disabled={!pickedKeywords.size} onClick={() => makeBatchKeywordTask(pickedRows)}>Create review task</button>
+              <button type="button" className="secondary-button" disabled={!pickedKeywords.size} onClick={openKeywordReport}>Report</button>
+              <button type="button" className="secondary-button" disabled={!pickedKeywords.size} onClick={downloadKeywordCsv}>CSV</button>
+              <button type="button" className="text-button" onClick={() => setPickedKeywords(new Set(rows.map((row) => row.key)))}>Select all {rows.length}</button>
+              {pickedKeywords.size > 0 && <button type="button" className="text-button" onClick={() => setPickedKeywords(new Set())}>Clear</button>}
+            </div>
+            {savedMsg && <p className="kw-note" role="status">{savedMsg} <button type="button" className="text-button" onClick={() => setKwMode("saved")}>Open saved keywords</button></p>}
+            <div className="kw-table-wrap"><table className="kw-table">
+              <thead><tr><th className="kw-check"><input type="checkbox" aria-label="Select shown keywords" checked={shown.length > 0 && shown.every((row) => pickedKeywords.has(row.key))} onChange={(event) => setPickedKeywords((current) => { const next = new Set(current); shown.forEach((row) => event.target.checked ? next.add(row.key) : next.delete(row.key)); return next; })} /></th><th>{sortHead("keyword", "Keyword")}</th><th>{sortHead("volume", "Volume")}</th><th>{sortHead("cpc", "CPC")}</th><th>{sortHead("competition", "Competition")}</th>{anyDfs && <th>SEO diff.</th>}<th>Location</th></tr></thead>
+              <tbody>{shown.map((row) => { const level = competitionLevel(row.competition); const isSaved = savedKeys.has(`${row.keyword.toLowerCase()}|${row.location}`); return <tr key={row.key} className={pickedKeywords.has(row.key) ? "picked" : ""}>
+                <td className="kw-check"><input type="checkbox" aria-label={`Select ${row.keyword}`} checked={pickedKeywords.has(row.key)} onChange={() => setPickedKeywords((current) => { const next = new Set(current); if (next.has(row.key)) next.delete(row.key); else next.add(row.key); return next; })} /></td>
+                <td><b>{row.keyword}</b>{isSaved && <span className="kw-saved-badge" title="Already in saved keywords">Saved</span>}</td>
+                <td className="num">{number(row.avgMonthlySearches)}</td>
+                <td className="num" title={row.source === "DataForSEO" ? "USD" : "Account currency"}>{row.lowTopOfPageBid == null || row.highTopOfPageBid == null ? "—" : `${row.lowTopOfPageBid.toFixed(2)}–${row.highTopOfPageBid.toFixed(2)}`}</td>
+                <td><span className={`kw-comp ${level}`}>{competitionLabel[level]}</span>{row.competitionIndex != null && <small> {row.competitionIndex}</small>}</td>
+                {anyDfs && <td className="num">{row.difficulty == null ? "—" : row.difficulty}</td>}
+                <td><small>{row.location}</small></td>
+              </tr>; })}</tbody>
+            </table></div>
+            {rows.length > 50 && <button className="secondary-button seo-keyword-more" type="button" onClick={() => setShowAllKeywordIdeas(!showAllKeywordIdeas)}>{showAllKeywordIdeas ? "Show top 50" : `Show all ${rows.length}`}</button>}
+          </>;
+        })()}
+        {keywordIdeas && !kwRows.length && <p className="seo-data-message">No keyword ideas were returned for this location and those seed phrases. Try a city or nearby service area.</p>}
+        {keywordSource === "dataforseo" && keywordResearchHistory.length > 0 && <details className="seo-keyword-history"><summary>Past DataForSEO research · {keywordResearchHistory.length}</summary><ul>{keywordResearchHistory.map((run) => <li key={run.id}><span><b>{run.location}</b><small>{run.seeds.join(", ")} · {new Date(run.createdAt).toLocaleString("en-IE")}</small></span><span>{run.results.length} ideas · {run.costUsd == null ? "cost unavailable" : `$${run.costUsd.toFixed(4)}`}</span></li>)}</ul></details>}
+        </>}
+        </>}
         </>}
         {keywordSource === "dataforseo" && keywordPart !== "ideas" && <section className="seo-competitor-research"><div className="seo-data-heading"><div><h3>Competitor keyword gaps</h3><p>Find terms where a competitor appears in organic search and this client does not.</p></div></div>
           <p className="seo-data-footnote">Client site: <b>{clientWebsite(client) || "No website saved"}</b>. {keywordPart === "competitors" ? "" : "Uses the location above. "}Add up to three competitor websites, one per line. This is a paid DataForSEO check.</p>
