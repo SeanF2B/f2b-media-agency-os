@@ -8,7 +8,7 @@ type Recurring = { id: string; clientId: string; title: string; items: Item[]; v
 type ClientInfo = { id: string; name: string; email: string; currency: string; fee: number; services: Array<{ name: string; fee: number }> };
 type Settings = { businessName: string; address: string; vatNumber: string; bankDetails: string; paymentTermsDays: number; prefix: string; nextNumber: number; footerNote: string; replyTo: string };
 type Data = { invoices: Invoice[]; recurring: Recurring[]; settings: Settings; clients: ClientInfo[]; currency: string; mailReady: boolean };
-type Draft = { id?: string; clientId: string; clientName: string; clientEmail: string; clientAddress: string; issueDate: string; dueDate: string; items: Item[]; vatRate: number; notes: string; currency: string };
+type Draft = { id?: string; saveEmailToClient?: boolean; clientId: string; clientName: string; clientEmail: string; clientAddress: string; issueDate: string; dueDate: string; items: Item[]; vatRate: number; notes: string; currency: string };
 type RecDraft = { id?: string; clientId: string; title: string; items: Item[]; vatRate: number; interval: string; nextDate: string; autoSend: boolean; notes: string; currency: string };
 
 async function call<T>(body?: unknown, qs = ""): Promise<T> {
@@ -33,6 +33,8 @@ export function InvoicingView({ scopeClientId }: { scopeClientId: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
+  const [preview, setPreview] = useState<string | null>(null);
+  const openPreview = async (id: string) => { setError(""); try { setPreview((await call<{ html: string }>({ action: "preview", id })).html); } catch (e) { setError(e instanceof Error ? e.message : "Could not load the preview."); } };
 
   const load = useCallback(async () => { try { setData(await call<Data>(undefined, `?clientId=${encodeURIComponent(scopeClientId || "agency")}`)); setError(""); } catch (e) { setError(e instanceof Error ? e.message : "Could not load invoices."); } }, [scopeClientId]);
   useEffect(() => { setData(null); void load(); }, [load]);
@@ -68,7 +70,7 @@ export function InvoicingView({ scopeClientId }: { scopeClientId: string }) {
         <span className={`iv-pill ${i.status}`}>{LABEL[i.status]}</span>
         <div className="iv-actions">
           {i.rawStatus !== "paid" && i.rawStatus !== "void" && <button type="button" className="iv-btn" disabled={busy} onClick={() => setEditor({ id: i.id, clientId: i.clientId, clientName: i.clientName, clientEmail: i.clientEmail, clientAddress: i.clientAddress, issueDate: i.issueDate, dueDate: i.dueDate, items: i.items, vatRate: i.vatRate, notes: i.notes, currency: i.currency })}>Edit</button>}
-          {i.rawStatus !== "void" && <a className="iv-btn" href={i.link} target="_blank" rel="noopener noreferrer" onClick={(e) => { if (i.rawStatus === "draft") { e.preventDefault(); setNote("Send the invoice first. Drafts have no public link yet."); } }}>View</a>}
+          {i.rawStatus !== "void" && <a className="iv-btn" href={i.link} target="_blank" rel="noopener noreferrer" onClick={(e) => { if (i.rawStatus === "draft") { e.preventDefault(); void openPreview(i.id); } }}>{i.rawStatus === "draft" ? "Preview" : "View"}</a>}
           {(i.rawStatus === "draft" || i.rawStatus === "sent") && <button type="button" className="iv-btn" disabled={busy} onClick={() => void act({ action: "send", id: i.id }, `${i.number} sent to ${i.clientEmail || "the client"}.`)}>{i.rawStatus === "draft" ? "Send" : "Resend"}</button>}
           {(i.rawStatus === "sent" || i.rawStatus === "draft") && <button type="button" className="iv-btn ok" disabled={busy} onClick={() => void act({ action: "mark-paid", id: i.id }, `${i.number} marked as paid.`)}>✓ Paid</button>}
           {i.rawStatus === "paid" && <button type="button" className="iv-btn" disabled={busy} onClick={() => void act({ action: "mark-unpaid", id: i.id })}>Undo paid</button>}
@@ -89,6 +91,7 @@ export function InvoicingView({ scopeClientId }: { scopeClientId: string }) {
 
     {tab === "settings" && <SettingsPanel settings={data.settings} onSave={async (s) => { await call({ action: "save-settings", settings: s }); await load(); }} />}
     {editor && <InvoiceEditor draft={editor} clients={data.clients} terms={data.settings.paymentTermsDays} onClose={() => setEditor(null)} onSave={async (d, send) => { const r = await call<{ id: string }>({ action: "save-invoice", ...d }); if (send) await call({ action: "send", id: d.id || r.id }); setEditor(null); setNote(send ? "Invoice saved and sent." : "Invoice saved."); await load(); }} />}
+    {preview !== null && <PreviewModal html={preview} onClose={() => setPreview(null)} />}
     {recEditor && <RecurringEditor draft={recEditor} clients={data.clients} onClose={() => setRecEditor(null)} onSave={async (d) => { await call({ action: "save-recurring", ...d }); setRecEditor(null); setNote("Subscription saved."); await load(); }} />}
   </section>;
 }
@@ -102,14 +105,30 @@ function Lines({ items, onChange, currency }: { items: Item[]; onChange: (i: Ite
 function Totals({ items, vat, currency }: { items: Item[]; vat: number; currency: string }) { const t = calc(items, vat); return <div className="iv-totals"><div><span>Subtotal</span><b>{fmt(t.sub, currency)}</b></div>{vat > 0 && <div><span>VAT {vat}%</span><b>{fmt(t.v, currency)}</b></div>}<div className="g"><span>Total</span><b>{fmt(t.total, currency)}</b></div></div>; }
 function Modal({ title, onClose, children, footer }: { title: string; onClose: () => void; children: React.ReactNode; footer: React.ReactNode }) { return <div className="iv-modal" role="dialog" aria-label={title} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}><div className="iv-dialog"><header><h2>{title}</h2><button type="button" className="iv-x" aria-label="Close" onClick={onClose}>✕</button></header>{children}<footer>{footer}</footer></div></div>; }
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function PreviewModal({ html, onClose, closeLabel = "Close", extra }: { html: string; onClose: () => void; closeLabel?: string; extra?: React.ReactNode }) {
+  return <Modal title="Invoice preview" onClose={onClose} footer={<><button type="button" className="secondary-button" onClick={onClose}>{closeLabel}</button>{extra}</>}>
+    <p className="iv-small">This is exactly what your client will see. Drafts aren’t visible to anyone until you send them.</p>
+    <iframe className="iv-preview" title="Invoice preview" srcDoc={html} sandbox="allow-scripts allow-modals" /></Modal>;
+}
 function InvoiceEditor({ draft, clients, terms, onClose, onSave }: { draft: Draft; clients: ClientInfo[]; terms: number; onClose: () => void; onSave: (d: Draft, send: boolean) => Promise<void> }) {
   const [d, setD] = useState<Draft>(draft); const [busy, setBusy] = useState(false); const [err, setErr] = useState("");
   const pick = (id: string) => { const c = clients.find((x) => x.id === id); setD({ ...d, clientId: id, clientName: c?.name || d.clientName, clientEmail: c?.email || d.clientEmail, currency: c?.currency || d.currency }); };
-  const go = async (send: boolean) => { setBusy(true); setErr(""); try { await onSave(d, send); } catch (e) { setErr(e instanceof Error ? e.message : "Could not save."); setBusy(false); } };
-  return <Modal title={d.id ? "Edit invoice" : "New invoice"} onClose={onClose} footer={<><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button type="button" className="secondary-button" disabled={busy} onClick={() => void go(false)}>Save draft</button><button type="button" className="primary-button" disabled={busy} onClick={() => void go(true)}>{busy ? "Working…" : "Save & send"}</button></>}>
+  const client = clients.find((x) => x.id === d.clientId);
+  const missingOnFile = Boolean(client && !client.email.trim());
+  const emailOk = EMAIL_RE.test(d.clientEmail.trim());
+  const [preview, setPreview] = useState<string | null>(null);
+  const go = async (send: boolean) => {
+    if (send && !emailOk) { setErr(d.clientEmail.trim() ? "That email address doesn’t look right. Check it before sending." : `Add an email address to send this invoice to${client ? ` — ${client.name} has none on file yet` : ""}.`); return; }
+    setBusy(true); setErr(""); try { await onSave({ ...d, clientEmail: d.clientEmail.trim(), saveEmailToClient: missingOnFile && emailOk && d.saveEmailToClient !== false }, send); } catch (e) { setErr(e instanceof Error ? e.message : "Could not save."); setBusy(false); }
+  };
+  const showPreview = async () => { setErr(""); try { setPreview((await call<{ html: string }>({ action: "preview", ...d })).html); } catch (e) { setErr(e instanceof Error ? e.message : "Could not load the preview."); } };
+  if (preview !== null) return <PreviewModal html={preview} onClose={() => setPreview(null)} closeLabel="Back to editing" extra={<><button type="button" className="secondary-button" disabled={busy} onClick={() => void go(false)}>Save draft</button><button type="button" className="primary-button" disabled={busy} onClick={() => { setPreview(null); void go(true); }}>{busy ? "Working…" : "Save & send"}</button></>} />;
+  return <Modal title={d.id ? "Edit invoice" : "New invoice"} onClose={onClose} footer={<><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button type="button" className="secondary-button" disabled={busy} onClick={() => void showPreview()}>Preview</button><button type="button" className="secondary-button" disabled={busy} onClick={() => void go(false)}>Save draft</button><button type="button" className="primary-button" disabled={busy} onClick={() => void go(true)}>{busy ? "Working…" : "Save & send"}</button></>}>
     <div className="iv-grid"><label>Client<select value={d.clientId} onChange={(e) => pick(e.target.value)}><option value="">Someone else…</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
       <label>Name on invoice<input value={d.clientName} onChange={(e) => setD({ ...d, clientName: e.target.value })} /></label>
-      <label>Email to send to<input type="email" value={d.clientEmail} onChange={(e) => setD({ ...d, clientEmail: e.target.value })} placeholder="client@example.com" /></label>
+      <label>Email to send to<input type="email" value={d.clientEmail} onChange={(e) => setD({ ...d, clientEmail: e.target.value })} placeholder="client@example.com" className={missingOnFile && !d.clientEmail.trim() ? "iv-need" : undefined} />
+        {missingOnFile && (d.clientEmail.trim() ? <span className="iv-check iv-small"><input type="checkbox" checked={d.saveEmailToClient !== false} onChange={(e) => setD({ ...d, saveEmailToClient: e.target.checked })} /> Save to {client!.name}’s profile</span> : <span className="iv-small iv-need-text">No email on file for {client!.name} — add one here</span>)}</label>
       <label>Issue date<input type="date" value={d.issueDate} onChange={(e) => setD({ ...d, issueDate: e.target.value, dueDate: plus(e.target.value, terms) })} /></label>
       <label>Due date<input type="date" value={d.dueDate} onChange={(e) => setD({ ...d, dueDate: e.target.value })} /></label>
       <label>VAT %<input type="number" min="0" max="100" step="any" value={d.vatRate} onChange={(e) => setD({ ...d, vatRate: Number(e.target.value) })} /></label></div>

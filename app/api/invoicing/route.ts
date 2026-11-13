@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { authorizeAdmin, respond } from "@/lib/settings-auth";
-import { addDays, addInterval, cleanItems, createInvoice, ensureTables, loadSettings, runRecurring, saveSettings, sendInvoiceEmail, today, totals, type Interval } from "@/lib/invoicing/core";
+import { addDays, addInterval, cleanItems, createInvoice, ensureTables, invoiceHtml, loadSettings, runRecurring, saveSettings, sendInvoiceEmail, today, totals, type Interval } from "@/lib/invoicing/core";
 
 export const dynamic = "force-dynamic";
 const INTERVALS = ["weekly", "monthly", "quarterly", "yearly"];
@@ -11,6 +11,22 @@ async function workspaceInfo() {
   let ws: any = {}; try { ws = JSON.parse(row?.data || "{}"); } catch { /* ignore */ }
   const clients = (ws.clients || []).map((c: any) => ({ id: String(c.id), name: String(c.company || c.name || ""), email: String(c.email || ""), currency: String(c.currency || ""), fee: (c.services || []).reduce((n: number, s: any) => n + (Number(s.fee) || 0), 0), services: (c.services || []).filter((s: any) => Number(s.fee) > 0).map((s: any) => ({ name: String(s.name || s.type || "Service"), fee: Number(s.fee) })) }));
   return { clients, currency: String(ws.settings?.currency || "EUR"), adminEmail: String(ws.settings?.adminEmail || "") };
+}
+const validEmail = (v: unknown) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || "").trim());
+// Saves an email onto the client's profile in the workspace document (compare-and-set so no other edit is overwritten).
+async function saveClientEmail(clientId: string, email: string) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const row = await env.DB!.prepare("SELECT data, updated_at FROM workspace_documents WHERE id='f2b-agency'").first<{ data: string; updated_at: string }>();
+    if (!row) return false;
+    let ws: any; try { ws = JSON.parse(row.data || "{}"); } catch { return false; }
+    const client = (ws.clients || []).find((c: any) => String(c.id) === clientId);
+    if (!client) return false;
+    if (String(client.email || "").trim()) return true; // never overwrite an email that's already on file
+    client.email = email;
+    const saved = await env.DB!.prepare("UPDATE workspace_documents SET data = ?1, updated_at = ?2 WHERE id = ?3 AND updated_at = ?4").bind(JSON.stringify(ws), `invoice-client-email-${crypto.randomUUID()}`, "f2b-agency", row.updated_at).run();
+    if (saved.meta.changes === 1) return true;
+  }
+  return false;
 }
 const shape = (r: any) => { const overdue = r.status === "sent" && r.due_date < today(); return { id: r.id, clientId: r.client_id, clientName: r.client_name, clientEmail: r.client_email, clientAddress: r.client_address, number: r.number, status: overdue ? "overdue" : r.status, rawStatus: r.status, issueDate: r.issue_date, dueDate: r.due_date, currency: r.currency, items: JSON.parse(r.items || "[]"), vatRate: r.vat_rate, subtotal: r.subtotal, vat: r.vat, total: r.total, notes: r.notes, recurringId: r.recurring_id, sentAt: r.sent_at, paidAt: r.paid_at, link: `/api/marketing-public/invoice?token=${r.public_token}` }; };
 
@@ -38,7 +54,22 @@ export async function POST(request: Request) {
     await ensureTables();
     const info = await workspaceInfo(), origin = new URL(request.url).origin, action = String(b.action || ""), now = new Date().toISOString();
     if (action === "save-settings") { await saveSettings(auth.ownerId, b.settings || {}); return respond({ settings: await loadSettings(auth.ownerId) }); }
+    if (action === "preview") {
+      const settings = await loadSettings(auth.ownerId);
+      if (b.id && !Array.isArray(b.items)) {
+        const inv = await env.DB!.prepare("SELECT * FROM inv_invoices WHERE id=?1 AND owner_id=?2").bind(b.id, auth.ownerId).first<any>();
+        if (!inv) return respond({ error: "Invoice not found." }, 404);
+        return respond({ html: invoiceHtml(inv, settings, inv.status) });
+      }
+      const items = cleanItems(b.items), t = totals(items, b.vatRate), client = info.clients.find((c: any) => c.id === b.clientId);
+      const existing = b.id ? await env.DB!.prepare("SELECT number FROM inv_invoices WHERE id=?1 AND owner_id=?2").bind(b.id, auth.ownerId).first<any>() : null;
+      const number = existing?.number || `${settings.prefix}${String(settings.nextNumber).padStart(4, "0")} (preview)`;
+      const issue = date(b.issueDate, today());
+      const inv = { number, client_name: String(b.clientName || client?.name || ""), client_email: String(b.clientEmail || ""), client_address: String(b.clientAddress || ""), issue_date: issue, due_date: date(b.dueDate, addDays(issue, settings.paymentTermsDays)), currency: String(b.currency || client?.currency || info.currency).slice(0, 3).toUpperCase(), items: JSON.stringify(items), vat_rate: t.vatRate, subtotal: t.subtotal, vat: t.vat, total: t.total, notes: String(b.notes || "") };
+      return respond({ html: invoiceHtml(inv, settings, "draft") });
+    }
     if (action === "save-invoice") {
+      if (b.saveEmailToClient && b.clientId && validEmail(b.clientEmail)) await saveClientEmail(String(b.clientId), String(b.clientEmail).trim().slice(0, 200));
       const items = cleanItems(b.items); if (!items.length) return respond({ error: "Add at least one line item." }, 400);
       const client = info.clients.find((c: any) => c.id === b.clientId); const s = await loadSettings(auth.ownerId);
       const issue = date(b.issueDate, today()), due = date(b.dueDate, addDays(issue, s.paymentTermsDays));
