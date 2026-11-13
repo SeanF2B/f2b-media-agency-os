@@ -81,7 +81,7 @@ function EndBadge({ kind, win }: { kind: EndKind | "win"; win?: boolean }) {
 }
 
 /* Final position shown after a game ends: loser king square goes red with a badge, winner king gets a crown */
-function ChessFinalBoard({ game, currentUserId, animate, busy, onRematch, onClose }: { game: Game; currentUserId: string; animate: boolean; busy?: boolean; onRematch: () => void; onClose: () => void }) {
+function ChessFinalBoard({ game, currentUserId, animate, busy, onRematch, onClose, onOutcome }: { game: Game; currentUserId: string; animate: boolean; busy?: boolean; onRematch: () => void; onClose: () => void; onOutcome?: (outcome: "win" | "loss" | "draw") => void }) {
   const flipped = game.blackId === currentUserId;
   const lower = (game.result || "").toLowerCase();
   const wId = winnerId(game);
@@ -91,6 +91,8 @@ function ChessFinalBoard({ game, currentUserId, animate, busy, onRematch, onClos
   const board = boardFromFen(game.fen);
   const last = latestMoveSquares(game.moves);
   const outcome = wId === currentUserId ? "win" : wId ? "loss" : "draw";
+  const played = useRef(false);
+  useEffect(() => { if (animate && !played.current) { played.current = true; onOutcome?.(outcome); } }, [animate, outcome, onOutcome]);
   return <div className={`chess-final ${outcome} ${animate ? "is-animating" : ""}`} role="img" aria-label={`Final position: ${game.result || "game over"}`}>
     <div className={`chess-final-board ${flipped ? "flipped" : ""}`}>
       {Array.from({ length: 8 }, (_, r) => Array.from({ length: 8 }, (_, c) => {
@@ -217,41 +219,47 @@ function effectsSince(moves: Game["moves"], start: number, gameId: string, nextK
   });
   return effects;
 }
+/* Premium sound set: soft felt-on-wood "thock" (warm low body + short filtered knock) through a gentle compressor. */
+const masterBus = new WeakMap<AudioContext, AudioNode>();
+function chessBus(context: AudioContext) {
+  let bus = masterBus.get(context);
+  if (!bus) {
+    const comp = context.createDynamicsCompressor(); comp.threshold.value = -20; comp.knee.value = 18; comp.ratio.value = 3; comp.attack.value = .003; comp.release.value = .18;
+    const out = context.createGain(); out.gain.value = .55; comp.connect(out); out.connect(context.destination); bus = comp; masterBus.set(context, bus);
+  }
+  return bus;
+}
+function thock(context: AudioContext, offset: number, strength: number, body = 120, brightness = 1) {
+  const bus = chessBus(context); const t = context.currentTime + offset;
+  const frames = Math.ceil(context.sampleRate * .03); const buffer = context.createBuffer(1, frames, context.sampleRate); const data = buffer.getChannelData(0);
+  for (let i = 0; i < frames; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / frames) ** 4;
+  const noise = context.createBufferSource(); noise.buffer = buffer;
+  const band = context.createBiquadFilter(); band.type = "bandpass"; band.frequency.value = 850 * brightness; band.Q.value = 1.1;
+  const nGain = context.createGain(); nGain.gain.setValueAtTime(strength * .9, t); nGain.gain.exponentialRampToValueAtTime(.0001, t + .035);
+  noise.connect(band); band.connect(nGain); nGain.connect(bus); noise.start(t); noise.stop(t + .04);
+  const osc = context.createOscillator(); osc.type = "sine"; osc.frequency.setValueAtTime(body * 1.6, t); osc.frequency.exponentialRampToValueAtTime(body, t + .03);
+  const oGain = context.createGain(); oGain.gain.setValueAtTime(.0001, t); oGain.gain.exponentialRampToValueAtTime(strength * .7, t + .004); oGain.gain.exponentialRampToValueAtTime(.0001, t + .11);
+  osc.connect(oGain); oGain.connect(bus); osc.start(t); osc.stop(t + .12);
+}
+function bell(context: AudioContext, offset: number, freq: number, volume: number, length = .9) {
+  const bus = chessBus(context); const t = context.currentTime + offset;
+  for (const [ratio, amp] of [[1, 1], [2, .28], [3.01, .1]]) {
+    const osc = context.createOscillator(); osc.type = "sine"; osc.frequency.value = freq * ratio;
+    const g = context.createGain(); g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(volume * amp, t + .012); g.gain.exponentialRampToValueAtTime(.0001, t + length / ratio);
+    osc.connect(g); g.connect(bus); osc.start(t); osc.stop(t + length);
+  }
+}
 function playMoveSound(context: AudioContext, kind: MoveEffect["sound"]) {
   if (context.state !== "running") return;
-  // A short, low wooden clack: filtered impact noise plus quickly decaying wood
-  // resonances. Keeping the transient soft avoids the sharp, electronic beep.
-  const tap = (offset: number, strength: number, pitch: number) => {
-    const start = context.currentTime + offset;
-    const frames = Math.ceil(context.sampleRate * .045);
-    const buffer = context.createBuffer(1, frames, context.sampleRate);
-    const samples = buffer.getChannelData(0);
-    for (let i = 0; i < frames; i++) {
-      const envelope = (1 - i / frames) ** 2.8;
-      samples[i] = (Math.random() * 2 - 1) * envelope;
-    }
-    const source = context.createBufferSource(); source.buffer = buffer;
-    const filter = context.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.setValueAtTime(1450, start); filter.Q.setValueAtTime(.55, start);
-    const noiseGain = context.createGain(); noiseGain.gain.setValueAtTime(.0001, start); noiseGain.gain.exponentialRampToValueAtTime(strength * .42, start + .002); noiseGain.gain.exponentialRampToValueAtTime(.0001, start + .05);
-    source.connect(filter); filter.connect(noiseGain); noiseGain.connect(context.destination); source.start(start); source.stop(start + .05);
-    for (const [ratio, volume, decay] of [[1, .19, .115], [2.13, .075, .075], [3.42, .035, .045]]) {
-      const oscillator = context.createOscillator(); oscillator.type = "sine"; oscillator.frequency.setValueAtTime(pitch * ratio, start);
-      const resonance = context.createGain(); resonance.gain.setValueAtTime(.0001, start); resonance.gain.exponentialRampToValueAtTime(strength * volume, start + .002); resonance.gain.exponentialRampToValueAtTime(.0001, start + decay);
-      oscillator.connect(resonance); resonance.connect(context.destination); oscillator.start(start); oscillator.stop(start + decay);
-    }
-  };
-  if (kind === "move") tap(0, .38, 185);
-  if (kind === "capture") { tap(0, .31, 205); tap(.075, .48, 145); }
-  if (kind === "check") { tap(0, .43, 155); tap(.105, .32, 235); }
-  if (kind === "castle") {
-    tap(0, .34, 180); tap(.12, .42, 150);
-    // A quiet, wooden-resonance chime marks castling without turning it into a beep.
-    for (const [offset, frequency, volume] of [[.23, 660, .055], [.27, 880, .035]]) {
-      const start = context.currentTime + offset; const oscillator = context.createOscillator(); oscillator.type = "sine"; oscillator.frequency.setValueAtTime(frequency, start);
-      const gain = context.createGain(); gain.gain.setValueAtTime(.0001, start); gain.gain.exponentialRampToValueAtTime(volume, start + .008); gain.gain.exponentialRampToValueAtTime(.0001, start + .42);
-      oscillator.connect(gain); gain.connect(context.destination); oscillator.start(start); oscillator.stop(start + .42);
-    }
-  }
+  if (kind === "move") thock(context, 0, .5, 118, 1);
+  if (kind === "capture") { thock(context, 0, .42, 135, 1.25); thock(context, .045, .55, 105, .9); }
+  if (kind === "check") { thock(context, 0, .5, 118, 1); bell(context, .06, 987.8, .045, .7); }
+  if (kind === "castle") { thock(context, 0, .45, 122, 1); thock(context, .11, .48, 112, .95); }
+}
+function playEndSound(context: AudioContext, outcome: "win" | "loss" | "draw") {
+  if (context.state !== "running") return;
+  const notes = outcome === "win" ? [523.25, 659.25, 783.99, 1046.5] : outcome === "loss" ? [392, 311.13] : [440, 440];
+  notes.forEach((f, i) => bell(context, i * (outcome === "win" ? .11 : .2), f, outcome === "win" ? .06 : .045, outcome === "win" ? 1.2 : .9));
 }
 
 function ChessLeaderboard({ leaderboard, currentUserId }: { leaderboard: Leader[]; currentUserId: string }) {
@@ -469,7 +477,7 @@ export function ChessView({ staff, currentUserId, canPlay = true, openInviteId =
         }))}</div></div></div><p className="chess-turn-note">{game.mode === "ai" && thinkingGameId === game.id ? "AI is thinking…" : isMyTurn ? "Your turn. Click or drag a piece to its destination." : game.mode === "ai" ? "AI is thinking…" : "Waiting for your opponent. The board refreshes automatically."}</p>{failedAiGameId === game.id && <button className="secondary-button" onClick={() => retryAiMove(game.id)}>Retry AI’s move</button>}
       </article>; })}</div>{people.length > 0 && <aside className="chess-board-sidebar"><ChessLeaderboard leaderboard={leaderboard} currentUserId={currentUserId} /></aside>}</div></section>}
       {!active.length && people.length > 0 && <ChessLeaderboard leaderboard={leaderboard} currentUserId={currentUserId} />}
-      {endgameGame && <section className="chess-section chess-final-section"><ChessFinalBoard key={endgameGame.id} game={endgameGame} currentUserId={currentUserId} animate={endgameCueId === endgameGame.id} busy={busy} onClose={() => closeFinal(endgameGame.id)} onRematch={() => rematch(endgameGame)} /></section>}
+      {endgameGame && <section className="chess-section chess-final-section"><ChessFinalBoard key={endgameGame.id} game={endgameGame} currentUserId={currentUserId} animate={endgameCueId === endgameGame.id} busy={busy} onClose={() => closeFinal(endgameGame.id)} onRematch={() => rematch(endgameGame)} onOutcome={(outcome) => { if (soundOn && audioRef.current) playEndSound(audioRef.current, outcome); }} /></section>}
       {!active.length && !pending.length && <div className="chess-empty panel"><span>♟</span><h2>No active games</h2><p>Start a game against AI or challenge a teammate.</p></div>}
     </>}
   </div>;
