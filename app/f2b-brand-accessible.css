@@ -8682,3 +8682,8 @@ fieldset.crm-new-contact legend { padding:0 6px; font-size:12px; font-weight:700
 .overview-panels.overview-panels-two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .overview-panels.overview-panels-two .recent-activity-panel { grid-column: auto; }
 @media (max-width: 760px) { .overview-panels.overview-panels-two { grid-template-columns: 1fr; } }
+.ad-head-controls, .ai-dashboard-head-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.ad-campaign-select { max-width: 280px; font: inherit; font-size: 12px; padding: 5px 8px; border-radius: 8px; border: 1px solid rgba(127,127,127,.3); background: transparent; color: inherit; }
+.ad-report-off p { margin: 0; font-size: 13px; }
+.ai-dashboard-merged { margin-bottom: 15px; }
+.ai-dashboard-merged .ai-dashboard-list { max-height: 520px; overflow: auto; }
