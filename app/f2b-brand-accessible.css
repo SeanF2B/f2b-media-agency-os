@@ -8588,3 +8588,18 @@ body.task-card-drag-active .bot-live:not(.pipeline-card-drag-preview .bot-live) 
 .bookkeeping-rows>div{display:grid;grid-template-columns:96px 1fr auto auto;gap:10px;align-items:center;font-size:13px}
 .bookkeeping-rows small{opacity:.7}
 .bookkeeping-message{margin-top:10px;font-weight:600}
+/* Tasks: single board with an AI tasks toggle switch */
+.task-ai-toggle { position:relative; display:inline-flex; align-items:center; gap:8px; min-height:42px; padding:6px 14px 6px 8px; border:1px solid var(--f2b-border); border-radius:11px; background:var(--f2b-white); color:var(--f2b-ink); font-size:13px; cursor:pointer; user-select:none; }
+.task-ai-toggle input { position:absolute; opacity:0; width:1px; height:1px; pointer-events:none; }
+.task-ai-toggle-track { position:relative; flex:none; width:38px; height:22px; border-radius:999px; background:color-mix(in srgb,var(--f2b-muted) 35%,var(--f2b-white)); transition:background .18s ease; }
+.task-ai-toggle-thumb { position:absolute; top:3px; left:3px; width:16px; height:16px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.25); transition:transform .18s ease; }
+.task-ai-toggle.is-on .task-ai-toggle-track { background:var(--brand-primary,#3b82f6); }
+.task-ai-toggle.is-on .task-ai-toggle-thumb { transform:translateX(16px); }
+.task-ai-toggle input:focus-visible + .task-ai-toggle-track { outline:2px solid var(--brand-primary,#3b82f6); outline-offset:2px; }
+.task-ai-toggle b { font-weight:800; }
+.task-ai-toggle-count { display:inline-grid; place-items:center; min-width:20px; height:20px; padding:0 5px; border-radius:999px; background:color-mix(in srgb,currentColor 12%,transparent); font-size:11px; font-weight:750; }
+.task-ai-toggle small { color:var(--f2b-muted); font-size:12px; font-weight:600; }
+.app-shell.dark-mode .task-ai-toggle { background:var(--dark-panel); border-color:var(--dark-border); color:#fff; }
+.app-shell.dark-mode .task-ai-toggle small { color:var(--dark-muted); }
+.app-shell.dark-mode .task-ai-toggle-track { background:var(--dark-border); }
+.app-shell.dark-mode .task-ai-toggle.is-on .task-ai-toggle-track { background:var(--brand-primary,#3b82f6); }
