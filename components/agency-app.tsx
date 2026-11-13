@@ -272,7 +272,7 @@ function ClientScopePicker({ value, clients, onChange }: { value: string; client
   const pick = (id: string) => { onChange(id); setOpen(false); };
   return <div className="client-scope" ref={rootRef}>
     <label id="client-scope-label">Viewing</label>
-    <button type="button" className="client-scope-trigger" aria-haspopup="listbox" aria-expanded={open} aria-labelledby="client-scope-label" onClick={() => setOpen((state) => !state)}>{badge(current)}<span className="client-scope-name">{current ? current.name : "Agency"}</span><span className="client-scope-caret" aria-hidden="true">▾</span></button>
+    <button type="button" className="client-scope-trigger" aria-haspopup="listbox" aria-expanded={open} aria-labelledby="client-scope-label" onClick={() => setOpen((state) => !state)}>{current ? null : badge()}<span className="client-scope-name">{current ? current.name : "Agency"}</span><span className="client-scope-caret" aria-hidden="true">▾</span></button>
     {open && <ul className="client-scope-menu" role="listbox" aria-labelledby="client-scope-label">
       <li><button type="button" role="option" aria-selected={!value} className={!value ? "active" : ""} onClick={() => pick("")}>{badge()}<span>Agency</span></button></li>
       {clients.map((client) => <li key={client.id}><button type="button" role="option" aria-selected={value === client.id} className={value === client.id ? "active" : ""} onClick={() => pick(client.id)}>{badge(client)}<span>{client.name}</span></button></li>)}
