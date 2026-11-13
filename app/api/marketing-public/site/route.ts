@@ -81,10 +81,19 @@ async function siteFormLead(request: Request, c: string) {
   const stage = pipeline ? await db.prepare("SELECT id FROM crm_pipeline_stages WHERE owner_id=?1 AND pipeline_id=?2 AND category='open' ORDER BY position LIMIT 1").bind(ownerId, pipeline.id).first<{ id: string }>() : null;
   const stmts = [db.prepare("INSERT INTO crm_contacts (id, owner_id, client_id, first_name, last_name, email, phone, company, source, notes, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,'',?8,?9,?10,?10) ON CONFLICT(id) DO UPDATE SET email=CASE WHEN excluded.email<>'' THEN excluded.email ELSE crm_contacts.email END, phone=excluded.phone, source=excluded.source, updated_at=excluded.updated_at WHERE crm_contacts.owner_id=excluded.owner_id")
     .bind(contactId, ownerId, c, first, last, email, phone, source, notes, now)];
-  if (pipeline && stage) stmts.push(db.prepare("INSERT INTO crm_opportunities (id, owner_id, pipeline_id, stage_id, contact_id, client_id, title, value, currency, source, notes, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,'EUR',?9,?10,?11,?11)")
-    .bind(crypto.randomUUID(), ownerId, pipeline.id, stage.id, contactId, c, `Consultation · ${name}`.slice(0, 200), estimate, estimate ? WEBSITE_ESTIMATE_SOURCE : source, notes, now));
+  const { projectType, projectLocation } = projectDetails(s("form", 80) || s("form_name", 80), `${answers}\n${message}`, s("location", 160));
+  if (pipeline && stage) stmts.push(db.prepare("INSERT INTO crm_opportunities (id, owner_id, pipeline_id, stage_id, contact_id, client_id, title, value, currency, source, notes, created_at, updated_at, project_type, project_location) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,'EUR',?9,?10,?11,?11,?12,?13)")
+    .bind(crypto.randomUUID(), ownerId, pipeline.id, stage.id, contactId, c, `Consultation · ${name}`.slice(0, 200), estimate, estimate ? WEBSITE_ESTIMATE_SOURCE : source, notes, now, projectType, projectLocation));
   await db.batch(stmts);
-  await logFormSubmission(db, { id: crypto.randomUUID(), ownerId, clientId: c, source: "site-form", formKey: `site:${c}:${s("form_name", 80) || "book-a-consultation"}`, formName: s("form_name", 120) || "Book a consultation", pageUrl: page || request.headers.get("referer") || "", name, email, phone, message: [answers, message].filter(Boolean).join("\n"), contactId, createdAt: now });
+  {
+    // The live site may put "Form: interior-design" / "Booked from: <url>" inside its answers.
+    const blob = [answers, message].join("\n");
+    const line = (label: string) => (blob.match(new RegExp(`^${label}:\\s*(.+)$`, "mi"))?.[1] || "").trim();
+    const formSlug = (s("form", 80) || s("form_name", 80) || line("Form") || "book-a-consultation").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const formName = s("form_name", 120) || formSlug.replace(/-/g, " ").replace(/^./, (char) => char.toUpperCase());
+    const cleanAnswers = blob.split(/^Pages viewed/mi)[0].split("\n").filter((row) => !/^(Form|Booked from|Page|Ref):/i.test(row.trim())).join("\n").trim();
+    await logFormSubmission(db, { id: crypto.randomUUID(), ownerId, clientId: c, source: "site-form", formKey: `site:${c}:${formSlug}`, formName, pageUrl: page || line("Booked from") || line("Page") || request.headers.get("referer") || "", name, email, phone, message: cleanAnswers, contactId, createdAt: now });
+  }
   return ok();
 }
 
@@ -110,4 +119,16 @@ function estimateFromAnswers(answers: string) {
   const base = picked.map((opt) => ESTIMATE_BASE[opt] || 0).find((v) => v > 0) || 0;
   if (!base) return 0;
   return Math.round(picked.reduce((total, opt) => total * (ESTIMATE_FACTOR[opt] || 1), base) / 100) * 100;
+}
+
+// Project type / location for the pipeline card, from the form name and the answers.
+function projectDetails(formField: string, blob: string, locationField: string) {
+  const rows = blob.split(/^Pages viewed/mi)[0].split("\n").map((row) => row.trim()).filter(Boolean);
+  const value = (test: RegExp) => { const row = rows.find((item) => test.test(item.split(/[?:]/)[0] || "")); return row ? row.replace(/^[^?:]*[?:]\s*/, "").trim() : ""; };
+  const form = (formField || value(/^form$/i)).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const generic = !form || /book|consult|contact|enquir|quote/.test(form);
+  const firstAnswer = rows.find((row) => /\?\s*\S/.test(row) && !/^(notes|form|booked from|page|ref)\b/i.test(row))?.replace(/^[^?]*\?\s*/, "") || "";
+  const projectType = (generic ? firstAnswer : form.replace(/^./, (char) => char.toUpperCase())).slice(0, 120);
+  const projectLocation = (locationField || value(/location|area|county|town|city|address|eircode|where is/i)).slice(0, 160);
+  return { projectType, projectLocation };
 }

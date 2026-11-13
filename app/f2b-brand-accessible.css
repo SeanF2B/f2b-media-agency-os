@@ -9175,3 +9175,15 @@ html body .app-shell .sidebar .nav-item.active, html body .app-shell .sidebar .n
 .ops-icon-button:hover svg { transform: rotate(45deg); }
 .ops-icon-button svg { transition: transform .3s ease; }
 .dark-mode .ops-icon-button { background: #1f262c; border-color: #3a444d; color: #edf2f6; }
+
+/* Pipeline cards: source icon, project type / location, visible tags (GHL style) */
+.crm-card-facts .crm-source { display: flex; align-items: center; gap: 6px; }
+.crm-card-facts .crm-source .crm-ico { flex: none; color: var(--brand-primary, #1677c8); }
+.crm-card-facts > div { grid-template-columns: 70px 1fr; }
+.crm-card-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.crm-card-tag { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; background: color-mix(in srgb, var(--brand-primary, #1677c8) 10%, #fff); color: #1c2330; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.crm-card-tag .crm-ico { color: var(--brand-primary, #1677c8); flex: none; }
+.crm-card-tag.more { background: #eef1f5; color: #475569; }
+.dark-mode .crm-card-tag { background: #2c353d; color: #edf2f6; }
+.dark-mode .crm-card-tag.more { background: #252c33; color: #aab6c1; }
+.dark-mode .crm-card-facts .crm-source .crm-ico, .dark-mode .crm-card-tag .crm-ico { color: #8cc4f0; }
