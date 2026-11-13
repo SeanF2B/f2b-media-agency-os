@@ -31,7 +31,7 @@
 .f2b-glass .app-shell .page-content { background:transparent !important; }
 .f2b-glass .app-shell .panel, .f2b-glass .app-shell .metric-card, .f2b-glass .app-shell .welcome-card, .f2b-glass .app-shell .pipeline-card,
 .f2b-glass .app-shell .pipeline-toolbar, .f2b-glass .app-shell .client-list-card, .f2b-glass .app-shell .client-detail, .f2b-glass .app-shell .studio-panel,
-.f2b-glass .app-shell .modal, .f2b-glass .app-shell .topbar, .f2b-glass .app-shell .lead-profile-card, .f2b-glass .app-shell .overview-finance-toolbar {
+.f2b-glass .app-shell .topbar, .f2b-glass .app-shell .lead-profile-card, .f2b-glass .app-shell .overview-finance-toolbar {
   background:linear-gradient(135deg, rgba(255,255,255,.62), rgba(255,255,255,.30)) !important;
   -webkit-backdrop-filter:blur(22px) saturate(180%); backdrop-filter:blur(22px) saturate(180%);
   border:1px solid rgba(255,255,255,.75) !important;
@@ -39,7 +39,7 @@
 }
 .f2b-glass .app-shell.dark-mode .panel, .f2b-glass .app-shell.dark-mode .metric-card, .f2b-glass .app-shell.dark-mode .welcome-card, .f2b-glass .app-shell.dark-mode .pipeline-card,
 .f2b-glass .app-shell.dark-mode .pipeline-toolbar, .f2b-glass .app-shell.dark-mode .client-list-card, .f2b-glass .app-shell.dark-mode .client-detail, .f2b-glass .app-shell.dark-mode .studio-panel,
-.f2b-glass .app-shell.dark-mode .modal, .f2b-glass .app-shell.dark-mode .topbar, .f2b-glass .app-shell.dark-mode .lead-profile-card, .f2b-glass .app-shell.dark-mode .overview-finance-toolbar {
+.f2b-glass .app-shell.dark-mode .topbar, .f2b-glass .app-shell.dark-mode .lead-profile-card, .f2b-glass .app-shell.dark-mode .overview-finance-toolbar {
   background:linear-gradient(135deg, rgba(40,48,58,.62), rgba(30,36,44,.34)) !important; border-color:rgba(255,255,255,.14) !important;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.16), 0 12px 32px rgba(0,0,0,.40) !important;
 }
@@ -53,3 +53,6 @@
   box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 6px 20px rgba(0,0,0,.12); cursor:pointer; }
 .f2b-glass-toggle-dot { width:8px; height:8px; border-radius:50%; background:#9ca3af; }
 .f2b-glass .f2b-glass-toggle-dot { background:#22c55e; }
+/* Pop-ups stay solid (white in light mode) even with liquid glass on — no see-through */
+.f2b-glass .app-shell .modal { background:#fff !important; -webkit-backdrop-filter:none !important; backdrop-filter:none !important; }
+.f2b-glass .app-shell.dark-mode .modal { background:#1f262c !important; }

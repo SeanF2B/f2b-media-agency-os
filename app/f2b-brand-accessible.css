@@ -8991,3 +8991,16 @@ html body .app-shell .sidebar .nav-item .nav-icon svg.lucide-nav-icon * { stroke
 .rank-url { max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
 .rank-alert { color:#b45309; font-weight:700; }
 .ops-table td small.muted { display:block; font-size:11px; }
+
+/* Team page inside a client sub-account: only that sub-account's team, with a toggle for the agency team */
+.team-scope-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 0 16px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--f2b-border, #dfe5ec); background: var(--f2b-white, #fff); font-size: 13px; }
+.team-agency-toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+.team-agency-toggle input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.team-agency-toggle i { width: 36px; height: 20px; border-radius: 999px; background: #c9d2db; position: relative; transition: background .15s ease; flex: none; }
+.team-agency-toggle i::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .15s ease; }
+.team-agency-toggle input:checked + i { background: var(--brand-primary, #1677c8); }
+.team-agency-toggle input:checked + i::after { transform: translateX(16px); }
+.team-agency-toggle input:focus-visible + i { outline: 2px solid var(--brand-primary, #1677c8); outline-offset: 2px; }
+.team-agency-toggle small { font-weight: 700; padding: 1px 7px; border-radius: 999px; background: rgba(127,127,127,.15); }
+.team-card.is-agency-member { opacity: .78; }
+.dark-mode .team-scope-bar { background: #1f262c; border-color: #3a444d; color: #edf2f6; }
