@@ -8575,3 +8575,5 @@ body.task-card-drag-active .bot-live:not(.pipeline-card-drag-preview .bot-live) 
 .app-shell .assignee-chip > .bot-live { margin:3px 2px 3px 3px; }
 .app-shell .assignee-chip > span:last-child:not(.bot-live) { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
 .bot-live, .bot-body { overflow:visible !important; }
+.client-tax-adsync{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:-2px 0 4px}
+.client-tax-adsync small{opacity:.8}

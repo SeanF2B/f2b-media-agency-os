@@ -86,6 +86,15 @@ export function summarizeMetaAdsTotals(rows: MetaAdsRow[]) {
   return rows.reduce<MetaAdsTotals>((sum, row) => ({ spend: sum.spend + metric(row, "spend"), impressions: sum.impressions + metric(row, "impressions"), clicks: sum.clicks + metric(row, "clicks"), leads: sum.leads + metric(row, "actions_lead") }), { spend: 0, impressions: 0, clicks: 0, leads: 0 });
 }
 
+export function summarizeMetaAdsDailySpend(rows: MetaAdsRow[]) {
+  const daily = new Map<string, number>();
+  for (const row of rows) {
+    const date = String(row.date || "").slice(0, 10);
+    if (date) daily.set(date, (daily.get(date) || 0) + metric(row, "spend"));
+  }
+  return [...daily.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, spend]) => ({ date, spend }));
+}
+
 export function summarizeMetaAdsDailyClicks(rows: MetaAdsRow[]) {
   const daily = new Map<string, number>();
   for (const row of rows) {

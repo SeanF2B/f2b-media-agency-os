@@ -3438,6 +3438,35 @@ function AssistantView({ workspace, allowedAiModes, onSavePrompt, onScheduleTask
 const TAX_EXPENSE_CATEGORIES = ["Software & subscriptions", "Advertising & marketing", "Travel & vehicle", "Equipment", "Office & utilities", "Professional fees", "Wages & subcontractors", "Insurance", "Stock & materials", "Business entertainment (not deductible)", "Other"];
 const AD_SPEND_CATEGORY = "Advertising & marketing";
 const isNonDeductible = (category: string) => /not deductible/i.test(category);
+const AD_SPEND_AUTO_PREFIX = "auto-ads-";
+const AD_SPEND_SOURCES = [
+  { key: "google", label: "Google Ads", endpoint: "/api/google-ads/workspace", account: (client: Client) => String(client.googleAdsAccountId || "").replace(/\D/g, ""), daily: (json: any) => (json?.current?.daily || []).map((day: any) => ({ date: String(day.date || ""), spend: Number(day.spend) || 0 })) },
+  { key: "meta", label: "Meta Ads", endpoint: "/api/meta-ads/workspace", account: (client: Client) => String(client.metaAdsAccountId || "").replace(/^act_/i, "").replace(/\D/g, ""), daily: (json: any) => (json?.current?.dailySpend || []).map((day: any) => ({ date: String(day.date || ""), spend: Number(day.spend) || 0 })) },
+] as const;
+// Pulls this year's ad spend from the client's connected Google / Meta Ads accounts and writes one expense per platform per month.
+async function fetchAutoAdSpendEntries(client: Client, year: number): Promise<{ entries: TaxBookEntry[]; synced: string[]; errors: string[] }> {
+  const today = new Date(); const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+  const to = localDateKey(yesterday); const from = `${year}-01-01`;
+  const entries: TaxBookEntry[] = []; const synced: string[] = []; const errors: string[] = [];
+  if (to < from) return { entries, synced, errors };
+  for (const source of AD_SPEND_SOURCES) {
+    if (!source.account(client)) continue;
+    try {
+      const response = await fetch(`${source.endpoint}?clientId=${encodeURIComponent(client.id)}&range=custom&from=${from}&to=${to}`, { cache: "no-store" });
+      const json = await response.json().catch(() => null);
+      if (!response.ok || !json || !["connected", "no_data"].includes(json.status)) { errors.push(`${source.label}: ${json?.message || json?.error || `couldn’t load (HTTP ${response.status})`}`); continue; }
+      const months = new Map<string, number>();
+      for (const day of source.daily(json)) { if (!day.date.startsWith(String(year)) || !(day.spend > 0)) continue; const month = day.date.slice(0, 7); months.set(month, (months.get(month) || 0) + day.spend); }
+      for (const [month, spend] of months) {
+        const [y, m] = month.split("-").map(Number); const monthEnd = localDateKey(new Date(y, m, 0));
+        const label = new Date(y, m - 1, 1).toLocaleDateString("en-IE", { month: "long", year: "numeric" });
+        entries.push({ id: `${AD_SPEND_AUTO_PREFIX}${source.key}-${month}`, kind: "Expense", date: monthEnd > to ? to : monthEnd, description: `${source.label} spend · ${label}`, category: AD_SPEND_CATEGORY, amount: Math.round(spend * 100) / 100 });
+      }
+      synced.push(source.label);
+    } catch { errors.push(`${source.label}: couldn’t reach the ads connection`); }
+  }
+  return { entries, synced, errors };
+}
 // Irish 2026 rates (Budget 2026): income tax 20%/40% (single cut-off €44,000, joint one-earner €53,000), USC, self-employed PRSI, 12.5% corporation tax on trading profits.
 function ClientTaxTracker({ client, onSave, taxSettings }: { client: Client; onSave?: (client: Client) => void; taxSettings?: TaxSettings }) {
   const country = taxCountry(taxSettings); const countryLabel = TAX_COUNTRIES.find((item) => item.code === country)?.label || "Ireland";
@@ -3446,6 +3475,9 @@ function ClientTaxTracker({ client, onSave, taxSettings }: { client: Client; onS
   const [draft, setDraft] = useState({ kind: "Expense" as "Income" | "Expense", date: localDateKey(), description: "", category: TAX_EXPENSE_CATEGORIES[0], amount: "" });
   const [showAll, setShowAll] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
+  const [adSync, setAdSync] = useState<{ busy: boolean; note: string }>({ busy: false, note: "" });
+  const adSyncStarted = useRef(false);
+  const hasAdAccounts = AD_SPEND_SOURCES.some((source) => source.account(client));
   const save = (next: ClientTaxBooks) => onSave?.({ ...client, taxBooks: next });
   const entries = books.entries.filter((entry) => entry.date.startsWith(String(year)));
   const income = entries.filter((e) => e.kind === "Income").reduce((sum, e) => sum + e.amount, 0);
@@ -3468,6 +3500,26 @@ function ClientTaxTracker({ client, onSave, taxSettings }: { client: Client; onS
     save({ ...books, entries: [{ id: crypto.randomUUID(), kind: draft.kind, date: draft.date, description: draft.description.trim(), category: draft.kind === "Income" ? "Income" : (draft.category || "Other"), amount }, ...books.entries] });
     setDraft({ ...draft, description: "", amount: "" });
   };
+  const syncAdSpend = async (manual = false) => {
+    if (!hasAdAccounts || !onSave) return;
+    setAdSync({ busy: true, note: "Syncing ad spend…" });
+    const result = await fetchAutoAdSpendEntries(client, year);
+    const syncedKeys = AD_SPEND_SOURCES.filter((source) => result.synced.includes(source.label)).map((source) => `${AD_SPEND_AUTO_PREFIX}${source.key}-${year}-`);
+    const kept = books.entries.filter((entry) => !syncedKeys.some((prefix) => entry.id.startsWith(prefix)));
+    const next = [...result.entries, ...kept];
+    const signature = (list: TaxBookEntry[]) => list.filter((entry) => entry.id.startsWith(AD_SPEND_AUTO_PREFIX)).map((entry) => `${entry.id}:${entry.amount}:${entry.date}`).sort().join("|");
+    if (signature(next) !== signature(books.entries)) save({ ...books, entries: next });
+    try { localStorage.setItem(`f2b-adspend-sync-${client.id}`, localDateKey()); } catch { /* storage unavailable */ }
+    const time = new Date().toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit" });
+    setAdSync({ busy: false, note: result.synced.length ? `${result.synced.join(" + ")} spend synced automatically · ${time}${result.errors.length ? ` · ${result.errors.join("; ")}` : ""}` : result.errors.join("; ") || (manual ? "No ad spend found yet this year." : "") });
+  };
+  useEffect(() => {
+    if (adSyncStarted.current || !hasAdAccounts || !onSave || !books.businessType) return;
+    adSyncStarted.current = true;
+    let last = ""; try { last = localStorage.getItem(`f2b-adspend-sync-${client.id}`) || ""; } catch { /* storage unavailable */ }
+    if (last !== localDateKey()) void syncAdSpend();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client.id, hasAdAccounts, books.businessType]);
   const sorted = [...books.entries].sort((a, b) => b.date.localeCompare(a.date));
   const visible = showAll ? sorted : sorted.slice(0, 8);
   if (!books.businessType) return <section className="panel client-tax" aria-label="Business type"><div className="client-tax-head"><div><p className="eyebrow">💶 EXPENSES & TAX · {countryLabel.toUpperCase()}</p><h2>Is {client.name} a sole trader or a company?</h2><p>This decides how tax is estimated: personal income tax and social charges for a sole trader, or company tax for a limited company. (Change the country in Settings → Tax.)</p></div></div><div className="client-tax-choice"><button type="button" disabled={!onSave} onClick={() => save({ ...books, businessType: "sole_trader", household: "single" })}><b>👤 Sole trader</b><small>Personal income tax + social charges</small></button><button type="button" disabled={!onSave} onClick={() => save({ ...books, businessType: "company" })}><b>🏢 Company</b><small>Company / corporation tax on profit</small></button></div></section>;
@@ -3475,6 +3527,7 @@ function ClientTaxTracker({ client, onSave, taxSettings }: { client: Client; onS
     <div className="client-tax-head"><div><p className="eyebrow">💶 EXPENSES & TAX · {countryLabel.toUpperCase()} · {year}</p><h2>{client.name} · {books.businessType === "company" ? "Company" : "Sole trader"}</h2><p>Log income and expenses; the tax estimate updates as you go.</p></div>{onSave && <div className="client-tax-type"><button type="button" className={books.businessType === "sole_trader" ? "selected" : ""} onClick={() => save({ ...books, businessType: "sole_trader" })}>👤 Sole trader</button><button type="button" className={books.businessType === "company" ? "selected" : ""} onClick={() => save({ ...books, businessType: "company" })}>🏢 Company</button></div>}</div>
     <div className="client-tax-stats"><div><small>Income</small><b>{eur(income)}</b></div><div><small>Expenses</small><b>{eur(expenses)}</b></div><div><small>Ad spend</small><b>{eur(adSpend)}</b></div><div><small>Taxable profit</small><b>{eur(profit)}</b></div><div className="accent"><small>{books.businessType === "company" ? "Corporation tax so far" : "Tax so far"}</small><b>{eur(books.businessType === "company" ? company.tax : personalNow.total)}</b></div></div>
     <div className="finance-actions client-tax-actions"><button type="button" className="secondary-button income-button" onClick={() => { setDraft({ ...draft, kind: "Income" }); setFormOpen(true); }}>＋ Add income</button><button type="button" className="secondary-button expense-button" onClick={() => { setDraft({ ...draft, kind: "Expense", category: draft.category === AD_SPEND_CATEGORY ? TAX_EXPENSE_CATEGORIES[0] : draft.category }); setFormOpen(true); }}>＋ Add expense</button><button type="button" className="secondary-button expense-button" onClick={() => { setDraft({ ...draft, kind: "Expense", category: AD_SPEND_CATEGORY, description: draft.description || "Ad spend" }); setFormOpen(true); }}>＋ Add ad spend</button></div>
+    {hasAdAccounts && <div className="client-tax-adsync"><small>{adSync.note || "Ad spend from the connected Google / Meta Ads account is added here automatically each day."}</small>{onSave && <button type="button" className="text-button" disabled={adSync.busy} onClick={() => void syncAdSpend(true)}>{adSync.busy ? "Syncing…" : "⟳ Sync ad spend now"}</button>}</div>}
     {formOpen && <div className="client-tax-add"><h3>Add {draft.kind === "Expense" && draft.category === AD_SPEND_CATEGORY ? "ad spend" : draft.kind.toLowerCase()}</h3><div className="client-tax-form"><select aria-label="Type" value={draft.kind} onChange={(event) => setDraft({ ...draft, kind: event.target.value as "Income" | "Expense" })}><option>Expense</option><option>Income</option></select>{draft.kind === "Expense" && <select aria-label="Category" value={draft.category} onChange={(event) => setDraft({ ...draft, category: event.target.value })}>{TAX_EXPENSE_CATEGORIES.map((category) => <option key={category} value={category}>{category === AD_SPEND_CATEGORY ? "Ad spend (advertising & marketing)" : category}</option>)}</select>}<input type="date" aria-label="Date" value={draft.date} onChange={(event) => setDraft({ ...draft, date: event.target.value })} /><input aria-label="Description" placeholder="What was it?" value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} /><input aria-label="Amount" inputMode="decimal" placeholder="Amount" value={draft.amount} onChange={(event) => setDraft({ ...draft, amount: event.target.value.replace(/[^0-9.,]/g, "") })} onKeyDown={(event) => { if (event.key === "Enter") add(); }} /><button type="button" disabled={!onSave} onClick={() => { add(); }}>＋ Add</button><button type="button" onClick={() => setFormOpen(false)}>Cancel</button></div></div>}
     <div className="client-tax-list"><h3>Records</h3>{visible.length ? visible.map((entry) => <div key={entry.id} className={entry.kind === "Income" ? "income" : "expense"}><span>{entry.date}</span><b>{entry.description}</b><strong>{entry.kind === "Income" ? "+" : "−"}{eur(entry.amount)}</strong>{onSave && <button type="button" className="file-icon-btn file-icon-danger" title="Delete" aria-label={`Delete ${entry.description}`} onClick={() => save({ ...books, entries: books.entries.filter((item) => item.id !== entry.id) })}>🗑</button>}</div>) : <p className="muted">Nothing logged yet. Add your first expense or payment above.</p>}{sorted.length > 8 && <button type="button" className="secondary-button" onClick={() => setShowAll((v) => !v)}>{showAll ? "Show fewer" : `Show all ${sorted.length}`}</button>}</div>
     <div className="client-tax-section"><h3>🧾 Tax estimate</h3>

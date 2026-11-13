@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "../../../chatgpt-auth";
 import { getTeamPermissions, type TeamPermissions } from "@/lib/access-permissions";
-import { compareMetaAdsTotals, metaAdsPerformanceWindow, summarizeMetaAdsCampaignDailyClicks, summarizeMetaAdsDailyClicks, summarizeMetaAdsRows, summarizeMetaAdsTotals, type MetaAdsRange, type MetaAdsSection, type MetaAdsRow } from "@/lib/meta-ads-performance";
+import { compareMetaAdsTotals, metaAdsPerformanceWindow, summarizeMetaAdsCampaignDailyClicks, summarizeMetaAdsDailyClicks, summarizeMetaAdsDailySpend, summarizeMetaAdsRows, summarizeMetaAdsTotals, type MetaAdsRange, type MetaAdsSection, type MetaAdsRow } from "@/lib/meta-ads-performance";
 import { listDailyMarketingSnapshots, loadCachedMarketingData, saveDailyMarketingSnapshot } from "@/lib/marketing-data-history";
 import { metaAdsConnectionExists, readDirectMetaAdsInsights, configuredMetaApiVersion } from "@/lib/meta-ads-direct";
 
@@ -88,7 +88,7 @@ export async function GET(request: Request) {
     const previousCampaigns = summarizeMetaAdsRows(previousRows, "campaigns");
     const status = currentRows.length ? "connected" : "no_data";
     const fetchedAt = new Date();
-    const currentPayload = { totals: { ...current, ctr: current.impressions ? current.clicks / current.impressions : null, costPerLead: current.leads ? current.spend / current.leads : null }, campaigns, daily: summarizeMetaAdsDailyClicks(currentRows), campaignDaily: summarizeMetaAdsCampaignDailyClicks(currentRows), sourceRows: currentRows.length, mayBeLimited: currentRows.length >= 1000 };
+    const currentPayload = { totals: { ...current, ctr: current.impressions ? current.clicks / current.impressions : null, costPerLead: current.leads ? current.spend / current.leads : null }, campaigns, daily: summarizeMetaAdsDailyClicks(currentRows), dailySpend: summarizeMetaAdsDailySpend(currentRows), campaignDaily: summarizeMetaAdsCampaignDailyClicks(currentRows), sourceRows: currentRows.length, mayBeLimited: currentRows.length >= 1000 };
     if (range === "last_30d") await saveDailyMarketingSnapshot({ db: env.DB, ...cacheScope, service: "Meta Ads", accountId, status, payload: { current: currentPayload }, fetchedAt }).catch(() => null);
     const snapshots = await listDailyMarketingSnapshots({ db: env.DB, ...cacheScope, service: "Meta Ads", accountId, limit: 30 }).catch(() => []);
     return Response.json({ status, source, client: { id: client.id, name: client.name, logo: client.logo || "" }, accountId, currency: String(workspace.settings?.currency || "EUR"), range, dateWindow: { current: currentWindow, previous }, current: currentPayload, previous: { ...prior, campaigns: previousCampaigns }, changes: compareMetaAdsTotals(current, prior), snapshots, updatedAt: fetchedAt.toISOString(), dataNote: `Spend, clicks and leads are reported by Meta${direct ? " through the direct Meta Marketing API connection" : " through Windsor"}. Lead totals depend on Meta’s configured events and attribution; they are not CRM-verified contacts. Daily history tracks a consistent rolling 30-day window and updates automatically in the background.` }, { headers: { "Cache-Control": "no-store" } });
