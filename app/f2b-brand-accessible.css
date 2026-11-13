@@ -8854,3 +8854,8 @@ fieldset.crm-new-contact legend { padding:0 6px; font-size:12px; font-weight:700
 .app-shell .sidebar .nav-item.active .lucide-nav-icon, .app-shell .sidebar .nav-item.active .nav-image-icon { animation: f2b-nav-bob 2.2s ease-in-out infinite; transform-origin: 50% 75%; }
 .app-shell .sidebar .nav-item:hover .lucide-nav-icon, .app-shell .sidebar .nav-item:hover .nav-image-icon { animation: f2b-nav-bob 1.1s ease-in-out infinite; transform-origin: 50% 75%; }
 @media (prefers-reduced-motion: reduce) { .app-shell .sidebar .lucide-nav-icon, .app-shell .sidebar .nav-image-icon { animation: none !important; } }
+
+/* Client sub-account: client logo shown at the top of the sidebar — larger, no tile, edge or shadow */
+.app-shell .sidebar .sidebar-brand.sidebar-brand-client { display: flex !important; justify-content: center !important; align-items: center !important; padding: 6px 12px 14px !important; background: none !important; border: 0 !important; box-shadow: none !important; }
+.app-shell .sidebar .sidebar-client-logo { display: block; width: auto !important; height: auto !important; max-width: 190px !important; max-height: 96px !important; object-fit: contain !important; background: none !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; filter: none !important; padding: 0 !important; }
+@media (max-width: 760px) { .app-shell .sidebar .sidebar-client-logo { max-width: 140px !important; max-height: 56px !important; } }
