@@ -8556,3 +8556,12 @@ body.task-card-drag-active .bot-live:not(.pipeline-card-drag-preview .bot-live) 
 
 /* Sub-account task boards: the client is already known, so no client logo or name on the cards. */
 .pipeline-client.no-client-mark { display: none !important; }
+
+/* Mobile: the side menu was a full-screen-height block that pushed the page content far down. Make it a compact header. */
+@media (max-width: 760px) {
+  .app-shell .sidebar { height: auto !important; max-height: none !important; min-height: 0 !important; position: static !important; overflow: visible !important; padding: 10px 12px 12px !important; gap: 8px !important; }
+  .app-shell .sidebar-brand { padding: 0 0 4px !important; }
+  .app-shell .brand-lockup.sidebar-logo { width: 40px !important; height: 40px !important; flex: 0 0 40px !important; }
+  .app-shell .sidebar-bottom { margin-top: 0 !important; }
+  .app-shell .sidebar nav { max-height: none !important; }
+}
