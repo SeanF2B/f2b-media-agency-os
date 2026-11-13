@@ -8921,3 +8921,4 @@ html body .app-shell .sidebar .nav-item .nav-icon svg.lucide-nav-icon * { stroke
 .ops-client-pick select { min-height:38px; padding:0 10px; border:1px solid var(--f2b-border,#d9dee3); border-radius:10px; background:var(--f2b-white,#fff); color:var(--f2b-ink,#1f2328); font:inherit; min-width:220px; }
 .ops-embed { min-width:0; }
 .app-shell.dark-mode .ops-client-pick select { background:#1f1e22; border-color:#3a393d; color:#fff; }
+.ops-more { margin:0; font-size:13px; color:var(--f2b-muted,#5b6470); }

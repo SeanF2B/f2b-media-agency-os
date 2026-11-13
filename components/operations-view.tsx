@@ -14,7 +14,7 @@ type OpsClient = {
 };
 type OpsTask = { id: string; clientId: string; status: string; aiDismissedAt?: string; aiApprovals?: Array<{ status?: string }>; aiRunState?: string };
 type SiteRow = { clientId: string; backend: string; previewUrl: string; repo: string; branch: string; updatedAt: string };
-export type OperationsTab = "overview" | "websites" | "onboarding" | "local" | "keywords" | "audits" | "reports";
+export type OperationsTab = "overview" | "websites" | "onboarding" | "local" | "keywords" | "audits" | "reports" | "media";
 export type CommunityResult = { url: string; title: string; snippet: string; platform: string };
 type Check = { label: string; ok: boolean; page?: string };
 
@@ -42,7 +42,7 @@ export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenW
   onOpenPage: (page: string, clientId?: string) => void; onOpenWebsite: (client: OpsClient) => void; onOpenDns: () => void;
   onStartOnboarding?: (clientId: string) => void; onboarding?: React.ReactNode;
   onCreateGbpTask?: (clientId: string) => string; onCreateCommunityTask?: (clientId: string, results: CommunityResult[]) => string;
-  renderTool?: (tool: "keywords" | "audits" | "reports", clientId: string) => React.ReactNode;
+  renderTool?: (tool: "keywords" | "audits" | "reports" | "media", clientId: string) => React.ReactNode;
 }) {
   const [toolClientId, setToolClientId] = useState("");
   const [community, setCommunity] = useState<Record<string, { busy?: boolean; error?: string; results?: CommunityResult[]; cost?: number | null; note?: string; usage?: { clientRuns: number; lastRun: string | null; workspaceRuns: number; monthCostUsd: number } }>>({});
@@ -87,9 +87,10 @@ export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenW
   return <section className="ops-centre">
     <div className="page-heading"><div><p className="eyebrow">Agency</p><h1>Operations</h1><p className="muted">Client services, connections and websites in one place. Everything opens the existing tools.</p></div></div>
     <div className="ops-tabs" role="tablist" aria-label="Operations sections">
-      {([["overview", "Overview"], ["onboarding", "Onboarding"], ["websites", "Websites & Domains"], ["keywords", "Keyword planner"], ["audits", "Audits"], ["reports", "Reports"], ["local", "Local & community"]] as Array<[OperationsTab, string]>).filter(([key]) => (key !== "onboarding" || onboarding) && (!["keywords", "audits", "reports"].includes(key) || renderTool)).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? "active" : ""} onClick={() => onTab(key)}>{label}</button>)}
+      {([["overview", "Overview"], ["onboarding", "Onboarding"], ["websites", "Websites & Domains"], ["keywords", "Keyword planner"], ["audits", "Audits"], ["reports", "Reports"], ["local", "Local & community"], ["media", "Media library"]] as Array<[OperationsTab, string]>).filter(([key]) => (key !== "onboarding" || onboarding) && (!["keywords", "audits", "reports", "media"].includes(key) || renderTool)).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? "active" : ""} onClick={() => onTab(key)}>{label}</button>)}
     </div>
 
+    {tab === "overview" && <p className="ops-more">Also: {[["SEO", "SEO"], ["Google Ads", "Google Ads"], ["Meta Ads", "Meta Ads"], ["Proposal Studio", "Proposals"], ["Automations", "Marketing automations"]].map(([page, label], index) => <span key={page}>{index ? " · " : ""}<button type="button" className="text-button" onClick={() => onOpenPage(page)}>{label}</button></span>)}</p>}
     {tab === "overview" && <>
       <div className="ops-summary">
         <div><b>{active.length}</b><span>Active clients</span></div>
@@ -126,6 +127,7 @@ export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenW
     </>}
 
     {tab === "onboarding" && onboarding}
+    {tab === "media" && renderTool && <div className="ops-embed">{renderTool("media", "")}</div>}
 
     {(tab === "keywords" || tab === "audits" || tab === "reports") && renderTool && (() => {
       const selected = active.find((client) => client.id === toolClientId) || active[0];
