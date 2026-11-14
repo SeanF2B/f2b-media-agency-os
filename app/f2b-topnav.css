@@ -499,3 +499,11 @@ html body .app-shell .ai-completed-screenshot > :not(img):not(.ai-attachment-fil
 .client-status-filter button { flex: 1; justify-content: center; }
 .status-pill.status-toggle { cursor: pointer; border: 0; font: inherit; font-size: 12px; font-weight: 700; }
 .status-pill.inactive { background: rgba(229,72,77,.14) !important; color: #c23b3f !important; }
+
+/* Receipt attachment on income / expense entries */
+html body .modal .finance-receipt-field > span { display:block; font-size:.82rem; font-weight:700; margin-bottom:6px; }
+html body .modal .finance-receipt-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+html body .modal .finance-receipt-link { display:inline-flex; align-items:center; gap:6px; max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:7px 12px; border-radius:10px; background:color-mix(in srgb, var(--brand-secondary, #0b74b8) 10%, #fff); color:#1d2433; font-weight:600; font-size:.85rem; text-decoration:none; }
+html body .modal .finance-receipt-pick { cursor:pointer; display:inline-flex; align-items:center; padding:7px 14px; font-size:.85rem; }
+html body .modal .finance-receipt-remove { border:0; background:transparent; font-size:1.1rem; color:#b42318; cursor:pointer; padding:2px 6px; }
+html body .finance-row .finance-receipt-chip { margin-left:6px; text-decoration:none; font-size:.85em; }

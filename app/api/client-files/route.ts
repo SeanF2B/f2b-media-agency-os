@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     const form = await request.formData();
     const clientId = String(form.get("clientId") || "");
     const file = form.get("file");
-    if (!data.clients?.some((client: { id: string }) => client.id === clientId)) return Response.json({ error: "Choose a client first." }, { status: 400 });
+    if (clientId !== "agency" && !data.clients?.some((client: { id: string }) => client.id === clientId)) return Response.json({ error: "Choose a client first." }, { status: 400 });
     if (!(file instanceof File) || !file.size) return Response.json({ error: "Choose a file to upload." }, { status: 400 });
     if (file.size > 20 * 1024 * 1024) return Response.json({ error: "Each file must be 20 MB or smaller." }, { status: 413 });
     const allowed = new Set(["application/pdf", "text/plain", "text/csv", "application/json", "application/zip", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.openxmlformats-officedocument.presentationml.presentation", "application/msword", "application/vnd.ms-excel", "application/vnd.ms-powerpoint", "image/jpeg", "image/png", "image/webp"]);
