@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { BrandIcon } from "./brand-icon";
 
 type IntegrationStatus = "ready" | "partial" | "needs_setup" | "optional" | "not_available";
 type Integration = { id: string; name: string; group: string; status: IntegrationStatus; detail: string; mappedClients: number; mappingUnit?: string; actionLabel: string; actionPage: string; connectHref?: string; publicAccessSetupConfigured?: boolean; usage?: { status: "available" | "unavailable"; periodStart?: string; requestCount?: number; knownCostUsd?: number | null; unknownCostCount?: number; byService?: { keywordResearch: { requestCount: number; knownCostUsd: number | null; unknownCostCount: number }; competitorResearch?: { requestCount: number; knownCostUsd: number | null; unknownCostCount: number }; localMaps: { requestCount: number; knownCostUsd: number | null; unknownCostCount: number }; backlinks: { requestCount: number; knownCostUsd: number | null; unknownCostCount: number } } }; sync?: { lastAttemptAt: string | null; lastSuccessfulAt: string | null; status: string; detail: string | null; failedClients: string[]; failedAccounts?: Array<{ clientId: string; clientName: string; service: string }>; failedCount: number } };
@@ -128,7 +129,7 @@ export function IntegrationsView({ onNavigate }: { onNavigate: (page: string) =>
           <div><b>{done} of {shown.length} tools connected</b><p>{done === shown.length ? "You’re all set 🎉" : "Connect the rest to unlock reports, ads and lead sync."}</p></div>
         </section>
         <section className="lp-grid" aria-label="Tools">{shown.map((item, index) => <article className={`lp-card status-${item.status}`} style={{ "--lp-delay": `${index * 55}ms` } as CSSProperties} key={item.id}>
-          <div className="lp-icon" aria-hidden="true">{integrationIcons[item.id] || "🔗"}</div>
+          <div className="lp-icon" aria-hidden="true"><BrandIcon id={item.id} size={24} fallback={integrationIcons[item.id] || "🔗"} /></div>
           <div className="lp-body"><h3>{item.name}</h3><p>{plainHelp[item.id] || firstSentence(item.detail)}</p>{item.mappingUnit && <small className="lp-chip">{mappingSummary(item)}</small>}</div>
           <div className="lp-action">{item.status === "ready" ? <span className="lp-done" role="img" aria-label="Connected">✓ Connected</span> : item.connectHref ? <a className="lp-button" href={item.connectHref}>Connect</a> : <button className="lp-button" type="button" onClick={() => onNavigate(item.actionPage)}>Set up</button>}</div>
         </article>)}</section>

@@ -464,3 +464,12 @@ html body .app-shell.dark-mode .finance-row:has(.finance-kind.expense), html bod
 html body .app-shell.dark-mode .finance-row:has(.finance-kind.expense):nth-child(even), html body .app-shell.dark-mode .client-tax-list > div.expense:nth-child(even) { background: rgba(229,72,77,.18) !important; }
 html body .app-shell.dark-mode .finance-row:has(.finance-kind.income), html body .app-shell.dark-mode .finance-row.finance-client-income, html body .app-shell.dark-mode .client-tax-list > div.income { background: rgba(47,179,109,.1) !important; }
 html body .app-shell.dark-mode .finance-row:has(.finance-kind.income):nth-child(even), html body .app-shell.dark-mode .finance-row.finance-client-income:nth-child(even), html body .app-shell.dark-mode .client-tax-list > div.income:nth-child(even) { background: rgba(47,179,109,.2) !important; }
+
+/* Per-client connection percentage (Operations) */
+.ops-conn { align-items: center; }
+.ops-conn-pct { position: relative; width: 34px; height: 34px; min-width: 34px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-right: 6px; background: conic-gradient(var(--pct-colour, #2fb36d) var(--pct), rgba(127,127,127,.22) 0); }
+.ops-conn-pct::before { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: var(--surface, #fff); }
+.app-shell.dark-mode .ops-conn-pct::before { background: #22282e; }
+.ops-conn-pct b { position: relative; font-size: 9.5px; font-weight: 800; }
+.ops-conn-pct.good { --pct-colour: #2fb36d; } .ops-conn-pct.mid { --pct-colour: #f0a431; } .ops-conn-pct.low { --pct-colour: #e5484d; }
+.ops-conn .brand-icon, .lp-icon .brand-icon { display: block; }
