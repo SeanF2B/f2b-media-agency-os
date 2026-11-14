@@ -2407,8 +2407,11 @@ ${senderName}`, staffType: member.staffType || (isSubAccountRole(member.role) ? 
   const openTaskCount = viewWorkspace.tasks.filter((t) => t.status !== "Done" && !t.aiDismissedAt).length;
   const navPriority = ["Overview", "Clients", "CRM", "Conversations", "Tasks", "Operations", "Invoicing", "Bookkeeping", "CRM Automations", "Lead Factory", "Team", "AI Assistant", "Activity", "Chess"];
   const orderedNav = [...visibleNav].filter((item) => !(activeScopeId && item.key === "CRM Automations")).sort((x, y) => (navPriority.indexOf(x.key) + 1 || 99) - (navPriority.indexOf(y.key) + 1 || 99));
-  const primaryNav = orderedNav.slice(0, 7);
-  const moreNav = [...orderedNav.slice(7), ...(viewIsAdmin ? [{ key: "Settings", icon: "⚙️" }] : [])];
+  // Agency view: every page on the bar (no More menu). Sub-accounts: first seven, with Bookkeeping and Team always on the bar.
+  const settingsNav = viewIsAdmin ? [{ key: "Settings", icon: "⚙️" }] : [];
+  const pinnedNav = ["Bookkeeping", "Team"];
+  const primaryNav = activeScopeId ? orderedNav.filter((item, index) => index < 7 || pinnedNav.includes(item.key)) : [...orderedNav, ...settingsNav];
+  const moreNav = activeScopeId ? [...orderedNav.filter((item, index) => !(index < 7 || pinnedNav.includes(item.key))), ...settingsNav] : [];
   const moreActive = moreNav.some((item) => navActive(item.key));
   navOrderRef.current = [...primaryNav, ...moreNav].map((item) => item.key);
   const goPage = (key: string) => { setPage(key); setSelectedClient(""); setNavMoreOpen(false); };
@@ -2420,8 +2423,8 @@ ${senderName}`, staffType: member.staffType || (isSubAccountRole(member.role) ? 
           <div className="tn-brand">{activeScopeId && scopedClient?.logo ? <div className="tn-logo tn-logo-client"><CleanLogo className="sidebar-client-logo" src={scopedClient.logo} alt={scopedClient.name} /></div> : <div className="tn-logo"><BrandLogo className="sidebar-logo" /></div>}</div>
           {viewWorkspace.clients.length > 0 || activeScopeId ? <ClientScopePicker value={activeScopeId} clients={workspace.clients.filter((item) => (previewMember ? baseViewWorkspace.clients.some((allowed) => allowed.id === item.id) : true))} onChange={setClientScope} /> : null}
         </div>
-        <nav className="tn-nav" aria-label="Workspace">
-          {primaryNav.map((item) => <button key={item.key} type="button" className={`tn-item ${navActive(item.key) ? "active" : ""}`} aria-current={navActive(item.key) ? "page" : undefined} onClick={() => goPage(item.key)}><span className="tn-icon">{navGlyph(item.key)}{item.key === "Tasks" && openTaskCount > 0 && <span className="tn-count">{openTaskCount > 99 ? "99+" : openTaskCount}</span>}</span><span className="tn-label">{navLabel(item.key)}</span></button>)}
+        <nav className={`tn-nav ${activeScopeId ? "" : "tn-nav-all"}`} aria-label="Workspace">
+          {primaryNav.map((item) => <button key={item.key} type="button" className={`tn-item ${navActive(item.key) ? "active" : ""}`} aria-current={navActive(item.key) ? "page" : undefined} title={navLabel(item.key)} onClick={() => goPage(item.key)}><span className="tn-icon">{navGlyph(item.key)}{item.key === "Tasks" && openTaskCount > 0 && <span className="tn-count">{openTaskCount > 99 ? "99+" : openTaskCount}</span>}</span><span className="tn-label">{navLabel(item.key)}</span></button>)}
           {moreNav.length > 0 && <div className="tn-more-wrap">
             <button type="button" className={`tn-item ${moreActive ? "active" : ""}`} aria-haspopup="menu" aria-expanded={navMoreOpen} onClick={() => setNavMoreOpen((open) => !open)}><span className="tn-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="2" /><rect x="13.5" y="3.5" width="7" height="7" rx="2" /><rect x="3.5" y="13.5" width="7" height="7" rx="2" /><rect x="13.5" y="13.5" width="7" height="7" rx="2" /></svg></span><span className="tn-label">More</span></button>
             {navMoreOpen && <><button type="button" className="tn-scrim" aria-label="Close menu" onClick={() => setNavMoreOpen(false)} /><div className="tn-more-menu" role="menu">{moreNav.map((item) => <button key={item.key} type="button" role="menuitem" className={navActive(item.key) ? "active" : ""} onClick={() => goPage(item.key)}><span className="tn-icon">{navGlyph(item.key)}</span><span>{navLabel(item.key)}</span></button>)}</div></>}

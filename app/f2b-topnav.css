@@ -153,3 +153,11 @@ html body .app-shell.client-scoped.topnav-layout .tn-bar .client-scope .client-s
 /* Keyboard focus on the right-hand buttons (reached with D after the last page) */
 html body .app-shell.topnav-layout .tn-right .top-actions button:focus-visible { outline: 3px solid var(--brand-primary, #3b82f6) !important; outline-offset: 2px; }
 html body .app-shell.client-scoped.topnav-layout .tn-right .top-actions button:focus-visible { outline-color: var(--sb-fg-strong, #fff) !important; }
+
+/* Agency view shows every page on the bar: compact items, labels only when there's room */
+.tn-nav.tn-nav-all { gap: 0; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.tn-nav.tn-nav-all::-webkit-scrollbar { display: none; }
+.tn-nav.tn-nav-all .tn-item { min-width: 0; padding: 8px 9px 7px; font-size: 11.5px; }
+@media (max-width: 1900px) { .tn-nav.tn-nav-all .tn-item { padding: 8px 7px 7px; font-size: 11px; } }
+@media (max-width: 1720px) { .tn-nav.tn-nav-all .tn-label { display: none; } .tn-nav.tn-nav-all .tn-item { padding: 10px; min-width: 44px; } }
+@media (min-width: 861px) and (max-width: 1720px) { .app-shell.topnav-layout .tn-bar:has(.tn-nav-all) { grid-template-columns: auto minmax(0, 1fr) auto; } .tn-nav.tn-nav-all { justify-self: center; } }
