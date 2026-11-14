@@ -775,17 +775,20 @@ export function AgencyApp() {
   const [navMoreOpen, setNavMoreOpen] = useState(false);
   // A / D and ← / → switch top-nav pages when nobody is typing.
   const navOrderRef = useRef<string[]>([]);
+  const darkToggleRef = useRef<() => void>(() => {});
   const pageRef = useRef(page);
   pageRef.current = page;
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
       const key = event.key;
-      const dir = key === "ArrowRight" || key === "d" || key === "D" ? 1 : key === "ArrowLeft" || key === "a" || key === "A" ? -1 : 0;
-      if (!dir) return;
+      const isL = key === "l" || key === "L";
+      const dir = isL ? 0 : key === "ArrowRight" || key === "d" || key === "D" ? 1 : key === "ArrowLeft" || key === "a" || key === "A" ? -1 : 0;
+      if (!dir && !isL) return;
       const el = document.activeElement as HTMLElement | null;
       if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.closest("[role=tablist],[role=listbox],[role=menu],[role=slider],[role=grid],[contenteditable=true]"))) return;
       if (document.querySelector("[role=dialog], .modal, .modal-backdrop, .iv-modal, [aria-modal=true]")) return;
+      if (isL) { event.preventDefault(); darkToggleRef.current(); return; }
       if (pageRef.current === "Chess") return;
       const order = navOrderRef.current;
       if (order.length < 2) return;
@@ -1164,6 +1167,7 @@ export function AgencyApp() {
     window.localStorage.setItem("f2b-dark-mode", String(next));
     return next;
   });
+  darkToggleRef.current = toggleDarkMode;
 
   useEffect(() => {
     if (!workspace.activeTimer && !workspace.tasks.some((task) => task.aiRunState === "running" && task.aiRunStartedAt)) return;
