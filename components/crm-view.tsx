@@ -333,17 +333,44 @@ export function CrmView({ onOpenClient, scopeClientId = "", conversations, initi
     event.preventDefault();
     const drag: StageDrag = { id: stageId, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, moved: false, overId: "" };
     stageDragRef.current = drag;
+    // Lift the whole column like a card: a floating copy follows the pointer and tilts with the movement.
+    const sourceEl = event.currentTarget.closest<HTMLElement>(".crm-stage");
+    const sourceRect = sourceEl?.getBoundingClientRect();
+    const grabX = sourceRect ? event.clientX - sourceRect.left : 0, grabY = sourceRect ? event.clientY - sourceRect.top : 0;
+    let ghost: HTMLElement | null = null, lastX = event.clientX, tilt = 0, settle = 0;
+    const placeGhost = (x: number, y: number) => {
+      if (!ghost) return;
+      tilt = Math.max(-7, Math.min(7, tilt * 0.75 + (x - lastX) * 0.6)); lastX = x;
+      ghost.style.left = `${x - grabX}px`; ghost.style.top = `${y - grabY}px`;
+      ghost.style.transform = `rotate(${tilt.toFixed(2)}deg) scale(1.03)`;
+      window.clearTimeout(settle); settle = window.setTimeout(() => { if (ghost) { tilt = 0; ghost.style.transform = "rotate(0deg) scale(1.03)"; } }, 90);
+      const board = sourceEl?.closest<HTMLElement>(".crm-kanban");
+      if (board) { const b = board.getBoundingClientRect(); if (x > b.right - 60) board.scrollLeft += 18; else if (x < b.left + 60) board.scrollLeft -= 18; }
+    };
     const onMove = (pointerEvent: PointerEvent) => {
       if (stageDragRef.current !== drag || pointerEvent.pointerId !== drag.pointerId) return;
       if (!drag.moved && Math.hypot(pointerEvent.clientX - drag.startX, pointerEvent.clientY - drag.startY) < 6) return;
       pointerEvent.preventDefault();
-      if (!drag.moved) { drag.moved = true; setDraggingStageId(drag.id); }
+      if (!drag.moved) {
+        drag.moved = true; setDraggingStageId(drag.id);
+        if (sourceEl && sourceRect) {
+          ghost = sourceEl.cloneNode(true) as HTMLElement;
+          ghost.classList.add("crm-stage-ghost");
+          Object.assign(ghost.style, { position: "fixed", left: `${sourceRect.left}px`, top: `${sourceRect.top}px`, width: `${sourceRect.width}px`, height: `${sourceRect.height}px`, margin: "0", zIndex: "2147483000", pointerEvents: "none", transformOrigin: `${grabX}px ${Math.min(grabY, 80)}px`, transition: "transform 110ms ease-out, box-shadow 160ms ease-out" });
+          document.body.appendChild(ghost);
+          sourceEl.classList.add("crm-stage-lifted");
+        }
+      }
+      placeGhost(pointerEvent.clientX, pointerEvent.clientY);
       const target = document.elementFromPoint(pointerEvent.clientX, pointerEvent.clientY)?.closest<HTMLElement>(".crm-stage[data-crm-stage]");
       const nextTargetId = target?.dataset.crmStage || "";
       if (drag.overId !== nextTargetId) { drag.overId = nextTargetId; setStageDropTargetId(nextTargetId); }
     };
     const clear = () => {
       drag.removeListeners?.();
+      window.clearTimeout(settle);
+      sourceEl?.classList.remove("crm-stage-lifted");
+      if (ghost) { const g = ghost; ghost = null; const target = document.querySelector<HTMLElement>(`.crm-stage[data-crm-stage="${CSS.escape(drag.overId || drag.id)}"]`)?.getBoundingClientRect(); g.style.transition = "left 180ms ease, top 180ms ease, transform 180ms ease, opacity 180ms ease"; if (target) { g.style.left = `${target.left}px`; g.style.top = `${target.top}px`; } g.style.transform = "rotate(0deg) scale(1)"; g.style.opacity = "0"; window.setTimeout(() => g.remove(), 200); }
       if (stageDragRef.current === drag) stageDragRef.current = null;
       setDraggingStageId("");
       setStageDropTargetId("");

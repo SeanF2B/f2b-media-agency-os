@@ -240,3 +240,7 @@ html body .app-shell .crm-stage-actions { flex-wrap: nowrap; gap: 6px; }
 html body .app-shell .crm-stage .crm-card { min-width: 0; }
 html body .app-shell .crm-card-facts dd { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 760px) { html body .app-shell .crm-kanban { grid-template-columns: repeat(var(--crm-stage-count, 7), minmax(270px, 86vw)) !important; } }
+/* Picking up a whole stage column */
+.crm-stage-ghost { box-shadow: 0 28px 60px rgba(15,25,40,.32), 0 6px 16px rgba(15,25,40,.18) !important; border-radius: 18px; overflow: hidden; cursor: grabbing; }
+.crm-stage.crm-stage-lifted { opacity: .35; outline: 2px dashed color-mix(in srgb, var(--brand-primary, #3b82f6) 45%, transparent); outline-offset: -4px; }
+.crm-stage-drag-handle { cursor: grab; touch-action: none; }
