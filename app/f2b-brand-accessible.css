@@ -9453,3 +9453,4 @@ html body.f2b-dark .f2b-on-light:is(input, textarea, #f2b-white-text-override)::
 .app-shell.dark-mode .sf-step,.app-shell.dark-mode .sf-action{background:#171c20;border-color:#3c4850}.app-shell.dark-mode .sf-end{background:#14261b;border-color:#25503a}
 .app-shell.dark-mode .sf-card small,.app-shell.dark-mode .sf-stats,.app-shell.dark-mode .sf-meta,.app-shell.dark-mode .sf-q-row small,.app-shell.dark-mode .sf-step-n,.app-shell.dark-mode .sf-history small{color:#9fb0ba}.app-shell.dark-mode .sf-stats b{color:#edf3f6}
 .app-shell.dark-mode .sf-name:hover,.app-shell.dark-mode .sf-name:focus,.app-shell.dark-mode .sf-step header input:focus{background:#171c20;border-color:#3c4850}
+.cv-filters{flex-wrap:wrap}.cv-filters button{min-width:max-content}
