@@ -102,6 +102,7 @@ export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenW
   const [sites, setSites] = useState<SiteRow[] | null>(null);
   const [siteError, setSiteError] = useState("");
   const [query, setQuery] = useState("");
+  const [statusView, setStatusView] = useState<"active" | "inactive" | "all">("active");
   const active = useMemo(() => clients.filter((client) => client.status !== "Inactive" && client.status !== "Archived" && !/^agency$/i.test(client.name.trim())), [clients]);
   useEffect(() => {
     if (!["overview", "websites", "local"].includes(tab) || sites) return;
@@ -112,7 +113,9 @@ export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenW
     }).catch((reason) => { setSites([]); setSiteError(reason instanceof Error ? reason.message : "Website list unavailable."); });
   }, [tab, sites]);
   const siteFor = (id: string) => (sites || []).find((row) => row.clientId === id);
-  const rows = active.filter((client) => !query.trim() || client.name.toLowerCase().includes(query.trim().toLowerCase())).map((client) => {
+  const isActiveClient = (client: OpsClient) => client.status !== "Inactive" && client.status !== "Archived";
+  const listed = clients.filter((client) => !/^agency$/i.test(client.name.trim()) && (statusView === "all" || (statusView === "active" ? isActiveClient(client) : !isActiveClient(client))));
+  const rows = listed.filter((client) => !query.trim() || client.name.toLowerCase().includes(query.trim().toLowerCase())).map((client) => {
     const openTasks = tasks.filter((task) => task.clientId === client.id && task.status !== "Done" && !task.aiDismissedAt);
     const approvals = openTasks.filter((task) => (task.aiApprovals || []).some((item) => item.status === "pending") || task.aiRunState === "needs_review").length;
     const checks = connectionChecks(client, Boolean(siteFor(client.id)));
@@ -142,7 +145,7 @@ export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenW
         <button type="button" onClick={() => onOpenPage("Tasks")}><b>{totalApprovals}</b><span>Waiting for review</span></button>
         <div className={issues ? "warn" : ""}><b>{issues}</b><span>Missing connections</span></div>
       </div>
-      <div className="ops-toolbar"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search clients…" aria-label="Search clients" />{onStartOnboarding && <button type="button" className="primary-button" onClick={() => onStartOnboarding("")}>＋ Onboard a client</button>}</div>
+      <div className="ops-toolbar"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search clients…" aria-label="Search clients" /><span className="ops-status-filter" role="tablist" aria-label="Client status">{([["active", "Active"], ["inactive", "Inactive"], ["all", "All"]] as const).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={statusView === key} className={statusView === key ? "active" : ""} onClick={() => setStatusView(key)}>{label}<span>{key === "all" ? clients.filter((c) => !/^agency$/i.test(c.name.trim())).length : clients.filter((c) => !/^agency$/i.test(c.name.trim()) && (key === "active" ? isActiveClient(c) : !isActiveClient(c))).length}</span></button>)}</span>{onStartOnboarding && <button type="button" className="primary-button" onClick={() => onStartOnboarding("")}>＋ Onboard a client</button>}</div>
       <div className="ops-table-wrap"><table className="ops-table">
         <thead><tr><th>Client</th><th>Services</th><th>Connections</th><th>Tasks</th><th></th></tr></thead>
         <tbody>{rows.map(({ client, openTasks, approvals, checks, missing }) => <tr key={client.id}>

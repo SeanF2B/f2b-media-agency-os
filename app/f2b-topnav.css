@@ -479,3 +479,21 @@ html body .app-shell.topnav-layout .tn-left { padding-left: 14px; gap: 18px; }
 .kw-from-site { margin-left: 8px; padding: 2px 8px; border-radius: 99px; border: 1px solid color-mix(in srgb, var(--brand-primary, #3b82f6) 45%, transparent); background: transparent; color: inherit; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
 .kw-from-site:disabled { opacity: .5; cursor: default; }
 .kw-site-note { display: block; margin-top: 6px; font-size: 12px; opacity: .8; grid-column: 1 / -1; }
+
+/* History cards: tiny attachment thumbnails, no attach button */
+html body .app-shell .ai-completed-screenshots .ai-add-screenshot { display: none !important; }
+html body .app-shell .ai-completed-screenshots { padding: 8px 10px !important; }
+html body .app-shell .ai-completed-screenshots header { font-size: 12px; margin-bottom: 6px !important; }
+html body .app-shell .ai-completed-screenshot-grid { display: flex !important; flex-wrap: wrap; gap: 6px !important; grid-template-columns: none !important; }
+html body .app-shell .ai-completed-screenshot { width: 44px !important; height: 44px !important; min-height: 0 !important; padding: 0 !important; border-radius: 8px !important; overflow: hidden; flex: none; }
+html body .app-shell .ai-completed-screenshot img, html body .app-shell .ai-completed-screenshot .ai-attachment-file { width: 44px !important; height: 44px !important; min-height: 0 !important; object-fit: cover; font-size: 10px !important; display: flex; align-items: center; justify-content: center; }
+html body .app-shell .ai-completed-screenshot > :not(img):not(.ai-attachment-file) { display: none !important; }
+
+/* Active / Inactive / All client filters */
+.ops-status-filter { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: rgba(0,0,0,.05); flex: none; }
+.app-shell.dark-mode .ops-status-filter { background: rgba(255,255,255,.06); }
+.ops-status-filter button { border: 0; background: transparent; padding: 7px 12px; border-radius: 9px; font: inherit; font-size: 13px; font-weight: 700; color: inherit; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+.ops-status-filter button span { font-size: 11px; opacity: .7; }
+.ops-status-filter button.active { background: var(--brand-primary, #3b82f6); color: #fff; }
+.client-status-filter { display: flex; margin-bottom: 8px; }
+.client-status-filter button { flex: 1; justify-content: center; }
