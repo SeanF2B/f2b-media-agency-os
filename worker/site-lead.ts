@@ -7,7 +7,7 @@
 // GET  /api/site-lead-photo?key=  team-only (Access identity required) photo viewer for CRM notes / emails
 import { logFormSubmission } from "../lib/form-submission-log";
 import { logSystemEmail } from "../lib/email-log";
-import { formSettingsFor } from "../lib/site-forms";
+import { estimateFor, formSettingsFor } from "../lib/site-forms";
 
 type Env = Cloudflare.Env & { DB?: D1Database; BUCKET?: R2Bucket; RESEND_API_KEY?: string; TASK_NOTIFICATION_FROM?: string };
 
@@ -117,6 +117,7 @@ async function saveLead(request: Request, env: Env, site: SiteConfig) {
     stage = pipe && st ? { id: st.id, pipeline_id: pipe.id } : null;
   }
 
+  const estimate = kind === "quote" ? estimateFor(formCfg, jobType) : 0;
   const now = new Date().toISOString();
   const existing = await db.prepare("SELECT id FROM crm_contacts WHERE owner_id=?1 AND client_id=?2 AND ((?3<>'' AND lower(email)=?3) OR phone=?4 OR phone=?5) ORDER BY updated_at DESC LIMIT 1").bind(owner, site.clientId, email, phone, phoneRaw).first<{ id: string }>();
   const contactId = existing?.id || crypto.randomUUID();
@@ -131,6 +132,7 @@ async function saveLead(request: Request, env: Env, site: SiteConfig) {
     `${kind === "contact" ? "📨 Contact form" : "🏠 Quote request"} · ${site.name} website`,
     "",
     `Job: ${job}`,
+    estimate ? `Rough estimate: €${estimate.toLocaleString("en-IE")}` : "",
     ...answers.map(([q, a]) => `${q}: ${a}`),
     urgency && `When: ${urgency}`,
     property && `Property: ${property}`,
@@ -154,8 +156,8 @@ async function saveLead(request: Request, env: Env, site: SiteConfig) {
       .bind(contactId, owner, site.clientId, first || name, rest.join(" "), email, phone, source, town ? `Location: ${town}` : "", now),
   ];
   if (stage) {
-    stmts.push(db.prepare("INSERT INTO crm_opportunities (id, owner_id, pipeline_id, stage_id, contact_id, client_id, title, value, currency, source, source_submission_id, notes, created_at, updated_at, project_type, project_location) VALUES (?1,?2,?3,?4,?5,?6,?7,0,'EUR',?8,?9,?10,?11,?11,?12,?13)")
-      .bind(oppId, owner, stage.pipeline_id, stage.id, contactId, site.clientId, title, source, subKey, notes, now, job, town));
+    stmts.push(db.prepare("INSERT INTO crm_opportunities (id, owner_id, pipeline_id, stage_id, contact_id, client_id, title, value, currency, source, source_submission_id, notes, created_at, updated_at, project_type, project_location) VALUES (?1,?2,?3,?4,?5,?6,?7,?14,'EUR',?8,?9,?10,?11,?11,?12,?13)")
+      .bind(oppId, owner, stage.pipeline_id, stage.id, contactId, site.clientId, title, source, subKey, notes, now, job, town, estimate));
     stmts.push(db.prepare("INSERT INTO crm_activities (id, owner_id, opportunity_id, contact_id, activity_type, body, created_by, created_at) VALUES (?1,?2,?3,?4,'note',?5,?6,?7)")
       .bind(crypto.randomUUID(), owner, oppId, contactId, notes, `${site.name} website`, now));
   }

@@ -7,7 +7,7 @@ export type FormOption = { label: string; value: string; hint?: string };
 export type FormField = { id: string; label: string; type: "choice" | "text" | "email" | "tel" | "textarea" | "photos" | "select"; required?: boolean; options?: FormOption[]; step: string; showWhen?: { field: string; equals: string[] } };
 export type FormRule = { id: string; when: { field: string; equals: string }; then: Array<{ action: "tag" | "urgent" | "stage" | "notify"; value: string }> };
 export type FormDefinition = { steps: Array<{ id: string; title: string }>; fields: FormField[]; rules: FormRule[] };
-export type FormSettings = { status: "live" | "paused"; notify: string[]; stageId?: string; thankYouUrl?: string; pages: { mode: "all" | "include" | "exclude"; paths: string[] } };
+export type FormSettings = { status: "live" | "paused"; notify: string[]; stageId?: string; thankYouUrl?: string; estimates?: Record<string, number>; pages: { mode: "all" | "include" | "exclude"; paths: string[] } };
 export type SiteForm = { id: string; clientId: string; formKey: string; name: string; site: string; definition: FormDefinition; settings: FormSettings; updatedAt: string; updatedBy: string };
 
 export const SITE_FORMS_SQL = [
@@ -58,6 +58,16 @@ export function builtInForms(): Array<Omit<SiteForm, "id" | "updatedAt" | "updat
         { id: "name", label: "Name", type: "text", required: true, step: "main" }, { id: "phone", label: "Phone", type: "tel", required: true, step: "main" },
         { id: "email", label: "Email", type: "email", step: "main" }, { id: "message", label: "Message", type: "textarea", required: true, step: "main" }], rules: [] } },
   ];
+}
+
+/** Rough starting estimates (EUR) for the built-in roofing quote form, used until the client sets their own in Forms → Settings. */
+export const DEFAULT_JOB_ESTIMATES: Record<string, number> = { leak: 350, "roof-repair": 600, "flat-roof": 3500, "new-roof": 12000, gutters: 900, "fascia-soffit": 3000, cleaning: 600, "verge-ridge": 1200 };
+
+/** Rough value for a lead: the form's saved estimate for the chosen job, else the built-in default. */
+export function estimateFor(settings: FormSettings | null, jobType: string): number {
+  const own = settings?.estimates?.[jobType];
+  if (typeof own === "number" && own >= 0) return own;
+  return DEFAULT_JOB_ESTIMATES[jobType] || 0;
 }
 
 export const emptyDefinition = (): FormDefinition => ({ steps: [{ id: "main", title: "Form" }], fields: [], rules: [] });

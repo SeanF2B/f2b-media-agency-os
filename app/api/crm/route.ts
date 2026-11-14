@@ -133,13 +133,28 @@ export async function GET(request: Request) {
       // Strict: a sub-account only sees its own pipelines; the agency only sees agency pipelines.
       const rawScope = clean(url.searchParams.get("clientId"), 80);
       const scopeClient = rawScope === "agency" ? "" : rawScope;
+      // Agency dashboard can ask for every client's pipelines at once (all=1); sub-accounts stay strict.
+      const allClients = !scopeClient && url.searchParams.get("all") === "1" && !access.scopeClientId ? "1" : "";
       const fromDate = /^\d{4}-\d{2}-\d{2}$/.test(url.searchParams.get("from") || "") ? String(url.searchParams.get("from")) : "";
       const toDate = /^\d{4}-\d{2}-\d{2}$/.test(url.searchParams.get("to") || "") ? `${url.searchParams.get("to")}T23:59:59.999Z` : "";
-      const rows = await db.prepare("SELECT s.category, o.currency, COUNT(*) AS total, SUM(o.value) AS value FROM crm_opportunities o JOIN crm_pipeline_stages s ON s.id=o.stage_id AND s.owner_id=o.owner_id JOIN crm_pipelines p ON p.id=o.pipeline_id AND p.owner_id=o.owner_id WHERE o.owner_id=?1 AND p.archived=0 AND s.category IN ('open','won') AND COALESCE(p.client_id,'')=?2 AND (?3='' OR o.created_at>=?3) AND (?4='' OR o.created_at<=?4) GROUP BY s.category, o.currency").bind(ownerId, scopeClient, fromDate, toDate).all<{ category: string; currency: string; total: number; value: number }>();
+      const rows = await db.prepare("SELECT s.category, o.currency, COUNT(*) AS total, SUM(o.value) AS value FROM crm_opportunities o JOIN crm_pipeline_stages s ON s.id=o.stage_id AND s.owner_id=o.owner_id JOIN crm_pipelines p ON p.id=o.pipeline_id AND p.owner_id=o.owner_id WHERE o.owner_id=?1 AND p.archived=0 AND s.category IN ('open','won') AND (?5='1' OR COALESCE(p.client_id,'')=?2) AND (?3='' OR o.created_at>=?3) AND (?4='' OR o.created_at<=?4) GROUP BY s.category, o.currency").bind(ownerId, scopeClient, fromDate, toDate, allClients).all<{ category: string; currency: string; total: number; value: number }>();
       const groups = (rows.results || []).map((row) => ({ category: row.category, currency: clean(row.currency, 3) || "EUR", count: Number(row.total) || 0, value: Number(row.value) || 0 }));
-      const stageRows = await db.prepare("SELECT s.name, s.category, s.position, o.currency, COUNT(o.id) AS total, COALESCE(SUM(o.value),0) AS value FROM crm_pipeline_stages s JOIN crm_pipelines p ON p.id=s.pipeline_id AND p.owner_id=s.owner_id LEFT JOIN crm_opportunities o ON o.stage_id=s.id AND o.owner_id=s.owner_id AND (?3='' OR o.created_at>=?3) AND (?4='' OR o.created_at<=?4) WHERE s.owner_id=?1 AND p.archived=0 AND COALESCE(p.client_id,'')=?2 GROUP BY s.id, o.currency ORDER BY p.created_at, s.position").bind(ownerId, scopeClient, fromDate, toDate).all<{ name: string; category: string; position: number; currency: string | null; total: number; value: number }>();
+      const stageRows = await db.prepare(`SELECT s.name, s.category, s.position, o.currency, COUNT(o.id) AS total, COALESCE(SUM(o.value),0) AS value FROM crm_pipeline_stages s JOIN crm_pipelines p ON p.id=s.pipeline_id AND p.owner_id=s.owner_id LEFT JOIN crm_opportunities o ON o.stage_id=s.id AND o.owner_id=s.owner_id AND (?3='' OR o.created_at>=?3) AND (?4='' OR o.created_at<=?4) WHERE s.owner_id=?1 AND p.archived=0 AND (?5='1' OR COALESCE(p.client_id,'')=?2) GROUP BY ${allClients ? "s.category, s.name" : "s.id"}, o.currency ORDER BY ${allClients ? "MIN(s.position)" : "p.created_at, s.position"}`).bind(ownerId, scopeClient, fromDate, toDate, allClients).all<{ name: string; category: string; position: number; currency: string | null; total: number; value: number }>();
       const stages = (stageRows.results || []).map((row) => ({ name: String(row.name), category: String(row.category), currency: clean(row.currency, 3) || "EUR", count: Number(row.total) || 0, value: Number(row.value) || 0 }));
-      return Response.json({ open: groups.filter((row) => row.category === "open"), won: groups.filter((row) => row.category === "won"), stages }, { headers: { "Cache-Control": "no-store" } });
+      // Where leads come from: opportunity count and value per source, split into open / won / lost.
+      const sourceRows = await db.prepare("SELECT COALESCE(NULLIF(TRIM(o.source),''),'Unknown') AS source, s.category, COUNT(*) AS total, COALESCE(SUM(o.value),0) AS value FROM crm_opportunities o JOIN crm_pipeline_stages s ON s.id=o.stage_id AND s.owner_id=o.owner_id JOIN crm_pipelines p ON p.id=o.pipeline_id AND p.owner_id=o.owner_id WHERE o.owner_id=?1 AND p.archived=0 AND (?5='1' OR COALESCE(p.client_id,'')=?2) AND (?3='' OR o.created_at>=?3) AND (?4='' OR o.created_at<=?4) GROUP BY 1, s.category").bind(ownerId, scopeClient, fromDate, toDate, allClients).all<{ source: string; category: string; total: number; value: number }>();
+      const sourceMap = new Map<string, { source: string; count: number; value: number; won: number; wonValue: number; open: number }>();
+      for (const row of sourceRows.results || []) {
+        const key = clean(row.source, 80) || "Unknown";
+        const item = sourceMap.get(key) || { source: key, count: 0, value: 0, won: 0, wonValue: 0, open: 0 };
+        const n = Number(row.total) || 0, v = Number(row.value) || 0;
+        item.count += n; item.value += v;
+        if (row.category === "won") { item.won += n; item.wonValue += v; }
+        if (row.category === "open") item.open += n;
+        sourceMap.set(key, item);
+      }
+      const sources = [...sourceMap.values()].sort((a, b) => b.count - a.count || b.value - a.value).slice(0, 12);
+      return Response.json({ open: groups.filter((row) => row.category === "open"), won: groups.filter((row) => row.category === "won"), stages, sources }, { headers: { "Cache-Control": "no-store" } });
     }
     const search = clean(url.searchParams.get("search"), 120).toLowerCase();
     // Server-side client scope (f2b_client cookie or ?clientId=). No scope = everything (legacy behaviour).

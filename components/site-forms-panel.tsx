@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type DragEvent } from "react";
 import { ArrowRight, ClipboardList, GitBranch, GripVertical, History, Inbox, Plus, Settings2, Trash2, Zap } from "lucide-react";
 import { FormSubmissionsView } from "./form-submissions-view";
-import type { FormDefinition, FormField, FormRule, FormSettings } from "@/lib/site-forms";
+import { DEFAULT_JOB_ESTIMATES, type FormDefinition, type FormField, type FormRule, type FormSettings } from "@/lib/site-forms";
 
 // Operations → Forms: every client website form in one place.
 // Pick a form → Submissions (history of every lead) · Logic (visual flow, drag to reorder, edit rules) · Settings · Change history.
@@ -82,7 +82,7 @@ function FormDetail({ form, client, stages, clients, tab, onTab, onBack, onSaved
     <nav className="ops-seg sf-tabs" role="tablist">{tabs.map(([key, label, Icon]) => <button type="button" role="tab" key={key} aria-selected={tab === key} className={tab === key ? "active" : ""} onClick={() => onTab(key)}><Icon size={14} /> {label}</button>)}</nav>
     {tab === "submissions" && <FormSubmissionsView scopeClientId={form.clientId} clients={clients} active formKey={form.formKey} defaultPreset="12m" />}
     {tab === "logic" && <LogicEditor def={def} onChange={editDef} stages={stages} />}
-    {tab === "settings" && <SettingsEditor settings={settings} onChange={editSettings} stages={stages} />}
+    {tab === "settings" && <SettingsEditor settings={settings} onChange={editSettings} stages={stages} jobs={def.fields.find((f) => f.id === "jobType")?.options || []} />}
     {tab === "history" && (!form.id ? <p className="ops-empty">No saved changes yet. Every save is recorded here with who changed what.</p> : history === null ? <p className="ops-empty">Loading history…</p> : !history.length ? <p className="ops-empty">No changes yet.</p> :
       <ol className="sf-history">{history.map((h) => <li key={h.id}><b>{h.summary}</b><small>{fmt(h.at)} · {h.by}</small></li>)}</ol>)}
   </div>;
@@ -140,12 +140,13 @@ function LogicEditor({ def, onChange, stages }: { def: FormDefinition; onChange:
   </div>;
 }
 
-function SettingsEditor({ settings, onChange, stages }: { settings: FormSettings; onChange: (s: FormSettings) => void; stages: Stage[] }) {
+function SettingsEditor({ settings, onChange, stages, jobs }: { settings: FormSettings; onChange: (s: FormSettings) => void; stages: Stage[]; jobs: Array<{ label: string; value: string }> }) {
   const [paths, setPaths] = useState(settings.pages.paths.join("\n"));
   return <div className="sf-settings">
     <label className="sf-inline"><input type="checkbox" checked={settings.status === "live"} onChange={(e) => onChange({ ...settings, status: e.target.checked ? "live" : "paused" })} /> Form is live</label>
     <label>Email new submissions to<input value={settings.notify.join(", ")} onChange={(e) => onChange({ ...settings, notify: e.target.value.split(/[,\s]+/).filter(Boolean) })} placeholder="owner@business.ie, office@…" /><small className="muted">Each lead is emailed here, with photos attached.</small></label>
     <label>New leads land in<select value={settings.stageId || ""} onChange={(e) => onChange({ ...settings, stageId: e.target.value })}><option value="">First open stage (default)</option>{stages.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}</select></label>
+    {jobs.length > 0 && <div className="sf-estimates"><b>Rough estimates</b><small className="muted">Each new lead gets this value on the Leads board so pipeline reports show what it&rsquo;s roughly worth. Edit the value on the lead once you&rsquo;ve quoted.</small><div className="sf-estimate-grid">{jobs.filter((j) => j.value !== "other").map((j) => <label key={j.value}><span>{j.label}</span><span className="sf-euro">€<input type="number" min={0} step={50} value={settings.estimates?.[j.value] ?? DEFAULT_JOB_ESTIMATES[j.value] ?? 0} onChange={(e) => onChange({ ...settings, estimates: { ...(settings.estimates || {}), [j.value]: Math.max(0, Number(e.target.value) || 0) } })} /></span></label>)}</div></div>}
     <label>Thank-you page (for conversion tracking)<input value={settings.thankYouUrl || ""} onChange={(e) => onChange({ ...settings, thankYouUrl: e.target.value })} placeholder="/thank-you/" /></label>
     <label>Show on<select value={settings.pages.mode} onChange={(e) => onChange({ ...settings, pages: { ...settings.pages, mode: e.target.value as FormSettings["pages"]["mode"] } })}><option value="all">Every page</option><option value="include">Only these pages</option><option value="exclude">Every page except</option></select></label>
     {settings.pages.mode !== "all" && <label>Page URLs (one per line, * for wildcards)<textarea rows={4} value={paths} onChange={(e) => { setPaths(e.target.value); onChange({ ...settings, pages: { ...settings.pages, paths: e.target.value.split("\n").map((p) => p.trim()).filter(Boolean) } }); }} placeholder={"/contact/\n/roof-repair-*"} /></label>}

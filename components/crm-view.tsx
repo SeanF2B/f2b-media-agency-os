@@ -43,6 +43,20 @@ function QuickContactActions({ name, email, phone, subject, dnd, onClearDnd }: {
   </>;
 }
 
+// Short project facts pulled from a website-form note (job, answers, timing, property, location, rough estimate).
+const HIDDEN_FACTS = /^(name|phone|email|photos?|photo \d+|source|page|details)$/i;
+function projectFacts(notes?: string | null): Array<[string, string]> {
+  if (!notes) return [];
+  const out: Array<[string, string]> = [];
+  for (const line of notes.split("\n")) {
+    const m = line.match(/^([A-Za-z][\w ?/&-]{1,28}):\s+(.+)$/);
+    if (!m || HIDDEN_FACTS.test(m[1].trim())) continue;
+    out.push([m[1].trim().replace(/\?$/, ""), m[2].trim()]);
+    if (out.length >= 6) break;
+  }
+  return out;
+}
+
 export function CrmView({ onOpenClient, scopeClientId = "", conversations, initialTab = "Pipeline", onOpenClients, onOpenLeadFactory }: { onOpenLeadFactory?: () => void; onOpenClient: (clientId: string) => void; scopeClientId?: string; conversations?: ReactNode; onOpenClients?: () => void; initialTab?: "Pipeline" | "Contacts" | "Conversations" }) {
   const [data, setData] = useState<Payload>(empty);
   const [tab, setTab] = useState<"Pipeline" | "Contacts" | "Conversations">(initialTab === "Conversations" && !conversations ? "Pipeline" : initialTab);
@@ -539,7 +553,8 @@ export function CrmView({ onOpenClient, scopeClientId = "", conversations, initi
         <div className="crm-card-stage-row"><dt>Stage:</dt><dd><select className="crm-card-stage-select" aria-label={`Move ${item.title} to stage`} value={item.stage_id} onChange={(event) => void moveOpportunity(item.id, event.target.value)}>{pipeline!.stages.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}</select></dd></div>
       </dl>
       {(() => { const cardTags = item.contact_id ? tagsByContact.get(item.contact_id) || [] : []; return cardTags.length ? <div className="crm-card-tags" aria-label="Tags">{cardTags.slice(0, 4).map((tag) => <span key={tag} className="crm-card-tag"><Ico icon={Tag} size={11} />{tag}</span>)}{cardTags.length > 4 && <span className="crm-card-tag more">+{cardTags.length - 4}</span>}</div> : null; })()}
-      {item.notes && <details className="crm-card-answers" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()}><summary><Ico icon={NotebookPen} size={13} /> Form answers & website visit</summary><pre>{item.notes}</pre></details>}
+      {(() => { const facts = projectFacts(item.notes); return facts.length ? <dl className="crm-project-facts" aria-label="Project details">{facts.map(([k, v]) => <div key={k}><dt>{k}</dt><dd title={v}>{v}</dd></div>)}</dl> : null; })()}
+      {item.notes && <details className="crm-card-answers" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()}><summary><Ico icon={NotebookPen} size={13} /> Full form answers & website visit</summary><pre>{item.notes}</pre></details>}
       <div className="crm-card-icons">
         <QuickContactActions name={contact && contact !== "No contact linked" ? contact : companyName || item.title} email={email} phone={phoneValue} subject={`Following up: ${item.title}`} dnd={dnd} onClearDnd={() => void markDnd(item, false)} />
         {!dnd && !email && !phoneValue && <button type="button" className="crm-card-icon crm-quick-missing" title="Add a phone or email to call, text, email or WhatsApp" aria-label={`Add contact details for ${item.title}`} onClick={() => { setEditingOpp(item); setModal("opportunity-edit"); }}>＋<Ico icon={Phone} /></button>}
