@@ -346,3 +346,6 @@ html body .app-shell .assistant-composer textarea:hover { box-shadow: none !impo
 .tt-sort { all: unset; cursor: pointer; }
 .tt-sort.active { color: var(--brand-primary, #3b82f6); }
 .tt-empty { padding: 20px; text-align: center; opacity: .7; }
+.tt-group-toggle, .tt-group-toggle b { color: inherit !important; filter: none !important; }
+.tt-group-toggle .tt-caret { color: var(--tt-group); }
+.tt-group-toggle::before { content: ""; width: 10px; height: 10px; border-radius: 3px; background: var(--tt-group); }
