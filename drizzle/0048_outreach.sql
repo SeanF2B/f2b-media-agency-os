@@ -161,6 +161,7 @@ CREATE TABLE IF NOT EXISTS outreach_sends (
   status TEXT NOT NULL DEFAULT 'claimed',       -- claimed | sent | failed | bounced
   error TEXT NOT NULL DEFAULT '',
   conv_message_id TEXT,
+  body_fingerprint TEXT NOT NULL DEFAULT '',  -- shingle hashes, used to keep copy non-repetitive
   created_at TEXT NOT NULL,
   sent_at TEXT
 );
@@ -276,3 +277,60 @@ CREATE TABLE IF NOT EXISTS outreach_audit (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS outreach_audit_owner_idx ON outreach_audit(owner_id, created_at);
+
+-- Outreach settings (re-contact gap, booking link, seat prices, alert chat…).
+CREATE TABLE IF NOT EXISTS outreach_settings (
+  owner_id TEXT PRIMARY KEY NOT NULL,
+  data TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT NOT NULL
+);
+
+-- Free inbox placement testing: seed inboxes you own (Gmail, Outlook.com) connected by OAuth.
+CREATE TABLE IF NOT EXISTS outreach_seeds (
+  id TEXT PRIMARY KEY NOT NULL,
+  owner_id TEXT NOT NULL,
+  provider TEXT NOT NULL,                       -- gmail | outlook
+  email TEXT NOT NULL,
+  encrypted_token TEXT NOT NULL,
+  token_iv TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'ok',
+  last_error TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS outreach_seeds_owner_email_idx ON outreach_seeds(owner_id, email);
+
+CREATE TABLE IF NOT EXISTS outreach_placement_tests (
+  id TEXT PRIMARY KEY NOT NULL,
+  owner_id TEXT NOT NULL,
+  mailbox_id TEXT NOT NULL,
+  token TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'sending',       -- sending | waiting | done | failed
+  results_json TEXT NOT NULL DEFAULT '[]',      -- [{seed, provider, placement: inbox|spam|promotions|missing}]
+  inbox_rate REAL,
+  created_at TEXT NOT NULL,
+  completed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS outreach_placement_mailbox_idx ON outreach_placement_tests(owner_id, mailbox_id, created_at);
+CREATE INDEX IF NOT EXISTS outreach_placement_status_idx ON outreach_placement_tests(status, created_at);
+
+-- AI usage per day and feature (tokens + cost when the provider reports it).
+CREATE TABLE IF NOT EXISTS outreach_ai_usage (
+  owner_id TEXT NOT NULL,
+  day TEXT NOT NULL,
+  feature TEXT NOT NULL,                        -- copy | classify | responder | opener
+  calls INTEGER NOT NULL DEFAULT 0,
+  tokens_in INTEGER NOT NULL DEFAULT 0,
+  tokens_out INTEGER NOT NULL DEFAULT 0,
+  cost_usd REAL NOT NULL DEFAULT 0,
+  PRIMARY KEY (owner_id, day, feature)
+);
+
+-- Alert de-duplication (one alert per issue per day).
+CREATE TABLE IF NOT EXISTS outreach_alerts (
+  owner_id TEXT NOT NULL,
+  alert_key TEXT NOT NULL,
+  last_sent_at TEXT NOT NULL,
+  detail TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (owner_id, alert_key)
+);

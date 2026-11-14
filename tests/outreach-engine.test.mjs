@@ -133,3 +133,11 @@ test("positive replies create one deal, move it forward, never reopen won/lost",
   assert.equal(planPositiveReplyOpportunity({ existing: { id: "o", stage_id: "s3", stage_category: "open", stage_position: 3 }, target }).op, "touch");
   assert.equal(planPositiveReplyOpportunity({ existing: { id: "o", stage_id: "w", stage_category: "won", stage_position: 5 }, target }).op, "none");
 });
+
+test("embedded schema matches the migration file", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { OUTREACH_SCHEMA } = await import("../lib/outreach/schema-sql.mjs");
+  const sql = readFileSync(new URL("../drizzle/0048_outreach.sql", import.meta.url), "utf8").split("\n").filter((line) => !line.trim().startsWith("--")).join("\n");
+  const statements = sql.split(";").map((part) => part.replace(/--[^\n]*/g, "").replace(/\s+/g, " ").trim()).filter(Boolean);
+  assert.deepEqual(OUTREACH_SCHEMA, statements);
+});
