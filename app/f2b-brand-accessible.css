@@ -9403,3 +9403,4 @@ html body.f2b-dark .f2b-on-light:is(input, textarea, #f2b-white-text-override)::
 .app-shell.dark-mode .kw-research-form input, .app-shell.dark-mode .kw-research-form select, .app-shell.dark-mode .kw-filters input, .app-shell.dark-mode .kw-filters select, .app-shell.dark-mode .kw-bulk, .app-shell.dark-mode .kw-bulk select, .app-shell.dark-mode .kw-table th, .app-shell.dark-mode .saved-kw-groups, .app-shell.dark-mode .saved-kw-new input, .app-shell.dark-mode .saved-kw-rename input { background:#1f1e22; border-color:#3a393d; color:#fff; }
 .app-shell.dark-mode .kw-table-wrap { border-color:#3a393d; }
 @media (max-width:900px) { .kw-research-form { grid-template-columns:1fr 1fr; } .kw-f-seeds, .kw-f-go { grid-column:1 / -1; } .saved-kw { grid-template-columns:1fr; } .saved-kw-groups { position:static; } }
+.book-tabs { margin: 0 0 14px; }
