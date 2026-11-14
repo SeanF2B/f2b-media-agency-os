@@ -1,0 +1,3 @@
+export function createTelegram(config: { botToken: string; chatId?: string }, deps?: { fetchImpl?: typeof fetch; sleepImpl?: (ms: number) => Promise<void> }): { verify(): Promise<{ username: string; name: string }>; send(text: string, buttons?: Array<{ text: string; url: string }>): Promise<{ messageId: number | null }> };
+export function formatPositiveAlert(p: { prospectName?: string; prospectEmail?: string; company?: string; campaign?: string; replyText?: string; suggestedReply?: string; confidence?: number; conversationUrl?: string }): { text: string; buttons: Array<{ text: string; url: string }> };
+export function formatOperationalAlert(p: { title: string; detail?: string; url?: string }): { text: string; buttons: Array<{ text: string; url: string }> };

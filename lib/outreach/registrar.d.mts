@@ -1,0 +1,4 @@
+export type DomainOffer = { domain: string; available: boolean; tier: string; currency: string; registrationCents: number; renewalCents: number; reason: string };
+export function suggestDomainNames(businessName: string, options?: { count?: number }): string[];
+export function normaliseOffer(item: unknown): DomainOffer;
+export function createRegistrar(config: { apiToken: string; accountId: string; purchasesEnabled?: boolean }, deps?: { fetchImpl?: typeof fetch; sleepImpl?: (ms: number) => Promise<void> }): { search(query: string, options?: { limit?: number }): Promise<DomainOffer[]>; check(domains: string[]): Promise<DomainOffer[]>; registration(domain: string): Promise<any>; registrationStatus(domain: string): Promise<any>; register(domain: string, options: { approval: { approvedBy: string; approvedAt: string; domains: string[] }; years?: number; autoRenew?: boolean }): Promise<{ domain: string; alreadyOwned: boolean; status: string; workflow?: unknown }> };
