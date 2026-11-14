@@ -453,3 +453,14 @@ html body .app-shell .settings-apis-stack .dns-panel form button { height: 42px;
 .app-shell.dark-mode .client-focus-clear { background: rgba(255,255,255,.12); }
 .tn-bar .client-focus .client-dot { width: 20px; height: 20px; min-width: 20px; border-radius: 6px; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; color: #fff; }
 .tn-bar .client-focus .client-dot img { width: 100%; height: 100%; object-fit: contain; background: #fff; }
+
+/* Money lists: rows tinted by type (red = expense, green = income), alternating shades */
+html body .app-shell .finance-row:has(.finance-kind.expense), html body .app-shell .client-tax-list > div.expense { background: rgba(229,72,77,.06) !important; }
+html body .app-shell .finance-row:has(.finance-kind.expense):nth-child(even), html body .app-shell .client-tax-list > div.expense:nth-child(even) { background: rgba(229,72,77,.13) !important; }
+html body .app-shell .finance-row:has(.finance-kind.income), html body .app-shell .finance-row.finance-client-income, html body .app-shell .client-tax-list > div.income { background: rgba(47,179,109,.07) !important; }
+html body .app-shell .finance-row:has(.finance-kind.income):nth-child(even), html body .app-shell .finance-row.finance-client-income:nth-child(even), html body .app-shell .client-tax-list > div.income:nth-child(even) { background: rgba(47,179,109,.15) !important; }
+html body .app-shell .finance-row, html body .app-shell .client-tax-list > div { border-radius: 10px; padding-left: 10px !important; padding-right: 10px !important; border-bottom-color: transparent !important; margin-bottom: 3px; }
+html body .app-shell.dark-mode .finance-row:has(.finance-kind.expense), html body .app-shell.dark-mode .client-tax-list > div.expense { background: rgba(229,72,77,.09) !important; }
+html body .app-shell.dark-mode .finance-row:has(.finance-kind.expense):nth-child(even), html body .app-shell.dark-mode .client-tax-list > div.expense:nth-child(even) { background: rgba(229,72,77,.18) !important; }
+html body .app-shell.dark-mode .finance-row:has(.finance-kind.income), html body .app-shell.dark-mode .finance-row.finance-client-income, html body .app-shell.dark-mode .client-tax-list > div.income { background: rgba(47,179,109,.1) !important; }
+html body .app-shell.dark-mode .finance-row:has(.finance-kind.income):nth-child(even), html body .app-shell.dark-mode .finance-row.finance-client-income:nth-child(even), html body .app-shell.dark-mode .client-tax-list > div.income:nth-child(even) { background: rgba(47,179,109,.2) !important; }
