@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useFocusClient } from "@/lib/focus-client";
+import { readFocusClient, setFocusClient, useFocusClient } from "@/lib/focus-client";
 import { BrandIcon } from "./brand-icon";
 import { BarChart3, ClipboardList, Factory, FileText, Globe, LayoutDashboard, MapPin, Megaphone, Search, Zap, type LucideIcon } from "lucide-react";
 import { AiVisibilityPanel } from "./ai-visibility-panel";
@@ -78,7 +78,7 @@ export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenW
 }) {
   const [toolClientId, setToolClientIdState] = useState(() => { try { return window.localStorage.getItem("f2b-ops-client") || ""; } catch { return ""; } });
   useFocusClient((id) => { if (id) setToolClientIdState(id); });
-  const setToolClientId = (id: string) => { setToolClientIdState(id); try { window.localStorage.setItem("f2b-ops-client", id); } catch { /* storage unavailable */ } };
+  const setToolClientId = (id: string) => { setToolClientIdState(id); if (id) setFocusClient(id); try { window.localStorage.setItem("f2b-ops-client", id); } catch { /* storage unavailable */ } };
   const [siteMode, setSiteMode] = useState<"sites" | "media">("sites");
   const [localMode, setLocalMode] = useState<"business" | "ai">("business");
   const [reportMode, setReportMode] = useState<"audits" | "reports">("audits");
@@ -126,12 +126,14 @@ export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenW
   const totalApprovals = rows.reduce((sum, row) => sum + row.approvals, 0);
 
   const selected = active.find((client) => client.id === toolClientId) || active[0];
+  // The top-bar client picker drives every Operations tool; when it's on "All clients", show the client being used there.
+  const needsClient = tab !== "overview" && tab !== "onboarding" && tab !== "automations" && tab !== "leadfactory";
+  useEffect(() => { if (needsClient && selected && !readFocusClient()) setFocusClient(selected.id); }, [needsClient, selected?.id]);
   const seg = <K extends string>(value: K, set: (key: K) => void, items: Array<[K, string]>, label: string) => <span className="ops-seg" role="tablist" aria-label={label}>{items.map(([key, text]) => <button type="button" role="tab" key={key} aria-selected={value === key} className={value === key ? "active" : ""} onClick={() => set(key)}>{text}</button>)}</span>;
   const seoLocation = ((selected as OpsClient & { seoLocations?: string[] } | undefined)?.seoLocations || [])[0] || "Ireland";
 
   return <section className="ops-centre">
     <div className="page-heading ops-heading"><div><p className="eyebrow">Agency</p><h1>Operations</h1></div>
-      {tab !== "overview" && tab !== "onboarding" && tab !== "automations" && tab !== "leadfactory" && tab !== "forms" && !(tab === "websites" && siteMode === "sites") && !(tab === "local" && localMode === "business") && selected && <label className="ops-client-pick ops-client-shared"><span className="ops-client-question">Which client are we working on?</span><select aria-label="Client for all Operations tools" value={selected.id} onChange={(event) => setToolClientId(event.target.value)}>{active.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></label>}
     </div>
     <div className="ops-tabs" role="tablist" aria-label="Operations sections">
       {([["overview", "Overview"], ["seo", "SEO & Research"], ["ads", "Google Ads"], ["websites", "Websites"], ["forms", "Forms"], ["local", "Local & AI"], ["reports", "Reports"], ["automations", "Automations"], ["leadfactory", "Lead Factory"]] as Array<[OperationsTab, string]>).filter(([key]) => (!["seo", "ads", "reports"].includes(key) || renderTool) && (key !== "automations" || Boolean(automations)) && (key !== "leadfactory" || hasLeadFactory)).map(([key, label]) => { const Icon = OPS_TAB_ICONS[key]; return <button type="button" role="tab" key={key} aria-selected={tab === key || (key === "overview" && tab === "onboarding")} className={tab === key || (key === "overview" && tab === "onboarding") ? "active" : ""} onClick={() => onTab(key)}>{Icon && <Icon size={16} strokeWidth={1.9} aria-hidden="true" className="ops-tab-icon" />}{label}</button>; })}
