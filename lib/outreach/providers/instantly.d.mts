@@ -1,0 +1,20 @@
+export type Mailbox = { email: string; domain: string; firstName: string; lastName: string; status: string; statusCode: number | null; warmupStatus: string; warmupScore: number | null; dailyLimit: number | null; mailProvider: string; setupPending: boolean; tags: string[] };
+export const ACCOUNT_STATUS: Record<number, string>;
+export const WARMUP_STATUS: Record<number, string>;
+export const PROVIDER_CODE: Record<number, string>;
+export function normaliseAccount(item: unknown): Mailbox;
+export function createInstantlyClient(apiKey: string, deps?: { fetchImpl?: typeof fetch; sleepImpl?: (ms: number) => Promise<void> }): {
+  name: "instantly";
+  verify(): Promise<true>;
+  listAccounts(options?: { maxPages?: number }): Promise<Mailbox[]>;
+  setWarmup(emails: string[], enabled: boolean): Promise<Array<{ id: string; status: string }>>;
+  backgroundJob(id: string): Promise<unknown>;
+  pauseAccount(email: string): Promise<Mailbox>;
+  resumeAccount(email: string): Promise<Mailbox>;
+  setDailyLimit(email: string, dailyLimit: number): Promise<Mailbox>;
+  warmupAnalytics(emails: string[]): Promise<unknown>;
+  listCampaigns(options?: { maxPages?: number }): Promise<unknown[]>;
+  campaignAnalytics(options?: { startDate?: string; endDate?: string; campaignId?: string }): Promise<unknown>;
+  listReceived(options?: { limit?: number; cursor?: string; campaignId?: string }): Promise<{ items: unknown[]; next: string | null }>;
+  reply(input: { replyToId: string; fromAccount: string; subject: string; html?: string; text?: string }): Promise<unknown>;
+};

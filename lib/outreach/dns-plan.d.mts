@@ -1,0 +1,10 @@
+export type DnsRecord = { id: string; type: string; name: string; content: string; priority?: number };
+export type DnsAction = { op: "create" | "update" | "delete"; type: string; name: string; content?: string; priority?: number; recordId?: string; before?: DnsRecord; reason: string };
+export type DnsConflict = { type: string; name: string; found: string[]; expected?: string[]; message: string };
+export type DesiredDns = { mx?: Array<{ host: string; priority: number }>; spfIncludes?: string[]; dkim?: Array<{ selector: string; type: "TXT" | "CNAME"; value: string }>; dmarc?: { policy?: "none" | "quarantine" | "reject"; rua?: string } };
+export function parseSpf(content: string): { terms: string[]; allTerm: string | null } | null;
+export function spfLookupCount(content: string): number;
+export function mergeSpf(existing: string | null | undefined, includes: string[], defaultAll?: string): string;
+export function dmarcValue(options?: { policy?: string; rua?: string; pct?: number; aspf?: string; adkim?: string }): string;
+export function planDomainDns(input: { domain: string; protected?: boolean; existing?: DnsRecord[]; managedRecordIds?: Iterable<string>; desired?: DesiredDns }): { actions: DnsAction[]; conflicts: DnsConflict[]; warnings: string[]; ok: string[] };
+export function canTightenDmarc(current: "none" | "quarantine" | "reject", target: "none" | "quarantine" | "reject", evidence: { reportDays: number; messagesSeen: number; legitimateUnalignedSources: number }, options?: { minDays?: number; minMessages?: number }): { allowed: boolean; reason: string };
