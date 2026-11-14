@@ -276,3 +276,13 @@ html body .app-shell .crm-stage-header .crm-stage-action:first-child, html body 
 html body .app-shell .crm-stage > :not(.crm-stage-header) { margin-left: 10px; margin-right: 10px; }
 html body .app-shell .crm-stage .crm-empty-stage { padding: 22px 6px !important; font-size: 12px !important; opacity: .7; }
 @media (hover: none) { html body .app-shell .crm-stage-header .crm-stage-actions { opacity: 1; } }
+/* Stage header v2: name gets the full column width; count, total and actions on the second row */
+html body .app-shell .crm-stage > .crm-stage-header { position: relative; grid-template-columns: auto minmax(0, 1fr) auto !important; grid-template-areas: "title title title" "total count actions" !important; }
+html body .app-shell .crm-stage-header .crm-stage-title { display: contents !important; }
+html body .app-shell .crm-stage-header .crm-stage-heading { grid-area: title; display: block !important; min-width: 0; padding-right: 16px; }
+html body .app-shell .crm-stage-header .crm-stage-heading h2 { font-size: 14px !important; word-break: normal !important; overflow-wrap: anywhere; hyphens: auto; }
+html body .app-shell .crm-stage-header .crm-stage-drag-handle { position: absolute; top: 9px; right: 6px; opacity: 0; transition: opacity .15s ease; cursor: grab; }
+html body .app-shell .crm-stage:hover .crm-stage-drag-handle, html body .app-shell .crm-stage-drag-handle:focus-visible { opacity: .7; }
+html body .app-shell .crm-stage-header .crm-stage-title > span { grid-area: count; justify-self: start; }
+html body .app-shell .crm-stage-header .crm-stage-total { grid-area: total; }
+@media (hover: none) { html body .app-shell .crm-stage-header .crm-stage-drag-handle { opacity: .6; } }
