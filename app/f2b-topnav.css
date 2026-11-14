@@ -507,3 +507,8 @@ html body .modal .finance-receipt-link { display:inline-flex; align-items:center
 html body .modal .finance-receipt-pick { cursor:pointer; display:inline-flex; align-items:center; padding:7px 14px; font-size:.85rem; }
 html body .modal .finance-receipt-remove { border:0; background:transparent; font-size:1.1rem; color:#b42318; cursor:pointer; padding:2px 6px; }
 html body .finance-row .finance-receipt-chip { margin-left:6px; text-decoration:none; font-size:.85em; }
+/* Top bar items: even spacing, and the hover ring stays inside each item so it never touches a neighbour or gets clipped at the bar's edge */
+.tn-nav.tn-nav-all { gap: 4px; padding: 5px; }
+html body .app-shell.topnav-layout .tn-nav .tn-item.tn-item.tn-item:not(:disabled):hover { transform: translateY(-1px); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--brand-secondary-ink, #1e3a8a) 40%, transparent) !important; }
+html body .app-shell.dark-mode.topnav-layout .tn-nav .tn-item.tn-item.tn-item:not(:disabled):hover { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--brand-secondary-ink-dark, #9fb3ff) 50%, transparent) !important; }
+html body .app-shell.client-scoped.topnav-layout .tn-nav .tn-item.tn-item.tn-item:not(:disabled):hover { box-shadow: inset 0 0 0 2px var(--sb-edge, rgba(255,255,255,.35)) !important; }
