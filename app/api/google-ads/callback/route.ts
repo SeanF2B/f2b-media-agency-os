@@ -3,6 +3,7 @@ import { getChatGPTUser } from "../../../chatgpt-auth";
 import { encryptRefreshToken } from "@/lib/google-ads-direct";
 import { encryptCalendarRefreshToken, syncGoogleCalendarTasks } from "@/lib/google-calendar";
 import { saveDriveConnection } from "@/lib/media-library/server";
+import { saveGmail } from "@/lib/bookkeeping-email";
 
 export const dynamic = "force-dynamic";
 
@@ -94,6 +95,35 @@ function finishDrive(request: Request, result: string) {
   return new Response(null, { status: 302, headers: { Location: url.toString(), "Set-Cookie": "f2b_google_drive_oauth_state=; Max-Age=0; Path=/api/google-ads; Secure; HttpOnly; SameSite=Lax", "Cache-Control": "no-store" } });
 }
 
+function finishGmail(request: Request, result: string) {
+  const url = new URL("/", request.url);
+  url.searchParams.set("page", "Bookkeeping");
+  url.searchParams.set("gmailConnection", result);
+  return new Response(null, { status: 302, headers: { Location: url.toString(), "Set-Cookie": "f2b_gmail_oauth_state=; Max-Age=0; Path=/api/google-ads; Secure; HttpOnly; SameSite=Lax", "Cache-Control": "no-store" } });
+}
+
+async function completeGmailConnection(request: Request, ownerId: string, state: string, code: string) {
+  const [, scopeId = "agency", nonce = ""] = state.split(":");
+  const cookie = request.headers.get("cookie")?.split(";").map((item) => item.trim()).find((item) => item.startsWith("f2b_gmail_oauth_state="))?.slice("f2b_gmail_oauth_state=".length) || "";
+  const url = new URL(request.url);
+  if (url.searchParams.has("error")) return finishGmail(request, "cancelled");
+  if (!nonce || !cookie || nonce !== cookie || !code || !env.GOOGLE_ADS_CLIENT_ID || !env.GOOGLE_ADS_CLIENT_SECRET || !env.GOOGLE_ADS_TOKEN_ENCRYPTION_KEY) return finishGmail(request, "oauth-failed");
+  try {
+    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ code, client_id: env.GOOGLE_ADS_CLIENT_ID, client_secret: env.GOOGLE_ADS_CLIENT_SECRET, redirect_uri: `${url.origin}/api/google-ads/callback`, grant_type: "authorization_code" }), signal: AbortSignal.timeout(15000) });
+    const tokens = await tokenResponse.json() as { access_token?: string; refresh_token?: string; scope?: string };
+    if (!tokenResponse.ok || !tokens.access_token) return finishGmail(request, "oauth-failed");
+    if (!tokens.refresh_token) return finishGmail(request, "refresh-token-missing");
+    if (!String(tokens.scope || "").includes("gmail")) return finishGmail(request, "scope-missing");
+    const profileResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", { headers: { Authorization: `Bearer ${tokens.access_token}` }, signal: AbortSignal.timeout(10000) });
+    const profile = profileResponse.ok ? await profileResponse.json() as { email?: string } : {};
+    await saveGmail(ownerId, scopeId, tokens.refresh_token, profile.email || "");
+    return finishGmail(request, "connected");
+  } catch (error) {
+    console.error("Gmail OAuth callback failed", error instanceof Error ? error.message : "unknown");
+    return finishGmail(request, "oauth-failed");
+  }
+}
+
 async function completeDriveConnection(request: Request, ownerId: string, state: string, code: string) {
   const cookie = request.headers.get("cookie")?.split(";").map((item) => item.trim()).find((item) => item.startsWith("f2b_google_drive_oauth_state="))?.slice("f2b_google_drive_oauth_state=".length) || "";
   const url = new URL(request.url);
@@ -126,6 +156,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const state = url.searchParams.get("state") || "";
   if (state.startsWith("calendar:")) return completeCalendarConnection(request, data, state, url.searchParams.get("code") || "");
+  if (state.startsWith("gmail:")) return completeGmailConnection(request, String(data.ownerId || user.userId), state, url.searchParams.get("code") || "");
   if (state.startsWith("drive:")) return completeDriveConnection(request, String(data.ownerId || user.userId), state, url.searchParams.get("code") || "");
   if (state.startsWith("searchConsole:")) return completeSearchConsoleConnection(request, String(data.ownerId || user.userId), state.slice("searchConsole:".length), url.searchParams.get("code") || "");
   const cookie = request.headers.get("cookie")?.split(";").map((item) => item.trim()).find((item) => item.startsWith("f2b_google_ads_oauth_state="))?.slice("f2b_google_ads_oauth_state=".length) || "";
