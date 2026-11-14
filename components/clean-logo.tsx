@@ -19,8 +19,20 @@ async function stripBackground(src: string): Promise<string> {
   ctx.drawImage(img, 0, 0, w, h);
   const data = ctx.getImageData(0, 0, w, h); const px = data.data;
   const at = (x: number, y: number) => (y * w + x) * 4;
+  // Trims empty transparent margins so small wordmarks fill the space they're given.
+  const cropped = () => {
+    let x0 = w, y0 = h, x1 = -1, y1 = -1;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (px[at(x, y) + 3] > 16) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    if (x1 < 0) return canvas.toDataURL("image/png");
+    const pad = Math.round(Math.max(x1 - x0, y1 - y0) * 0.04);
+    x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(w - 1, x1 + pad); y1 = Math.min(h - 1, y1 + pad);
+    if ((x1 - x0 + 1) * (y1 - y0 + 1) > w * h * 0.92) return canvas.toDataURL("image/png");
+    const out = document.createElement("canvas"); out.width = x1 - x0 + 1; out.height = y1 - y0 + 1;
+    out.getContext("2d")!.drawImage(canvas, x0, y0, out.width, out.height, 0, 0, out.width, out.height);
+    return out.toDataURL("image/png");
+  };
   const corners = [at(0, 0), at(w - 1, 0), at(0, h - 1), at(w - 1, h - 1)].filter((i) => px[i + 3] > 200);
-  if (corners.length < 3) return src; // already transparent
+  if (corners.length < 3) return cropped(); // already transparent
   const [br, bg, bb] = [0, 1, 2].map((c) => Math.round(corners.reduce((sum, i) => sum + px[i + c], 0) / corners.length));
   const dist = (i: number) => Math.max(Math.abs(px[i] - br), Math.abs(px[i + 1] - bg), Math.abs(px[i + 2] - bb));
   if (corners.filter((i) => dist(i) < 28).length < 3) return src; // corners disagree: no flat background
@@ -36,7 +48,7 @@ async function stripBackground(src: string): Promise<string> {
   }
   if (cleared > w * h * 0.97) return src; // would erase the whole logo
   ctx.putImageData(data, 0, 0);
-  return canvas.toDataURL("image/png");
+  return cropped();
 }
 
 export function useCleanLogo(src?: string | null): string {
