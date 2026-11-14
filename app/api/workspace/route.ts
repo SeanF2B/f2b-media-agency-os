@@ -1,7 +1,7 @@
 import { assertDeletable, AccountError } from "@/lib/client-accounts/client-accounts-core";
 import { getChatGPTUser } from "../../chatgpt-auth";
 import { env } from "cloudflare:workers";
-import { enforceOwnerOnlyOverview, fullTeamPermissions, getMemberPermissions, type TeamPermissions } from "@/lib/access-permissions";
+import { enforceOwnerOnlyOverview, fullTeamPermissions, getMemberPermissions, isSubAccountRole, type TeamPermissions } from "@/lib/access-permissions";
 import { canViewAiAssignedTask, isAiAssignedTask } from "@/lib/ai-task-access";
 import { applyPendingReason } from "@/lib/task-pending-reason";
 
@@ -119,7 +119,11 @@ export async function GET() {
         visible = {
           ...normalized,
           settings: { ...normalized.settings, adminEmail: "" },
-          staff: permissions.team ? normalized.staff : normalized.staff.filter((member: Staff) => member.id === profile?.id),
+          // Sub-account staff only ever see people in their own sub-account (plus account-level AI agents), never the wider agency team.
+          staff: !permissions.team ? normalized.staff.filter((member: Staff) => member.id === profile?.id)
+            : isSubAccountRole((profile as any)?.role) && Array.isArray((profile as any)?.clientAccessIds)
+              ? normalized.staff.filter((member: any) => member.id === profile?.id || (member.isBot && member.botLevel !== "admin") || (Array.isArray(member.clientAccessIds) && member.clientAccessIds.some((id: string) => (profile as any).clientAccessIds.includes(id))))
+              : normalized.staff,
           clients: safeClients,
           projects: visibleProjects,
           tasks: visibleTasks,

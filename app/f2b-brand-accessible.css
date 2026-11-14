@@ -9405,3 +9405,12 @@ html body.f2b-dark .f2b-on-light:is(input, textarea, #f2b-white-text-override)::
 @media (max-width:900px) { .kw-research-form { grid-template-columns:1fr 1fr; } .kw-f-seeds, .kw-f-go { grid-column:1 / -1; } .saved-kw { grid-template-columns:1fr; } .saved-kw-groups { position:static; } }
 .book-tabs { margin: 0 0 14px; }
 .book-tabs + .bs, .bs + .bs { margin-top: 14px; }
+/* Team: staff type / access level */
+.staff-type-seg { display: inline-flex; gap: 4px; padding: 4px; border-radius: 10px; background: rgba(127,127,127,.12); width: fit-content; }
+.staff-type-seg button { border: 0; background: transparent; padding: 8px 14px; border-radius: 8px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; color: inherit; }
+.staff-type-seg button.on { background: var(--brand-primary, #1677c8); color: var(--brand-primary-fg, #fff) !important; }
+.permission-checks label.is-disabled { opacity: .45; }
+.team-type-filter { margin: 0 0 14px; }
+.team-type-filter small { opacity: .7; margin-left: 4px; }
+.team-type-line { margin: 2px 0 0; font-size: 12px; font-weight: 600; color: var(--brand-primary, #1677c8); }
+.team-type-line.subaccount { color: #b45309; }
