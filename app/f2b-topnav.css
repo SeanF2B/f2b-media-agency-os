@@ -127,3 +127,7 @@ html body .app-shell.topnav-layout .tn-bar .client-scope .client-scope-trigger, 
 html body .app-shell.dark-mode.topnav-layout .tn-bar .client-scope .client-scope-trigger, html body .app-shell.dark-mode.topnav-layout .tn-bar .client-scope .client-scope-name { color: #f2f6f8 !important; }
 html body .app-shell.dark-mode.topnav-layout .tn-bar .client-scope-menu, html body .app-shell.dark-mode.topnav-layout .tn-bar .client-scope-menu button { color: #f2f6f8 !important; }
 html body .app-shell.topnav-layout:not(.dark-mode) .tn-bar .client-scope-menu button { color: #1f2a33 !important; }
+/* Keep client logos visible: dark logos get a soft light tile in dark mode, light logos a dark tile in light mode. */
+.tn-logo-client:has(img[data-ink="dark"]), .tn-logo-client:has(img[data-ink="light"]) { transition: background .2s ease; border-radius: 14px; }
+.app-shell.dark-mode .tn-logo-client:has(img[data-ink="dark"]), .app-shell.dark-mode .tn-logo-client:has(img[data-ink="mid"]) { background: rgba(255,255,255,.9); box-shadow: inset 0 1px 0 #fff, 0 4px 14px rgba(0,0,0,.25); padding: 0 10px; }
+.app-shell:not(.dark-mode) .tn-logo-client:has(img[data-ink="light"]) { background: var(--brand-sidebar, #1f2a33); padding: 0 10px; }

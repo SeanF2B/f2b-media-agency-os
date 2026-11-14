@@ -6,7 +6,11 @@ const cache = new Map<string, string>();
 
 // Removes a flat background (usually white) baked into a logo: flood-fills from the image edges,
 // making pixels close to the corner colour transparent. Falls back to the original on any failure.
+let inkOut: Ink = "mid";
+export type Ink = "dark" | "light" | "mid";
+const inkCache = new Map<string, Ink>();
 async function stripBackground(src: string): Promise<string> {
+  inkOut = "mid";
   const img = new Image();
   img.crossOrigin = "anonymous";
   img.decoding = "async";
@@ -20,7 +24,10 @@ async function stripBackground(src: string): Promise<string> {
   const data = ctx.getImageData(0, 0, w, h); const px = data.data;
   const at = (x: number, y: number) => (y * w + x) * 4;
   // Trims empty transparent margins so small wordmarks fill the space they're given.
+  // Average brightness of the visible logo pixels, so the top bar can give dark logos a light tile in dark mode (and vice versa).
+  const measureInk = () => { let sum = 0, n = 0; for (let i = 0; i < px.length; i += 16) { if (px[i + 3] > 128) { sum += 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2]; n++; } } inkOut = n ? (sum / n < 110 ? "dark" : sum / n > 170 ? "light" : "mid") : "mid"; };
   const cropped = () => {
+    measureInk();
     let x0 = w, y0 = h, x1 = -1, y1 = -1;
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (px[at(x, y) + 3] > 16) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
     if (x1 < 0) return canvas.toDataURL("image/png");
@@ -58,7 +65,7 @@ export function useCleanLogo(src?: string | null): string {
     const hit = cache.get(src); if (hit) { setOut(hit); return; }
     setOut(src);
     let live = true;
-    stripBackground(src).catch(() => src).then((result) => { cache.set(src, result); if (live) setOut(result); });
+    stripBackground(src).catch(() => src).then((result) => { cache.set(src, result); inkCache.set(src, inkOut); if (live) setOut(result); });
     return () => { live = false; };
   }, [src]);
   return out;
@@ -66,5 +73,5 @@ export function useCleanLogo(src?: string | null): string {
 
 export function CleanLogo({ src, alt, className }: { src: string; alt: string; className?: string }) {
   const clean = useCleanLogo(src);
-  return clean ? <img className={className} src={clean} alt={alt} /> : null;
+  return clean ? <img className={className} src={clean} alt={alt} data-ink={inkCache.get(src) || "mid"} /> : null;
 }
