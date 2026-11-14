@@ -25,6 +25,7 @@ const SITES: Record<string, SiteConfig> = {
     notify: ["proroofersgalway@gmail.com"],
   },
 };
+const TEST_INBOX = "sean@f2bmedia.com";
 const APP_URL = "https://f2b-media-agency-os.f2b-media.workers.dev";
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
@@ -170,16 +171,20 @@ async function saveLead(request: Request, env: Env, site: SiteConfig) {
         attachments.push({ filename: `photo-${i + 1}.${key.split(".").pop()}`, content: btoa(bin) });
       }
       const mail = leadEmail(site, { kind, job, answers, urgency, property, town, details, name, phone, email, photos: attachments.length, channel, page, when: now });
+      // Test leads (flag set only by the edge Worker for an authorised test) go to the agency, not the client.
+      const isTest = b.test === true;
+      const to = isTest ? [TEST_INBOX] : site.notify;
+      if (isTest) mail.subject = `TEST – ${mail.subject}`;
       const fromAddr = (env.TASK_NOTIFICATION_FROM.match(/<([^>]+)>/)?.[1] || env.TASK_NOTIFICATION_FROM).trim();
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json", "Idempotency-Key": `site-lead/${subKey}` },
-        body: JSON.stringify({ from: `${site.name} Website <${fromAddr}>`, to: site.notify, subject: mail.subject, html: mail.html, text: mail.text, ...(email ? { reply_to: email } : {}), ...(attachments.length ? { attachments } : {}) }),
+        body: JSON.stringify({ from: `${site.name} Website <${fromAddr}>`, to, subject: mail.subject, html: mail.html, text: mail.text, ...(email ? { reply_to: email } : {}), ...(attachments.length ? { attachments } : {}) }),
         signal: AbortSignal.timeout(20_000),
       });
       const out = await res.json().catch(() => null) as { id?: string; message?: string } | null;
-      emailStatus = res.ok ? `sent to ${site.notify.join(", ")} (${out?.id || "accepted"})` : `failed: HTTP ${res.status} ${out?.message || ""}`.trim();
-      if (res.ok) await logSystemEmail(db as never, { ownerId: owner, clientId: site.clientId, to: site.notify.join(", "), subject: mail.subject, text: mail.text }).catch(() => undefined);
+      emailStatus = res.ok ? `sent to ${to.join(", ")} (${out?.id || "accepted"})` : `failed: HTTP ${res.status} ${out?.message || ""}`.trim();
+      if (res.ok) await logSystemEmail(db as never, { ownerId: owner, clientId: site.clientId, to: to.join(", "), subject: mail.subject, text: mail.text }).catch(() => undefined);
     } catch (e) { emailStatus = `failed: ${e instanceof Error ? e.message : "error"}`; }
   }
   if (stage) await db.prepare("INSERT INTO crm_activities (id, owner_id, opportunity_id, contact_id, activity_type, body, created_by, created_at) VALUES (?1,?2,?3,?4,'note',?5,?6,?7)")
