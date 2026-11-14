@@ -82,7 +82,9 @@
 .tn-right { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
 .tn-right .top-actions { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
 .tn-right .save-state, .tn-right .install-app-button, .tn-right .staff-view-pick { display: none !important; }
-.tn-right .theme-toggle span, .tn-right .ai-assistant-quick-link span { display: none; }
+.tn-right .theme-toggle > span:not(.f2b-ico), .tn-right .ai-assistant-quick-link > span:not(.ai-eyes-icon) { display: none; }
+.tn-right .f2b-ico { width: 18px !important; height: 18px !important; margin: 0 !important; font-size: 18px; }
+.tn-right .ai-assistant-quick-link .ai-eyes-icon { margin: 0; }
 .tn-right .theme-toggle, .tn-right .notes-quick-trigger, .tn-right .activity-quick-trigger, .tn-right .ai-assistant-quick-link {
   width: 40px; height: 40px; min-width: 40px; padding: 0 !important; display: inline-flex; align-items: center; justify-content: center;
   border-radius: 12px !important; background: rgba(255,255,255,.55) !important; border: 1px solid rgba(20,30,40,.1) !important; position: relative; }
