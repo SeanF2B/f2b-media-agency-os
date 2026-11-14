@@ -105,3 +105,12 @@
 .app-shell .chess-pause-resume:active { transform:translateY(3px); box-shadow:0 1px 0 #4f7a26; }
 @keyframes chess-pause-in { from { opacity:0; } to { opacity:1; } }
 @media (max-width:650px) { .app-shell .chess-pause .chess-player-avatar { width:60px; height:60px; } .app-shell .chess-pause-players { gap:12px; } }
+
+/* ===== Chess: game-over overlay (dark backdrop; confetti only on a win) ===== */
+.app-shell .chess-final-overlay { position:fixed; inset:0; z-index:9999; display:grid; place-items:center; padding:20px; background:rgba(4,8,14,.8); backdrop-filter:blur(4px); animation:chess-pause-in .3s ease-out both; overflow:hidden; }
+.app-shell .chess-final-overlay.loss { background:radial-gradient(circle at center, rgba(40,8,12,.72), rgba(4,6,10,.9)); }
+.app-shell .chess-final-overlay .chess-final { position:static; width:min(92vw, calc(100dvh - 140px), 620px); }
+.app-shell .chess-final-overlay .chess-final-confetti { position:fixed; inset:0; z-index:1; }
+.app-shell .chess-final-overlay .chess-final-board, .app-shell .chess-final-overlay .chess-final-actions { position:relative; z-index:2; }
+.app-shell .chess-final-overlay .chess-final-confetti i { animation-duration:2.6s; }
+@keyframes chess-final-confetti { 0% { opacity:1; transform:translateY(0) rotate(0); } 100% { opacity:0; transform:translateY(105vh) rotate(var(--r)); } }

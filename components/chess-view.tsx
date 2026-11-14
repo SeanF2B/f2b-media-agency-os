@@ -436,6 +436,7 @@ export function ChessView({ staff, currentUserId, canPlay = true, openInviteId =
   const retryAiMove = (gameId: string) => { aiRetryCounts.current.delete(gameId); stockfishJobs.current.delete(gameId); setFailedAiGameId(null); setError(""); setAiRetryNonce((nonce) => nonce + 1); };
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && finalGameId) { closeFinal(finalGameId); return; }
       if (event.key !== "Escape" || !selectedActiveGameId) return;
       const target = event.target as HTMLElement | null;
       if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
@@ -445,7 +446,8 @@ export function ChessView({ staff, currentUserId, canPlay = true, openInviteId =
     const onVisibility = () => { if (document.visibilityState === "hidden" && selectedActiveGameId) setPausedGameId(selectedActiveGameId); };
     window.addEventListener("keydown", onKey); document.addEventListener("visibilitychange", onVisibility);
     return () => { window.removeEventListener("keydown", onKey); document.removeEventListener("visibilitychange", onVisibility); };
-  }, [selectedActiveGameId, selected]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedActiveGameId, selected, finalGameId]);
   const closeFinal = (gameId: string) => { setClosedFinalIds((ids) => ids.includes(gameId) ? ids : [...ids, gameId]); setFinalGameId((current) => current === gameId ? null : current); };
   const rematch = (game: Game) => {
     closeFinal(game.id);
@@ -490,7 +492,7 @@ export function ChessView({ staff, currentUserId, canPlay = true, openInviteId =
         }))}</div></div></div><p className="chess-turn-note">{game.mode === "ai" && thinkingGameId === game.id ? "AI is thinking…" : isMyTurn ? "Your turn. Click or drag a piece to its destination." : game.mode === "ai" ? "AI is thinking…" : "Waiting for your opponent. The board refreshes automatically."}</p>{failedAiGameId === game.id && <button className="secondary-button" onClick={() => retryAiMove(game.id)}>Retry AI’s move</button>}
       </article>; })}</div>{people.length > 0 && <aside className="chess-board-sidebar"><ChessLeaderboard leaderboard={leaderboard} currentUserId={currentUserId} /></aside>}</div></section>}
       {!active.length && people.length > 0 && <ChessLeaderboard leaderboard={leaderboard} currentUserId={currentUserId} />}
-      {endgameGame && <section className="chess-section chess-final-section"><ChessFinalBoard key={endgameGame.id} game={endgameGame} currentUserId={currentUserId} animate={endgameCueId === endgameGame.id} busy={busy} onClose={() => closeFinal(endgameGame.id)} onRematch={() => rematch(endgameGame)} onOutcome={(outcome) => { if (soundOn && audioRef.current) playEndSound(audioRef.current, outcome); }} /></section>}
+      {endgameGame && (finalGameId === endgameGame.id ? <div className={`chess-final-overlay ${endgameWinnerId === currentUserId ? "win" : endgameWinnerId ? "loss" : "draw"}`} role="dialog" aria-label="Game over"><ChessFinalBoard key={endgameGame.id} game={endgameGame} currentUserId={currentUserId} animate={endgameCueId === endgameGame.id} busy={busy} onClose={() => closeFinal(endgameGame.id)} onRematch={() => rematch(endgameGame)} onOutcome={(outcome) => { if (soundOn && audioRef.current) playEndSound(audioRef.current, outcome); }} /></div> : <section className="chess-section chess-final-section"><ChessFinalBoard key={endgameGame.id} game={endgameGame} currentUserId={currentUserId} animate={endgameCueId === endgameGame.id} busy={busy} onClose={() => closeFinal(endgameGame.id)} onRematch={() => rematch(endgameGame)} onOutcome={(outcome) => { if (soundOn && audioRef.current) playEndSound(audioRef.current, outcome); }} /></section>)}
       {!active.length && !pending.length && <div className="chess-empty panel"><span>♟</span><h2>No active games</h2><p>Start a game against AI or challenge a teammate.</p></div>}
     </>}
   </div>;
