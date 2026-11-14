@@ -112,7 +112,12 @@
   .tn-more-wrap { position: static; }
   .tn-more-menu { right: 8px; top: auto; margin-top: 54px; position: fixed; }
   .tn-bar .client-scope-trigger { max-width: 150px; min-width: 0; }
-  .tn-right .notes-quick-trigger { display: none !important; }
+  .tn-right .notes-quick-trigger, .tn-right .ai-assistant-quick-link, .tn-right .theme-toggle { display: none !important; }
+  .tn-bar { position: relative; top: 0; gap: 10px; padding: 8px 10px; }
+  .tn-left { gap: 8px; }
+  .tn-logo { height: 38px; min-width: 38px; }
+  .tn-logo-client img, .tn-logo-client .sidebar-client-logo { max-height: 36px; max-width: 70px; }
+  .tn-item { min-width: 44px; padding: 8px; }
 }
 @media (prefers-reduced-motion: reduce) { .tn-item { transition: none; } }
 /* Picker text must stay readable (beats older .client-scope rules) */
