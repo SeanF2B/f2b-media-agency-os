@@ -401,3 +401,13 @@ span.tt-pill { display: inline-block; text-align: center; color: #fff; font-weig
 .app-shell.dark-mode .tt-repeat { color: #c3b2ff; }
 .tt-muted { opacity: .4; }
 .tt-service { overflow: hidden; text-overflow: ellipsis; display: block; }
+
+/* Notes button removed from the top bar (notes live in each client profile) */
+html body .app-shell .tn-right .notes-quick-trigger { display: none !important; }
+
+/* Settings dropdowns and fields always look like fields */
+html body .app-shell .bs select, html body .app-shell .bs input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]), html body .app-shell .bs textarea { appearance: none; -webkit-appearance: none; padding: 10px 36px 10px 12px !important; border: 1px solid #cfd8de !important; border-radius: 10px !important; background-color: #fff !important; color: #1f2a33 !important; font: inherit; min-height: 42px; }
+html body .app-shell .bs input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]), html body .app-shell .bs textarea { padding-right: 12px !important; }
+html body .app-shell .bs select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235b6872' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important; background-repeat: no-repeat !important; background-position: right 12px center !important; cursor: pointer; }
+html body .app-shell.dark-mode .bs select, html body .app-shell.dark-mode .bs input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]), html body .app-shell.dark-mode .bs textarea { background-color: #1b2228 !important; border-color: #3c4850 !important; color: #eef3f6 !important; }
+html body .app-shell.dark-mode .bs select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a9b6bf' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important; }
