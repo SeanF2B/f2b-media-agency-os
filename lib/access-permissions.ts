@@ -86,5 +86,15 @@ export const ROLE_DESCRIPTIONS: Record<string, string> = {
   "Sub-account Viewer": "Read-only view of one sub-account's clients, projects, tasks and activity.",
 };
 /** Pages a teammate can be allowed to see (the sidebar). Admin-only pages are always admin-only. */
-export const VIEWABLE_PAGES = ["Tasks", "Clients", "Activity", "AI Assistant", "Team", "Report Studio", "Proposal Studio", "SEO", "Google Ads", "Meta Ads", "Media Library", "Tracking & Analytics", "Chess"] as const;
+export const VIEWABLE_PAGES = ["CRM", "Conversations", "Tasks", "Clients", "Activity", "AI Assistant", "Team", "Report Studio", "Proposal Studio", "SEO", "Google Ads", "Meta Ads", "Media Library", "Tracking & Analytics", "Chess"] as const;
 export function isSubAccountRole(role?: string) { return Boolean(role && (SUB_ACCOUNT_ROLES as readonly string[]).includes(role)); }
+/** Sub-account levels that can use that sub-account's Pipeline/contacts and Conversations. */
+export const CRM_ROLES = ["Sub-account Manager", "Sub-account User"] as const;
+/** Client ids a non-admin teammate may use the CRM / Conversations for, or [] when they can't. */
+export function crmClientScope(member: { role?: string; clientAccessIds?: unknown; pageAccess?: unknown } | null | undefined, page: "CRM" | "Conversations"): string[] {
+  if (!member || !(CRM_ROLES as readonly string[]).includes(member.role || "")) return [];
+  const ids = Array.isArray(member.clientAccessIds) ? member.clientAccessIds.map(String).filter(Boolean) : [];
+  if (!ids.length) return [];
+  if (Array.isArray(member.pageAccess) && !member.pageAccess.includes(page)) return [];
+  return ids;
+}

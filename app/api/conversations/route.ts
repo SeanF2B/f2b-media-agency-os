@@ -1,23 +1,26 @@
 import { env } from "cloudflare:workers";
-import { authorizeAdmin, respond } from "@/lib/settings-auth";
+import { authorizeAdminOrSubAccount, respond } from "@/lib/settings-auth";
 import { aiCredentialStorageReady } from "@/lib/ai-credentials";
 import { addMessage, botReply, ensureTables, loadSettings, saveSettings, sendTwilio, twilioCredentials, type NumberConfig } from "@/lib/conversations/core";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const auth = await authorizeAdmin("open Conversations");
+  const auth = await authorizeAdminOrSubAccount("open Conversations", "Conversations");
   if (auth.error) return auth.error;
+  const allowed = auth.scope; // null = admin (everything); otherwise this person's own sub-account ids
   try {
     await ensureTables();
     const url = new URL(request.url), view = url.searchParams.get("view") || "threads";
-    const scope = url.searchParams.get("clientId") || "agency";
+    const requested = url.searchParams.get("clientId") || "agency";
+    const scope = allowed ? (allowed.includes(requested) ? requested : allowed[0]) : requested;
+    if (allowed && view === "settings") return respond({ error: "Only an admin can change Conversation settings." }, 403);
     const { settings } = await loadSettings(auth.ownerId);
     if (view === "settings") return respond({ settings, secureStorageReady: aiCredentialStorageReady(), webhookUrl: `${url.origin}/api/marketing-public/twilio` });
     if (view === "thread") {
       const id = url.searchParams.get("id") || "";
       const thread = await env.DB!.prepare("SELECT * FROM conv_threads WHERE id=?1 AND owner_id=?2").bind(id, auth.ownerId).first();
-      if (!thread) return respond({ error: "That conversation could not be found." }, 404);
+      if (!thread || (allowed && !allowed.includes(String((thread as any).client_id || "")))) return respond({ error: "That conversation could not be found." }, 404);
       const messages = (await env.DB!.prepare("SELECT id, direction, sender, body, error, created_at FROM conv_messages WHERE thread_id=?1 ORDER BY created_at ASC LIMIT 300").bind(id).all()).results || [];
       await env.DB!.prepare("UPDATE conv_threads SET unread=0 WHERE id=?1").bind(id).run();
       return respond({ thread: { ...thread, unread: 0 }, messages });
@@ -30,20 +33,22 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await authorizeAdmin("use Conversations");
+  const auth = await authorizeAdminOrSubAccount("use Conversations", "Conversations");
   if (auth.error) return auth.error;
+  const allowed = auth.scope;
   let b: any; try { b = await request.json(); } catch { return respond({ error: "Send a valid request." }, 400); }
   try {
     await ensureTables();
     const action = String(b.action || "");
     if (action === "save-settings") {
+      if (allowed) return respond({ error: "Only an admin can change Conversation settings." }, 403);
       if (b.authToken && !aiCredentialStorageReady()) return respond({ error: "Secure storage needs a one-time server setup before the Auth Token can be saved." }, 503);
       await saveSettings(auth.ownerId, { accountSid: b.accountSid, authToken: b.authToken, numbers: Array.isArray(b.numbers) ? b.numbers as NumberConfig[] : undefined, botEnabled: b.botEnabled, botName: b.botName, businessInfo: b.businessInfo, botRules: b.botRules, handoffMessage: b.handoffMessage });
       return respond({ settings: (await loadSettings(auth.ownerId)).settings });
     }
     const id = String(b.id || "");
     const thread = id ? await env.DB!.prepare("SELECT * FROM conv_threads WHERE id=?1 AND owner_id=?2").bind(id, auth.ownerId).first<any>() : null;
-    if (!thread) return respond({ error: "That conversation could not be found." }, 404);
+    if (!thread || (allowed && !allowed.includes(String(thread.client_id || "")))) return respond({ error: "That conversation could not be found." }, 404);
     if (action === "send" && thread.channel === "email") {
       // Email reply from the inbox: sent from the system sender, replies come back to the person who wrote it.
       const text = String(b.body || "").trim().slice(0, 10000);

@@ -1,4 +1,5 @@
 import { crmScopeFrom } from "@/lib/client-accounts/client-accounts-api";
+import { crmClientScope } from "@/lib/access-permissions";
 import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "../../chatgpt-auth";
 
@@ -10,7 +11,7 @@ type WorkspaceData = { ownerId?: string; clients?: Array<{ id: string; name: str
 type PipelineRow = { id: string; name: string; description: string; stage_id: string | null; stage_name: string | null; stage_position: number | null; stage_category: StageCategory | null };
 type PipelineView = { id: string; name: string; description: string; clientId?: string | null; stages: Array<{ id: string; name: string; position: number; category: StageCategory }> };
 
-async function context() {
+async function context(request?: Request) {
   const user = await getChatGPTUser();
   if (!user) return { response: reply("Sign in before opening the CRM.", 401) };
   if (!env.DB) return { response: reply("The private workspace database is unavailable.", 503) };
@@ -21,7 +22,8 @@ async function context() {
       'staff', json(COALESCE((SELECT json_group_array(json_object(
         'id', json_extract(value, '$.id'), 'name', json_extract(value, '$.name'),
         'avatar', CASE WHEN substr(COALESCE(json_extract(value, '$.avatar'), ''), 1, 11) = 'data:image/' THEN '' ELSE json_extract(value, '$.avatar') END,
-        'email', json_extract(value, '$.email'), 'role', json_extract(value, '$.role'), 'isBot', json_extract(value, '$.isBot')
+        'email', json_extract(value, '$.email'), 'role', json_extract(value, '$.role'), 'isBot', json_extract(value, '$.isBot'),
+        'clientAccessIds', json(json_extract(value, '$.clientAccessIds')), 'pageAccess', json(json_extract(value, '$.pageAccess'))
       )) FROM json_each(data, '$.staff')), '[]'))
     ) AS data
     FROM workspace_documents WHERE id = 'f2b-agency'
@@ -30,8 +32,59 @@ async function context() {
   let workspace: WorkspaceData;
   try { workspace = JSON.parse(row.data); } catch { return { response: reply("The agency workspace data could not be read.", 503) }; }
   const admin = workspace.ownerId === user.userId || workspace.staff?.some((person: { email?: string; role?: string; isBot?: boolean }) => !person.isBot && person.email?.toLowerCase() === user.email.toLowerCase() && ["Owner", "Admin"].includes(person.role || ""));
-  if (!admin) return { response: reply("Only an agency owner or admin can manage CRM records.", 403) };
-  return { db: env.DB, ownerId: String(workspace.ownerId || ""), workspace, user };
+  if (!admin) {
+    // Sub-account staff (Manager / User) may use the CRM, locked to their own sub-account.
+    const me = (workspace.staff || []).find((person: any) => !person.isBot && String(person.email || "").toLowerCase() === user.email.toLowerCase());
+    const allowed = crmClientScope(me as any, "CRM").filter((id: string) => (workspace.clients || []).some((item) => String(item.id) === id));
+    if (!allowed.length) return { response: reply("Only an agency owner or admin can manage CRM records.", 403) };
+    const requested = request ? (crmScopeFrom(request) as { clientId: string | null } | null)?.clientId || "" : "";
+    const scopeClientId = allowed.includes(requested) ? requested : allowed[0];
+    const visibleStaff = (workspace.staff || []).filter((person: any) => person.isBot || (Array.isArray(person.clientAccessIds) && person.clientAccessIds.includes(scopeClientId)));
+    return { db: env.DB, ownerId: String(workspace.ownerId || ""), workspace: { ...workspace, clients: (workspace.clients || []).filter((item) => String(item.id) === scopeClientId), staff: visibleStaff } as WorkspaceData, user, scopeClientId };
+  }
+  return { db: env.DB, ownerId: String(workspace.ownerId || ""), workspace, user, scopeClientId: "" };
+}
+
+function withClientScope(request: Request, clientId: string) {
+  const url = new URL(request.url); url.searchParams.set("clientId", clientId);
+  return new Request(url.toString(), request);
+}
+/** For sub-account staff: every record an action touches must belong to their sub-account. Returns an error response or null. */
+async function scopedGuard(db: D1Database, ownerId: string, clientId: string, action: string, body: Record<string, unknown>): Promise<Response | null> {
+  const no = () => reply("That record is not in your sub-account.", 403);
+  const str = (v: unknown) => clean(v, 80);
+  const list = (v: unknown) => Array.isArray(v) ? [...new Set(v.map(str).filter(Boolean))].slice(0, 500) : [];
+  const contactOk = async (id: string, allowNew = false) => { const row = await db.prepare("SELECT client_id FROM crm_contacts WHERE owner_id=?1 AND id=?2").bind(ownerId, id).first<{ client_id: string | null }>(); return row ? row.client_id === clientId : allowNew; };
+  const pipelineOk = async (id: string) => { const row = await db.prepare("SELECT client_id FROM crm_pipelines WHERE owner_id=?1 AND id=?2").bind(ownerId, id).first<{ client_id: string | null }>(); return Boolean(row && row.client_id === clientId); };
+  const oppOk = async (id: string) => { const row = await db.prepare("SELECT p.client_id FROM crm_opportunities o JOIN crm_pipelines p ON p.id=o.pipeline_id AND p.owner_id=o.owner_id WHERE o.owner_id=?1 AND o.id=?2").bind(ownerId, id).first<{ client_id: string | null }>(); return Boolean(row && row.client_id === clientId); };
+  const all = async (ids: string[], check: (id: string) => Promise<boolean>) => { for (const id of ids) if (!await check(id)) return false; return true; };
+  if (body.clientId !== undefined && body.clientId !== null && body.clientId !== "" && body.clientId !== clientId) return no();
+  switch (action) {
+    case "saveContact": return str(body.id) && !await contactOk(str(body.id), true) ? no() : null;
+    case "deleteContacts": case "tagContacts": case "flagContacts": return await all(list(body.ids), (id) => contactOk(id)) ? null : no();
+    case "setFlag": return (body.kind === "contact" ? await contactOk(str(body.refId)) : await oppOk(str(body.refId))) ? null : no();
+    case "saveSmartList": case "deleteSmartList": {
+      if (!str(body.id)) return null;
+      const row = await db.prepare("SELECT client_id FROM crm_smart_lists WHERE owner_id=?1 AND id=?2").bind(ownerId, str(body.id)).first<{ client_id: string | null }>().catch(() => null);
+      return !row || row.client_id === clientId ? null : no();
+    }
+    case "createPipeline": return null; // created inside their sub-account (scope is forced)
+    case "createStage": case "updateStage": case "swapStages": case "reorderStages": case "deleteStage": case "archivePipeline": return await pipelineOk(str(body.pipelineId)) ? null : no();
+    case "createOpportunity": return await pipelineOk(str(body.pipelineId)) && (!str(body.contactId) || await contactOk(str(body.contactId))) ? null : no();
+    case "moveOpportunity": case "updateOpportunity": case "deleteOpportunity": case "updateOpportunityValue": case "updateOpportunityMeta":
+      if (!await oppOk(str(body.id))) return no();
+      if (str(body.pipelineId) && !await pipelineOk(str(body.pipelineId))) return no();
+      if (str(body.contactId) && !await contactOk(str(body.contactId))) return no();
+      return null;
+    case "reorderOpportunities": return await all(list(body.ids), oppOk) ? null : no();
+    case "addActivity": return (!str(body.contactId) || await contactOk(str(body.contactId))) && (!str(body.opportunityId) || await oppOk(str(body.opportunityId))) ? null : no();
+    case "updateActivity": case "deleteActivity": {
+      const row = await db.prepare("SELECT opportunity_id, contact_id FROM crm_activities WHERE owner_id=?1 AND id=?2").bind(ownerId, str(body.id)).first<{ opportunity_id: string | null; contact_id: string | null }>();
+      if (!row) return no();
+      return (row.opportunity_id && await oppOk(row.opportunity_id)) || (row.contact_id && await contactOk(row.contact_id)) ? null : no();
+    }
+    default: return reply("Only an agency admin can do that.", 403);
+  }
 }
 
 function clean(value: unknown, max = 500) { return typeof value === "string" ? value.trim().slice(0, max) : ""; }
@@ -69,7 +122,8 @@ async function ensurePipeline(db: D1Database, ownerId: string) {
 }
 
 export async function GET(request: Request) {
-  const access = await context(); if (access.response) return access.response;
+  const access = await context(request); if (access.response) return access.response;
+  if (access.scopeClientId) request = withClientScope(request, access.scopeClientId);
   const { db, ownerId, workspace } = access;
   try {
     await ensurePipeline(db, ownerId);
@@ -118,10 +172,16 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const access = await context(); if (access.response) return access.response;
+  const access = await context(request); if (access.response) return access.response;
+  if (access.scopeClientId) request = withClientScope(request, access.scopeClientId);
   const { db, ownerId, user } = access;
   let body: Record<string, unknown>; try { body = await request.json() as Record<string, unknown>; } catch { return reply("Send valid CRM details."); }
   const action = clean(body.action, 40), now = new Date().toISOString();
+  if (access.scopeClientId) {
+    const denied = await scopedGuard(db, ownerId, access.scopeClientId, action, body);
+    if (denied) return denied;
+    if (["saveContact", "createOpportunity"].includes(action)) body.clientId = access.scopeClientId;
+  }
   try {
     if (action === "syncClients") {
       await db.prepare("CREATE TABLE IF NOT EXISTS crm_client_sync_done (owner_id TEXT NOT NULL, client_id TEXT NOT NULL, PRIMARY KEY (owner_id, client_id))").run();

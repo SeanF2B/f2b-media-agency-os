@@ -1,10 +1,11 @@
-import type { TeamPermissions } from "./access-permissions";
+import { CRM_ROLES, type TeamPermissions } from "./access-permissions";
 
-export function canOpenPage(page: string, permissions: TeamPermissions, isAdmin: boolean, hasClientScope = false) {
+export function canOpenPage(page: string, permissions: TeamPermissions, isAdmin: boolean, hasClientScope = false, role = "") {
   return page === "Overview" ? permissions.overview || isAdmin
     : page === "Activity" || page === "Activity & Time" ? permissions.overview || permissions.timesheets || permissions.clientActivity || permissions.allActivity
     : page === "Clients" ? permissions.clients || hasClientScope
-    : page === "CRM" || page === "CRM Automations" || page === "Conversations" || page === "Invoicing" || page === "Bookkeeping" ? isAdmin
+    : page === "CRM" || page === "Conversations" ? isAdmin || (hasClientScope && (CRM_ROLES as readonly string[]).includes(role))
+    : page === "CRM Automations" || page === "Invoicing" || page === "Bookkeeping" ? isAdmin
     : page === "Tasks" ? permissions.tasks || permissions.aiTasks
     : page === "Operations" ? isAdmin
     : page === "SEO" || page === "Media Library" ? permissions.clients || hasClientScope || isAdmin
