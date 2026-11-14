@@ -57,7 +57,15 @@ export async function GET(request: Request) {
   const hostOf = (raw: string) => { try { return new URL(/^https?:/.test(raw) ? raw : `https://${raw}`).hostname.replace(/^www\./, ""); } catch { return ""; } };
   // Forms seen in submissions but not registered yet (e.g. Red Island's booking forms).
   const discovered = statRows.filter((s) => !known.has(s.form_key) && !removed.has(s.form_key)).map((s) => ({ id: "", clientId: s.client_id, formKey: s.form_key, name: s.name || s.form_key.split(":").pop() || "Form", site: hostOf(s.page) || hostOf(clients.find((c) => c.id === s.client_id)?.website || ""), definition: null, settings: null, updatedAt: "", updatedBy: "" }));
-  const all = [...registered, ...discovered].map((f) => { const s = byKey.get(f.formKey); return { ...f, clientName: clients.find((c) => c.id === f.clientId)?.name || "Unknown client", submissions: s?.n || 0, last30: s?.n30 || 0, lastAt: s?.last || "" }; });
+  // One form per client: a client's other form keys (e.g. the same booking form sent under different names)
+  // are folded into its main form, so their submissions still count and show.
+  const withStats = [...registered, ...discovered].map((f) => { const s = byKey.get(f.formKey); return { ...f, clientName: clients.find((c) => c.id === f.clientId)?.name || "Unknown client", submissions: s?.n || 0, last30: s?.n30 || 0, lastAt: s?.last || "", aliases: [] as string[] }; });
+  const all: typeof withStats = [];
+  for (const f of withStats.sort((a, b) => Number(Boolean(b.definition)) - Number(Boolean(a.definition)) || b.submissions - a.submissions)) {
+    const main = all.find((x) => x.clientId === f.clientId);
+    if (!main) { all.push(f); continue; }
+    main.aliases.push(f.formKey); main.submissions += f.submissions; main.last30 += f.last30; if (f.lastAt > main.lastAt) main.lastAt = f.lastAt;
+  }
   const clientIds = [...new Set(all.map((f) => f.clientId))].slice(0, 50);
   const stageRows = clientIds.length ? ((await db.prepare(`SELECT p.client_id, p.name AS pipeline, s.id, s.name FROM crm_pipelines p JOIN crm_pipeline_stages s ON s.pipeline_id=p.id AND s.owner_id=p.owner_id WHERE p.owner_id=?1 AND p.archived=0 AND p.client_id IN (${clientIds.map((_, i) => `?${i + 2}`).join(",")}) ORDER BY p.created_at, s.position LIMIT 400`).bind(ownerId, ...clientIds).all<{ client_id: string; pipeline: string; id: string; name: string }>()).results || []) : [];
   const stages: Record<string, Array<{ id: string; label: string }>> = {};

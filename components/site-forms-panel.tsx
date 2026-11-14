@@ -9,7 +9,7 @@ import type { FormDefinition, FormField, FormRule, FormSettings } from "@/lib/si
 // Pick a form → Submissions (history of every lead) · Logic (visual flow, drag to reorder, edit rules) · Settings · Change history.
 
 type Client = { id: string; name: string; logo?: string; color?: string };
-type FormRow = { id: string; clientId: string; clientName: string; formKey: string; name: string; site: string; definition: FormDefinition | null; settings: FormSettings | null; updatedAt: string; updatedBy: string; submissions: number; last30: number; lastAt: string };
+type FormRow = { id: string; clientId: string; clientName: string; formKey: string; name: string; site: string; definition: FormDefinition | null; settings: FormSettings | null; updatedAt: string; updatedBy: string; submissions: number; last30: number; lastAt: string; aliases?: string[] };
 type Stage = { id: string; label: string };
 type Tab = "submissions" | "logic" | "settings" | "history";
 
@@ -85,7 +85,7 @@ function FormDetail({ form, client, stages, clients, tab, onTab, onBack, onSaved
       {tab !== "submissions" && <span className="sf-save"><input value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="What changed? (optional)" aria-label="Change note" /><button type="button" className="primary-button" disabled={busy || !dirty} onClick={() => void save()}>{busy ? "Saving…" : "Save"}</button>{msg && <small role="status">{msg}</small>}</span>}
     </header>
     <nav className="ops-seg sf-tabs" role="tablist">{tabs.map(([key, label, Icon]) => <button type="button" role="tab" key={key} aria-selected={tab === key} className={tab === key ? "active" : ""} onClick={() => onTab(key)}><Icon size={14} /> {label}</button>)}</nav>
-    {tab === "submissions" && <FormSubmissionsView scopeClientId={form.clientId} clients={clients} active formKey={form.formKey} defaultPreset="12m" />}
+    {tab === "submissions" && <FormSubmissionsView scopeClientId={form.clientId} clients={clients} active formKey={form.aliases?.length ? undefined : form.formKey} defaultPreset="12m" />}
     {tab === "logic" && <LogicEditor def={def} onChange={editDef} stages={stages} />}
     {tab === "settings" && <SettingsEditor settings={settings} onChange={editSettings} stages={stages} />}
     {tab === "history" && (!form.id ? <p className="ops-empty">No saved changes yet. Every save is recorded here with who changed what.</p> : history === null ? <p className="ops-empty">Loading history…</p> : !history.length ? <p className="ops-empty">No changes yet.</p> :
