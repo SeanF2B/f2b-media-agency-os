@@ -1,0 +1,59 @@
+name: Outreach CI
+
+# Full production build + every test, for the Outreach branch and PRs into main.
+# Read-only: no secrets, no deploy. Failures are surfaced as annotations so they
+# can be read from the check-runs API.
+on:
+  push:
+    branches: ["outreach/**"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: outreach-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile 2>&1 | tee /tmp/install.log
+      - name: Unit + integration tests
+        run: |
+          set -o pipefail
+          node --test tests/*.test.mjs 2>&1 | tee /tmp/test.log
+      - name: Typecheck Outreach
+        run: |
+          set -o pipefail
+          npx tsc --noEmit -p tsconfig.json 2>&1 | tee /tmp/tsc-all.log | grep -E "outreach|crm-view|agency-app|operations-view|worker/" > /tmp/tsc.log || true
+          if [ -s /tmp/tsc.log ]; then cat /tmp/tsc.log; exit 1; fi
+      - name: Production build
+        run: |
+          set -o pipefail
+          pnpm build 2>&1 | tee /tmp/build.log
+      - name: End-to-end (built worker)
+        if: hashFiles('tests/e2e/*.mjs') != ''
+        run: |
+          set -o pipefail
+          node --test tests/e2e/*.mjs 2>&1 | tee /tmp/e2e.log
+      - name: Report failure details
+        if: failure()
+        run: |
+          for f in /tmp/test.log /tmp/tsc.log /tmp/build.log /tmp/e2e.log /tmp/install.log; do
+            [ -s "$f" ] || continue
+            grep -nE "not ok|Error|error|ERR|failed|✘|expected|actual" "$f" | tail -40 | while IFS= read -r line; do
+              echo "::error title=$(basename $f)::${line:0:900}"
+            done
+          done
