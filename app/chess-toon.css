@@ -114,3 +114,11 @@
 .app-shell .chess-final-overlay .chess-final-board, .app-shell .chess-final-overlay .chess-final-actions { position:relative; z-index:2; }
 .app-shell .chess-final-overlay .chess-final-confetti i { animation-duration:2.6s; }
 @keyframes chess-final-confetti { 0% { opacity:1; transform:translateY(0) rotate(0); } 100% { opacity:0; transform:translateY(105vh) rotate(var(--r)); } }
+
+/* ===== Chess: game over stays in place on the page; everything around it dims ===== */
+.app-shell .chess-final-section.is-spotlight { position:relative; z-index:60; }
+.app-shell .chess-final-section.is-spotlight .chess-final { width:min(100%,680px); border-radius:16px; box-shadow:0 0 0 200vmax rgba(4,8,14,.8); animation:chess-spotlight-in .35s ease-out both; }
+.app-shell .chess-final-section.is-spotlight.loss .chess-final { box-shadow:0 0 0 200vmax rgba(26,6,10,.82); }
+.app-shell .chess-final-section.is-spotlight .chess-final-confetti { position:fixed; inset:0; z-index:70; }
+.app-shell .chess-final-section.is-spotlight .chess-final-confetti i { animation-duration:2.6s; }
+@keyframes chess-spotlight-in { from { box-shadow:0 0 0 200vmax rgba(4,8,14,0); } }

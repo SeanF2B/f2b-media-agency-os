@@ -93,8 +93,10 @@ function ChessFinalBoard({ game, currentUserId, animate, busy, onRematch, onClos
   const last = latestMoveSquares(game.moves);
   const outcome = wId === currentUserId ? "win" : wId ? "loss" : "draw";
   const played = useRef(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (animate) boxRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); }, [animate]);
   useEffect(() => { if (animate && !played.current) { played.current = true; onOutcome?.(outcome); } }, [animate, outcome, onOutcome]);
-  return <div className={`chess-final ${outcome} ${animate ? "is-animating" : ""}`} role="img" aria-label={`Final position: ${game.result || "game over"}`}>
+  return <div ref={boxRef} className={`chess-final ${outcome} ${animate ? "is-animating" : ""}`} role="img" aria-label={`Final position: ${game.result || "game over"}`}>
     <div className={`chess-final-board ${flipped ? "flipped" : ""}`}>
       {Array.from({ length: 8 }, (_, r) => Array.from({ length: 8 }, (_, c) => {
         const fenRow = flipped ? 7 - r : r; const fenCol = flipped ? 7 - c : c;
@@ -507,7 +509,7 @@ export function ChessView({ staff, currentUserId, canPlay = true, openInviteId =
         }))}</div></div></div><p className="chess-turn-note">{game.mode === "ai" && thinkingGameId === game.id ? "AI is thinking…" : isMyTurn ? "Your turn. Click or drag a piece to its destination." : game.mode === "ai" ? "AI is thinking…" : "Waiting for your opponent. The board refreshes automatically."}</p>{failedAiGameId === game.id && <button className="secondary-button" onClick={() => retryAiMove(game.id)}>Retry AI’s move</button>}
       </article>; })}</div>{people.length > 0 && <aside className="chess-board-sidebar"><ChessLeaderboard leaderboard={leaderboard} currentUserId={currentUserId} /></aside>}</div></section>}
       {!active.length && people.length > 0 && <ChessLeaderboard leaderboard={leaderboard} currentUserId={currentUserId} />}
-      {endgameGame && (finalGameId === endgameGame.id ? <div className={`chess-final-overlay ${endgameWinnerId === currentUserId ? "win" : endgameWinnerId ? "loss" : "draw"}`} role="dialog" aria-label="Game over"><ChessFinalBoard key={endgameGame.id} game={endgameGame} currentUserId={currentUserId} animate={endgameCueId === endgameGame.id} busy={busy} onClose={() => closeFinal(endgameGame.id)} onRematch={() => rematch(endgameGame)} onOutcome={(outcome) => { if (soundOn && audioRef.current) playEndSound(audioRef.current, outcome); }} /></div> : <section className="chess-section chess-final-section"><ChessFinalBoard key={endgameGame.id} game={endgameGame} currentUserId={currentUserId} animate={endgameCueId === endgameGame.id} busy={busy} onClose={() => closeFinal(endgameGame.id)} onRematch={() => rematch(endgameGame)} onOutcome={(outcome) => { if (soundOn && audioRef.current) playEndSound(audioRef.current, outcome); }} /></section>)}
+      {endgameGame && (finalGameId === endgameGame.id ? <section className={`chess-section chess-final-section is-spotlight ${endgameWinnerId === currentUserId ? "win" : endgameWinnerId ? "loss" : "draw"}`} aria-label="Game over"><ChessFinalBoard key={endgameGame.id} game={endgameGame} currentUserId={currentUserId} animate={endgameCueId === endgameGame.id} busy={busy} onClose={() => closeFinal(endgameGame.id)} onRematch={() => rematch(endgameGame)} onOutcome={(outcome) => { if (soundOn && audioRef.current) playEndSound(audioRef.current, outcome); }} /></section> : <section className="chess-section chess-final-section"><ChessFinalBoard key={endgameGame.id} game={endgameGame} currentUserId={currentUserId} animate={endgameCueId === endgameGame.id} busy={busy} onClose={() => closeFinal(endgameGame.id)} onRematch={() => rematch(endgameGame)} onOutcome={(outcome) => { if (soundOn && audioRef.current) playEndSound(audioRef.current, outcome); }} /></section>)}
       {!active.length && !pending.length && <div className="chess-empty panel"><span>♟</span><h2>No active games</h2><p>Start a game against AI or challenge a teammate.</p></div>}
     </>}
   </div>;
