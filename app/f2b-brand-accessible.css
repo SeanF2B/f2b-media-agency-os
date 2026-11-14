@@ -9416,3 +9416,13 @@ html body.f2b-dark .f2b-on-light:is(input, textarea, #f2b-white-text-override)::
 .team-type-line.subaccount { color: #b45309; }
 .bookkeeping-email-form{display:grid;gap:10px;margin-top:8px}.bookkeeping-email-form label{display:grid;gap:6px;font-size:13px;font-weight:600}.bookkeeping-email-form input{padding:10px 12px;border-radius:10px;border:1px solid #cfd8de;font:inherit;background:#fff;color:#1f2a33}.bookkeeping-connect{margin-top:8px;justify-self:start;width:max-content}.bookkeeping-email-row p{margin:6px 0}
 .app-shell.dark-mode .bookkeeping-email-form input{background:#1b2228;color:#eef3f6;border-color:#3c4850}
+
+/* Operations → Websites: "New website" chooser */
+.ops-newsite { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:10px 0; padding:14px 16px; border:1px solid var(--f2b-border,#d9dee3); border-radius:14px; background:var(--f2b-white,#fff); animation:opsNewsiteIn .22s ease-out; }
+.ops-newsite > div { flex:1 1 320px; display:grid; gap:2px; }
+.ops-newsite > div span { font-size:13px; color:var(--f2b-muted,#5b6470); }
+.ops-newsite select { min-height:38px; padding:0 10px; border:1px solid var(--f2b-border,#d9dee3); border-radius:10px; font:inherit; background:inherit; color:inherit; }
+.app-shell.dark-mode .ops-newsite { background:#1f1e22; border-color:#3a393d; color:#fff; }
+.app-shell.dark-mode .ops-newsite > div span { color:#c9c9cf; }
+@keyframes opsNewsiteIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
+@media (prefers-reduced-motion: reduce) { .ops-newsite { animation:none; } }

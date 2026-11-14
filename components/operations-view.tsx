@@ -76,6 +76,8 @@ export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenW
   useFocusClient((id) => { if (id) setToolClientIdState(id); });
   const setToolClientId = (id: string) => { setToolClientIdState(id); try { window.localStorage.setItem("f2b-ops-client", id); } catch { /* storage unavailable */ } };
   const [siteMode, setSiteMode] = useState<"sites" | "media">("sites");
+  const [newSiteOpen, setNewSiteOpen] = useState(false);
+  const [newSiteClientId, setNewSiteClientId] = useState("");
   const [localMode, setLocalMode] = useState<"business" | "ai">("business");
   const [reportMode, setReportMode] = useState<"audits" | "reports">("audits");
   const [seoMode, setSeoMode] = useState<"keywords" | "competitors" | "ranks" | "audit">("keywords");
@@ -154,7 +156,13 @@ export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenW
 
     {tab === "websites" && siteMode === "sites" && <>
       <div className="ops-subbar">{seg(siteMode, setSiteMode, [["sites", "Sites & domains"], ["media", "Media library"]], "Websites sections")}</div>
-      <div className="ops-toolbar"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search clients…" aria-label="Search clients" /><button type="button" className="secondary-button" onClick={onOpenDns}>Domains & DNS</button></div>
+      <div className="ops-toolbar"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search clients…" aria-label="Search clients" /><button type="button" className="primary-button" onClick={() => { const firstWithoutSite = rows.find(({ client }) => !siteFor(client.id) && !client.wordpressSiteUrl)?.client || rows[0]?.client; setNewSiteClientId(firstWithoutSite?.id || ""); setNewSiteOpen(true); }}>＋ New website</button><button type="button" className="secondary-button" onClick={onOpenDns}>Domains & DNS</button></div>
+      {newSiteOpen && <div className="ops-newsite" role="dialog" aria-label="Open the website builder">
+        <div><b>Open the website builder</b><span>Pick the client. A client without a site opens on a template picker (for example the Pro Roofers template) or a blank page. A client that already has a site opens straight into its pages.</span></div>
+        <select aria-label="Client for the new website" value={newSiteClientId} onChange={(event) => setNewSiteClientId(event.target.value)}>{rows.map(({ client }) => <option key={client.id} value={client.id}>{client.name}{siteFor(client.id) ? " · has a site" : client.wordpressSiteUrl ? " · WordPress" : " · no site yet"}</option>)}</select>
+        <button type="button" className="primary-button" disabled={!newSiteClientId} onClick={() => { const target = rows.find(({ client }) => client.id === newSiteClientId)?.client; if (target) { setNewSiteOpen(false); onOpenWebsite(target); } }}>Open builder</button>
+        <button type="button" className="secondary-button" onClick={() => setNewSiteOpen(false)}>Cancel</button>
+      </div>}
       {siteError && <p className="ops-empty" role="alert">{siteError}</p>}
       <div className="ops-table-wrap"><table className="ops-table">
         <thead><tr><th>Client</th><th>Website</th><th>Source</th><th>Last edited</th><th></th></tr></thead>
