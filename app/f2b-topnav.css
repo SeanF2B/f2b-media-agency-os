@@ -353,3 +353,51 @@ html body .app-shell .assistant-composer textarea:hover { box-shadow: none !impo
 html body .app-shell .ops-tabs button { display: inline-flex !important; align-items: center; gap: 8px; }
 html body .app-shell .ops-tabs .ops-tab-icon { flex: none; opacity: .85; }
 html body .app-shell .ops-tabs button.active .ops-tab-icon { opacity: 1; }
+
+/* Leads sub-pages share one header: no duplicate titles, no jumping between tabs */
+html body .app-shell .crm-workspace .cv-head { display: none !important; }
+html body .app-shell .leads-clients-head { margin-bottom: 14px; }
+html body .app-shell .leads-clients-head + .page-heading { justify-content: flex-end; margin-top: 0; min-height: 0; }
+html body .app-shell .leads-clients-head + .page-heading > div:first-child { display: none !important; }
+html body .app-shell .crm-tabs button { display: inline-flex; align-items: center; gap: 6px; }
+html body .app-shell .crm-heading { min-height: 92px; }
+
+/* Task table v2: tidy rows, bulk bar, view chips */
+.tt-toolbar { justify-content: space-between; }
+.tt-views { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: rgba(0,0,0,.05); }
+.app-shell.dark-mode .tt-views { background: rgba(255,255,255,.06); }
+.tt-views button { border: 0; background: transparent; padding: 7px 12px; border-radius: 9px; font: inherit; font-size: 13px; font-weight: 700; color: inherit; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+.tt-views button span { font-size: 11px; opacity: .7; }
+.tt-views button.active { background: var(--brand-primary, #3b82f6); color: #fff; }
+.tt-bulk { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 14px; border-radius: 14px; background: color-mix(in srgb, var(--brand-primary, #3b82f6) 12%, transparent); border: 1px solid color-mix(in srgb, var(--brand-primary, #3b82f6) 30%, transparent); }
+.tt-bulk label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; }
+.tt-bulk select, .tt-bulk input { padding: 6px 8px; border-radius: 8px; border: 1px solid #cfd8de; font: inherit; font-size: 12.5px; background: #fff; color: #1f2a33; }
+.tt-bulk-delete { border: 1px solid #e5484d; color: #e5484d; background: transparent; border-radius: 8px; padding: 6px 12px; font: inherit; font-weight: 700; font-size: 12.5px; cursor: pointer; }
+.tt-table { table-layout: fixed; }
+.tt-c-check { width: 40px; } .tt-c-owner { width: 170px; } .tt-c-pill { width: 124px; } .tt-c-date { width: 96px; } .tt-c-repeat { width: 110px; } .tt-c-service { width: 140px; } .tt-c-est { width: 60px; }
+.tt-table td { padding: 5px 10px !important; height: 40px; }
+.tt-table th { padding: 9px 10px !important; }
+.tt-check input, .tt-table th input, .tt-group input { width: 15px; height: 15px; }
+.tt-row.picked td { background: color-mix(in srgb, var(--brand-primary, #3b82f6) 10%, transparent) !important; }
+.tt-row td:nth-child(2) { box-shadow: none; }
+.tt-row td:first-child { box-shadow: inset 3px 0 0 var(--tt-group) !important; }
+.tt-title { max-width: 100%; font-size: 13.5px; }
+.tt-group td { padding: 12px 10px 6px !important; height: auto; }
+.tt-group-line { display: flex; align-items: center; gap: 12px; }
+.tt-group-toggle { font-size: 14px; gap: 8px; }
+.tt-group-toggle::before { display: none; }
+.tt-chip { width: 10px; height: 10px; border-radius: 3px; background: var(--tt-group); display: inline-block; }
+.tt-group-bar { margin-top: 0; flex: 0 1 180px; height: 5px; }
+.tt-owner { font-size: 13px; overflow: hidden; }
+.tt-owner span:last-child { overflow: hidden; text-overflow: ellipsis; }
+.tt-pill { height: 28px; min-width: 0 !important; width: 100%; padding: 0 8px !important; font-size: 12px !important; line-height: 28px; border-radius: 7px !important; }
+span.tt-pill { display: inline-block; text-align: center; color: #fff; font-weight: 700; }
+.tt-date { position: relative; display: inline-flex; align-items: center; height: 28px; padding: 0 8px; border-radius: 7px; font-size: 12.5px; font-weight: 600; cursor: pointer; border: 1px solid transparent; }
+.tt-date:hover { border-color: #cfd8de; }
+.tt-date.empty span { opacity: .45; font-weight: 500; }
+.tt-date.overdue { color: #d13b3b; background: rgba(229,72,77,.1); }
+.tt-date input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+.tt-repeat { font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 99px; background: rgba(140,108,242,.14); color: #6d4fd8; white-space: nowrap; }
+.app-shell.dark-mode .tt-repeat { color: #c3b2ff; }
+.tt-muted { opacity: .4; }
+.tt-service { overflow: hidden; text-overflow: ellipsis; display: block; }
