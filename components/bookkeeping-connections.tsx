@@ -61,7 +61,19 @@ export function parseBankStatementCsv(text: string): { entries: ImportedBookEntr
   return { entries, skipped };
 }
 
-export function BookkeepingConnections({ scopeName, existingIds, onImport }: { scopeName: string; existingIds: string[]; onImport?: (entries: ImportedBookEntry[]) => Promise<void> | void }) {
+export function BookkeepingConnections({ scopeName, existingIds, onImport, savedEmail = "", onSaveEmail }: { scopeName: string; existingIds: string[]; onImport?: (entries: ImportedBookEntry[]) => Promise<void> | void; savedEmail?: string; onSaveEmail?: (email: string) => Promise<void> | void }) {
+  const [emailDraft, setEmailDraft] = useState(savedEmail);
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [emailMsg, setEmailMsg] = useState("");
+  const saveEmail = async (value: string) => {
+    const clean = value.trim().toLowerCase();
+    if (clean && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) { setEmailMsg("That email address doesn’t look right."); return; }
+    if (!onSaveEmail) return; setEmailBusy(true); setEmailMsg("");
+    try { await onSaveEmail(clean); setEditingEmail(false); setEmailDraft(clean); setEmailMsg(clean ? "✓ Inbox saved." : "Inbox disconnected."); }
+    catch (cause) { setEmailMsg(cause instanceof Error ? cause.message : "Couldn’t save. Please try again."); }
+    finally { setEmailBusy(false); }
+  };
   const [preview, setPreview] = useState<{ entries: ImportedBookEntry[]; skipped: number; duplicates: number; fileName: string } | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -94,7 +106,15 @@ export function BookkeepingConnections({ scopeName, existingIds, onImport }: { s
       <div className="bookkeeping-card">
         <h3>📧 Bookkeeping email</h3>
         <p>Connect an inbox so receipts and supplier invoices are picked up and logged as expenses automatically.</p>
-        <p className="bookkeeping-muted">Email connection: not connected yet.</p>
+        {savedEmail && !editingEmail ? <div className="bookkeeping-email-row">
+          <p><b>Connected inbox:</b> {savedEmail}</p>
+          {onSaveEmail && <div className="bs-actions"><button type="button" className="bs-ghost" onClick={() => { setEmailDraft(savedEmail); setEditingEmail(true); setEmailMsg(""); }}>Change</button><button type="button" className="bs-ghost" disabled={emailBusy} onClick={() => void saveEmail("")}>Disconnect</button></div>}
+          <p className="bookkeeping-muted">Receipts and supplier invoices from this inbox will be logged as expenses once automatic reading is switched on. Nothing is imported yet.</p>
+        </div> : onSaveEmail ? (editingEmail ? <form className="bookkeeping-email-form" onSubmit={(event) => { event.preventDefault(); void saveEmail(emailDraft); }}>
+          <label>Inbox where receipts arrive<input type="email" required value={emailDraft} placeholder="accounts@business.ie" onChange={(event) => setEmailDraft(event.target.value)} autoFocus /></label>
+          <div className="bs-actions"><button type="button" className="bs-ghost" onClick={() => setEditingEmail(false)}>Cancel</button><button type="submit" className="bs-save" disabled={emailBusy}>{emailBusy ? "Saving…" : "Connect inbox"}</button></div>
+        </form> : <button type="button" className="bs-save bookkeeping-connect" onClick={() => { setEditingEmail(true); setEmailMsg(""); }}>✉ Connect email</button>) : <p className="bookkeeping-muted">Email connection: not connected yet.</p>}
+        {emailMsg && <p className="bookkeeping-message" role="status">{emailMsg}</p>}
       </div>
     </div>
     {preview && <div className="bookkeeping-preview" role="region" aria-label="Import preview">

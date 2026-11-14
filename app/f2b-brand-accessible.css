@@ -9414,3 +9414,5 @@ html body.f2b-dark .f2b-on-light:is(input, textarea, #f2b-white-text-override)::
 .team-type-filter small { opacity: .7; margin-left: 4px; }
 .team-type-line { margin: 2px 0 0; font-size: 12px; font-weight: 600; color: var(--brand-primary, #1677c8); }
 .team-type-line.subaccount { color: #b45309; }
+.bookkeeping-email-form{display:grid;gap:10px;margin-top:8px}.bookkeeping-email-form label{display:grid;gap:6px;font-size:13px;font-weight:600}.bookkeeping-email-form input{padding:10px 12px;border-radius:10px;border:1px solid #cfd8de;font:inherit;background:#fff;color:#1f2a33}.bookkeeping-connect{margin-top:8px;justify-self:start;width:max-content}.bookkeeping-email-row p{margin:6px 0}
+.app-shell.dark-mode .bookkeeping-email-form input{background:#1b2228;color:#eef3f6;border-color:#3c4850}

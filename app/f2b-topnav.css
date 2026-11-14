@@ -161,3 +161,9 @@ html body .app-shell.client-scoped.topnav-layout .tn-right .top-actions button:f
 @media (max-width: 1900px) { .tn-nav.tn-nav-all .tn-item { padding: 8px 7px 7px; font-size: 11px; } }
 @media (max-width: 1720px) { .tn-nav.tn-nav-all .tn-label { display: none; } .tn-nav.tn-nav-all .tn-item { padding: 10px; min-width: 44px; } }
 @media (min-width: 861px) and (max-width: 1720px) { .app-shell.topnav-layout .tn-bar:has(.tn-nav-all) { grid-template-columns: auto minmax(0, 1fr) auto; } .tn-nav.tn-nav-all { justify-self: center; } }
+/* Settings gear beside the profile picture */
+.tn-right .tn-settings-button { width: 40px; height: 40px; min-width: 40px; padding: 0 !important; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px !important; background: rgba(255,255,255,.55) !important; border: 1px solid rgba(20,30,40,.1) !important; color: #1f2a33; cursor: pointer; }
+.app-shell.dark-mode .tn-right .tn-settings-button { background: rgba(255,255,255,.08) !important; border-color: rgba(255,255,255,.14) !important; color: #eef3f6; }
+.tn-right .tn-settings-button.active { background: color-mix(in srgb, var(--brand-primary, #3b82f6) 16%, #fff) !important; color: color-mix(in srgb, var(--brand-primary, #3b82f6) 70%, #0b1620); }
+html body .app-shell.client-scoped.topnav-layout .tn-right .tn-settings-button { background: color-mix(in srgb, var(--sb-mix, #fff) 8%, var(--brand-sidebar, #1f2123)) !important; border-color: var(--sb-edge, rgba(255,255,255,.2)) !important; color: var(--sb-fg-strong, #fff) !important; }
+html body .app-shell.client-scoped.topnav-layout .tn-right .tn-settings-button.active { background: color-mix(in srgb, var(--sb-mix, #fff) 18%, var(--brand-sidebar, #1f2123)) !important; }
