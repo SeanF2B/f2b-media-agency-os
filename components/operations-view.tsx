@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useFocusClient } from "@/lib/focus-client";
 import { BarChart3, Factory, FileText, Globe, LayoutDashboard, MapPin, Megaphone, Search, Zap, type LucideIcon } from "lucide-react";
 import { AiVisibilityPanel } from "./ai-visibility-panel";
 import { RankTrackingPanel } from "./rank-tracking-panel";
@@ -72,6 +73,7 @@ export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenW
   renderTool?: (tool: "keywords" | "seo-keywords" | "seo-competitors" | "seo-audit" | "audits" | "reports" | "media" | "ads", clientId: string) => React.ReactNode;
 }) {
   const [toolClientId, setToolClientIdState] = useState(() => { try { return window.localStorage.getItem("f2b-ops-client") || ""; } catch { return ""; } });
+  useFocusClient((id) => { if (id) setToolClientIdState(id); });
   const setToolClientId = (id: string) => { setToolClientIdState(id); try { window.localStorage.setItem("f2b-ops-client", id); } catch { /* storage unavailable */ } };
   const [siteMode, setSiteMode] = useState<"sites" | "media">("sites");
   const [localMode, setLocalMode] = useState<"business" | "ai">("business");

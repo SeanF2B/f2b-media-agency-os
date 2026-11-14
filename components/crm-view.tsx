@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useFocusClient } from "@/lib/focus-client";
 import { createCardDragFx, showFxError, type CardDragFx } from "@/lib/card-drag-fx";
 import { ArrowUpDown, Ban, BellOff, Briefcase, Building2, Columns3, Filter, Footprints, Globe, Handshake, Mail, MapPin, Megaphone, MessageSquareText, MousePointerClick, NotebookPen, Pencil, Phone, Plus, Search, Share2, SquareKanban, Tag, Trash2, UserRound, Users, Zap, type LucideIcon } from "lucide-react";
 import { CrmNotesPanel, type CrmNote } from "@/components/crm-notes-panel";
@@ -48,6 +49,7 @@ export function CrmView({ onOpenClient, scopeClientId = "", conversations, initi
   const [pipelineId, setPipelineId] = useState("");
   const [search, setSearch] = useState("");
   const [clientFilterState, setClientFilter] = useState("");
+  useFocusClient(setClientFilter, !scopeClientId);
   // When a client sub-account is selected the server already returns only that client's pipelines, deals and contacts.
   const clientFilter = scopeClientId ? "" : clientFilterState;
   const [modal, setModal] = useState<"contact" | "contact-details" | "opportunity" | "opportunity-edit" | "opportunity-notes" | "pipeline" | "stage" | "edit-stage" | "delete-stage" | "" > ("");
