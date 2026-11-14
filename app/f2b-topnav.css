@@ -150,3 +150,6 @@ html body .app-shell.client-scoped.topnav-layout .tn-right .theme-toggle, html b
 html body .app-shell.client-scoped.topnav-layout .tn-right .activity-quick-trigger, html body .app-shell.client-scoped.topnav-layout .tn-right .ai-assistant-quick-link {
   background: color-mix(in srgb, var(--sb-mix, #fff) 8%, var(--brand-sidebar, #1f2123)) !important; border-color: var(--sb-edge, rgba(255,255,255,.2)) !important; color: var(--sb-fg-strong, #fff) !important; }
 html body .app-shell.client-scoped.topnav-layout .tn-bar .client-scope .client-scope-trigger, html body .app-shell.client-scoped.topnav-layout .tn-bar .client-scope .client-scope-name { color: var(--sb-fg-strong, #fff) !important; }
+/* Keyboard focus on the right-hand buttons (reached with D after the last page) */
+html body .app-shell.topnav-layout .tn-right .top-actions button:focus-visible { outline: 3px solid var(--brand-primary, #3b82f6) !important; outline-offset: 2px; }
+html body .app-shell.client-scoped.topnav-layout .tn-right .top-actions button:focus-visible { outline-color: var(--sb-fg-strong, #fff) !important; }

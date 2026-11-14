@@ -793,6 +793,16 @@ export function AgencyApp() {
       const order = navOrderRef.current;
       if (order.length < 2) return;
       const current = order.indexOf(pageRef.current);
+      // After the last page, D carries on into the round buttons on the right (AI Assistant, theme, notes, activity, profile).
+      const rightBtns = [...document.querySelectorAll<HTMLElement>(".tn-right .top-actions > button, .tn-right .top-actions > div > button")].filter((btn) => btn.offsetParent !== null);
+      const ri = el ? rightBtns.indexOf(el) : -1;
+      if (ri >= 0) {
+        event.preventDefault();
+        const n = ri + dir;
+        if (n >= 0 && n < rightBtns.length) { rightBtns[n].focus(); return; }
+        el!.blur(); setPage(n < 0 ? order[order.length - 1] : order[0]); setSelectedClient(""); setNavMoreOpen(false); return;
+      }
+      if (dir === 1 && current === order.length - 1 && rightBtns.length) { event.preventDefault(); rightBtns[0].focus(); return; }
       const next = order[((current < 0 ? 0 : current + dir) + order.length) % order.length];
       event.preventDefault();
       setPage(next); setSelectedClient(""); setNavMoreOpen(false);
