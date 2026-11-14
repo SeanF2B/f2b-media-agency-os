@@ -29,7 +29,7 @@ function ConnectionDots({ client, hasSite, onOpen }: { client: OpsClient; hasSit
   return <span className="ops-conn">{CONNECTIONS.map((item) => { const ok = item.ok(client, hasSite); return <button key={item.key} type="button" className={ok ? "ok" : "missing"} title={`${item.label}: ${ok ? "connected" : "not connected"}`} aria-label={`${item.label} ${ok ? "connected" : "not connected"}`} onClick={() => onOpen(item.page)}>{item.icon}<i /></button>; })}</span>;
 }
 type SiteRow = { clientId: string; backend: string; previewUrl: string; repo: string; branch: string; updatedAt: string };
-export type OperationsTab = "overview" | "seo" | "ads" | "websites" | "local" | "reports" | "onboarding";
+export type OperationsTab = "overview" | "seo" | "ads" | "websites" | "local" | "reports" | "onboarding" | "automations" | "leadfactory";
 /** Older links/state used more tabs; map them onto the six areas (+ the sub-view they opened). */
 export function normalizeOpsTab(value: string): { tab: OperationsTab; sub?: string } {
   const legacy: Record<string, { tab: OperationsTab; sub?: string }> = { keywords: { tab: "seo" }, audits: { tab: "reports", sub: "audits" }, media: { tab: "websites", sub: "media" }, ai: { tab: "local", sub: "ai" } };
@@ -62,10 +62,10 @@ function wpAdminUrl(siteUrl: string) {
   try { const url = new URL(/^https?:\/\//i.test(siteUrl) ? siteUrl : `https://${siteUrl}`); return `${url.origin}${url.pathname.replace(/\/+$/, "").replace(/\/wp-admin$/, "")}/wp-admin/`; } catch { return siteUrl; }
 }
 
-export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenWebsite, onOpenDns, onStartOnboarding, onboarding, onCreateGbpTask, onCreateCommunityTask, renderTool }: {
+export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenWebsite, onOpenDns, onStartOnboarding, onboarding, onCreateGbpTask, onCreateCommunityTask, renderTool, automations, hasLeadFactory = false }: {
   clients: OpsClient[]; tasks: OpsTask[]; tab: OperationsTab; onTab: (tab: OperationsTab) => void;
   onOpenPage: (page: string, clientId?: string) => void; onOpenWebsite: (client: OpsClient) => void; onOpenDns: () => void;
-  onStartOnboarding?: (clientId: string) => void; onboarding?: React.ReactNode;
+  onStartOnboarding?: (clientId: string) => void; onboarding?: React.ReactNode; automations?: React.ReactNode; hasLeadFactory?: boolean;
   onCreateGbpTask?: (clientId: string) => string; onCreateCommunityTask?: (clientId: string, results: CommunityResult[]) => string;
   renderTool?: (tool: "keywords" | "seo-keywords" | "seo-competitors" | "seo-audit" | "audits" | "reports" | "media" | "ads", clientId: string) => React.ReactNode;
 }) {
@@ -120,12 +120,13 @@ export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenW
 
   return <section className="ops-centre">
     <div className="page-heading ops-heading"><div><p className="eyebrow">Agency</p><h1>Operations</h1></div>
-      {tab !== "overview" && tab !== "onboarding" && !(tab === "websites" && siteMode === "sites") && !(tab === "local" && localMode === "business") && selected && <label className="ops-client-pick ops-client-shared"><span className="ops-client-logo">{selected.logo ? <img src={selected.logo} alt="" /> : <i style={{ background: selected.color || "#d9dee3" }} />}</span><select aria-label="Client for all Operations tools" value={selected.id} onChange={(event) => setToolClientId(event.target.value)}>{active.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></label>}
+      {tab !== "overview" && tab !== "onboarding" && tab !== "automations" && tab !== "leadfactory" && !(tab === "websites" && siteMode === "sites") && !(tab === "local" && localMode === "business") && selected && <label className="ops-client-pick ops-client-shared"><span className="ops-client-logo">{selected.logo ? <img src={selected.logo} alt="" /> : <i style={{ background: selected.color || "#d9dee3" }} />}</span><select aria-label="Client for all Operations tools" value={selected.id} onChange={(event) => setToolClientId(event.target.value)}>{active.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></label>}
     </div>
     <div className="ops-tabs" role="tablist" aria-label="Operations sections">
-      {([["overview", "Overview"], ["seo", "SEO & Research"], ["ads", "Google Ads"], ["websites", "Websites"], ["local", "Local & AI"], ["reports", "Reports"]] as Array<[OperationsTab, string]>).filter(([key]) => !["seo", "ads", "reports"].includes(key) || renderTool).map(([key, label]) => <button type="button" role="tab" key={key} aria-selected={tab === key || (key === "overview" && tab === "onboarding")} className={tab === key || (key === "overview" && tab === "onboarding") ? "active" : ""} onClick={() => onTab(key)}>{label}</button>)}
+      {([["overview", "Overview"], ["seo", "SEO & Research"], ["ads", "Google Ads"], ["websites", "Websites"], ["local", "Local & AI"], ["reports", "Reports"], ["automations", "Automations"], ["leadfactory", "Lead Factory"]] as Array<[OperationsTab, string]>).filter(([key]) => (!["seo", "ads", "reports"].includes(key) || renderTool) && (key !== "automations" || Boolean(automations)) && (key !== "leadfactory" || hasLeadFactory)).map(([key, label]) => <button type="button" role="tab" key={key} aria-selected={tab === key || (key === "overview" && tab === "onboarding")} className={tab === key || (key === "overview" && tab === "onboarding") ? "active" : ""} onClick={() => onTab(key)}>{label}</button>)}
     </div>
 
+    {tab === "automations" && automations}
     {tab === "overview" && <p className="ops-more">Also: {[["SEO", "SEO"], ["Google Ads", "Google Ads"], ["Meta Ads", "Meta Ads"], ["Proposal Studio", "Proposals"], ["Automations", "Marketing automations"]].map(([page, label], index) => <span key={page}>{index ? " · " : ""}<button type="button" className="text-button" onClick={() => onOpenPage(page)}>{label}</button></span>)}</p>}
     {tab === "overview" && <>
       <div className="ops-summary">
