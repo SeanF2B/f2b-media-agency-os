@@ -535,3 +535,21 @@ html body .modal.lead-icp-modal .lead-profile-editor { border:0 !important; padd
 html body .modal.lead-icp-modal .lead-icp-modal-close { position:absolute; top:14px; right:14px; z-index:2; }
 html body .modal.lead-icp-modal .lead-profile-actions { position:sticky; bottom:-22px; display:flex; justify-content:flex-end; gap:10px; padding:14px 0 4px; margin-top:14px; background:#fff; border-top:1px solid #eef1f5; }
 html body .modal.lead-icp-modal .lead-icon-options { max-height:140px; overflow:auto; }
+
+/* Mobile: section tabs become a sticky footer bar */
+@media (max-width: 860px) {
+  html body .app-shell.topnav-layout .tn-bar { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; background: rgba(255,255,255,.94) !important; }
+  html body .app-shell.dark-mode.topnav-layout .tn-bar { background: rgba(24,26,30,.96) !important; }
+  html body .app-shell.client-scoped.topnav-layout .tn-bar { background: var(--brand-sidebar, #1f2123) !important; }
+  html body .app-shell.topnav-layout .tn-bar .tn-nav {
+    position: fixed !important; left: 10px; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); top: auto !important;
+    z-index: 140; order: initial; margin: 0 !important; justify-content: space-around; gap: 2px; padding: 6px !important;
+    border-radius: 20px !important; overflow-x: auto;
+    background: rgba(255,255,255,.82) !important; -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%);
+    border: 1px solid rgba(255,255,255,.9) !important; box-shadow: 0 10px 30px rgba(30,40,70,.18), inset 0 1px 0 rgba(255,255,255,.95) !important;
+  }
+  html body .app-shell.dark-mode.topnav-layout .tn-bar .tn-nav { background: rgba(30,32,38,.86) !important; border-color: rgba(255,255,255,.12) !important; }
+  html body .app-shell.client-scoped.topnav-layout .tn-bar .tn-nav { background: color-mix(in srgb, var(--brand-sidebar, #1f2123) 92%, transparent) !important; border-color: var(--sb-edge, rgba(255,255,255,.2)) !important; }
+  html body .app-shell.topnav-layout .tn-bar .tn-nav .tn-item { flex: 1 0 auto; min-width: 48px; }
+  html body .app-shell.topnav-layout .main-area { padding-bottom: calc(86px + env(safe-area-inset-bottom, 0px)) !important; }
+}
