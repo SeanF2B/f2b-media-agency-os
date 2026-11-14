@@ -1,5 +1,6 @@
 import handler from "vinext/server/fetch-handler";
 import { logSystemEmail } from "../lib/email-log";
+import { handleSiteLeadRoutes, isInternalCall } from "./site-lead";
 import { processDueAiTasks, processDueFinanceRecurring } from "./scheduled-ai";
 import { processDueMarketingAutomations } from "./marketing-automations";
 import { processCrmAutomations } from "../lib/crm-automations/engine.ts";
@@ -237,8 +238,12 @@ const worker = {
       headers: authenticatedHeaders,
     });
 
-    let appRequest = authenticatedRequest;
     const incomingUrl = new URL(authenticatedRequest.url);
+    if (incomingUrl.pathname.startsWith("/internal/site-lead") || incomingUrl.pathname === "/api/site-lead-photo") {
+      const leadResponse = await handleSiteLeadRoutes(authenticatedRequest, env as never, incomingUrl, identity?.email, isInternalCall(request));
+      if (leadResponse) return leadResponse;
+    }
+    let appRequest = authenticatedRequest;
     if ((authenticatedRequest.method === "GET" || authenticatedRequest.method === "HEAD") && incomingUrl.pathname === "/" && env.DB) {
       const hostname = normalizeMarketingHostname(incomingUrl.hostname);
       if (hostname) {
