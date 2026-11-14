@@ -9495,3 +9495,17 @@ html body.f2b-dark .f2b-on-light:is(input, textarea, #f2b-white-text-override)::
 @keyframes chess-badge-soft { from { transform:scale(.4); opacity:0; } to { transform:none; opacity:1; } }
 @keyframes chess-king-tip { 0%,100% { transform:none; } 40% { transform:rotate(-8deg); } 70% { transform:rotate(4deg); } }
 .app-shell .chess-final-confetti i { width:7px; height:11px; border-width:1.5px; }
+
+/* ===== Chess: pause screen (Esc) ===== */
+.app-shell .chess-pause { position:absolute; inset:0; z-index:20; display:grid; place-items:center; background:rgba(6,10,16,.72); backdrop-filter:blur(3px); border-radius:14px; animation:chess-pause-in .22s ease-out both; }
+.app-shell .chess-pause-card { display:grid; justify-items:center; gap:22px; padding:28px 32px; border-radius:18px; background:rgba(22,28,38,.92); box-shadow:0 20px 60px rgba(0,0,0,.5), inset 0 0 0 1px rgba(255,255,255,.08); color:#fff; }
+.app-shell .chess-pause-players { display:flex; align-items:center; gap:22px; }
+.app-shell .chess-pause-player { display:grid; justify-items:center; gap:10px; max-width:150px; text-align:center; }
+.app-shell .chess-pause-player b { color:#fff !important; font-size:15px; line-height:1.25; }
+.app-shell .chess-pause .chess-player-avatar { flex:none; width:84px; height:84px; border:3px solid #fff; box-shadow:0 6px 18px rgba(0,0,0,.4); font-size:34px; }
+.app-shell .chess-pause .chess-player-avatar svg, .app-shell .chess-pause .chess-player-avatar img { width:62%; height:62%; }
+.app-shell .chess-pause-vs { font-weight:900; font-size:22px; color:rgba(255,255,255,.7) !important; }
+.app-shell .chess-pause-resume { min-width:200px; height:50px; border-radius:12px !important; border:0 !important; background:#7cb342 !important; color:#fff !important; font-size:18px !important; font-weight:800; box-shadow:0 4px 0 #4f7a26; cursor:pointer; }
+.app-shell .chess-pause-resume:active { transform:translateY(3px); box-shadow:0 1px 0 #4f7a26; }
+@keyframes chess-pause-in { from { opacity:0; } to { opacity:1; } }
+@media (max-width:650px) { .app-shell .chess-pause .chess-player-avatar { width:60px; height:60px; } .app-shell .chess-pause-players { gap:12px; } }

@@ -61,7 +61,7 @@ export function ContrastGuard() {
         if (tag === "SCRIPT" || tag === "STYLE" || tag === "IMG" || tag === "IFRAME" || tag === "CANVAS") continue;
         if (el.closest(".marketing-live-page")) continue;
         // Chess boards and pieces set their own colours; recolouring them per square makes pieces flicker as they move.
-        if (el.closest(".chess-board, .chess-final-board, .chess-thumbnail, .chess-piece-svg")) continue;
+        if (el.closest(".chess-board, .chess-final-board, .chess-thumbnail, .chess-piece-svg, .chess-pause")) continue;
         const marked = el.dataset[MARK] === "1";
         const light = dark && isLight(el);
         if (light && !marked) {
