@@ -178,6 +178,8 @@ CREATE TABLE IF NOT EXISTS outreach_replies (
   campaign_id TEXT,
   mailbox_id TEXT,
   host_message_id TEXT NOT NULL,                -- Graph/Gmail id, dedupes polling
+  internet_message_id TEXT NOT NULL DEFAULT '', -- RFC Message-ID, so our answer threads correctly
+  subject TEXT NOT NULL DEFAULT '',
   label TEXT NOT NULL,
   confidence REAL NOT NULL DEFAULT 0,
   needs_review INTEGER NOT NULL DEFAULT 0,
