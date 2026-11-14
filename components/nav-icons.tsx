@@ -2,7 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import { getDisplayCurrency } from "@/lib/display-currency";
 import {
   CircleCheck, Compass, Crown, FileText, Globe, History, Image, LayoutDashboard, Mail, Megaphone,
-  MessageCircle, Receipt, ReceiptEuro, ReceiptPoundSterling, ReceiptText, Rocket, Search, Send, Settings, Smartphone, SquareKanban, TrendingUp, UserCog, Users, Zap,
+  MessageCircle, BookOpen, Receipt, ReceiptEuro, ReceiptPoundSterling, ReceiptText, Rocket, Search, Send, Settings, Smartphone, SquareKanban, TrendingUp, UserCog, Users, Zap,
 } from "lucide-react";
 
 // Line icons used in place of emojis across the app shell (sidebar, settings link, tool tabs).
@@ -16,6 +16,7 @@ const icons: Record<string, LucideIcon> = {
   Automations: Zap,
   Conversations: MessageCircle,
   Invoicing: Receipt,
+  Bookkeeping: BookOpen,
   Tasks: CircleCheck,
   Operations: Compass,
   Team: UserCog,
