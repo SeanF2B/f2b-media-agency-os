@@ -148,6 +148,7 @@ const worker = {
             const detail = await response.json().catch(() => null) as { message?: string } | null;
             throw new Error(`The email provider returned HTTP ${response.status}: ${detail?.message || "message was not accepted"}.`);
           }
+          await logSystemEmail(env.DB as never, { to: message.to, subject: message.subject, text: message.text || "" });
         } : undefined,
       }),
       processDueAiTasks({ ...env, hasDirectSearchConsole: hasGoogleSearchConsoleConnection, readDirectSearchConsole: readGoogleSearchConsoleRows }, new Date(controller.scheduledTime)),

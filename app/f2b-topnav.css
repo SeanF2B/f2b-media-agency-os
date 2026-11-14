@@ -251,3 +251,8 @@ html body .app-shell .crm-card-facts dd { min-width: 0; overflow: hidden; text-o
 .crm-stage-ghost { box-shadow: 0 28px 60px rgba(15,25,40,.32), 0 6px 16px rgba(15,25,40,.18) !important; border-radius: 18px; overflow: hidden; cursor: grabbing; }
 .crm-stage.crm-stage-lifted { opacity: .35; outline: 2px dashed color-mix(in srgb, var(--brand-primary, #3b82f6) 45%, transparent); outline-offset: -4px; }
 .crm-stage-drag-handle { cursor: grab; touch-action: none; }
+
+/* Bar is pinned flush to the top edge so page content never shows above or beside it */
+html body .app-shell.topnav-layout .tn-bar { top: 0 !important; margin: 0 0 6px !important; border-radius: 0 0 22px 22px !important; border-top: 0 !important; }
+html body .app-shell.topnav-layout:not(.client-scoped) .tn-bar { background: linear-gradient(135deg, rgba(255,255,255,.94), rgba(255,255,255,.86)) !important; }
+html body .app-shell.dark-mode.topnav-layout:not(.client-scoped) .tn-bar { background: linear-gradient(135deg, rgba(36,43,52,.96), rgba(26,31,38,.92)) !important; }
