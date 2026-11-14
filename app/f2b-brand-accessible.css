@@ -9499,7 +9499,8 @@ html body.f2b-dark .f2b-on-light:is(input, textarea, #f2b-white-text-override)::
 /* ===== Chess: pause screen (Esc) ===== */
 .app-shell .chess-pause { position:absolute; inset:0; z-index:20; display:grid; place-items:center; background:rgba(6,10,16,.72); backdrop-filter:blur(3px); border-radius:14px; animation:chess-pause-in .22s ease-out both; }
 .app-shell .chess-pause-card { display:grid; justify-items:center; gap:22px; padding:28px 32px; border-radius:18px; background:rgba(22,28,38,.92); box-shadow:0 20px 60px rgba(0,0,0,.5), inset 0 0 0 1px rgba(255,255,255,.08); color:#fff; }
-.app-shell .chess-pause-players { display:flex; align-items:center; gap:22px; }
+.app-shell .chess-pause-players { display:flex; align-items:flex-start; gap:22px; }
+.app-shell .chess-pause-vs { align-self:center; margin-bottom:28px; }
 .app-shell .chess-pause-player { display:grid; justify-items:center; gap:10px; max-width:150px; text-align:center; }
 .app-shell .chess-pause-player b { color:#fff !important; font-size:15px; line-height:1.25; }
 .app-shell .chess-pause .chess-player-avatar { flex:none; width:84px; height:84px; border:3px solid #fff; box-shadow:0 6px 18px rgba(0,0,0,.4); font-size:34px; }
