@@ -140,7 +140,10 @@ export function SeoView({ initialTab, sections, keywordPart = "all", embedded = 
   const [kwComp, setKwComp] = useState("");
   const [kwText, setKwText] = useState("");
   const [kwSort, setKwSort] = useState<"volume" | "cpc" | "competition" | "keyword">("volume");
-  const [kwGrouped, setKwGrouped] = useState(true);
+  const [kwGroupMode, setKwGroupMode] = useState<"theme" | "services" | "ai" | "none">("theme");
+  const kwGrouped = kwGroupMode !== "none";
+  const [aiGroups, setAiGroups] = useState<Record<string, string> | null>(null);
+  const [aiGroupBusy, setAiGroupBusy] = useState(false);
   const [saved, setSaved] = useState<SavedKeywordData | null>(null);
   const [savedBusy, setSavedBusy] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
@@ -161,7 +164,7 @@ export function SeoView({ initialTab, sections, keywordPart = "all", embedded = 
     const base = [...new Set([...(client.seoServices || []), ...fromCampaigns].map((item) => item.toLowerCase()))].slice(0, 8);
     setKeywordSeeds(base.map((item) => area && !item.includes(area) ? `${item} ${area}` : item).join(", "));
     setKeywordUrl(clientWebsite(client));
-    setKeywordIdeas(null); setPickedKeywords(new Set()); setKwRows([]); setSaved(null); setSavedMsg(""); setSaveGroupId(""); setKwRegion(null); setKwRegionQuery("");
+    setKeywordIdeas(null); setPickedKeywords(new Set()); setKwRows([]); setAiGroups(null); setSaved(null); setSavedMsg(""); setSaveGroupId(""); setKwRegion(null); setKwRegionQuery("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client?.id]);
   const keywordReportRows = () => kwRows.filter((row) => pickedKeywords.has(row.key)).sort((a, b) => (b.avgMonthlySearches || 0) - (a.avgMonthlySearches || 0));
@@ -476,6 +479,42 @@ ${sorted.map((group, index) => `<section class="page"><div class="running">${esc
     for (const seed of keywordSeeds.split(/[\n,]+/).map((item) => item.trim()).filter(Boolean).slice(0, 10)) { const hit = words(seed).filter((word) => kw.has(word) || [...kw].some((k) => k.startsWith(word.slice(0, 5)))).length; if (hit > score) { best = seed; score = hit; } }
     return best || "Other related searches";
   };
+  // Split by the client's own services (SEO services + billed service / campaign names).
+  const clientServiceList = useMemo(() => [...new Set([...((client?.seoServices || []) as string[]), ...((client?.services || []).map((service) => String(service.campaignName || service.name || "").replace(/^.*?:\s*/, "").replace(/^F2B\s*\|\s*/i, "")))].map((item) => item.trim()).filter((item) => item.length > 2))], [client]);
+  const serviceOf = (keyword: string) => {
+    const stop = new Set(["near", "me", "the", "a", "for", "in", "of", "and", "best", "ireland", "services", "service", ...((client?.seoLocations || []) as string[]).map((item) => item.toLowerCase())]);
+    const words = (text: string) => text.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length > 2 && !stop.has(word));
+    const kw = words(keyword); let best = "", score = 0;
+    for (const service of clientServiceList) { const hit = words(service).filter((word) => kw.some((k) => k === word || k.startsWith(word.slice(0, 5)) || word.startsWith(k.slice(0, 5)))).length; if (hit > score) { best = service; score = hit; } }
+    return best || "Other related searches";
+  };
+  const groupOf = (keyword: string) => kwGroupMode === "services" ? serviceOf(keyword) : kwGroupMode === "ai" && aiGroups ? (aiGroups[keyword.toLowerCase()] || "Other related searches") : themeOf(keyword);
+  const runAiGroups = async () => {
+    if (!kwRows.length) return;
+    setAiGroupBusy(true); setSavedMsg("");
+    try {
+      const response = await fetch("/api/ai-assist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "adgroups", clientId: client?.id, clientName: client?.name, keywords: kwRows.map((row) => row.keyword) }) });
+      const json = await response.json().catch(() => ({})) as { groups?: Array<{ name: string; keywords: string[] }>; error?: string };
+      if (!response.ok || !json.groups) throw new Error(json.error || "AI grouping failed.");
+      const map: Record<string, string> = {}; json.groups.forEach((group) => group.keywords.forEach((keyword) => { map[keyword] = group.name; }));
+      setAiGroups(map); setKwGroupMode("ai");
+      setSavedMsg(`AI suggested ${json.groups.length} ad groups. Check them, then use “Save as group” on each.`);
+    } catch (reason) { setSavedMsg(reason instanceof Error ? reason.message : "AI grouping failed."); setKwGroupMode("theme"); }
+    finally { setAiGroupBusy(false); }
+  };
+  const newSaveGroup = async () => {
+    if (!client) return;
+    const name = window.prompt("New group name (e.g. an ad group or service)")?.trim();
+    if (!name) return;
+    const ok = await callSaved({ action: "createGroup", name: name.slice(0, 60) });
+    if (ok) {
+      const response = await fetch(`/api/seo/saved-keywords?clientId=${encodeURIComponent(client.id)}`).catch(() => null);
+      const json = response && response.ok ? await response.json().catch(() => null) as SavedKeywordData | null : null;
+      const group = (json?.groups || saved?.groups || []).find((item) => item.name.toLowerCase() === name.slice(0, 60).toLowerCase());
+      if (json) setSaved(json);
+      if (group) setSaveGroupId(group.id);
+    }
+  };
   // Reads the client's own website and turns the services it lists into seed keywords (only what the site states).
   const scanSiteForSeeds = async () => {
     if (!client) return;
@@ -526,6 +565,7 @@ ${sorted.map((group, index) => `<section class="page"><div class="running">${esc
       setKeywordIdeas(payload); setShowAllKeywordIdeas(false);
       const checkedAt = payload.updatedAt || new Date().toISOString();
       const geo = keywordSource === "google" ? (kwRegion?.id || keywordGeo) : "";
+      setAiGroups(null); if (kwGroupMode === "ai") setKwGroupMode("theme");
       setKwRows((current) => { const map = new Map(current.map((row) => [row.key, row])); for (const row of payload.results) { const key = `${row.keyword.toLowerCase()}|${payload.location}`; map.set(key, { ...row, key, location: payload.location, geo, source: payload.source, checkedAt }); } return [...map.values()]; });
       if (keywordSource === "dataforseo") setKeywordResearchHistory((current) => [{ id: payload.historyId || crypto.randomUUID(), createdAt: payload.updatedAt || new Date().toISOString(), location: payload.location, seeds, costUsd: payload.providerCostUsd ?? null, results: payload.results }, ...current].slice(0, 20));
     } catch (reason) { setKeywordError(reason instanceof Error ? reason.message : "Keyword research could not be completed."); }
@@ -698,13 +738,14 @@ ${sorted.map((group, index) => `<section class="page"><div class="running">${esc
               <label><span>Min. volume</span><input type="number" min={0} value={kwMin} onChange={(event) => setKwMin(event.target.value)} placeholder="0" /></label>
               <label><span>Max. CPC</span><input type="number" min={0} step="0.1" value={kwMaxCpc} onChange={(event) => setKwMaxCpc(event.target.value)} placeholder="Any" /></label>
               <label><span>Competition</span><select value={kwComp} onChange={(event) => setKwComp(event.target.value)}><option value="">Any</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
-              <label className="kw-group-toggle"><input type="checkbox" checked={kwGrouped} onChange={(event) => setKwGrouped(event.target.checked)} /> Group by theme</label>
+              <label className="kw-group-mode"><span>Group by</span><select value={kwGroupMode} onChange={(event) => { const next = event.target.value as typeof kwGroupMode; if (next === "ai" && !aiGroups) void runAiGroups(); else setKwGroupMode(next); }}><option value="theme">Seed theme</option><option value="services" disabled={!clientServiceList.length}>Client services{clientServiceList.length ? "" : " (none set)"}</option><option value="ai">AI ad groups</option><option value="none">No grouping</option></select></label>
+              <button type="button" className="secondary-button kw-ai-groups" disabled={aiGroupBusy || !kwRows.length} onClick={() => void runAiGroups()}>{aiGroupBusy ? "Grouping…" : aiGroups ? "✨ Re-run AI ad groups" : "✨ AI ad groups"}</button>
               <span className="kw-count">{rows.length} of {kwRows.length} ideas{keywordIdeas?.providerCostUsd != null ? ` · last run $${keywordIdeas.providerCostUsd.toFixed(4)}` : ""}</span>
               <button type="button" className="text-button" onClick={() => { if (window.confirm("Clear all research results? Saved keywords are not affected.")) { setKwRows([]); setPickedKeywords(new Set()); setKeywordIdeas(null); } }}>Clear results</button>
             </div>
             <div className="kw-bulk" role="toolbar" aria-label="Bulk actions">
               <b>{pickedKeywords.size ? `${pickedKeywords.size} selected` : "Tick keywords to save or report"}</b>
-              <span className="kw-bulk-group"><select aria-label="Save to group" value={saveGroupId} onChange={(event) => setSaveGroupId(event.target.value)}><option value="">Save to: Ungrouped</option>{(saved?.groups || []).map((group) => <option key={group.id} value={group.id}>Save to: {group.name}</option>)}</select><button type="button" className="primary-button" disabled={!pickedKeywords.size || savedBusy} onClick={() => void saveResearchRows(pickedRows)}>Save to {client?.name || "client"}</button></span>
+              <span className="kw-bulk-group"><select aria-label="Save to group" value={saveGroupId} onChange={(event) => setSaveGroupId(event.target.value)}><option value="">Save to: Ungrouped</option>{(saved?.groups || []).map((group) => <option key={group.id} value={group.id}>Save to: {group.name}</option>)}</select><button type="button" className="secondary-button kw-new-group" disabled={savedBusy || !client} onClick={() => void newSaveGroup()} title="Create a new group">＋ Group</button><button type="button" className="primary-button" disabled={!pickedKeywords.size || savedBusy} onClick={() => void saveResearchRows(pickedRows)}>Save to {client?.name || "client"}</button></span>
               <button type="button" className="secondary-button" disabled={!pickedKeywords.size} onClick={() => makeBatchKeywordTask(pickedRows)}>Create review task</button>
               <button type="button" className="secondary-button" disabled={!pickedKeywords.size} onClick={openKeywordReport}>Report</button>
               <button type="button" className="secondary-button" disabled={!pickedKeywords.size} onClick={downloadKeywordCsv}>CSV</button>
@@ -722,7 +763,7 @@ ${sorted.map((group, index) => `<section class="page"><div class="running">${esc
                 <td><span className={`kw-comp ${level}`}>{competitionLabel[level]}</span>{row.competitionIndex != null && <small> {row.competitionIndex}</small>}</td>
                 {anyDfs && <td className="num">{row.difficulty == null ? "—" : row.difficulty}</td>}
                 <td><small>{row.location}</small></td>
-              </tr>; }; if (!kwGrouped) return shown.map(renderRow); const groups = new Map<string, typeof shown>(); for (const row of shown) { const key = themeOf(row.keyword); groups.set(key, [...(groups.get(key) || []), row]); } return [...groups.entries()].sort((a, b) => Number(a[0] === "Other related searches") - Number(b[0] === "Other related searches") || b[1].reduce((n, r) => n + (r.avgMonthlySearches || 0), 0) - a[1].reduce((n, r) => n + (r.avgMonthlySearches || 0), 0)).map(([name, list]) => <Fragment key={`g-${name}`}><tr className="kw-group-row"><td className="kw-check"><input type="checkbox" aria-label={`Select all in ${name}`} checked={list.every((row) => pickedKeywords.has(row.key))} onChange={(event) => setPickedKeywords((current) => { const next = new Set(current); list.forEach((row) => event.target.checked ? next.add(row.key) : next.delete(row.key)); return next; })} /></td><td colSpan={anyDfs ? 6 : 5}><div className="kw-group-head"><b>{name.replace(/^./, (c) => c.toUpperCase())}</b><span>{list.length} keywords · {list.reduce((n, r) => n + (r.avgMonthlySearches || 0), 0).toLocaleString("en-IE")} searches/mo</span><button type="button" className="secondary-button kw-group-save" disabled={savedBusy} onClick={() => void saveAsGroup(name, list)}>Save as group to {client?.name || "client"}</button></div></td></tr>{list.map(renderRow)}</Fragment>); })()}</tbody>
+              </tr>; }; if (!kwGrouped) return shown.map(renderRow); const groups = new Map<string, typeof shown>(); for (const row of shown) { const key = groupOf(row.keyword); groups.set(key, [...(groups.get(key) || []), row]); } return [...groups.entries()].sort((a, b) => Number(a[0] === "Other related searches") - Number(b[0] === "Other related searches") || b[1].reduce((n, r) => n + (r.avgMonthlySearches || 0), 0) - a[1].reduce((n, r) => n + (r.avgMonthlySearches || 0), 0)).map(([name, list]) => <Fragment key={`g-${name}`}><tr className="kw-group-row"><td className="kw-check"><input type="checkbox" aria-label={`Select all in ${name}`} checked={list.every((row) => pickedKeywords.has(row.key))} onChange={(event) => setPickedKeywords((current) => { const next = new Set(current); list.forEach((row) => event.target.checked ? next.add(row.key) : next.delete(row.key)); return next; })} /></td><td colSpan={anyDfs ? 6 : 5}><div className="kw-group-head"><b>{name.replace(/^./, (c) => c.toUpperCase())}</b><span>{list.length} keywords · {list.reduce((n, r) => n + (r.avgMonthlySearches || 0), 0).toLocaleString("en-IE")} searches/mo</span><button type="button" className="secondary-button kw-group-save" disabled={savedBusy} onClick={() => void saveAsGroup(name, list)}>Save as group to {client?.name || "client"}</button></div></td></tr>{list.map(renderRow)}</Fragment>); })()}</tbody>
             </table></div>
             {rows.length > 50 && <button className="secondary-button seo-keyword-more" type="button" onClick={() => setShowAllKeywordIdeas(!showAllKeywordIdeas)}>{showAllKeywordIdeas ? "Show top 50" : `Show all ${rows.length}`}</button>}
           </>;
