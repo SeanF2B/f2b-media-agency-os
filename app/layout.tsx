@@ -4,6 +4,7 @@ import "./globals.css";
 import "./f2b-brand-accessible.css";
 import "./ai-history.css";
 import "./f2b-icons-glass.css";
+import "./f2b-topnav.css";
 
 export const metadata: Metadata = {
   title: "F2B Media Agency OS",
