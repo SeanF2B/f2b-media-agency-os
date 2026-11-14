@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     try {
       const response = await fetch(aiEndpoint(env, "responses", provider)!, {
         method: "POST", headers: aiHeaders(env, provider)!,
-        body: JSON.stringify({ model: aiModel(env, undefined, provider), instructions: groupInstructions, input: JSON.stringify({ business: client ? { name: client.name, services } : null, keywords }), max_output_tokens: 4000, store: false }),
+        body: JSON.stringify({ model: aiModel(env, undefined, provider), instructions: groupInstructions, input: JSON.stringify({ business: client ? { name: client.name, services } : null, keywords }), max_output_tokens: 4000, ...(provider?.name === "OpenRouter" ? { reasoning: { effort: "low" } } : {}), store: false }),
         signal: AbortSignal.timeout(60_000),
       });
       const payload = await response.json().catch(() => null);
@@ -58,6 +58,14 @@ export async function POST(request: Request) {
       if (left.length) groups.push({ name: "Other", keywords: left });
       return respond({ groups });
     } catch { return respond({ error: "Couldn’t group these keywords. Try again." }, 502); }
+  }
+  // Domain / website fields: answer instantly with the selected client's own site, no AI call.
+  if (/domain|website|site url|\burl\b/i.test(`${body.field || ""} ${body.placeholder || ""}`) && !Array.isArray(body.keywords)) {
+    const site = String(client?.wordpressSiteUrl || client?.website || "").trim();
+    let host = ""; try { host = site ? new URL(/^https?:/i.test(site) ? site : `https://${site}`).hostname.replace(/^www\./, "") : ""; } catch { host = ""; }
+    if (/competitor/i.test(String(body.field || "")) && !/client/i.test(String(body.field || ""))) return respond({ error: "Type the competitor domains you want to compare." }, 400);
+    if (!host) return respond({ error: client ? `Add ${client.name}’s website in Clients first.` : "Pick a client first." }, 400);
+    return respond({ text: /url/i.test(String(body.field || "")) ? `https://${host}` : host, mode: "suggest" });
   }
   const polish = body.mode === "polish" && String(body.current || "").trim().length > 0;
   const list = Boolean(body.list);
@@ -78,8 +86,8 @@ export async function POST(request: Request) {
   try {
     const response = await fetch(aiEndpoint(env, "responses", provider)!, {
       method: "POST", headers: aiHeaders(env, provider)!,
-      body: JSON.stringify({ model: aiModel(env, undefined, provider), instructions, input: JSON.stringify(input), max_output_tokens: 600, store: false }),
-      signal: AbortSignal.timeout(30_000),
+      body: JSON.stringify({ model: aiModel(env, undefined, provider), instructions, input: JSON.stringify(input), max_output_tokens: list ? 450 : 300, ...(provider?.name === "OpenRouter" ? { reasoning: { effort: "low" } } : {}), store: false }),
+      signal: AbortSignal.timeout(20_000),
     });
     const payload = await response.json().catch(() => null);
     if (!response.ok) return respond({ error: payload?.error?.message || "The AI provider didn’t respond. Try again." }, 502);
