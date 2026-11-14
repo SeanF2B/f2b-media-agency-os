@@ -267,6 +267,11 @@ function selectedFormIds(form: Record<string, string>, key: string): string[] { 
 function parseObjectForm(value: string | undefined): Record<string, unknown> | null { try { const parsed = JSON.parse(value || ""); return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null; } catch { return null; } }
 function permissionsFromForm(form: Record<string, string>, role: string): TeamPermissions { const defaults = getTeamPermissions(role); const permissions = Object.fromEntries(permissionKeys.map((key) => [key, form[`permission_${key}`] === undefined ? defaults[key] : form[`permission_${key}`] === "true"])) as TeamPermissions; if (role !== "Owner") permissions.overview = false; if (!permissions.aiTasks) { permissions.aiApprovals = false; permissions.aiCompletedTasks = false; } return permissions; }
 const emptyWorkspace = (): Workspace => ({ ownerId: "", settings: { adminEmail: "sean@f2bmedia.com", currency: "EUR", weekStarts: "Monday" }, staff: botTeammates, clients: [], projects: [], tasks: [], entries: [], financeRecords: [], financeRecurring: [], notes: [], files: [], vault: null, vaultEntries: [], hiddenAiAgentIds: [], reportTemplates: [], leadProfiles: [], leadLists: [], activity: [], activeTimer: null });
+function ScopeSearch({ value, onChange, onEnter }: { value: string; onChange: (value: string) => void; onEnter: () => void }) {
+  return <li className="client-scope-search"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg><input autoFocus type="search" value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); onEnter(); } }} placeholder="Search clients…" aria-label="Search clients" /></li>;
+}
+const matchesClient = (client: Client, query: string) => !query.trim() || `${client.name} ${client.company || ""}`.toLowerCase().includes(query.trim().toLowerCase());
+
 function ClientScopePicker({ value, clients, onChange }: { value: string; clients: Client[]; onChange: (id: string) => void }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -278,13 +283,18 @@ function ClientScopePicker({ value, clients, onChange }: { value: string; client
   }, [open]);
   const current = clients.find((item) => item.id === value);
   const badge = (client?: Client) => client ? <span className={`client-dot ${client.logo ? "has-logo" : ""}`} style={{ background: client.color }}>{client.logo ? <img src={client.logo} alt="" /> : initials(client.name).slice(0, 1)}</span> : <span className="client-dot agency-dot"><img src="/f2b-home-icon.png" alt="" /></span>;
+  const [query, setQuery] = useState("");
+  useEffect(() => { if (!open) setQuery(""); }, [open]);
+  const shown = clients.filter((client) => matchesClient(client, query));
   const pick = (id: string) => { onChange(id); setOpen(false); };
   return <div className="client-scope" ref={rootRef}>
     <label id="client-scope-label">Viewing</label>
     <button type="button" className="client-scope-trigger" aria-haspopup="listbox" aria-expanded={open} aria-labelledby="client-scope-label" onClick={() => setOpen((state) => !state)}><span className="client-scope-name">{current ? current.name : "Agency"}</span><span className="client-scope-caret" aria-hidden="true">▾</span></button>
     {open && <ul className="client-scope-menu" role="listbox" aria-labelledby="client-scope-label">
-      <li><button type="button" role="option" aria-selected={!value} className={!value ? "active" : ""} onClick={() => pick("")}>{badge()}<span>Agency</span></button></li>
-      {clients.map((client) => <li key={client.id}><button type="button" role="option" aria-selected={value === client.id} className={value === client.id ? "active" : ""} onClick={() => pick(client.id)}>{badge(client)}<span>{client.name}</span></button></li>)}
+      <ScopeSearch value={query} onChange={setQuery} onEnter={() => { if (shown[0]) pick(shown[0].id); }} />
+      {(!query.trim() || "agency".includes(query.trim().toLowerCase())) && <li><button type="button" role="option" aria-selected={!value} className={!value ? "active" : ""} onClick={() => pick("")}>{badge()}<span>Agency</span></button></li>}
+      {!shown.length && query.trim() && !"agency".includes(query.trim().toLowerCase()) && <li className="client-scope-empty">No clients match</li>}
+      {shown.map((client) => <li key={client.id}><button type="button" role="option" aria-selected={value === client.id} className={value === client.id ? "active" : ""} onClick={() => pick(client.id)}>{badge(client)}<span>{client.name}</span></button></li>)}
     </ul>}
   </div>;
 }
@@ -302,12 +312,17 @@ function ClientFocusPicker({ clients }: { clients: Client[] }) {
   }, [open]);
   const current = clients.find((item) => item.id === value);
   const dot = (client: Client) => <span className={`client-dot ${client.logo ? "has-logo" : ""}`} style={{ background: client.color }}>{client.logo ? <img src={client.logo} alt="" /> : initials(client.name).slice(0, 1)}</span>;
+  const [query, setQuery] = useState("");
+  useEffect(() => { if (!open) setQuery(""); }, [open]);
+  const shown = clients.filter((client) => matchesClient(client, query));
   const pick = (id: string) => { setFocusClient(id); setValue(id); setOpen(false); };
   return <div className="client-scope client-focus" ref={rootRef}>
     <button type="button" className={`client-scope-trigger ${current ? "is-focused" : ""}`} aria-haspopup="listbox" aria-expanded={open} aria-label="Show work for one client" title="Filter every section to one client" onClick={() => setOpen((state) => !state)}>{current ? dot(current) : <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M3 5h18l-7 8v5l-4 2v-7z" /></svg>}<span className="client-scope-name">{current ? current.name : "All clients"}</span>{current ? <span className="client-focus-clear" role="button" aria-label="Show all clients" onClick={(event) => { event.stopPropagation(); pick(""); }}>×</span> : <span className="client-scope-caret" aria-hidden="true">▾</span>}</button>
     {open && <ul className="client-scope-menu" role="listbox" aria-label="Focus on a client">
-      <li><button type="button" role="option" aria-selected={!value} className={!value ? "active" : ""} onClick={() => pick("")}><span className="client-dot agency-dot"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 5h18l-7 8v5l-4 2v-7z" /></svg></span><span>All clients</span></button></li>
-      {clients.map((client) => <li key={client.id}><button type="button" role="option" aria-selected={value === client.id} className={value === client.id ? "active" : ""} onClick={() => pick(client.id)}>{dot(client)}<span>{client.name}</span></button></li>)}
+      <ScopeSearch value={query} onChange={setQuery} onEnter={() => { if (shown[0]) pick(shown[0].id); }} />
+      {!query.trim() && <li><button type="button" role="option" aria-selected={!value} className={!value ? "active" : ""} onClick={() => pick("")}><span className="client-dot agency-dot"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 5h18l-7 8v5l-4 2v-7z" /></svg></span><span>All clients</span></button></li>}
+      {!shown.length && query.trim() && <li className="client-scope-empty">No clients match</li>}
+      {shown.map((client) => <li key={client.id}><button type="button" role="option" aria-selected={value === client.id} className={value === client.id ? "active" : ""} onClick={() => pick(client.id)}>{dot(client)}<span>{client.name}</span></button></li>)}
     </ul>}
   </div>;
 }
