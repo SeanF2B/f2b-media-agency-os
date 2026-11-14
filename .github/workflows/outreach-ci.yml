@@ -65,7 +65,7 @@ jobs:
         if: hashFiles('tests/e2e/*.mjs') != ''
         run: |
           set -o pipefail
-          node --test tests/e2e/*.mjs 2>&1 | tee /tmp/e2e.log
+          node --experimental-transform-types --no-warnings --import ./tests/e2e/register.mjs --test tests/e2e/*.test.mjs 2>&1 | tee /tmp/e2e.log
       - name: Report failure details
         if: failure()
         run: |

@@ -25,16 +25,16 @@ export type OutreachState = {
 export async function outreachGet(params: Record<string, string> = {}): Promise<OutreachState> {
   const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value));
   const response = await fetch(`/api/outreach?${query.toString()}`, { cache: "no-store" });
-  const payload = await response.json().catch(() => ({}));
+  const payload = await response.json().catch(() => ({})) as { error?: string } & Record<string, unknown>;
   if (!response.ok) throw new Error(payload.error || "Could not load Outreach.");
-  return payload as OutreachState;
+  return payload as unknown as OutreachState;
 }
 
 export async function outreachAction<T = any>(action: string, body: Record<string, unknown> = {}): Promise<T> {
   const response = await fetch("/api/outreach", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, ...body }) });
-  const payload = await response.json().catch(() => ({}));
+  const payload = await response.json().catch(() => ({})) as { error?: string } & Record<string, unknown>;
   if (!response.ok) throw new Error(payload.error || "That didn't work. Try again.");
-  return payload as T;
+  return payload as unknown as T;
 }
 
 export const money = (cents: number | null | undefined, currency = "USD") => cents === null || cents === undefined ? "—" : new Intl.NumberFormat("en-IE", { style: "currency", currency, maximumFractionDigits: cents % 100 ? 2 : 0 }).format(cents / 100);

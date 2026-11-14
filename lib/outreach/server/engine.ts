@@ -94,7 +94,7 @@ async function sendTick(ownerId: string, settings: OutreachSettings, now: Date) 
       const contact = await database.prepare("SELECT first_name, last_name, company, email FROM crm_contacts WHERE id = ?1").bind(enrollment.contact_id).first<Row>();
       const vars = parseJson<Row>(enrollment.vars_json, {});
       const stepDef = campaignState[campaign.id].steps[planned.step];
-      const variant = stepDef.variants.find((item) => item.id === planned.variantId) || stepDef.variants[0];
+      const variant = stepDef.variants.find((item: { id: string }) => item.id === planned.variantId) || stepDef.variants[0];
       if (!recentByCampaign.has(campaign.id)) recentByCampaign.set(campaign.id, ((await database.prepare("SELECT body_fingerprint FROM outreach_sends WHERE campaign_id = ?1 AND status = 'sent' ORDER BY sent_at DESC LIMIT 30").bind(campaign.id).all<Row>()).results || []).map((row) => parseFingerprint(row.body_fingerprint)));
       const recent = recentByCampaign.get(campaign.id)!;
       const enrollState = parseJson<Row>(enrollment.variant_json, {});
@@ -146,23 +146,34 @@ async function syncReplies(ownerId: string, settings: OutreachSettings, now: Dat
   const mailboxes = (await database.prepare("SELECT * FROM outreach_mailboxes WHERE owner_id = ?1 AND status IN ('ramping', 'active', 'paused') AND (last_polled_at IS NULL OR last_polled_at < ?2) ORDER BY last_polled_at LIMIT 6").bind(ownerId, cutoff).all<Row>()).results || [];
   if (!mailboxes.length) return { processed: 0 };
   const ownAddresses = new Set(((await database.prepare("SELECT email FROM outreach_mailboxes WHERE owner_id = ?1").bind(ownerId).all<Row>()).results || []).map((row) => String(row.email).toLowerCase()));
-  let processed = 0;
+  let processed = 0, errors = 0;
   for (const mailbox of mailboxes) {
     try {
       const host = await mailHost(ownerId, mailbox.host as HostName);
       const delta = await host.inboxDelta(mailbox.host_user_id || mailbox.email, mailbox.inbox_cursor || "");
-      await database.prepare("UPDATE outreach_mailboxes SET inbox_cursor = ?2, last_polled_at = ?3 WHERE id = ?1").bind(mailbox.id, delta.cursor, nowIso()).run();
+      // Each message is handled on its own: one bad message never drops the rest of the batch.
+      // Failed messages are retried on the next poll (the cursor only moves once none failed);
+      // already-stored replies are skipped by their host message id, so nothing is handled twice.
+      let failed = 0;
       for (const item of delta.items) {
-        if (ownAddresses.has(item.from)) { await recordSelfTest(item); continue; }
-        processed += Number(await handleInbound(ownerId, settings, mailbox, item));
+        try {
+          if (ownAddresses.has(item.from)) { await recordSelfTest(item); continue; }
+          processed += Number(await handleInbound(ownerId, settings, mailbox, item));
+        } catch (error) {
+          failed += 1; errors += 1;
+          console.error(`outreach:reply ${mailbox.email} ${item.id}`, error);
+        }
       }
+      const attempts = Number(parseJson<Row>(mailbox.health_json, {}).replyRetries || 0);
+      const advance = !failed || attempts >= 3; // never get stuck forever on one poisoned message
+      await database.prepare("UPDATE outreach_mailboxes SET inbox_cursor = ?2, last_polled_at = ?3, health_json = json_set(COALESCE(NULLIF(health_json, ''), '{}'), '$.replyRetries', ?4) WHERE id = ?1").bind(mailbox.id, advance ? delta.cursor : (mailbox.inbox_cursor || delta.cursor), nowIso(), advance ? 0 : attempts + 1).run();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       await database.prepare("UPDATE outreach_mailboxes SET last_polled_at = ?2 WHERE id = ?1").bind(mailbox.id, nowIso()).run();
       if (/rejected|permission|401|403/i.test(message)) await criticalAlert(ownerId, settings, `mailbox-read:${mailbox.id}`, `Can't read replies for ${mailbox.email}`, message);
     }
   }
-  return { processed };
+  return { processed, errors };
 }
 
 async function recordSelfTest(item: InboundMessage) {
@@ -218,7 +229,11 @@ async function handleInbound(ownerId: string, settings: OutreachSettings, mailbo
     const telegram = await telegramConfig(ownerId);
     if (telegram?.chatId) {
       const alert = formatPositiveAlert({ prospectName: [contact?.first_name, contact?.last_name].filter(Boolean).join(" ") || item.fromName, prospectEmail: item.from, company: contact?.company, campaign: campaign?.name, replyText: item.text, suggestedReply: suggested, confidence: decision.confidence, conversationUrl: settings.appUrl ? `${settings.appUrl.replace(/\/$/, "")}/?page=CRM&leads=outreach&reply=${encodeURIComponent(message.id)}` : undefined });
-      await createTelegram(telegram).send(alert.text, alert.buttons).then(() => database.prepare("UPDATE outreach_replies SET notified_at = ?2 WHERE conv_message_id = ?1 AND notified_at IS NULL").bind(message.id, nowIso()).run()).catch((error) => console.error("outreach:telegram", error));
+      // A Telegram problem never blocks reply handling; the reply is already saved and visible in the Inbox.
+      try {
+        await createTelegram(telegram).send(alert.text, alert.buttons);
+        await database.prepare("UPDATE outreach_replies SET notified_at = ?2 WHERE conv_message_id = ?1 AND notified_at IS NULL").bind(message.id, nowIso()).run();
+      } catch (error) { console.error("outreach:telegram", error); }
     }
   }
   return true;

@@ -137,7 +137,12 @@ test("positive replies create one deal, move it forward, never reopen won/lost",
 test("embedded schema matches the migration file", async () => {
   const { readFileSync } = await import("node:fs");
   const { OUTREACH_SCHEMA } = await import("../lib/outreach/schema-sql.mjs");
-  const sql = readFileSync(new URL("../drizzle/0048_outreach.sql", import.meta.url), "utf8").split("\n").filter((line) => !line.trim().startsWith("--")).join("\n");
-  const statements = sql.split(";").map((part) => part.replace(/--[^\n]*/g, "").replace(/\s+/g, " ").trim()).filter(Boolean);
+  // Comments are removed before splitting, so a ";" inside a comment can never cut a statement.
+  const sql = readFileSync(new URL("../drizzle/0048_outreach.sql", import.meta.url), "utf8").split("\n").map((line) => line.replace(/--.*$/, "")).join("\n");
+  const statements = sql.split(";").map((part) => part.replace(/\s+/g, " ").trim()).filter(Boolean);
   assert.deepEqual(OUTREACH_SCHEMA, statements);
+  // Every statement must be complete and valid SQLite on its own (that's how the app runs them).
+  const { DatabaseSync } = await import("node:sqlite");
+  const sqlite = new DatabaseSync(":memory:");
+  for (const statement of OUTREACH_SCHEMA) assert.doesNotThrow(() => sqlite.prepare(statement).run(), statement.slice(0, 80));
 });
