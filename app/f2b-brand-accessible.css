@@ -9404,3 +9404,4 @@ html body.f2b-dark .f2b-on-light:is(input, textarea, #f2b-white-text-override)::
 .app-shell.dark-mode .kw-table-wrap { border-color:#3a393d; }
 @media (max-width:900px) { .kw-research-form { grid-template-columns:1fr 1fr; } .kw-f-seeds, .kw-f-go { grid-column:1 / -1; } .saved-kw { grid-template-columns:1fr; } .saved-kw-groups { position:static; } }
 .book-tabs { margin: 0 0 14px; }
+.book-tabs + .bs, .bs + .bs { margin-top: 14px; }

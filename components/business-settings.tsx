@@ -25,7 +25,7 @@ export function ColorField({ label, value, onChange }: { label: string; value: s
     <div className="bs-swatches" role="group" aria-label={`${label} presets`}>{PRESETS.map((color) => <button type="button" key={color} className={color === value ? "on" : ""} style={{ background: color }} aria-label={color} onClick={() => onChange(color)} />)}</div></div>;
 }
 
-export function BusinessSettings({ value, onSave }: { value: BusinessSettingsValue; onSave: (next: BusinessSettingsValue) => Promise<void> | void }) {
+export function BusinessSettings({ value, onSave, part = "all" }: { value: BusinessSettingsValue; onSave: (next: BusinessSettingsValue) => Promise<void> | void; part?: "all" | "brand" | "money" }) {
   const [draft, setDraft] = useState<Draft>(() => toDraft(value));
   const [saved, setSaved] = useState<Draft>(() => toDraft(value));
   const [busy, setBusy] = useState(false);
@@ -51,18 +51,18 @@ export function BusinessSettings({ value, onSave }: { value: BusinessSettingsVal
   const preview = { "--bs-primary": draft.primary, "--bs-secondary": draft.secondary } as React.CSSProperties;
 
   return <section className="bs" aria-labelledby="business-settings-heading">
-    <header className="bs-head"><div><p className="eyebrow">WORKSPACE</p><h2 id="business-settings-heading">Business settings</h2><p>Your brand, currency and tax. Everything here applies across the whole workspace and every client.</p></div>
+    <header className="bs-head"><div><p className="eyebrow">{part === "money" ? "MONEY & TAX" : "WORKSPACE"}</p><h2 id="business-settings-heading">{part === "money" ? "Currency & tax" : "Business settings"}</h2><p>{part === "money" ? "Currency, tax country and default company type used by Bookkeeping and the tax estimates." : part === "brand" ? "Your brand. Everything here applies across the whole workspace and every client." : "Your brand, currency and tax. Everything here applies across the whole workspace and every client."}</p></div>
       <div className="bs-actions">{justSaved && <span className="bs-saved" role="status">✓ Saved</span>}{dirty && <button type="button" className="bs-ghost" onClick={() => { setDraft(saved); setError(""); }}>Discard</button>}<button type="button" className="bs-save" disabled={!dirty || busy} onClick={() => void save()}>{busy ? "Saving…" : "Save changes"}</button></div></header>
     {error && <p className="bs-error" role="alert">{error}</p>}
     <div className="bs-body">
       <div className="bs-col">
-        <div className="bs-group"><h3>Brand</h3>
+        {part !== "money" && <div className="bs-group"><h3>Brand</h3>
           <div className="bs-field"><span className="bs-label">Logo</span>
             <div className="bs-logo"><span className="bs-logo-tile">{draft.logo ? <img src={draft.logo} alt="Logo" /> : <img src="/f2b-home-icon.png" alt="Default logo" className="dim" />}</span>
               <div className="bs-logo-actions"><label className="bs-btn">{draft.logo ? "Replace logo" : "Upload logo"}<input type="file" accept="image/*" hidden onChange={(event) => { upload(event.currentTarget.files?.[0]); event.currentTarget.value = ""; }} /></label>{draft.logo && <button type="button" className="bs-link" onClick={() => set({ logo: "" })}>Remove</button>}{draft.logo && <button type="button" className="bs-link" onClick={() => { void extractLogoColours(draft.logo).then((colours) => { if (colours) { set(colours); setNote("Colours picked from your logo."); } else setNote("Couldn't find clear colours in that logo. Pick them by hand."); }); }}>🎨 Pull colours from logo</button>}<small>PNG, JPG, SVG or WebP · square works best</small></div>{note && <p className="bs-note" role="status">{note}</p>}</div></div>
           <label className="bs-field"><span className="bs-label">Business name</span><input className="bs-input" value={draft.name} maxLength={60} placeholder="F2B Media" onChange={(event) => set({ name: event.target.value })} /></label>
-          <div className="bs-two"><ColorField label="Primary colour" value={draft.primary} onChange={(primary) => set({ primary })} /><ColorField label="Secondary colour" value={draft.secondary} onChange={(secondary) => set({ secondary })} /></div></div>
-        <div className="bs-group"><h3>Money & tax</h3>
+          <div className="bs-two"><ColorField label="Primary colour" value={draft.primary} onChange={(primary) => set({ primary })} /><ColorField label="Secondary colour" value={draft.secondary} onChange={(secondary) => set({ secondary })} /></div></div>}
+        {part !== "brand" && <div className="bs-group"><h3>Money & tax</h3>
           <div className="bs-two">
             <label className="bs-field"><span className="bs-label">Currency</span><select className="bs-input" value={draft.currency} onChange={(event) => set({ currency: event.target.value })}>{CURRENCIES.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}</select></label>
             <label className="bs-field"><span className="bs-label">Country for tax</span><select className="bs-input" value={draft.country} onChange={(event) => set({ country: event.target.value as TaxCountry })}>{TAX_COUNTRIES.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}</select></label>
@@ -70,11 +70,11 @@ export function BusinessSettings({ value, onSave }: { value: BusinessSettingsVal
           <div className="bs-field"><span className="bs-label">Default company type for clients</span>
             <div className="bs-seg" role="radiogroup" aria-label="Default company type">{([["", "Ask each time"], ["sole_trader", "Sole trader"], ["company", "Company"]] as const).map(([key, label]) => <button type="button" role="radio" aria-checked={draft.defaultBusinessType === key} key={key} className={draft.defaultBusinessType === key ? "on" : ""} onClick={() => set({ defaultBusinessType: key })}>{label}</button>)}</div></div>
           {draft.country === "OTHER" && <div className="bs-two"><label className="bs-field"><span className="bs-label">Personal tax rate (%)</span><input className="bs-input" inputMode="decimal" value={draft.otherPersonalRate} onChange={(event) => set({ otherPersonalRate: event.target.value.replace(/[^0-9.]/g, "") })} /></label><label className="bs-field"><span className="bs-label">Company tax rate (%)</span><input className="bs-input" inputMode="decimal" value={draft.otherCompanyRate} onChange={(event) => set({ otherCompanyRate: event.target.value.replace(/[^0-9.]/g, "") })} /></label></div>}
-          <small className="bs-hint">Ireland uses 2026 rates, the United Kingdom 2026/27. Tax figures are estimates, not tax advice.</small></div>
+          <small className="bs-hint">Ireland uses 2026 rates, the United Kingdom 2026/27. Tax figures are estimates, not tax advice.</small></div>}
       </div>
-      <aside className="bs-preview" style={preview} aria-label="Live preview"><span className="bs-label">Live preview</span>
+      {part !== "money" && <aside className="bs-preview" style={preview} aria-label="Live preview"><span className="bs-label">Live preview</span>
         <div className="bs-mock"><div className="bs-mock-side"><span className="bs-mock-logo">{draft.logo ? <img src={draft.logo} alt="" /> : <img src="/f2b-home-icon.png" alt="" />}</span><b>{draft.name || "Your business"}</b><i className="on" /><i /><i /></div>
-          <div className="bs-mock-main"><div className="bs-mock-tabs"><span className="on">Board</span><span>Approvals</span><span>History</span></div><div className="bs-mock-card"><b>Website redesign</b><small>{draft.currency} · {TAX_COUNTRIES.find((item) => item.code === draft.country)?.label.replace(/ \(.*/, "")}</small><span className="bs-mock-chip">In progress</span></div><button type="button" className="bs-mock-btn" tabIndex={-1}>Primary action</button><button type="button" className="bs-mock-btn alt" tabIndex={-1}>Secondary</button></div></div></aside>
+          <div className="bs-mock-main"><div className="bs-mock-tabs"><span className="on">Board</span><span>Approvals</span><span>History</span></div><div className="bs-mock-card"><b>Website redesign</b><small>{draft.currency} · {TAX_COUNTRIES.find((item) => item.code === draft.country)?.label.replace(/ \(.*/, "")}</small><span className="bs-mock-chip">In progress</span></div><button type="button" className="bs-mock-btn" tabIndex={-1}>Primary action</button><button type="button" className="bs-mock-btn alt" tabIndex={-1}>Secondary</button></div></div></aside>}
     </div>
   </section>;
 }
