@@ -100,7 +100,7 @@ export function BookkeepingConnections({ scopeName, existingIds, onImport, saved
       <div className="bookkeeping-card">
         <h3>🏦 Business bank account</h3>
         <p>Import a statement CSV from the bank (AIB, Bank of Ireland, PTSB, Revolut Business, Monzo, Starling and most others). Money in becomes income, money out becomes expenses, ad platform charges are tagged as ad spend, and rows already imported are skipped.</p>
-        {onImport ? <label className="bs-ghost bookkeeping-upload">⬆ Upload bank statement (.csv)<input type="file" accept=".csv,text/csv" hidden onChange={(event) => { void readFile(event.target.files?.[0]); event.target.value = ""; }} /></label> : <p className="bookkeeping-muted">Open a client sub-account to import into its books.</p>}
+        {onImport ? <label className="bs-save bookkeeping-upload bookkeeping-connect" role="button" tabIndex={0}>⬆ Upload bank statement (.csv)<input type="file" accept=".csv,text/csv" hidden onChange={(event) => { void readFile(event.target.files?.[0]); event.target.value = ""; }} /></label> : <p className="bookkeeping-muted">Open a client sub-account to import into its books.</p>}
         <p className="bookkeeping-muted">Live bank feed (automatic daily sync through open banking): not connected yet.</p>
       </div>
       <div className="bookkeeping-card">

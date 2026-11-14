@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { createCardDragFx, showFxError, type CardDragFx } from "@/lib/card-drag-fx";
 import { ArrowUpDown, Ban, BellOff, Briefcase, Building2, Columns3, Filter, Footprints, Globe, Handshake, Mail, MapPin, Megaphone, MessageSquareText, MousePointerClick, NotebookPen, Pencil, Phone, Plus, Search, Share2, SquareKanban, Tag, Trash2, UserRound, Users, Zap, type LucideIcon } from "lucide-react";
 import { CrmNotesPanel, type CrmNote } from "@/components/crm-notes-panel";
@@ -42,9 +42,9 @@ function QuickContactActions({ name, email, phone, subject, dnd, onClearDnd }: {
   </>;
 }
 
-export function CrmView({ onOpenClient, scopeClientId = "" }: { onOpenClient: (clientId: string) => void; scopeClientId?: string }) {
+export function CrmView({ onOpenClient, scopeClientId = "", conversations, initialTab = "Pipeline" }: { onOpenClient: (clientId: string) => void; scopeClientId?: string; conversations?: ReactNode; initialTab?: "Pipeline" | "Contacts" | "Conversations" }) {
   const [data, setData] = useState<Payload>(empty);
-  const [tab, setTab] = useState<"Pipeline" | "Contacts">("Pipeline");
+  const [tab, setTab] = useState<"Pipeline" | "Contacts" | "Conversations">(initialTab === "Conversations" && !conversations ? "Pipeline" : initialTab);
   const [pipelineId, setPipelineId] = useState("");
   const [search, setSearch] = useState("");
   const [clientFilterState, setClientFilter] = useState("");
@@ -495,8 +495,9 @@ export function CrmView({ onOpenClient, scopeClientId = "" }: { onOpenClient: (c
 
   return <section className="crm-workspace">
     <header className="crm-heading"><div><span className="crm-eyebrow">SALES WORKSPACE</span><h1>Pipeline</h1><p>Keep contacts and your sales pipeline together.</p></div><div className="crm-actions"><button type="button" className="primary-button" onClick={() => { setEditingContact(null); setTagDraft(""); setModal(tab === "Contacts" ? "contact" : "opportunity"); }}>＋ {tab === "Contacts" ? "Add contact" : "New opportunity"}</button></div></header>
-    <nav className="crm-tabs" role="tablist" aria-label="CRM sections">{(["Contacts", "Pipeline"] as const).map((item) => <button type="button" role="tab" aria-selected={tab === item} className={tab === item ? "active" : ""} key={item} onClick={() => setTab(item)}>{item === "Contacts" ? <Ico icon={Users} /> : <Ico icon={SquareKanban} />} {item}</button>)}</nav>
-    <div className="crm-toolbar"><label>Search<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name, email, company…" /></label>{!scopeClientId && <label className="client-filter">Client<select value={clientFilter} onChange={(event) => setClientFilter(event.target.value)}><option value="">All clients</option>{data.clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></label>}{tab === "Pipeline" && <><label>Pipeline<select value={pipeline?.id || ""} onChange={(event) => setPipelineId(event.target.value)}>{data.pipelines.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><button type="button" className="secondary-button" onClick={() => setModal("stage")} disabled={!pipeline}>＋ Add stage</button><button type="button" className="secondary-button" onClick={() => setModal("pipeline")}>＋ New pipeline</button></>}</div>
+    <nav className="crm-tabs" role="tablist" aria-label="CRM sections">{((conversations ? ["Pipeline", "Contacts", "Conversations"] : ["Pipeline", "Contacts"]) as Array<"Pipeline" | "Contacts" | "Conversations">).map((item) => <button type="button" role="tab" aria-selected={tab === item} className={tab === item ? "active" : ""} key={item} onClick={() => setTab(item)}>{item === "Contacts" ? <Ico icon={Users} /> : item === "Conversations" ? <Ico icon={MessageSquareText} /> : <Ico icon={SquareKanban} />} {item}</button>)}</nav>
+    {tab === "Conversations" && conversations}
+    {tab !== "Conversations" && <div className="crm-toolbar"><label>Search<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name, email, company…" /></label>{!scopeClientId && <label className="client-filter">Client<select value={clientFilter} onChange={(event) => setClientFilter(event.target.value)}><option value="">All clients</option>{data.clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></label>}{tab === "Pipeline" && <><label>Pipeline<select value={pipeline?.id || ""} onChange={(event) => setPipelineId(event.target.value)}>{data.pipelines.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><button type="button" className="secondary-button" onClick={() => setModal("stage")} disabled={!pipeline}>＋ Add stage</button><button type="button" className="secondary-button" onClick={() => setModal("pipeline")}>＋ New pipeline</button></>}</div>}
     {error && <div className="crm-error" role="alert">{error}</div>}
     {notice && <div className="crm-notice" role="status"><span>{notice.text}</span>{notice.undo && <button type="button" className="text-button" onClick={notice.undo}>Undo</button>}<button type="button" className="text-button" aria-label="Dismiss" onClick={() => setNotice(null)}>✕</button></div>}
     {draggingId && <div className="crm-drop-tray" aria-label="Drop the card here to flag it"><div data-crm-drop-action="spam" className={`crm-drop-action spam ${dropAction === "spam" ? "is-over" : ""}`}><span aria-hidden="true"><Ico icon={Ban} size={18} /></span><b>Spam</b><small>Remove from the pipeline</small></div><div data-crm-drop-action="dnd" className={`crm-drop-action dnd ${dropAction === "dnd" ? "is-over" : ""}`}><span aria-hidden="true"><Ico icon={BellOff} size={18} /></span><b>Enable DND</b><small>Do not disturb this contact</small></div></div>}
