@@ -1387,6 +1387,7 @@ export function AgencyApp() {
   const scopedClient = activeScopeId ? workspace.clients.find((item) => item.id === activeScopeId) : undefined;
   if (scopedClient?.currency) setDisplayCurrency(scopedClient.currency);
   useEffect(() => { if (activeScopeId && page === "Clients" && !selectedClient) setPage("Overview"); }, [activeScopeId, page, selectedClient]);
+  useEffect(() => { if (activeScopeId && page === "CRM Automations") setPage("Overview"); }, [activeScopeId, page]);
   const [autoColours, setAutoColours] = useState<{ logo: string; primary: string; secondary: string } | null>(null);
   const clientLogo = scopedClient?.logo && /^(data:image\/|https?:\/\/|\/)/.test(scopedClient.logo) ? scopedClient.logo : "";
   useEffect(() => { let live = true; setAutoColours(null); if (clientLogo && !/^#[0-9a-fA-F]{6}$/.test(String(scopedClient?.branding?.secondary || ""))) void extractLogoColours(clientLogo).then((colours) => { if (live && colours) setAutoColours({ logo: clientLogo, ...colours }); }); return () => { live = false; }; /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clientLogo, scopedClient?.id, scopedClient?.branding?.secondary]);
@@ -1444,7 +1445,7 @@ export function AgencyApp() {
   };
   const viewMember = previewMember || (selfProfile && selfProfile.id !== workspace.ownerId ? selfProfile : undefined);
   const pageVisible = (key: string) => !viewMember?.pageAccess || viewMember.role === "Admin" || !(VIEWABLE_PAGES as readonly string[]).includes(key) || viewMember.pageAccess.includes(key);
-  const pageAllowed = canOpenPage(page, viewAccess, viewIsAdmin, viewHasClientScope, viewMember?.role || "") && pageVisible(page);
+  const pageAllowed = canOpenPage(page, viewAccess, viewIsAdmin, viewHasClientScope, viewMember?.role || "") && pageVisible(page) && !(activeScopeId && page === "CRM Automations"); // Automations is agency level only
   const marketingPageActive = marketingPages.some((subpage) => subpage.key === page);
 
   const openModal = (name: string, initial: Record<string, string> = {}) => { if (name === "client" && !initial.clientId) setClientServiceRows(serviceTypes.map((service, index) => ({ id: `service-${index}`, name: service, campaignName: "", fee: "", mediaSpend: "", landingPageUrl: "", landingPagePlatform: "Other" }))); if (name === "client") setServiceToAdd(""); if (name === "staff" && !initial.staffId) setForm({ ...permissionFormValues(getTeamPermissions("Staff")), limitClientAccess: "true", clientAccessIds: "[]", aiModeAccess: "[]", vaultAccessEntryIds: "[]", ...initial }); else { const scopedDefaults: Record<string, string> = activeScopeId && name !== "client" && name !== "staff" && !initial.clientId ? { clientId: activeScopeId } : {}; setForm(name === "task" && !initial.taskId && initial.assigneeId === undefined ? { assigneeId: selfProfile?.id || sessionUser.id, ...scopedDefaults, ...initial } : { ...scopedDefaults, ...initial }); } setModal(name); };
@@ -2395,7 +2396,7 @@ ${senderName}`, staffType: member.staffType || (isSubAccountRole(member.role) ? 
   const navActive = (key: string) => page === key || (key === "Operations" && marketingPageActive) || (key === "Settings" && page === "Integrations");
   const openTaskCount = viewWorkspace.tasks.filter((t) => t.status !== "Done" && !t.aiDismissedAt).length;
   const navPriority = ["Overview", "Clients", "CRM", "Conversations", "Tasks", "Operations", "Invoicing", "Bookkeeping", "CRM Automations", "Lead Factory", "Team", "AI Assistant", "Activity", "Chess"];
-  const orderedNav = [...visibleNav].sort((x, y) => (navPriority.indexOf(x.key) + 1 || 99) - (navPriority.indexOf(y.key) + 1 || 99));
+  const orderedNav = [...visibleNav].filter((item) => !(activeScopeId && item.key === "CRM Automations")).sort((x, y) => (navPriority.indexOf(x.key) + 1 || 99) - (navPriority.indexOf(y.key) + 1 || 99));
   const primaryNav = orderedNav.slice(0, 7);
   const moreNav = [...orderedNav.slice(7), ...(viewIsAdmin ? [{ key: "Settings", icon: "⚙️" }] : [])];
   const moreActive = moreNav.some((item) => navActive(item.key));
@@ -2412,7 +2413,7 @@ ${senderName}`, staffType: member.staffType || (isSubAccountRole(member.role) ? 
         <nav className="tn-nav" aria-label="Workspace">
           {primaryNav.map((item) => <button key={item.key} type="button" className={`tn-item ${navActive(item.key) ? "active" : ""}`} aria-current={navActive(item.key) ? "page" : undefined} onClick={() => goPage(item.key)}><span className="tn-icon">{navGlyph(item.key)}{item.key === "Tasks" && openTaskCount > 0 && <span className="tn-count">{openTaskCount > 99 ? "99+" : openTaskCount}</span>}</span><span className="tn-label">{navLabel(item.key)}</span></button>)}
           {moreNav.length > 0 && <div className="tn-more-wrap">
-            <button type="button" className={`tn-item ${moreActive ? "active" : ""}`} aria-haspopup="menu" aria-expanded={navMoreOpen} onClick={() => setNavMoreOpen((open) => !open)}><span className="tn-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="2" /><rect x="13.5" y="3.5" width="7" height="7" rx="2" /><rect x="3.5" y="13.5" width="7" height="7" rx="2" /><rect x="13.5" y="13.5" width="7" height="7" rx="2" /></svg></span><span className="tn-label">{moreActive ? navLabel(moreNav.find((item) => navActive(item.key))!.key) : "More"}</span></button>
+            <button type="button" className={`tn-item ${moreActive ? "active" : ""}`} aria-haspopup="menu" aria-expanded={navMoreOpen} onClick={() => setNavMoreOpen((open) => !open)}><span className="tn-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="2" /><rect x="13.5" y="3.5" width="7" height="7" rx="2" /><rect x="3.5" y="13.5" width="7" height="7" rx="2" /><rect x="13.5" y="13.5" width="7" height="7" rx="2" /></svg></span><span className="tn-label">More</span></button>
             {navMoreOpen && <><button type="button" className="tn-scrim" aria-label="Close menu" onClick={() => setNavMoreOpen(false)} /><div className="tn-more-menu" role="menu">{moreNav.map((item) => <button key={item.key} type="button" role="menuitem" className={navActive(item.key) ? "active" : ""} onClick={() => goPage(item.key)}><span className="tn-icon">{navGlyph(item.key)}</span><span>{navLabel(item.key)}</span></button>)}</div></>}
           </div>}
         </nav>
