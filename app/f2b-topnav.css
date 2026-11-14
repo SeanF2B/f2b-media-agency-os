@@ -497,3 +497,5 @@ html body .app-shell .ai-completed-screenshot > :not(img):not(.ai-attachment-fil
 .ops-status-filter button.active { background: var(--brand-primary, #3b82f6); color: #fff; }
 .client-status-filter { display: flex; margin-bottom: 8px; }
 .client-status-filter button { flex: 1; justify-content: center; }
+.status-pill.status-toggle { cursor: pointer; border: 0; font: inherit; font-size: 12px; font-weight: 700; }
+.status-pill.inactive { background: rgba(229,72,77,.14) !important; color: #c23b3f !important; }
