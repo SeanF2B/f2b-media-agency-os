@@ -12,7 +12,7 @@ type Person = { id: string; name: string; avatar?: string };
 type Leader = { id: string; name: string; avatar?: string; wins: number; games: number };
 const files = "abcdefgh";
 type PieceFlight = { from: string; to: string; piece: string; key: number };
-type MoveEffect = { gameId: string; flights: PieceFlight[]; sound: "move" | "capture" | "check" | "castle"; key: number };
+type MoveEffect = { gameId: string; flights: PieceFlight[]; sound: "move" | "capture" | "check" | "castle" | "promote"; key: number };
 function ChessPiece({ piece, flight, flipped }: { piece: string; flight?: PieceFlight; flipped?: boolean }) {
   const type = piece.toLowerCase();
   const color = piece === piece.toUpperCase() ? "white-piece" : "black-piece";
@@ -207,7 +207,7 @@ function effectsSince(moves: Game["moves"], start: number, gameId: string, nextK
       const move = replay.move(record.san);
       if (index >= start) {
         const castle = move.flags.includes("k") || move.flags.includes("q");
-        const sound = castle ? "castle" : replay.isCheck() ? "check" : move.captured ? "capture" : "move";
+        const sound = move.promotion ? "promote" : castle ? "castle" : replay.isCheck() ? "check" : move.captured ? "capture" : "move";
         const flights: PieceFlight[] = [{ from: move.from, to: move.to, piece: move.promotion || move.piece, key: nextKey() }];
         if (castle) {
           const rank = move.color === "w" ? "1" : "8";
@@ -250,12 +250,27 @@ function bell(context: AudioContext, offset: number, freq: number, volume: numbe
     osc.connect(g); g.connect(bus); osc.start(t); osc.stop(t + length);
   }
 }
+function slide(context: AudioContext, offset: number, length: number, from: number, to: number, volume: number) {
+  const bus = chessBus(context); const t = context.currentTime + offset;
+  const frames = Math.ceil(context.sampleRate * length); const buffer = context.createBuffer(1, frames, context.sampleRate); const data = buffer.getChannelData(0);
+  for (let i = 0; i < frames; i++) data[i] = (Math.random() * 2 - 1) * Math.sin(Math.PI * i / frames);
+  const src = context.createBufferSource(); src.buffer = buffer;
+  const band = context.createBiquadFilter(); band.type = "bandpass"; band.Q.value = 2.2; band.frequency.setValueAtTime(from, t); band.frequency.exponentialRampToValueAtTime(to, t + length);
+  const g = context.createGain(); g.gain.value = volume;
+  src.connect(band); band.connect(g); g.connect(bus); src.start(t); src.stop(t + length);
+}
 function playMoveSound(context: AudioContext, kind: MoveEffect["sound"]) {
   if (context.state !== "running") return;
+  // Move: one warm felt-on-wood thock.
   if (kind === "move") thock(context, 0, .5, 118, 1);
-  if (kind === "capture") { thock(context, 0, .42, 135, 1.25); thock(context, .045, .55, 105, .9); }
-  if (kind === "check") { thock(context, 0, .5, 118, 1); bell(context, .06, 987.8, .045, .7); }
-  if (kind === "castle") { thock(context, 0, .45, 122, 1); thock(context, .11, .48, 112, .95); }
+  // Capture: sharp clack of piece on piece, then the captured piece knocked down with a short swish.
+  if (kind === "capture") { thock(context, 0, .55, 150, 2.4); thock(context, .05, .5, 96, .8); slide(context, .07, .12, 1800, 600, .18); }
+  // Check: thock plus a two-note warning bell.
+  if (kind === "check") { thock(context, 0, .5, 118, 1); bell(context, .07, 1318.5, .045, .55); bell(context, .2, 987.8, .05, .8); }
+  // Castle: king slides across, then king and rook land in quick succession with a low wooden chord.
+  if (kind === "castle") { slide(context, 0, .16, 500, 1400, .22); thock(context, .14, .5, 112, 1); thock(context, .24, .5, 128, 1.1); bell(context, .3, 196, .05, .9); bell(context, .3, 293.7, .035, .9); }
+  // Promotion: pawn lands, then a rising sparkle arpeggio as it becomes a new piece.
+  if (kind === "promote") { thock(context, 0, .5, 118, 1); [783.99, 987.77, 1174.66, 1567.98].forEach((f, n) => bell(context, .1 + n * .07, f, .05, .9)); slide(context, .1, .4, 3000, 8000, .05); }
 }
 function playEndSound(context: AudioContext, outcome: "win" | "loss" | "draw") {
   if (context.state !== "running") return;
