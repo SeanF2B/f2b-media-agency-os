@@ -631,3 +631,40 @@ html body .app-shell .kw-filters .kw-count { align-self:center; margin-left:auto
 html body .app-shell .kw-filters > .text-button { align-self:center; }
 html body .app-shell .kw-bulk .kw-bulk-group { display:inline-flex; align-items:center; gap:6px; }
 html body .app-shell .kw-bulk .kw-new-group { white-space:nowrap; }
+
+/* Full marketing audit: clear status chips */
+html body .full-marketing-audit-sources li .src-chip { font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; background:#f2f4f7; color:#667085; }
+html body .full-marketing-audit-sources li.src-connected .src-chip { background:#ecfdf3; color:#067647; }
+html body .full-marketing-audit-sources li.src-no_data .src-chip { background:#fffaeb; color:#b54708; }
+
+/* Local & AI: one client at a time */
+html body .app-shell .ops-local-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:16px; margin-top:12px; }
+html body .app-shell .ops-local-card { padding:18px; border-radius:16px; background:#fff; border:1px solid #e7ebf0; display:grid; gap:14px; align-content:start; }
+html body .app-shell .ops-local-card header { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:12px; align-items:start; }
+html body .app-shell .ops-local-card header > svg { margin-top:3px; color:var(--brand-secondary, #0b74b8); }
+html body .app-shell .ops-local-card h3 { margin:0 0 4px; font-size:16px; }
+html body .app-shell .ops-local-card p { margin:0; color:#667085; font-size:13px; line-height:1.5; }
+html body .app-shell .ops-local-status { font-size:11px; font-weight:700; padding:3px 9px; border-radius:999px; white-space:nowrap; }
+html body .app-shell .ops-local-status.ok { background:#ecfdf3; color:#067647; } html body .app-shell .ops-local-status.off { background:#fef3f2; color:#b42318; }
+html body .app-shell .ops-local-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+html body .app-shell .ops-local-results { margin:0; padding:0; list-style:none; display:grid; gap:6px; max-height:280px; overflow:auto; }
+html body .app-shell .ops-local-results a { display:block; padding:8px 10px; border-radius:10px; background:#f8fafc; color:#1f2a33; text-decoration:none; font-size:13px; }
+html body .app-shell .ops-local-results a b { color:var(--brand-secondary, #0b74b8); margin-right:6px; }
+html body .app-shell.dark-mode .ops-local-card { background:rgba(255,255,255,.04); border-color:rgba(255,255,255,.1); }
+
+/* Automations: client + website-form sections */
+html body .ca-section { margin-top:22px; }
+html body .ca-section-title { display:flex; align-items:center; gap:8px; font-size:17px; margin:0 0 10px; }
+html body .ca-section-title span { font-size:12px; padding:2px 8px; border-radius:999px; background:#eef2f6; color:#475467; }
+html body .ca-client-chip { display:inline-block; padding:2px 9px; border-radius:999px; background:color-mix(in srgb, var(--brand-secondary, #0b74b8) 10%, #fff); color:#1f2a33; font-size:12px; font-weight:600; }
+html body .ca-form-rules { display:grid; grid-template-columns:repeat(auto-fill, minmax(360px, 1fr)); gap:12px; }
+html body .ca-form-rule-card { padding:14px 16px; border-radius:14px; background:#fff; border:1px solid #e7ebf0; }
+html body .ca-form-rule-card header { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
+html body .ca-form-rule-card ul { margin:0; padding:0; list-style:none; display:grid; gap:6px; font-size:13px; }
+html body .ca-form-rule-card li { display:grid; gap:2px; padding:7px 10px; border-radius:9px; background:#f8fafc; }
+html body .ca-form-rule-card .ca-when { font-weight:600; color:#1f2a33; }
+html body .ca-form-status { margin-left:auto; font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; background:#fef3f2; color:#b42318; }
+html body .ca-form-status.on { background:#ecfdf3; color:#067647; }
+html body .ca-agency-none { margin:8px 0 0; }
+html body .app-shell.dark-mode .ca-form-rule-card { background:rgba(255,255,255,.04); border-color:rgba(255,255,255,.1); }
+html body .app-shell.dark-mode .ca-form-rule-card li { background:rgba(255,255,255,.04); }

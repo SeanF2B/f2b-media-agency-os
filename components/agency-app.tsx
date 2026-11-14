@@ -159,7 +159,7 @@ function renderAssistantText(content: string) {
 const priorityRank = (task: Task) => ({ Urgent: 0, High: 1, Normal: 2, Low: 3 } as Record<string, number>)[task.priority] ?? 4;
 const byBoardOrder = (list: Task[]) => [...list.filter((task) => task.boardOrder == null).sort((a, b) => priorityRank(a) - priorityRank(b)), ...list.filter((task) => task.boardOrder != null).sort((a, b) => (a.boardOrder as number) - (b.boardOrder as number))];
 const nav = [
-  { key: "Overview", icon: "📊" }, { key: "Settings", icon: "⚙️" }, { key: "Clients", icon: "👥" }, { key: "CRM", icon: "🗂️" }, { key: "CRM Automations", icon: "⚡" }, { key: "Conversations", icon: "💬" }, { key: "Invoicing", icon: "💶" }, { key: "Bookkeeping", icon: "📒" }, { key: "Tasks", icon: "✅" }, { key: "Operations", icon: "🧭" }, { key: "Lead Factory", icon: "🎯" }, { key: "Team", icon: "🧑‍💼" }, { key: "Chess", icon: "♟️" }, { key: "Activity", icon: "🕘" }, { key: "AI Assistant", icon: "" }, { key: "Integrations", icon: "🚀" },
+  { key: "Overview", icon: "📊" }, { key: "Settings", icon: "⚙️" }, { key: "Clients", icon: "👥" }, { key: "CRM", icon: "🗂️" }, { key: "CRM Automations", icon: "⚡" }, { key: "Conversations", icon: "💬" }, { key: "Invoicing", icon: "💶" }, { key: "Bookkeeping", icon: "📒" }, { key: "Tasks", icon: "✅" }, { key: "Operations", icon: "🧭" }, { key: "Media Library", icon: "🖼️" }, { key: "Lead Factory", icon: "🎯" }, { key: "Team", icon: "🧑‍💼" }, { key: "Chess", icon: "♟️" }, { key: "Activity", icon: "🕘" }, { key: "AI Assistant", icon: "" }, { key: "Integrations", icon: "🚀" },
 ];
 const marketingPages: Array<{ key: string; label: string; icon: string }> = [
   { key: "Sites", label: "Websites", icon: "🌐" },
@@ -2504,11 +2504,11 @@ ${senderName}`, staffType: member.staffType || (isSubAccountRole(member.role) ? 
 
   const visibleNav = nav.filter((item) => item.key === "Settings" || item.key === "Integrations" ? false : (item.key === "Lead Factory" || item.key === "Clients" || item.key === "Operations") && activeScopeId ? false : item.key === "Chess" && activeScopeId && scopedClient && !/^agency$/i.test(scopedClient.name.trim()) ? false : (canOpenPage(item.key, viewAccess, viewIsAdmin, viewHasClientScope, viewMember?.role || "") && pageVisible(item.key)));
   const canSeeLeadsPage = visibleNav.some((item) => item.key === "CRM");
-  const navLabel = (key: string) => key === "Integrations" ? "Launchpad" : key === "CRM" ? "Leads" : key === "CRM Automations" ? "Automations" : key === "Overview" ? "Dashboard" : key;
+  const navLabel = (key: string) => key === "Integrations" ? "Launchpad" : key === "CRM" ? "Leads" : key === "CRM Automations" ? "Automations" : key === "Overview" ? "Dashboard" : key === "Media Library" ? "Media" : key;
   const navGlyph = (key: string) => key === "CRM" ? <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 15V9a6 6 0 0 1 12 0v6" /><path d="M6 15h4v-6" /><path d="M18 15h-4v-6" /><path d="M6 19h4M14 19h4" /></svg> : key === "AI Assistant" ? <AiEyesIcon /> : key === "Lead Factory" ? <LeadFactoryOutlineIcon className="lucide-nav-icon nav-image-icon" /> : <NavIcon name={key} fallback={nav.find((item) => item.key === key)?.icon} size={20} />;
-  const navActive = (key: string) => page === key || (key === "CRM" && (page === "Clients" || page === "Lead Factory") && canSeeLeadsPage) || (key === "Operations" && marketingPageActive) || (key === "Settings" && page === "Integrations");
+  const navActive = (key: string) => page === key || (key === "CRM" && (page === "Clients" || page === "Lead Factory") && canSeeLeadsPage) || (key === "Operations" && marketingPageActive && page !== "Media Library") || (key === "Settings" && page === "Integrations");
   const openTaskCount = viewWorkspace.tasks.filter((t) => t.status !== "Done" && !t.aiDismissedAt).length;
-  const navPriority = ["Overview", "Clients", "CRM", "Conversations", "Tasks", "Operations", "Invoicing", "Bookkeeping", "CRM Automations", "Lead Factory", "Team", "AI Assistant", "Activity", "Chess"];
+  const navPriority = ["Overview", "Clients", "CRM", "Conversations", "Tasks", "Operations", "Invoicing", "Bookkeeping", "Media Library", "CRM Automations", "Lead Factory", "Team", "AI Assistant", "Activity", "Chess"];
   const orderedNav = [...visibleNav].filter((item) => !(activeScopeId && item.key === "CRM Automations")).sort((x, y) => (navPriority.indexOf(x.key) + 1 || 99) - (navPriority.indexOf(y.key) + 1 || 99));
   // Agency view: every page on the bar (no More menu). Sub-accounts: first seven, with Bookkeeping and Team always on the bar.
   const settingsNav = viewIsAdmin ? [{ key: "Settings", icon: "⚙️" }] : [];

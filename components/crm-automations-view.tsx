@@ -7,7 +7,8 @@ import { AutomationBuilder } from "@/components/crm-automation-builder";
 import { nodeSummary, triggerLabel, type AutomationNode } from "@/lib/crm-automations/model";
 
 type Item = { id: string; name: string; status: "on" | "off"; triggerType: string; trigger: AutomationNode | null; sendsEmail: boolean; lastRunAt: string | null; totalRuns: number; updatedAt: string };
-type Payload = { scope: string; clients: Array<{ id: string; name: string }>; automations: Item[]; killSwitch: { paused: boolean; pausedBy: string | null; pausedAt: string | null }; notifications: Array<{ id: string; title: string; body: string; read_at: string | null; created_at: string }> };
+type FormRuleSet = { formId: string; formName: string; clientId: string; clientName: string; status: string; notify: string[]; rules: Array<{ when: string; then: string[] }> };
+type Payload = { others?: Array<Item & { clientName: string; scopeId?: string }>; formRules?: FormRuleSet[]; scope: string; clients: Array<{ id: string; name: string }>; automations: Item[]; killSwitch: { paused: boolean; pausedBy: string | null; pausedAt: string | null }; notifications: Array<{ id: string; title: string; body: string; read_at: string | null; created_at: string }> };
 type Dialog = { kind: "new" } | { kind: "confirm-email"; id: string; name: string; subjects: string[] } | { kind: "problems"; problems: string[] } | { kind: "delete"; id: string; name: string } | { kind: "kill"; paused: boolean } | null;
 
 const when = (value: string | null) => (value ? new Date(value).toLocaleString("en-IE", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "Never");
@@ -23,6 +24,7 @@ export function CrmAutomationsView({ clientId }: { clientId?: string | null }) {
   const [data, setData] = useState<Payload | null>(null);
   const [error, setError] = useState("");
   const [openId, setOpenId] = useState("");
+  const [openScope, setOpenScope] = useState<string | null>(null);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [newName, setNewName] = useState("");
   const [busy, setBusy] = useState("");
@@ -37,17 +39,18 @@ export function CrmAutomationsView({ clientId }: { clientId?: string | null }) {
   useEffect(() => { setData(null); setOpenId(""); void load(); }, [load]);
   useEffect(() => { if (!toast) return; const timer = setTimeout(() => setToast(""), 4200); return () => clearTimeout(timer); }, [toast]);
 
-  const post = async (body: Record<string, unknown>) => {
-    const response = await fetch("/api/crm-automations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scope, ...body }) });
+  const post = async (body: Record<string, unknown>, scopeOverride?: string) => {
+    const response = await fetch("/api/crm-automations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scope: scopeOverride ?? scope, ...body }) });
     const payload = await response.json().catch(() => ({})) as Record<string, unknown> & { error?: string };
     return { response, payload };
   };
 
   /** Switch on/off, with the email confirmation step and plain-English problems. Returns true when it changed. */
-  const toggle = useCallback(async (id: string, next: "on" | "off", confirmEmails = false): Promise<boolean> => {
+  const toggle = useCallback(async (id: string, next: "on" | "off", confirmEmails = false, scopeOverride?: string): Promise<boolean> => {
     setBusy(id);
     try {
-      const { response, payload } = await post({ action: "setStatus", id, status: next, confirmEmails });
+      const itemScope = scopeOverride ?? data?.others?.find((other) => other.id === id)?.scopeId;
+      const { response, payload } = await post({ action: "setStatus", id, status: next, confirmEmails }, itemScope);
       if (response.status === 409 && payload.needsConfirmation) {
         const item = data?.automations.find((automation) => automation.id === id);
         setDialog({ kind: "confirm-email", id, name: item?.name || "This automation", subjects: (payload.emailSubjects as string[]) || [] });
@@ -67,7 +70,7 @@ export function CrmAutomationsView({ clientId }: { clientId?: string | null }) {
     setDialog(null); setNewName(""); await load(); setOpenId(String(payload.id));
   };
 
-  if (openId) return <div className="ca-root"><AutomationBuilder id={openId} scope={scope} onBack={() => { setOpenId(""); void load(); }} onToggle={(id, next) => toggle(id, next)} onChanged={() => void load()} />{dialog && renderDialog()}{toast && <div className="ca-toast" role="status">{toast}</div>}</div>;
+  if (openId) return <div className="ca-root"><AutomationBuilder id={openId} scope={openScope ?? scope} onBack={() => { setOpenId(""); setOpenScope(null); void load(); }} onToggle={(id, next) => toggle(id, next)} onChanged={() => void load()} />{dialog && renderDialog()}{toast && <div className="ca-toast" role="status">{toast}</div>}</div>;
 
   function renderDialog() {
     if (!dialog) return null;
@@ -119,13 +122,14 @@ export function CrmAutomationsView({ clientId }: { clientId?: string | null }) {
     {data?.killSwitch.paused && <div className="ca-banner danger"><ShieldAlert size={18} /><span><b>All automations are paused for {scopeName}.</b> Nothing will run until you resume.{data.killSwitch.pausedBy ? ` Paused by ${data.killSwitch.pausedBy} on ${when(data.killSwitch.pausedAt)}.` : ""}</span><button type="button" className="secondary-button" onClick={() => setDialog({ kind: "kill", paused: false })}>Resume</button></div>}
 
     {!data && !error && <div className="ca-empty"><p>Loading automations…</p></div>}
-    {data && data.automations.length === 0 && <div className="ca-empty-card">
+    {data && data.automations.length === 0 && !(data.others?.length) && !(data.formRules?.length) && <div className="ca-empty-card">
       <span className="ca-empty-icon"><Zap size={26} /></span>
       <h2>No automations yet</h2>
       <p>For example: when someone fills in your website form, tag them, send a welcome email, wait two days, then remind you to call.</p>
       <button type="button" className="primary-button" onClick={() => setDialog({ kind: "new" })}><Plus size={16} /> Create your first automation</button>
     </div>}
 
+    {data && !scope && data.automations.length === 0 && ((data.others?.length || 0) > 0 || (data.formRules?.length || 0) > 0) && <p className="ca-muted ca-agency-none">No agency-level automations yet — client and website-form automations are listed below.</p>}
     {data && data.automations.length > 0 && <div className="ca-table-wrap"><table className="ca-table">
       <thead><tr><th>Name</th><th>Starts when</th><th>Status</th><th>Last run</th><th className="num">Total runs</th><th><span className="sr-only">Actions</span></th></tr></thead>
       <tbody>{data.automations.map((item) => <tr key={item.id}>
@@ -140,6 +144,26 @@ export function CrmAutomationsView({ clientId }: { clientId?: string | null }) {
         </td>
       </tr>)}</tbody>
     </table></div>}
+
+    {data && !scope && (data.others?.length || 0) > 0 && <section className="ca-section"><h2 className="ca-section-title">Client automations <span>{data.others!.length}</span></h2><div className="ca-table-wrap"><table className="ca-table">
+      <thead><tr><th>Name</th><th>Client</th><th>Starts when</th><th>Status</th><th>Last run</th><th className="num">Total runs</th></tr></thead>
+      <tbody>{data.others!.map((item) => <tr key={item.id}>
+        <td><button type="button" className="ca-link" onClick={() => { setOpenScope(item.scopeId || ""); setOpenId(item.id); }}>{item.name}</button>{item.sendsEmail && <span className="ca-tag-mini" title="Sends emails"><Mail size={12} /> Email</span>}</td>
+        <td><span className="ca-client-chip">{item.clientName}</span></td>
+        <td><span className="ca-trigger-cell"><b>{triggerLabel(item.trigger?.config?.type)}</b>{item.trigger?.config?.type ? <small>{nodeSummary(item.trigger)}</small> : null}</span></td>
+        <td><label className={`ca-switch ${item.status === "on" ? "on" : ""}`}><input type="checkbox" checked={item.status === "on"} disabled={busy === item.id} onChange={(event) => void toggle(item.id, event.target.checked ? "on" : "off", false, item.scopeId || "")} aria-label={`Switch ${item.name} ${item.status === "on" ? "off" : "on"}`} /><span className="ca-switch-track"><span /></span>{item.status === "on" ? "On" : "Off"}</label></td>
+        <td>{when(item.lastRunAt)}</td>
+        <td className="num">{item.totalRuns.toLocaleString("en-IE")}</td>
+      </tr>)}</tbody>
+    </table></div></section>}
+
+    {data && !scope && (data.formRules?.length || 0) > 0 && <section className="ca-section"><h2 className="ca-section-title">Website form automations <span>{data.formRules!.length}</span></h2><p className="ca-muted">Built into each website form. Edit them in Operations → Forms.</p><div className="ca-form-rules">{data.formRules!.map((form) => <article key={form.formId} className="ca-form-rule-card">
+      <header><b>{form.formName}</b><span className="ca-client-chip">{form.clientName}</span><span className={`ca-form-status ${form.status === "live" ? "on" : ""}`}>{form.status === "live" ? "Live" : "Paused"}</span></header>
+      <ul>
+        <li><span className="ca-when">Every submission</span><span>→ Create lead in Leads{form.notify.length ? ` · Email ${form.notify.join(", ")}` : ""}</span></li>
+        {form.rules.map((rule, index) => <li key={index}><span className="ca-when">When {rule.when}</span><span>→ {rule.then.join(" · ") || "No action"}</span></li>)}
+      </ul>
+    </article>)}</div></section>}
 
     {data && <div className="ca-lower">
       <section className="ca-card">
