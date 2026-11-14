@@ -528,3 +528,10 @@ html body .app-shell .lead-profile-select > span svg { width:18px; height:18px; 
 html body .app-shell .lead-icon-options button > span { display:grid; place-items:center; width:100%; height:100%; border-radius:8px; }
 html body .app-shell .lead-icon-options button > span svg { width:19px; height:19px; }
 html.dark body .app-shell .lead-profile-card-actions > button, html[data-theme="dark"] body .app-shell .lead-profile-card-actions > button { background:rgba(255,255,255,.06) !important; border-color:rgba(255,255,255,.14) !important; color:#d0d5dd !important; }
+
+/* ICP profile editor as a popup */
+html body .modal.lead-icp-modal { position:relative; width:min(860px, 94vw); max-height:90vh; overflow:auto; background:#fff !important; padding:22px 24px !important; }
+html body .modal.lead-icp-modal .lead-profile-editor { border:0 !important; padding:0 !important; margin:0 !important; background:transparent !important; box-shadow:none !important; }
+html body .modal.lead-icp-modal .lead-icp-modal-close { position:absolute; top:14px; right:14px; z-index:2; }
+html body .modal.lead-icp-modal .lead-profile-actions { position:sticky; bottom:-22px; display:flex; justify-content:flex-end; gap:10px; padding:14px 0 4px; margin-top:14px; background:#fff; border-top:1px solid #eef1f5; }
+html body .modal.lead-icp-modal .lead-icon-options { max-height:140px; overflow:auto; }
