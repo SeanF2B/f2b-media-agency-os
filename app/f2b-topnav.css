@@ -230,3 +230,13 @@ html body .app-shell.dark-mode .assistant-composer .assistant-voice-button { bac
 html body .app-shell .assistant-composer:focus-within { border-color: var(--brand-primary, #3b82f6) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary, #3b82f6) 18%, transparent) !important; }
 html body .app-shell .assistant-privacy-note { display: block; margin-top: 8px; font-size: 12px; color: #6b7882; }
 @keyframes assistant-mic-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(229,72,77,.45); } 50% { box-shadow: 0 0 0 7px rgba(229,72,77,0); } }
+
+/* Leads board: roomy columns that scroll sideways instead of squashing */
+html body .app-shell .crm-kanban { display: grid !important; grid-auto-flow: column; grid-template-columns: repeat(var(--crm-stage-count, 7), minmax(300px, 1fr)) !important; gap: 14px !important; overflow-x: auto !important; overflow-y: visible; padding-bottom: 10px; scroll-snap-type: x proximity; }
+html body .app-shell .crm-kanban > .crm-stage { min-width: 300px; scroll-snap-align: start; }
+html body .app-shell .crm-stage-heading h2, html body .app-shell .crm-stage-title h2, html body .app-shell .crm-stage-title h3, html body .app-shell .crm-stage-title strong { font-size: 18px !important; line-height: 1.2 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+html body .app-shell .crm-stage-title { flex-wrap: nowrap; min-width: 0; }
+html body .app-shell .crm-stage-actions { flex-wrap: nowrap; gap: 6px; }
+html body .app-shell .crm-stage .crm-card { min-width: 0; }
+html body .app-shell .crm-card-facts dd { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 760px) { html body .app-shell .crm-kanban { grid-template-columns: repeat(var(--crm-stage-count, 7), minmax(270px, 86vw)) !important; } }
