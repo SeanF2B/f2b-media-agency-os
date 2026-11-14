@@ -173,3 +173,8 @@ html body .app-shell.client-scoped.topnav-layout .tn-right .tn-settings-button.a
 @keyframes claude-star-spin { to { rotate: 360deg; } }
 @keyframes claude-star-breathe { 0%, 100% { scale: 1; } 50% { scale: .86; } }
 @media (prefers-reduced-motion: reduce) { .avatar.claude-star-avatar .claude-star { animation: none; } }
+
+/* Dashboard spacing: Quick start sits on its own row above the finance period; stat cards fill the width */
+html body .app-shell .page-content .quick-row { margin: 0 0 16px !important; position: relative; z-index: 1; }
+html body .app-shell .page-content .quick-row + .overview-finance-toolbar { margin-top: 0 !important; }
+html body .app-shell .metric-grid.overview-metrics { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)) !important; }
