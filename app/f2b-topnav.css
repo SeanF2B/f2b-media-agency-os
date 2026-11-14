@@ -421,3 +421,9 @@ html body .app-shell.dark-mode .bs select { background-image: url("data:image/sv
 .bookkeeping-receipts li span { grid-row: span 2; font-size: 12px; opacity: .7; }
 .bookkeeping-receipts li b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bookkeeping-receipts li small { font-size: 12px; opacity: .75; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Task table due-date cell: single line, tidy */
+.tt-c-date { width: 104px !important; }
+.tt-date { white-space: nowrap; max-width: 100%; overflow: hidden; border: 1px solid transparent !important; box-shadow: none !important; transform: none !important; }
+.tt-date:hover { border-color: color-mix(in srgb, var(--brand-secondary-ink, #1e3a8a) 45%, transparent) !important; background: rgba(127,127,127,.08); }
+.app-shell.dark-mode .tt-date:hover { border-color: color-mix(in srgb, var(--brand-secondary-ink-dark, #9fb3ff) 50%, transparent) !important; }
+.tt-date input, .tt-date input:hover { border: 0 !important; box-shadow: none !important; transform: none !important; }
