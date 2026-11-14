@@ -122,3 +122,16 @@
 .app-shell .chess-final-section.is-spotlight .chess-final-confetti { position:fixed; inset:0; z-index:70; }
 .app-shell .chess-final-section.is-spotlight .chess-final-confetti i { animation-duration:2.6s; }
 @keyframes chess-spotlight-in { from { box-shadow:0 0 0 200vmax rgba(4,8,14,0); } }
+
+/* ===== Chess: finished game stays on its own board, spotlighted ===== */
+.app-shell .chess-game.is-spotlight { position:relative; z-index:60; box-shadow:0 0 0 200vmax rgba(4,8,14,.8); animation:chess-spotlight-in .35s ease-out both; }
+.app-shell .chess-game.is-spotlight.loss { box-shadow:0 0 0 200vmax rgba(26,6,10,.82); }
+.app-shell .chess-square.loser-king { background:#f2a9b0 !important; }
+.app-shell .chess-square.loser-king::before { display:none; }
+.app-shell .chess-board .chess-square:nth-child(8n) .chess-end-badge { right:2%; }
+.app-shell .chess-board .chess-square:nth-child(-n+8) .chess-end-badge { top:2%; }
+.app-shell .chess-game.is-finished .chess-end-badge { animation:chess-badge-soft .4s cubic-bezier(.2,.9,.3,1.15) .25s both; }
+.app-shell .chess-game.is-finished .loser-king .chess-piece-svg { animation:chess-king-tip .6s ease-in-out .15s both; }
+.app-shell .chess-game .chess-final-confetti { position:fixed; inset:0; z-index:70; pointer-events:none; overflow:hidden; }
+.app-shell .chess-game .chess-final-confetti i { animation-duration:2.6s; }
+.app-shell .chess-game.is-finished .chess-final-actions { width:min(100%,680px); margin:18px auto 0; }
