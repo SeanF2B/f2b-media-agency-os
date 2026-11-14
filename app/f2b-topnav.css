@@ -191,3 +191,25 @@ html body .app-shell .metric-grid.overview-metrics { grid-template-columns: repe
 @keyframes bot-z { 0% { opacity: 0; transform: translate(0, 0) rotate(-8deg); } 20% { opacity: 1; } 100% { opacity: 0; transform: translate(12px, -18px) rotate(12deg); } }
 @keyframes bot-snore { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04, .97); } }
 @media (prefers-reduced-motion: reduce) { .bot-zzz i { animation: none; opacity: .8; } .bot-zzz i:nth-child(2) { transform: translate(6px,-8px); } .bot-zzz i:nth-child(3) { transform: translate(12px,-16px); } .bot-live.bot-sleep .bot-body { animation: none; } }
+
+/* Books: add income/expense pop-up, receipts and export */
+.client-tax-modal { max-width: 520px; }
+.client-tax-modal-form { display: grid; gap: 14px; }
+.client-tax-modal-form label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; }
+.client-tax-modal-form label small { font-weight: 500; color: #5b6872; }
+.client-tax-modal-form input, .client-tax-modal-form select { padding: 10px 12px; border-radius: 10px; border: 1px solid #cfd8de; font: inherit; background: #fff; color: #1f2a33; }
+.client-tax-modal-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.client-tax-kind { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.client-tax-kind button { padding: 10px; border-radius: 12px; border: 1px solid #d8e0e6; background: #f6f8fa; font: inherit; font-weight: 700; color: #3a4650; cursor: pointer; }
+.client-tax-kind button.selected.income { background: #e7f6ec; border-color: #7cc79a; color: #14643a; }
+.client-tax-kind button.selected.expense { background: #fdecec; border-color: #ee9a9a; color: #9c2424; }
+.client-tax-receipt-pick { position: relative; display: flex; align-items: center; gap: 10px; padding: 12px; border: 1.5px dashed #c3ced6; border-radius: 12px; color: #3a4650; cursor: pointer; }
+.client-tax-receipt-pick input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.client-tax-receipt-link { text-decoration: none; }
+.client-tax-export { position: relative; display: inline-flex; }
+.client-tax-export-menu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 40; min-width: 220px; padding: 6px; border-radius: 12px; background: #fff; border: 1px solid #d8e0e6; box-shadow: 0 14px 36px rgba(10,20,30,.18); display: grid; gap: 2px; }
+.client-tax-export-menu button { text-align: left; padding: 9px 10px; border: 0; border-radius: 8px; background: transparent; font: inherit; font-weight: 600; color: #1f2a33; cursor: pointer; }
+.client-tax-export-menu button:hover { background: #f1f4f7; }
+.app-shell.dark-mode .client-tax-export-menu { background: #20272d; border-color: #3c4850; }
+.app-shell.dark-mode .client-tax-export-menu button { color: #eef3f6; }
+.app-shell.dark-mode .client-tax-export-menu button:hover { background: #2a333a; }
