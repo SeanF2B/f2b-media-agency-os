@@ -9454,3 +9454,16 @@ html body.f2b-dark .f2b-on-light:is(input, textarea, #f2b-white-text-override)::
 .app-shell.dark-mode .sf-card small,.app-shell.dark-mode .sf-stats,.app-shell.dark-mode .sf-meta,.app-shell.dark-mode .sf-q-row small,.app-shell.dark-mode .sf-step-n,.app-shell.dark-mode .sf-history small{color:#9fb0ba}.app-shell.dark-mode .sf-stats b{color:#edf3f6}
 .app-shell.dark-mode .sf-name:hover,.app-shell.dark-mode .sf-name:focus,.app-shell.dark-mode .sf-step header input:focus{background:#171c20;border-color:#3c4850}
 .cv-filters{flex-wrap:wrap}.cv-filters button{min-width:max-content}
+.sf-card-actions{display:flex;gap:6px}.sf-card-actions .secondary-button{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;font-size:12px}
+/* Forms: real field boxes like the rest of the CRM (hover = lift + secondary colour) */
+.sf-wrap :is(input:not([type=checkbox]),select,textarea),.sf-detail :is(input:not([type=checkbox]):not(.sf-name):not(.sf-step header input),select,textarea){min-height:38px;border:1px solid var(--line,#d5dfe4);border-radius:8px;background:var(--surface,#fff);color:var(--text,#18232c);padding:8px 10px;font:inherit;font-weight:500;width:100%;box-sizing:border-box;transition:border-color .15s,box-shadow .15s,transform .15s}
+.sf-detail .sf-step header input{min-height:0}
+.sf-wrap :is(input,select,textarea):hover,.sf-detail :is(input:not([type=checkbox]),select,textarea):hover{border-color:var(--brand-secondary,var(--brand-primary,#3b82f6));box-shadow:0 4px 12px rgba(15,23,42,.08);transform:translateY(-1px)}
+.sf-wrap :is(input,select,textarea):focus,.sf-detail :is(input:not([type=checkbox]),select,textarea):focus{outline:none;border-color:var(--brand-secondary,var(--brand-primary,#3b82f6));box-shadow:0 0 0 3px color-mix(in srgb,var(--brand-secondary,var(--brand-primary,#3b82f6)) 22%,transparent)}
+.sf-pick select{width:auto;min-width:220px}.sf-save input{width:240px}.sf-rule select,.sf-rule input,.sf-action select,.sf-action input{width:auto;min-height:32px;padding:5px 8px}
+.sf-settings{background:var(--surface,#fff);border:1px solid #dce3e7;border-radius:14px;padding:20px;max-width:680px}
+.sf-settings>label:not(.sf-inline){gap:6px}.sf-settings input[type=checkbox],.sf-q-edit input[type=checkbox]{width:18px;height:18px;accent-color:var(--brand-primary,#3b82f6);cursor:pointer}
+.sf-settings .sf-inline{background:#f6f8fa;border:1px solid #dce3e7;border-radius:10px;padding:10px 12px;cursor:pointer;transition:transform .15s,box-shadow .15s,border-color .15s}.sf-settings .sf-inline:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(15,23,42,.08);border-color:var(--brand-secondary,var(--brand-primary,#3b82f6))}
+.sf-settings small{font-weight:500}
+.app-shell.dark-mode .sf-wrap :is(input,select,textarea),.app-shell.dark-mode .sf-detail :is(input:not([type=checkbox]):not(.sf-name),select,textarea){border-color:#3c4850;background:#171c20;color:#edf3f6;color-scheme:dark}
+.app-shell.dark-mode .sf-settings{background:#20272d;border-color:#3c4850}.app-shell.dark-mode .sf-settings .sf-inline{background:#171c20;border-color:#3c4850}
