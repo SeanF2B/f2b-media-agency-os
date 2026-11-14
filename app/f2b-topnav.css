@@ -553,3 +553,21 @@ html body .modal.lead-icp-modal .lead-icon-options { max-height:140px; overflow:
   html body .app-shell.topnav-layout .tn-bar .tn-nav .tn-item { flex: 1 0 auto; min-width: 48px; }
   html body .app-shell.topnav-layout .main-area { padding-bottom: calc(86px + env(safe-area-inset-bottom, 0px)) !important; }
 }
+
+/* Mobile: the AI bot takes the logo spot and blinks */
+.tn-bot-logo { display: none; }
+@media (max-width: 860px) {
+  html body .app-shell.topnav-layout .tn-brand .tn-logo:not(.tn-logo-client) { display: none !important; }
+  html body .app-shell.topnav-layout .tn-brand .tn-bot-logo {
+    display: inline-grid; place-items: center; width: 44px; height: 44px; padding: 0; border-radius: 14px; cursor: pointer;
+    border: 1px solid color-mix(in srgb, var(--brand-primary, #3b82f6) 35%, #fff);
+    background: color-mix(in srgb, var(--brand-primary, #3b82f6) 10%, #fff);
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--brand-primary, #3b82f6) 22%, transparent);
+  }
+  html body .app-shell.dark-mode.topnav-layout .tn-brand .tn-bot-logo { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.16); }
+  html body .app-shell.topnav-layout .tn-bot-logo .ai-eyes-icon { transform: scale(1.55); }
+  html body .app-shell.topnav-layout .tn-bot-logo .ai-eyes-face i { animation: tn-bot-blink 2.6s ease-in-out infinite; }
+  html body .app-shell.topnav-layout .tn-bot-logo .ai-eyes-face i:nth-child(2) { animation-delay: .08s; }
+}
+@keyframes tn-bot-blink { 0%, 44%, 52%, 100% { transform: scaleY(1); } 48% { transform: scaleY(.1); } }
+@media (prefers-reduced-motion: reduce) { html body .app-shell .tn-bot-logo .ai-eyes-face i { animation: none !important; } }

@@ -2506,7 +2506,7 @@ ${senderName}`, staffType: member.staffType || (isSubAccountRole(member.role) ? 
     <main className="main-area">
       <header className="tn-bar">
         <div className="tn-left">
-          <div className="tn-brand">{activeScopeId && scopedClient?.logo ? <div className="tn-logo tn-logo-client"><CleanLogo className="sidebar-client-logo" src={scopedClient.logo} alt={scopedClient.name} /></div> : <div className="tn-logo"><BrandLogo className="sidebar-logo" /></div>}</div>
+          <div className="tn-brand">{activeScopeId && scopedClient?.logo ? <div className="tn-logo tn-logo-client"><CleanLogo className="sidebar-client-logo" src={scopedClient.logo} alt={scopedClient.name} /></div> : <><div className="tn-logo"><BrandLogo className="sidebar-logo" /></div><button type="button" className="tn-bot-logo" aria-label="Open AI Assistant" onClick={() => setAiAssistantPopupOpen(true)}><AiEyesIcon /></button></>}</div>
           {viewWorkspace.clients.length > 0 || activeScopeId ? <ClientScopePicker value={activeScopeId} clients={workspace.clients.filter((item) => (previewMember ? baseViewWorkspace.clients.some((allowed) => allowed.id === item.id) : true))} onChange={setClientScope} /> : null}
           {!activeScopeId && viewWorkspace.clients.length > 0 && <ClientFocusPicker clients={viewWorkspace.clients} />}
         </div>
