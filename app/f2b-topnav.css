@@ -167,3 +167,9 @@ html body .app-shell.client-scoped.topnav-layout .tn-right .top-actions button:f
 .tn-right .tn-settings-button.active { background: color-mix(in srgb, var(--brand-primary, #3b82f6) 16%, #fff) !important; color: color-mix(in srgb, var(--brand-primary, #3b82f6) 70%, #0b1620); }
 html body .app-shell.client-scoped.topnav-layout .tn-right .tn-settings-button { background: color-mix(in srgb, var(--sb-mix, #fff) 8%, var(--brand-sidebar, #1f2123)) !important; border-color: var(--sb-edge, rgba(255,255,255,.2)) !important; color: var(--sb-fg-strong, #fff) !important; }
 html body .app-shell.client-scoped.topnav-layout .tn-right .tn-settings-button.active { background: color-mix(in srgb, var(--sb-mix, #fff) 18%, var(--brand-sidebar, #1f2123)) !important; }
+/* Claude staff avatar: animated orange star, no background */
+.avatar.claude-star-avatar { background: transparent !important; border: 0 !important; box-shadow: none !important; display: inline-flex; align-items: center; justify-content: center; overflow: visible; }
+.avatar.claude-star-avatar .claude-star { width: 100%; height: 100%; animation: claude-star-spin 14s linear infinite, claude-star-breathe 3.2s ease-in-out infinite; transform-origin: 50% 50%; }
+@keyframes claude-star-spin { to { rotate: 360deg; } }
+@keyframes claude-star-breathe { 0%, 100% { scale: 1; } 50% { scale: .86; } }
+@media (prefers-reduced-motion: reduce) { .avatar.claude-star-avatar .claude-star { animation: none; } }
