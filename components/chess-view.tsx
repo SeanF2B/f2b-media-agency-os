@@ -1,5 +1,6 @@
 "use client";
 import { AiIcon } from "./ai-eyes-icon";
+import "@/app/chess-toon.css";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Chess, type Square } from "chess.js";
@@ -270,7 +271,7 @@ export function ChessView({ staff, currentUserId, canPlay = true, openInviteId =
   const [games, setGames] = useState<Game[]>([]); const [people, setPeople] = useState<Person[]>([]); const [leaderboard, setLeaderboard] = useState<Leader[]>([]); const [aiAvatar, setAiAvatar] = useState("🤖"); const [optimisticFens, setOptimisticFens] = useState<Record<string, string>>({}); const [opponentId, setOpponentId] = useState(""); const [focusedGameId, setFocusedGameId] = useState<string | null>(null);
   const [color, setColor] = useState("random"); const [difficulty, setDifficulty] = useState("medium"); const [aiRetryNonce, setAiRetryNonce] = useState(0); const [failedAiGameId, setFailedAiGameId] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null); const [thinkingGameId, setThinkingGameId] = useState<string | null>(null); const [now, setNow] = useState(0); const [loading, setLoading] = useState(true); const [busy, setBusy] = useState(false); const [error, setError] = useState(""); const [inviteNotice, setInviteNotice] = useState(""); const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine); const [pendingSyncCount, setPendingSyncCount] = useState(0);
-  const [soundOn, setSoundOn] = useState(true); const [activeEffect, setActiveEffect] = useState<MoveEffect | null>(null); const [endgameCueId, setEndgameCueId] = useState<string | null>(null); const [finalGameId, setFinalGameId] = useState<string | null>(null); const [pausedGameId, setPausedGameId] = useState<string | null>(null); const [closedFinalIds, setClosedFinalIds] = useState<string[]>([]);
+  const [soundOn] = useState(true); const [activeEffect, setActiveEffect] = useState<MoveEffect | null>(null); const [endgameCueId, setEndgameCueId] = useState<string | null>(null); const [finalGameId, setFinalGameId] = useState<string | null>(null); const [pausedGameId, setPausedGameId] = useState<string | null>(null); const [closedFinalIds, setClosedFinalIds] = useState<string[]>([]);
   const scrollToChessGame = useCallback((gameId: string) => {
     if (!gameId || typeof window === "undefined") return;
     window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
@@ -454,7 +455,7 @@ export function ChessView({ staff, currentUserId, canPlay = true, openInviteId =
     void act("challenge", { opponentId, color: myColor });
   };
   return <div className="chess-page" onPointerDownCapture={unlockSound}>
-    <header className="chess-page-head"><div><p className="eyebrow">TEAM PLAY</p><h1><svg className="chess-piece-svg cp-toon black-piece chess-title-icon" viewBox="0 0 45 45" aria-hidden="true"><ToonPiece type="p" /></svg>Chess</h1><p>Challenge a teammate or play AI.</p></div><div className="chess-page-actions"><button type="button" className="secondary-button" disabled={busy} onClick={() => void act("sample-email")}>✉️ Email me a sample</button><button type="button" className="secondary-button chess-sound-toggle" aria-pressed={soundOn} onClick={() => setSoundOn((enabled) => !enabled)}>{soundOn ? "🔊 Sound on" : "🔇 Sound off"}</button></div></header>
+    <header className="chess-page-head"><div><p className="eyebrow">TEAM PLAY</p><h1><svg className="chess-piece-svg cp-toon black-piece chess-title-icon" viewBox="0 0 45 45" aria-hidden="true"><ToonPiece type="p" /></svg>Chess</h1><p>Challenge a teammate or play AI.</p></div></header>
     <div className="chess-status-toasts" aria-live="polite">
       {error && <div className="chess-error" role="alert">{error}</div>}
       {(!online || pendingSyncCount > 0) && <div className="chess-offline-status" role="status">{!online ? "Offline mode · your games and moves are saved on this device and will sync when you reconnect." : `${pendingSyncCount} move${pendingSyncCount === 1 ? "" : "s"} waiting to sync · your local board is preserved.`}</div>}
