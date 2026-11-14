@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { Fragment, useEffect, useMemo, useState, type FormEvent } from "react";
 import { clientWebsite, clientWebsiteHost } from "@/lib/client-website";
 import { MarketingAuditPanel } from "@/components/marketing-audit-panel";
 import { MarketingSnapshotHistory, type MarketingHistorySnapshot } from "@/components/marketing-snapshot-history";
@@ -139,6 +139,7 @@ export function SeoView({ initialTab, sections, keywordPart = "all", embedded = 
   const [kwComp, setKwComp] = useState("");
   const [kwText, setKwText] = useState("");
   const [kwSort, setKwSort] = useState<"volume" | "cpc" | "competition" | "keyword">("volume");
+  const [kwGrouped, setKwGrouped] = useState(true);
   const [saved, setSaved] = useState<SavedKeywordData | null>(null);
   const [savedBusy, setSavedBusy] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
@@ -461,10 +462,30 @@ ${sorted.map((group, index) => `<section class="page"><div class="running">${esc
     finally { setSavedBusy(false); }
   };
   const savedKeys = useMemo(() => new Set((saved?.keywords || []).map((item) => `${item.keyword.toLowerCase()}|${item.location}`)), [saved]);
-  const saveResearchRows = async (rows: ResearchRow[]) => {
+  const saveResearchRows = async (rows: ResearchRow[], groupIdOverride?: string) => {
     if (!rows.length) return;
-    const ok = await callSaved({ action: "save", groupId: saveGroupId, keywords: rows.map((row) => ({ keyword: row.keyword, location: row.location, geo: row.geo, language: "English", avgMonthlySearches: row.avgMonthlySearches, competition: row.competition, competitionIndex: row.competitionIndex, lowTopOfPageBid: row.lowTopOfPageBid, highTopOfPageBid: row.highTopOfPageBid, difficulty: row.difficulty ?? null, source: row.source === "DataForSEO" ? "DataForSEO" : "Google Keyword Planner", checkedAt: row.checkedAt })) });
+    const ok = await callSaved({ action: "save", groupId: groupIdOverride ?? saveGroupId, keywords: rows.map((row) => ({ keyword: row.keyword, location: row.location, geo: row.geo, language: "English", avgMonthlySearches: row.avgMonthlySearches, competition: row.competition, competitionIndex: row.competitionIndex, lowTopOfPageBid: row.lowTopOfPageBid, highTopOfPageBid: row.highTopOfPageBid, difficulty: row.difficulty ?? null, source: row.source === "DataForSEO" ? "DataForSEO" : "Google Keyword Planner", checkedAt: row.checkedAt })) });
     if (ok) setPickedKeywords(new Set());
+  };
+  // Group research rows by the seed phrase they share the most words with (same rule as the PDF report).
+  const themeOf = (keyword: string) => {
+    const stop = new Set(["near", "me", "the", "a", "for", "in", "of", "and", "best", "ireland", ...((client?.seoLocations || []) as string[]).map((item) => item.toLowerCase())]);
+    const words = (text: string) => text.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length > 2 && !stop.has(word));
+    const kw = new Set(words(keyword)); let best = "", score = 0;
+    for (const seed of keywordSeeds.split(/[\n,]+/).map((item) => item.trim()).filter(Boolean).slice(0, 10)) { const hit = words(seed).filter((word) => kw.has(word) || [...kw].some((k) => k.startsWith(word.slice(0, 5)))).length; if (hit > score) { best = seed; score = hit; } }
+    return best || "Other related searches";
+  };
+  const saveAsGroup = async (name: string, rows: ResearchRow[]) => {
+    if (!client || !rows.length) return;
+    const groupName = name.replace(/^./, (c) => c.toUpperCase()).slice(0, 60);
+    let group = (saved?.groups || []).find((item) => item.name.toLowerCase() === groupName.toLowerCase());
+    if (!group) {
+      const response = await fetch("/api/seo/saved-keywords", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId: client.id, action: "createGroup", name: groupName }) });
+      const json = await response.json().catch(() => ({})) as SavedKeywordData & { error?: string };
+      if (!response.ok) { setSavedMsg(json.error || "Couldn’t create that group."); return; }
+      group = (json.groups || []).find((item) => item.name.toLowerCase() === groupName.toLowerCase());
+    }
+    await saveResearchRows(rows, group?.id || "");
   };
   function makeBatchKeywordTask(rows: ResearchRow[]) {
     if (!client || !rows.length) return;
@@ -659,12 +680,13 @@ ${sorted.map((group, index) => `<section class="page"><div class="running">${esc
               <label><span>Min. volume</span><input type="number" min={0} value={kwMin} onChange={(event) => setKwMin(event.target.value)} placeholder="0" /></label>
               <label><span>Max. CPC</span><input type="number" min={0} step="0.1" value={kwMaxCpc} onChange={(event) => setKwMaxCpc(event.target.value)} placeholder="Any" /></label>
               <label><span>Competition</span><select value={kwComp} onChange={(event) => setKwComp(event.target.value)}><option value="">Any</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
+              <label className="kw-group-toggle"><input type="checkbox" checked={kwGrouped} onChange={(event) => setKwGrouped(event.target.checked)} /> Group by theme</label>
               <span className="kw-count">{rows.length} of {kwRows.length} ideas{keywordIdeas?.providerCostUsd != null ? ` · last run $${keywordIdeas.providerCostUsd.toFixed(4)}` : ""}</span>
               <button type="button" className="text-button" onClick={() => { if (window.confirm("Clear all research results? Saved keywords are not affected.")) { setKwRows([]); setPickedKeywords(new Set()); setKeywordIdeas(null); } }}>Clear results</button>
             </div>
             <div className="kw-bulk" role="toolbar" aria-label="Bulk actions">
               <b>{pickedKeywords.size ? `${pickedKeywords.size} selected` : "Tick keywords to save or report"}</b>
-              <span className="kw-bulk-group"><select aria-label="Save to group" value={saveGroupId} onChange={(event) => setSaveGroupId(event.target.value)}><option value="">Save to: Ungrouped</option>{(saved?.groups || []).map((group) => <option key={group.id} value={group.id}>Save to: {group.name}</option>)}</select><button type="button" className="primary-button" disabled={!pickedKeywords.size || savedBusy} onClick={() => void saveResearchRows(pickedRows)}>Save</button></span>
+              <span className="kw-bulk-group"><select aria-label="Save to group" value={saveGroupId} onChange={(event) => setSaveGroupId(event.target.value)}><option value="">Save to: Ungrouped</option>{(saved?.groups || []).map((group) => <option key={group.id} value={group.id}>Save to: {group.name}</option>)}</select><button type="button" className="primary-button" disabled={!pickedKeywords.size || savedBusy} onClick={() => void saveResearchRows(pickedRows)}>Save to {client?.name || "client"}</button></span>
               <button type="button" className="secondary-button" disabled={!pickedKeywords.size} onClick={() => makeBatchKeywordTask(pickedRows)}>Create review task</button>
               <button type="button" className="secondary-button" disabled={!pickedKeywords.size} onClick={openKeywordReport}>Report</button>
               <button type="button" className="secondary-button" disabled={!pickedKeywords.size} onClick={downloadKeywordCsv}>CSV</button>
@@ -674,7 +696,7 @@ ${sorted.map((group, index) => `<section class="page"><div class="running">${esc
             {savedMsg && <p className="kw-note" role="status">{savedMsg} <button type="button" className="text-button" onClick={() => setKwMode("saved")}>Open saved keywords</button></p>}
             <div className="kw-table-wrap"><table className="kw-table">
               <thead><tr><th className="kw-check"><input type="checkbox" aria-label="Select shown keywords" checked={shown.length > 0 && shown.every((row) => pickedKeywords.has(row.key))} onChange={(event) => setPickedKeywords((current) => { const next = new Set(current); shown.forEach((row) => event.target.checked ? next.add(row.key) : next.delete(row.key)); return next; })} /></th><th>{sortHead("keyword", "Keyword")}</th><th>{sortHead("volume", "Volume")}</th><th>{sortHead("cpc", "CPC")}</th><th>{sortHead("competition", "Competition")}</th>{anyDfs && <th>SEO diff.</th>}<th>Location</th></tr></thead>
-              <tbody>{shown.map((row) => { const level = competitionLevel(row.competition); const isSaved = savedKeys.has(`${row.keyword.toLowerCase()}|${row.location}`); return <tr key={row.key} className={pickedKeywords.has(row.key) ? "picked" : ""}>
+              <tbody>{(() => { const renderRow = (row) => { const level = competitionLevel(row.competition); const isSaved = savedKeys.has(`${row.keyword.toLowerCase()}|${row.location}`); return <tr key={row.key} className={pickedKeywords.has(row.key) ? "picked" : ""}>
                 <td className="kw-check"><input type="checkbox" aria-label={`Select ${row.keyword}`} checked={pickedKeywords.has(row.key)} onChange={() => setPickedKeywords((current) => { const next = new Set(current); if (next.has(row.key)) next.delete(row.key); else next.add(row.key); return next; })} /></td>
                 <td><b>{row.keyword}</b>{isSaved && <span className="kw-saved-badge" title="Already in saved keywords">Saved</span>}</td>
                 <td className="num">{number(row.avgMonthlySearches)}</td>
@@ -682,7 +704,7 @@ ${sorted.map((group, index) => `<section class="page"><div class="running">${esc
                 <td><span className={`kw-comp ${level}`}>{competitionLabel[level]}</span>{row.competitionIndex != null && <small> {row.competitionIndex}</small>}</td>
                 {anyDfs && <td className="num">{row.difficulty == null ? "—" : row.difficulty}</td>}
                 <td><small>{row.location}</small></td>
-              </tr>; })}</tbody>
+              </tr>; }; if (!kwGrouped) return shown.map(renderRow); const groups = new Map<string, typeof shown>(); for (const row of shown) { const key = themeOf(row.keyword); groups.set(key, [...(groups.get(key) || []), row]); } return [...groups.entries()].sort((a, b) => Number(a[0] === "Other related searches") - Number(b[0] === "Other related searches") || b[1].reduce((n, r) => n + (r.avgMonthlySearches || 0), 0) - a[1].reduce((n, r) => n + (r.avgMonthlySearches || 0), 0)).map(([name, list]) => <Fragment key={`g-${name}`}><tr className="kw-group-row"><td className="kw-check"><input type="checkbox" aria-label={`Select all in ${name}`} checked={list.every((row) => pickedKeywords.has(row.key))} onChange={(event) => setPickedKeywords((current) => { const next = new Set(current); list.forEach((row) => event.target.checked ? next.add(row.key) : next.delete(row.key)); return next; })} /></td><td colSpan={anyDfs ? 6 : 5}><div className="kw-group-head"><b>{name.replace(/^./, (c) => c.toUpperCase())}</b><span>{list.length} keywords · {list.reduce((n, r) => n + (r.avgMonthlySearches || 0), 0).toLocaleString("en-IE")} searches/mo</span><button type="button" className="secondary-button kw-group-save" disabled={savedBusy} onClick={() => void saveAsGroup(name, list)}>Save as group to {client?.name || "client"}</button></div></td></tr>{list.map(renderRow)}</Fragment>); })()}</tbody>
             </table></div>
             {rows.length > 50 && <button className="secondary-button seo-keyword-more" type="button" onClick={() => setShowAllKeywordIdeas(!showAllKeywordIdeas)}>{showAllKeywordIdeas ? "Show top 50" : `Show all ${rows.length}`}</button>}
           </>;

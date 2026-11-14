@@ -286,3 +286,26 @@ html body .app-shell .crm-stage:hover .crm-stage-drag-handle, html body .app-she
 html body .app-shell .crm-stage-header .crm-stage-title > span { grid-area: count; justify-self: start; }
 html body .app-shell .crm-stage-header .crm-stage-total { grid-area: total; }
 @media (hover: none) { html body .app-shell .crm-stage-header .crm-stage-drag-handle { opacity: .6; } }
+
+/* Operations: client picker sits under the title with a clear question */
+html body .app-shell .ops-heading { display: flex !important; flex-direction: column; align-items: flex-start !important; gap: 12px; }
+html body .app-shell .ops-client-pick.ops-client-shared { display: inline-flex !important; align-items: center; gap: 12px; padding: 8px 10px 8px 16px !important; border-radius: 16px; position: static !important; }
+html body .app-shell .ops-client-question { font-size: 15px; font-weight: 700; white-space: nowrap; }
+
+/* Keyword research grouping */
+.kw-group-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.kw-table tr.kw-group-row td { background: color-mix(in srgb, var(--brand-primary, #3b82f6) 8%, transparent); border-top: 1px solid color-mix(in srgb, var(--brand-primary, #3b82f6) 20%, transparent); }
+.kw-group-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.kw-group-head span { font-size: 12px; opacity: .75; }
+.kw-group-head .kw-group-save { margin-left: auto; padding: 4px 10px !important; min-height: 0 !important; font-size: 12px !important; }
+
+/* House rule: every clickable and text box highlights and lifts slightly on hover in the secondary colour */
+html body .app-shell :is(button, [role="tab"], [role="menuitem"], a.primary-button, a.secondary-button, label.bs-save, label.bs-ghost, summary):not(:disabled):not([aria-disabled="true"]):not(.tn-scrim):not(.crm-stage-drag-handle) { transition: transform .14s ease, box-shadow .14s ease, background-color .14s ease, border-color .14s ease, color .14s ease; }
+html body .app-shell :is(button, [role="tab"], [role="menuitem"], a.primary-button, a.secondary-button, label.bs-save, label.bs-ghost):not(:disabled):not([aria-disabled="true"]):not(.tn-scrim):not(.crm-stage-drag-handle):hover { transform: translateY(-1px); box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-secondary-ink, #1e3a8a) 45%, transparent), 0 6px 14px color-mix(in srgb, var(--brand-secondary-ink, #1e3a8a) 18%, transparent) !important; }
+html body .app-shell.dark-mode :is(button, [role="tab"], [role="menuitem"], a.primary-button, a.secondary-button, label.bs-save, label.bs-ghost):not(:disabled):not([aria-disabled="true"]):not(.tn-scrim):not(.crm-stage-drag-handle):hover { box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-secondary-ink-dark, #9fb3ff) 55%, transparent), 0 6px 14px rgba(0,0,0,.35) !important; }
+html body .app-shell :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea):not(:disabled) { transition: border-color .14s ease, box-shadow .14s ease, transform .14s ease; }
+html body .app-shell :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea):not(:disabled):hover { border-color: color-mix(in srgb, var(--brand-secondary-ink, #1e3a8a) 60%, transparent) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-secondary-ink, #1e3a8a) 14%, transparent) !important; transform: translateY(-1px); }
+html body .app-shell.dark-mode :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea):not(:disabled):hover { border-color: color-mix(in srgb, var(--brand-secondary-ink-dark, #9fb3ff) 60%, transparent) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-secondary-ink-dark, #9fb3ff) 16%, transparent) !important; }
+html body .app-shell :is(input, select, textarea):focus-visible { transform: none; }
+html body .app-shell .assistant-composer textarea:hover { box-shadow: none !important; transform: none; }
+@media (prefers-reduced-motion: reduce) { html body .app-shell :is(button, [role="tab"], input, select, textarea):hover { transform: none !important; } }
