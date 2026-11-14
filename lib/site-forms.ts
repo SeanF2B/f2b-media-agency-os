@@ -7,7 +7,7 @@ export type FormOption = { label: string; value: string; hint?: string };
 export type FormField = { id: string; label: string; type: "choice" | "text" | "email" | "tel" | "textarea" | "photos" | "select"; required?: boolean; options?: FormOption[]; step: string; showWhen?: { field: string; equals: string[] } };
 export type FormRule = { id: string; when: { field: string; equals: string }; then: Array<{ action: "tag" | "urgent" | "stage" | "notify"; value: string }> };
 export type FormDefinition = { steps: Array<{ id: string; title: string }>; fields: FormField[]; rules: FormRule[] };
-export type FormSettings = { status: "live" | "paused"; notify: string[]; stageId?: string; thankYouUrl?: string; pages: { mode: "all" | "include" | "exclude"; paths: string[] } };
+export type FormSettings = { deleted?: boolean; status: "live" | "paused"; notify: string[]; stageId?: string; thankYouUrl?: string; pages: { mode: "all" | "include" | "exclude"; paths: string[] } };
 export type SiteForm = { id: string; clientId: string; formKey: string; name: string; site: string; definition: FormDefinition; settings: FormSettings; updatedAt: string; updatedBy: string };
 
 export const SITE_FORMS_SQL = [
@@ -53,10 +53,6 @@ export function builtInForms(): Array<Omit<SiteForm, "id" | "updatedAt" | "updat
           { id: "r-emergency", when: { field: "urgency", equals: "emergency" }, then: [{ action: "tag", value: "Emergency" }, { action: "urgent", value: "" }] },
           { id: "r-leaking", when: { field: "leaking", equals: "Yes, leaking now" }, then: [{ action: "tag", value: "Emergency" }, { action: "urgent", value: "" }] },
         ] } },
-    { clientId: PRO_ROOFERS, formKey: `site:${PRO_ROOFERS}:contact`, name: "Contact form", site: "proroofersgalway.ie", settings: { ...base, pages: { mode: "include", paths: ["/contact/"] } },
-      definition: { steps: [{ id: "main", title: "Contact" }], fields: [
-        { id: "name", label: "Name", type: "text", required: true, step: "main" }, { id: "phone", label: "Phone", type: "tel", required: true, step: "main" },
-        { id: "email", label: "Email", type: "email", step: "main" }, { id: "message", label: "Message", type: "textarea", required: true, step: "main" }], rules: [] } },
   ];
 }
 

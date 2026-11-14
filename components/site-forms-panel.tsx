@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type DragEvent } from "react";
-import { ArrowRight, ClipboardList, GitBranch, GripVertical, History, Inbox, Plus, Settings2, Trash2, Zap } from "lucide-react";
+import { ArrowRight, ClipboardList, Pencil, GitBranch, GripVertical, History, Inbox, Plus, Settings2, Trash2, Zap } from "lucide-react";
 import { FormSubmissionsView } from "./form-submissions-view";
 import type { FormDefinition, FormField, FormRule, FormSettings } from "@/lib/site-forms";
 
@@ -34,6 +34,11 @@ export function SiteFormsPanel({ clients, clientId, onClient }: { clients: Clien
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Forms unavailable."); setForms([]); }
   }, []);
   useEffect(() => { void load(); }, [load]);
+  const remove = async (f: FormRow) => {
+    if (!window.confirm(`Delete “${f.name}” (${f.clientName}) from Forms?\n\nIts ${f.submissions} submission(s) stay in the CRM and nothing changes on the live website.`)) return;
+    const r = await fetch(`/api/site-forms?key=${encodeURIComponent(f.formKey)}&clientId=${encodeURIComponent(f.clientId)}`, { method: "DELETE" });
+    if (r.ok) setForms((list) => (list || []).filter((x) => x.formKey !== f.formKey)); else { const j = await r.json().catch(() => ({})) as { error?: string }; setError(j.error || "Could not delete the form."); }
+  };
   const shown = (forms || []).filter((f) => !clientId || f.clientId === clientId);
   const open = (forms || []).find((f) => f.formKey === openKey) || null;
   const clientOf = (id: string) => clients.find((c) => c.id === id);
@@ -44,11 +49,11 @@ export function SiteFormsPanel({ clients, clientId, onClient }: { clients: Clien
     <div className="ops-toolbar"><label className="sf-pick">Client<select value={clientId} onChange={(e) => onClient(e.target.value)}><option value="">All clients</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label><span className="muted">Every form on every client site. Open one to see its submissions, logic and settings.</span></div>
     {error && <p className="ops-empty" role="alert">{error}</p>}
     {forms === null ? <p className="ops-empty">Loading forms…</p> : !shown.length ? <p className="ops-empty">No forms yet for this client. Forms appear here once a site form is connected or receives its first submission.</p> :
-      <div className="sf-grid">{shown.map((f) => { const c = clientOf(f.clientId); return <button type="button" key={f.formKey} className="sf-card" onClick={() => { setOpenKey(f.formKey); setTab("submissions"); }}>
+      <div className="sf-grid">{shown.map((f) => { const c = clientOf(f.clientId); return <div role="button" tabIndex={0} key={f.formKey} className="sf-card" onClick={() => { setOpenKey(f.formKey); setTab("submissions"); }} onKeyDown={(e) => { if (e.key === "Enter") { setOpenKey(f.formKey); setTab("submissions"); } }}>
         <span className="sf-card-top">{c?.logo ? <img src={c.logo} alt="" /> : <i style={{ background: c?.color || "#d9dee3" }} />}<span><b>{f.name}</b><small>{f.clientName}{f.site ? ` · ${f.site}` : ""}</small></span><span className={`sf-status ${f.settings?.status === "paused" ? "off" : "on"}`}>{f.settings ? (f.settings.status === "paused" ? "Paused" : "Live") : "Not set up"}</span></span>
         <span className="sf-stats"><span><b>{f.submissions}</b> submissions</span><span><b>{f.last30}</b> last 30 days</span><span>Last: {fmt(f.lastAt)}</span></span>
-        <span className="sf-meta">{f.definition ? `${f.definition.fields.length} questions · ${f.definition.rules.length} rules` : "Questions learned from submissions"}<ArrowRight size={15} /></span>
-      </button>; })}</div>}
+        <span className="sf-meta">{f.definition ? `${f.definition.fields.length} questions · ${f.definition.rules.length} rules` : "Questions learned from submissions"}<span className="sf-card-actions"><button type="button" className="secondary-button" onClick={(e) => { e.stopPropagation(); setOpenKey(f.formKey); setTab("logic"); }}><Pencil size={13} /> Edit</button><button type="button" className="secondary-button danger-text" onClick={(e) => { e.stopPropagation(); void remove(f); }}><Trash2 size={13} /> Delete</button></span></span>
+      </div>; })}</div>}
   </div>;
 }
 

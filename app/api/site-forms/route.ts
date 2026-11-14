@@ -48,13 +48,15 @@ export async function GET(request: Request) {
     db.prepare("SELECT * FROM site_forms WHERE owner_id=?1 ORDER BY name LIMIT 500").bind(ownerId),
     db.prepare("SELECT client_id, form_key, MAX(form_name) AS name, MAX(page_url) AS page, COUNT(*) AS n, MAX(created_at) AS last, SUM(CASE WHEN created_at >= ?3 THEN 1 ELSE 0 END) AS n30 FROM form_submission_log WHERE owner_id=?1 AND created_at >= ?2 AND client_id <> '' GROUP BY form_key LIMIT 500").bind(ownerId, since, new Date(Date.now() - 30 * 86_400_000).toISOString()),
   ]);
-  const registered = ((forms.results || []) as Row[]).map(shape);
+  const allRows = ((forms.results || []) as Row[]).map(shape);
+  const removed = new Set(allRows.filter((f) => f.settings.deleted).map((f) => f.formKey));
+  const registered = allRows.filter((f) => !f.settings.deleted);
   const statRows = (stats.results || []) as Array<{ client_id: string; form_key: string; name: string; page: string; n: number; last: string; n30: number }>;
   const byKey = new Map(statRows.map((s) => [s.form_key, s]));
   const known = new Set(registered.map((f) => f.formKey));
   const hostOf = (raw: string) => { try { return new URL(/^https?:/.test(raw) ? raw : `https://${raw}`).hostname.replace(/^www\./, ""); } catch { return ""; } };
   // Forms seen in submissions but not registered yet (e.g. Red Island's booking forms).
-  const discovered = statRows.filter((s) => !known.has(s.form_key)).map((s) => ({ id: "", clientId: s.client_id, formKey: s.form_key, name: s.name || s.form_key.split(":").pop() || "Form", site: hostOf(s.page) || hostOf(clients.find((c) => c.id === s.client_id)?.website || ""), definition: null, settings: null, updatedAt: "", updatedBy: "" }));
+  const discovered = statRows.filter((s) => !known.has(s.form_key) && !removed.has(s.form_key)).map((s) => ({ id: "", clientId: s.client_id, formKey: s.form_key, name: s.name || s.form_key.split(":").pop() || "Form", site: hostOf(s.page) || hostOf(clients.find((c) => c.id === s.client_id)?.website || ""), definition: null, settings: null, updatedAt: "", updatedBy: "" }));
   const all = [...registered, ...discovered].map((f) => { const s = byKey.get(f.formKey); return { ...f, clientName: clients.find((c) => c.id === f.clientId)?.name || "Unknown client", submissions: s?.n || 0, last30: s?.n30 || 0, lastAt: s?.last || "" }; });
   const clientIds = [...new Set(all.map((f) => f.clientId))].slice(0, 50);
   const stageRows = clientIds.length ? ((await db.prepare(`SELECT p.client_id, p.name AS pipeline, s.id, s.name FROM crm_pipelines p JOIN crm_pipeline_stages s ON s.pipeline_id=p.id AND s.owner_id=p.owner_id WHERE p.owner_id=?1 AND p.archived=0 AND p.client_id IN (${clientIds.map((_, i) => `?${i + 2}`).join(",")}) ORDER BY p.created_at, s.position LIMIT 400`).bind(ownerId, ...clientIds).all<{ client_id: string; pipeline: string; id: string; name: string }>()).results || []) : [];
@@ -83,4 +85,20 @@ export async function PUT(request: Request) {
   if (saved) await db.prepare("INSERT INTO site_form_history (id, owner_id, form_id, summary, snapshot, created_at, created_by) VALUES (?1,?2,?3,?4,?5,?6,?7)")
     .bind(crypto.randomUUID(), ownerId, saved.id, String(body.summary || "Saved changes").slice(0, 300), JSON.stringify({ definition, settings, name: body.name }), now, email).run();
   return Response.json({ form: saved ? shape(saved) : null }, { headers: { "Cache-Control": "no-store" } });
+}
+
+/** Remove a form from Operations → Forms. Its submissions stay in the CRM and the submission log. */
+export async function DELETE(request: Request) {
+  const ctx = await context();
+  if ("response" in ctx) return ctx.response;
+  const { db, ownerId, clients, email } = ctx;
+  const url = new URL(request.url);
+  const formKey = (url.searchParams.get("key") || "").slice(0, 160), clientId = (url.searchParams.get("clientId") || "").slice(0, 80);
+  if (!formKey.startsWith(`site:${clientId}:`) || !clients.some((c) => c.id === clientId)) return reply("Choose a form to delete.");
+  const now = new Date().toISOString();
+  const row = await db.prepare("SELECT * FROM site_forms WHERE owner_id=?1 AND form_key=?2").bind(ownerId, formKey).first<Row>();
+  const settings = { ...(row ? parseJson<FormSettings>(row.settings, defaultSettings()) : defaultSettings()), deleted: true };
+  await db.prepare("INSERT INTO site_forms (id, owner_id, client_id, form_key, name, site, definition, settings, updated_at, updated_by) VALUES (?1,?2,?3,?4,?5,'','{}',?6,?7,?8) ON CONFLICT(owner_id, form_key) DO UPDATE SET settings=excluded.settings, updated_at=excluded.updated_at, updated_by=excluded.updated_by")
+    .bind(row?.id || crypto.randomUUID(), ownerId, clientId, formKey, row?.name || formKey.split(":").pop() || "Form", JSON.stringify(settings), now, email).run();
+  return Response.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
 }
