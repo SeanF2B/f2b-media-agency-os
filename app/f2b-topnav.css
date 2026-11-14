@@ -349,3 +349,7 @@ html body .app-shell .assistant-composer textarea:hover { box-shadow: none !impo
 .tt-group-toggle, .tt-group-toggle b { color: inherit !important; filter: none !important; }
 .tt-group-toggle .tt-caret { color: var(--tt-group); }
 .tt-group-toggle::before { content: ""; width: 10px; height: 10px; border-radius: 3px; background: var(--tt-group); }
+/* Operations tab icons */
+html body .app-shell .ops-tabs button { display: inline-flex !important; align-items: center; gap: 8px; }
+html body .app-shell .ops-tabs .ops-tab-icon { flex: none; opacity: .85; }
+html body .app-shell .ops-tabs button.active .ops-tab-icon { opacity: 1; }

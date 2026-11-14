@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { BarChart3, Factory, FileText, Globe, LayoutDashboard, MapPin, Megaphone, Search, Zap, type LucideIcon } from "lucide-react";
 import { AiVisibilityPanel } from "./ai-visibility-panel";
 import { RankTrackingPanel } from "./rank-tracking-panel";
 
@@ -29,6 +30,7 @@ function ConnectionDots({ client, hasSite, onOpen }: { client: OpsClient; hasSit
   return <span className="ops-conn">{CONNECTIONS.map((item) => { const ok = item.ok(client, hasSite); return <button key={item.key} type="button" className={ok ? "ok" : "missing"} title={`${item.label}: ${ok ? "connected" : "not connected"}`} aria-label={`${item.label} ${ok ? "connected" : "not connected"}`} onClick={() => onOpen(item.page)}>{item.icon}<i /></button>; })}</span>;
 }
 type SiteRow = { clientId: string; backend: string; previewUrl: string; repo: string; branch: string; updatedAt: string };
+const OPS_TAB_ICONS: Partial<Record<string, LucideIcon>> = { overview: LayoutDashboard, seo: Search, ads: Megaphone, websites: Globe, local: MapPin, reports: FileText, automations: Zap, leadfactory: Factory, analytics: BarChart3 };
 export type OperationsTab = "overview" | "seo" | "ads" | "websites" | "local" | "reports" | "onboarding" | "automations" | "leadfactory";
 /** Older links/state used more tabs; map them onto the six areas (+ the sub-view they opened). */
 export function normalizeOpsTab(value: string): { tab: OperationsTab; sub?: string } {
@@ -123,7 +125,7 @@ export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenW
       {tab !== "overview" && tab !== "onboarding" && tab !== "automations" && tab !== "leadfactory" && !(tab === "websites" && siteMode === "sites") && !(tab === "local" && localMode === "business") && selected && <label className="ops-client-pick ops-client-shared"><span className="ops-client-question">Which client are we working on?</span><select aria-label="Client for all Operations tools" value={selected.id} onChange={(event) => setToolClientId(event.target.value)}>{active.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></label>}
     </div>
     <div className="ops-tabs" role="tablist" aria-label="Operations sections">
-      {([["overview", "Overview"], ["seo", "SEO & Research"], ["ads", "Google Ads"], ["websites", "Websites"], ["local", "Local & AI"], ["reports", "Reports"], ["automations", "Automations"], ["leadfactory", "Lead Factory"]] as Array<[OperationsTab, string]>).filter(([key]) => (!["seo", "ads", "reports"].includes(key) || renderTool) && (key !== "automations" || Boolean(automations)) && (key !== "leadfactory" || hasLeadFactory)).map(([key, label]) => <button type="button" role="tab" key={key} aria-selected={tab === key || (key === "overview" && tab === "onboarding")} className={tab === key || (key === "overview" && tab === "onboarding") ? "active" : ""} onClick={() => onTab(key)}>{label}</button>)}
+      {([["overview", "Overview"], ["seo", "SEO & Research"], ["ads", "Google Ads"], ["websites", "Websites"], ["local", "Local & AI"], ["reports", "Reports"], ["automations", "Automations"], ["leadfactory", "Lead Factory"]] as Array<[OperationsTab, string]>).filter(([key]) => (!["seo", "ads", "reports"].includes(key) || renderTool) && (key !== "automations" || Boolean(automations)) && (key !== "leadfactory" || hasLeadFactory)).map(([key, label]) => { const Icon = OPS_TAB_ICONS[key]; return <button type="button" role="tab" key={key} aria-selected={tab === key || (key === "overview" && tab === "onboarding")} className={tab === key || (key === "overview" && tab === "onboarding") ? "active" : ""} onClick={() => onTab(key)}>{Icon && <Icon size={16} strokeWidth={1.9} aria-hidden="true" className="ops-tab-icon" />}{label}</button>; })}
     </div>
 
     {tab === "automations" && automations}
