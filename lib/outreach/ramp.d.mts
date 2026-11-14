@@ -1,0 +1,3 @@
+export const DEFAULT_RAMP: Readonly<{ startDaily: number; stepPerDay: number; newDomainDays: number; newDomainCap: number; hardMax: number }>;
+export function dailyAllowance(p: { rampStartedAt: string | null; targetDaily: number; domainRegisteredAt?: string | null; healthBand?: "green" | "amber" | "red" | "grey"; sentToday?: number; now?: Date | string | number }, ramp?: typeof DEFAULT_RAMP): { limit: number; remaining: number; phase: "not-started" | "paused" | "ramping" | "active"; reason: string; day?: string };
+export function rampProgress(p: { rampStartedAt: string | null; targetDaily: number; now?: Date | string | number }, ramp?: typeof DEFAULT_RAMP): number;

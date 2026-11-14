@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { providerRequest, ProviderError, retryDelayMs } from "../lib/outreach/http.mjs";
-import { createInstantlyClient, normaliseAccount } from "../lib/outreach/providers/instantly.mjs";
 import { scoreHealth } from "../lib/outreach/health-score.mjs";
 import { planDomainDns, mergeSpf, spfLookupCount, canTightenDmarc, dmarcValue } from "../lib/outreach/dns-plan.mjs";
 import { ruleClassify, parseClassifierOutput, decide, buildClassifierMessages } from "../lib/outreach/reply-classifier.mjs";
@@ -27,53 +26,6 @@ test("never retries a non-idempotent POST and never leaks the key", async () => 
 });
 
 test("backoff is capped", () => { assert.equal(retryDelayMs(10), 20_000); assert.equal(retryDelayMs(0), 500); });
-
-// ---------- Instantly ----------
-test("normalises Instantly accounts with documented status codes", () => {
-  const account = normaliseAccount({ email: "Sean@Acme-Mail.com", status: -1, warmup_status: 1, provider_code: 3, daily_limit: 30, stat_warmup_score: 97, tags: [{ label: "roofing" }] });
-  assert.equal(account.email, "sean@acme-mail.com");
-  assert.equal(account.domain, "acme-mail.com");
-  assert.equal(account.status, "connection-error");
-  assert.equal(account.warmupStatus, "active");
-  assert.equal(account.mailProvider, "microsoft");
-  assert.deepEqual(account.tags, ["roofing"]);
-});
-
-test("lists accounts across cursor pages with bearer auth", async () => {
-  const seen = [];
-  const fetchImpl = async (url, init) => {
-    seen.push({ url: String(url), auth: init.headers.Authorization });
-    const cursor = new URL(url).searchParams.get("starting_after");
-    return cursor ? json(200, { items: [{ email: "b@x.com", status: 1 }], next_starting_after: null }) : json(200, { items: [{ email: "a@x.com", status: 1 }], next_starting_after: "c1" });
-  };
-  const client = createInstantlyClient("key_abc", { fetchImpl, sleepImpl: noSleep });
-  const accounts = await client.listAccounts();
-  assert.deepEqual(accounts.map((account) => account.email), ["a@x.com", "b@x.com"]);
-  assert.equal(seen[0].auth, "Bearer key_abc");
-  assert.match(seen[0].url, /limit=100/);
-});
-
-test("warmup enable batches at 100 emails per request", async () => {
-  const bodies = [];
-  const fetchImpl = async (_url, init) => { bodies.push(JSON.parse(init.body)); return json(200, { id: `job${bodies.length}`, status: "pending" }); };
-  const client = createInstantlyClient("k", { fetchImpl, sleepImpl: noSleep });
-  const jobs = await client.setWarmup(Array.from({ length: 150 }, (_, index) => `u${index}@x.com`), true);
-  assert.equal(jobs.length, 2);
-  assert.equal(bodies[0].emails.length, 100);
-  assert.equal(bodies[1].emails.length, 50);
-});
-
-test("a 401 becomes a clear message", async () => {
-  const client = createInstantlyClient("k", { fetchImpl: async () => json(401, {}), sleepImpl: noSleep });
-  await assert.rejects(client.verify(), /rejected the API key/);
-});
-
-test("a reply is sent once even if the server errors", async () => {
-  let calls = 0;
-  const client = createInstantlyClient("k", { fetchImpl: async () => { calls += 1; return json(503, {}); }, sleepImpl: noSleep });
-  await assert.rejects(client.reply({ replyToId: "e1", fromAccount: "a@x.com", subject: "Re: hi", text: "Thanks" }));
-  assert.equal(calls, 1);
-});
 
 // ---------- health score ----------
 test("no data gives grey with no number", () => {

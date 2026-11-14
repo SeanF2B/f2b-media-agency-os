@@ -1,40 +1,53 @@
-# Outreach module — build notes, credentials and changelog
+# Outreach — native cold-email engine (build notes, credentials, changelog)
 
-Navigation: one **Outreach** entry (agency admin only) with four tabs — Overview · Campaigns · Inbox · Infrastructure. Everything else lives in contextual settings panels.
+**Placement:** Leads → tabs `Clients · Contacts · Pipeline · Conversations · Outreach · Lead Factory`.
+Inside Outreach, four compact secondary tabs: `Overview · Campaigns · Inbox · Infrastructure`. Settings live in side panels.
 
-## Architecture
+**Independence:** no Instantly, Inframail, Smartlead or any other campaign platform. We own the campaign engine,
+scheduling, sequences, ramp-up, health scoring, inbox, AI and CRM integration. External services supply only raw
+infrastructure: domains + DNS (Cloudflare), mailboxes (Microsoft 365 / Google Workspace), AI tokens (OpenRouter),
+alerts (Telegram Bot API).
 
-| Layer | Choice | Why |
+## Shared CRM records (no duplicate CRM)
+| Outreach concept | Stored in | De-duplication |
 |---|---|---|
-| Sending, warm-up, Unibox, analytics, placement tests | **Instantly API v2** behind `lib/outreach/providers/instantly.mjs` | Spec forbids building SMTP servers; Instantly covers sending, rotation, bounce protection and reply sync. Adapter shape is provider-neutral so it can be swapped. |
-| Domain purchase | **Cloudflare Registrar API (beta)** | At-cost pricing, same account as DNS, availability + price check before purchase. Billable to the account's default payment profile — always behind an explicit approval. |
-| DNS | **Cloudflare DNS API** via the existing Domains & DNS token | Already connected. All changes planned by `lib/outreach/dns-plan.mjs`, logged in `outreach_dns_changes` with the previous value for rollback. |
-| Mailboxes | Google Workspace or Inframail (decision pending) | Inframail's documented API covers creating/listing/deleting email accounts only. |
-| Jobs | Existing 5-minute cron + `outreach_jobs` / `outreach_job_steps` (idempotent, resumable) | Queues are now on the Workers Free plan and can be added if cron throughput isn't enough. |
-| AI | Existing OpenRouter configuration (`lib/ai-provider.ts`) | Reply classification + copywriting; incoming email is fenced as untrusted data. |
-| Notifications | Telegram Bot API (bot to be confirmed — none exists in this repo) | Positive replies only; deduped via `outreach_replies.notified_at`. |
-| Meetings booked | Existing Google Calendar integration | Never set from email text. |
+| Prospect / company | `crm_contacts` (company = `crm_contacts.company`) | owner + lower(email) + client scope; blanks filled, typed data never overwritten |
+| Email thread + messages | `conv_threads` / `conv_messages` with `channel = 'email'` (shows in Conversations) | existing UNIQUE(owner, our_number, contact, channel) |
+| Deal on positive reply | `crm_opportunities`, `source = 'Outreach'`, `source_submission_id = 'outreach:<contact_id>'` | existing unique index → one deal per contact; won/lost never reopened |
+| Reply label, confidence, AI draft | `outreach_replies` (overlay keyed by `conv_messages.id`) | unique host message id per mailbox |
+| Sequence membership | `outreach_enrollments` | partial unique index: one active sequence per contact across all campaigns; 90-day re-contact cooldown on import |
+
+## Infrastructure (native)
+| Need | How | Notes |
+|---|---|---|
+| Send | Microsoft Graph `sendMail` (MIME) / Gmail API `messages.send` (raw) over HTTPS from the Worker; SMTP on 465/587 via Workers TCP sockets for other hosts | Workers can't use port 25; 465/587 are allowed |
+| Receive replies | Graph delta queries / Gmail history polling every 5 min from the existing cron | No IMAP servers to run |
+| Create mailboxes | Graph (create user + assign Exchange licence) / Admin SDK Directory API (service account + domain-wide delegation) | Seats are bought in the provider's admin centre; the OS creates and assigns them |
+| Domains | Cloudflare Registrar API (beta): search → price/availability → register | Billable to the default payment profile; explicit approval each time |
+| DNS | Cloudflare DNS API via the existing Domains & DNS token, planned by `dns-plan.mjs` | Protected domains untouched; history + rollback |
+| Warm-up | Native gradual ramp-up (`ramp.mjs`): 5/day +3/day to target, new domains held at 15/day for 14 days, amber halves, red stops | No engagement networks or fake conversations |
+| Lead checks | Syntax, disposable, role, personal-mailbox, MX via DNS-over-HTTPS | Mailbox-level verification needs port 25, so it's optional/pay-per-use only |
+| AI | Existing OpenRouter config | Email text fenced as untrusted |
+| Alerts | Telegram Bot API, positive replies only, deduped via `outreach_replies.notified_at` | Approve/Edit buttons via a secret-token webhook path |
 
 ## Safety rules enforced in code
-- Protected (primary business) domains: no DNS actions planned at all.
-- Only apex MX/SPF, `<selector>._domainkey` and `_dmarc` are considered; records the platform didn't create are never overwritten — they become conflicts. SPF is merged, never replaced.
-- DMARC tightens one step at a time, only with ≥14 days / ≥100 messages of aggregate reports and no unaligned legitimate senders.
-- Health score uses measured signals only; missing data is shown as unavailable; too little data → grey with no number; bounce > 3%, complaints > 0.3%, SPF/DKIM missing, connection error or provider restriction → pause.
-- Replies below 75% confidence go to the review queue. Sending a reply is never auto-retried.
-- Provider errors never include API keys.
+- Health score from measured signals only; grey when thin; pause on bounce > 3 %, complaints > 0.3 %, missing SPF/DKIM, connection errors, provider restrictions.
+- Every step send has an idempotency key (`enrollment:step`); replies are never auto-retried.
+- Unfilled personalisation variables block the send.
+- One-click unsubscribe headers (RFC 8058) on every campaign email; unsubscribes, bounces and complaints go to the global suppression list.
+- One send per mailbox per tick, minimum gap per mailbox, one email per company domain per tick, send windows in recipient or campaign time zone.
+- Follow-ups thread (In-Reply-To/References) from the same mailbox.
+- AI replies need approval by default; "meeting booked" only from calendar data.
 
 ## Credentials needed
-| Secret / setting | Where | Status |
+| Item | Where | Status |
 |---|---|---|
-| `AGENCY_CREDENTIALS_ENCRYPTION_KEY` | Worker secret | Exists (used for OpenRouter keys) |
-| Instantly API key (scope `all:all`) | Outreach → Infrastructure → Connections (encrypted in D1) | Needed |
-| Cloudflare token with **Registrar: Edit** + Zone/DNS Edit | Domains & DNS token | Existing token has Zone/DNS only — Registrar permission needed for purchases |
-| Default registrant contact + payment method | Cloudflare dashboard → Registrar | Needed before the first API purchase |
-| Telegram bot token + chat ID | Outreach settings | Needed |
-| Inframail API key (if chosen) | Outreach → Infrastructure → Connections | Optional |
-
-## Database
-`drizzle/0048_outreach.sql` — additive tables, all owner-scoped and indexed: `outreach_connections`, `outreach_domains`, `outreach_mailboxes`, `outreach_dns_changes`, `outreach_jobs`, `outreach_job_steps`, `outreach_suppressions`, `outreach_replies`, `outreach_audit`.
+| `AGENCY_CREDENTIALS_ENCRYPTION_KEY` | Worker secret | exists |
+| Microsoft Entra app (tenant id, client id, secret) with `User.ReadWrite.All`, `Mail.Send`, `Mail.Read`, scoped to outreach mailboxes by an application access policy | Outreach → Infrastructure → Connections | needed if Microsoft is chosen |
+| Google service account JSON with domain-wide delegation (`admin.directory.user`, `admin.directory.domain`, `gmail.send`, `gmail.readonly`) | same | needed if Google is chosen |
+| Cloudflare token with **Registrar: Edit** + Zone/DNS Edit; default registrant contact + payment method in Cloudflare | Domains & DNS | Registrar permission needed |
+| Telegram bot token (from @BotFather) + chat id | Outreach settings | needed |
 
 ## Changelog
-- **2026-11-14 — Phase 1 foundation (branch `outreach/phase-1-foundation`).** Schema migration; provider HTTP client with retry/backoff; Instantly v2 adapter (accounts, warm-up, pause/resume, limits, campaigns, analytics, received emails, reply); transparent health score; safe DNS planner (MX/SPF/DKIM/DMARC, conflicts, rollback data, DMARC progression); reply classifier (rules + fenced AI prompt + validation + review queue). 24 tests in `tests/outreach-core.test.mjs`. No UI or existing code changed yet.
+- **2026-11-14 · v2 native foundation** (branch `outreach/phase-1-foundation`). Removed the Instantly adapter. Schema rewritten around shared CRM records (15 additive tables, verified in SQLite incl. the cross-campaign duplicate block). New engine modules: `ramp`, `scheduler`, `mime`, `personalise`, `leads`, `crm-link`; kept `health-score`, `dns-plan`, `reply-classifier`, `http`. 31 tests (`tests/outreach-core.test.mjs`, `tests/outreach-engine.test.mjs`). No UI or existing code changed yet.
+- **2026-11-14 · v1** Instantly-based foundation (superseded).
