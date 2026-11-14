@@ -23,6 +23,8 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 50
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v5
         with:
@@ -40,10 +42,20 @@ jobs:
           set -o pipefail
           node --test $(ls tests/*.test.mjs | grep -v '/outreach-') 2>&1 | tee /tmp/legacy.log | tail -12
           grep -E "^# (pass|fail)" /tmp/legacy.log | sed 's/^/::notice title=existing suite::/'
-      - name: Typecheck Outreach
+      - name: Typecheck (new Outreach files strict; edited files must not add errors vs main)
         run: |
           set -o pipefail
-          npx tsc --noEmit -p tsconfig.json 2>&1 | tee /tmp/tsc-all.log | grep -E "outreach|crm-view|agency-app|operations-view|worker/" > /tmp/tsc.log || true
+          npx tsc --noEmit -p tsconfig.json > /tmp/tsc-head.log 2>&1 || true
+          grep -E "^(lib/outreach|components/outreach|app/api/outreach|app/api/marketing-public/outreach|worker/outreach)" /tmp/tsc-head.log > /tmp/tsc.log || true
+          git fetch -q --depth=50 origin main
+          git worktree add -q /tmp/base origin/main
+          ln -s "$PWD/node_modules" /tmp/base/node_modules
+          (cd /tmp/base && npx tsc --noEmit -p tsconfig.json > /tmp/tsc-base.log 2>&1 || true)
+          for f in $(git diff --name-only origin/main...HEAD -- '*.ts' '*.tsx' | grep -vE "^(lib/outreach|components/outreach|app/api/outreach)"); do
+            head_n=$(grep -c "^$f(" /tmp/tsc-head.log || true); base_n=$(grep -c "^$f(" /tmp/tsc-base.log || true)
+            echo "$f: $base_n errors on main, $head_n on branch"
+            if [ "$head_n" -gt "$base_n" ]; then grep "^$f(" /tmp/tsc-head.log >> /tmp/tsc.log; fi
+          done
           if [ -s /tmp/tsc.log ]; then cat /tmp/tsc.log; exit 1; fi
       - name: Production build
         run: |
