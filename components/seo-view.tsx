@@ -111,6 +111,7 @@ export function SeoView({ initialTab, sections, keywordPart = "all", embedded = 
   const [businessBusy, setBusinessBusy] = useState(false);
   const [businessSaving, setBusinessSaving] = useState(false);
   const [keywordSeeds, setKeywordSeeds] = useState("");
+  const [siteScan, setSiteScan] = useState<{ busy: boolean; note: string }>({ busy: false, note: "" });
   const [keywordUrl, setKeywordUrl] = useState("");
   const [keywordGeo, setKeywordGeo] = useState("2372");
   const [keywordSource, setKeywordSource] = useState<"google" | "dataforseo">(keywordPart === "competitors" ? "dataforseo" : "google");
@@ -475,6 +476,23 @@ ${sorted.map((group, index) => `<section class="page"><div class="running">${esc
     for (const seed of keywordSeeds.split(/[\n,]+/).map((item) => item.trim()).filter(Boolean).slice(0, 10)) { const hit = words(seed).filter((word) => kw.has(word) || [...kw].some((k) => k.startsWith(word.slice(0, 5)))).length; if (hit > score) { best = seed; score = hit; } }
     return best || "Other related searches";
   };
+  // Reads the client's own website and turns the services it lists into seed keywords (only what the site states).
+  const scanSiteForSeeds = async () => {
+    if (!client) return;
+    const site = clientWebsite(client);
+    if (!site) { setSiteScan({ busy: false, note: "Add the client’s website in Clients first." }); return; }
+    setSiteScan({ busy: true, note: "" });
+    try {
+      const response = await fetch("/api/onboarding-scrape", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: site, name: client.name }) });
+      const json = await response.json().catch(() => ({})) as { services?: string; serviceAreas?: string; error?: string };
+      if (!response.ok) throw new Error(json.error || "Couldn’t read the website.");
+      const seeds = String(json.services || "").split(/[\n,;•·|]+/).map((item) => item.replace(/\s+/g, " ").trim().toLowerCase()).filter((item) => item.length > 2 && item.length < 60);
+      if (!seeds.length) throw new Error("The website didn’t list clear services to use as seeds.");
+      setKeywordSeeds([...new Set(seeds)].slice(0, 10).join(", "));
+      const area = String(json.serviceAreas || "").split(/[\n,;]+/)[0]?.trim();
+      setSiteScan({ busy: false, note: `Seeds filled from ${site}${area ? ` · service area on site: ${area}` : ""}. Check them before running.` });
+    } catch (cause) { setSiteScan({ busy: false, note: cause instanceof Error ? cause.message : "Couldn’t read the website." }); }
+  };
   const saveAsGroup = async (name: string, rows: ResearchRow[]) => {
     if (!client || !rows.length) return;
     const groupName = name.replace(/^./, (c) => c.toUpperCase()).slice(0, 60);
@@ -650,7 +668,7 @@ ${sorted.map((group, index) => `<section class="page"><div class="running">${esc
         {kwMode === "saved" && <SavedKeywordsPanel clientId={client.id} clientName={client.name} data={saved} busy={savedBusy} message={savedMsg} call={callSaved} onCreateTask={(title, notes, checklist) => onCreateTask(client.id, title, notes, checklist)} />}
         {kwMode === "research" && <>
         <form className="kw-research-form" onSubmit={(event) => void runKeywordResearch(event)}>
-          <label className="kw-f-seeds"><span>Seed keywords</span><input value={keywordSeeds} onChange={(event) => setKeywordSeeds(event.target.value)} placeholder="interior designer dublin, kitchen renovation" aria-label="Seed keywords, comma separated (up to 10)" /></label>
+          <label className="kw-f-seeds"><span>Seed keywords <button type="button" className="kw-from-site" disabled={siteScan.busy || !clientWebsite(client)} title={clientWebsite(client) ? `Read ${clientWebsite(client)} and suggest seed keywords` : "Add the client’s website first"} onClick={(event) => { event.preventDefault(); void scanSiteForSeeds(); }}>{siteScan.busy ? "Reading site…" : "↻ From website"}</button></span><input value={keywordSeeds} onChange={(event) => setKeywordSeeds(event.target.value)} placeholder="interior designer dublin, kitchen renovation" aria-label="Seed keywords, comma separated (up to 10)" /></label>{siteScan.note && <small className="kw-site-note" role="status">{siteScan.note}</small>}
           <label className="kw-f-source"><span>Source</span><select value={keywordSource} onChange={(event) => { setKeywordSource(event.target.value as "google" | "dataforseo"); setKeywordError(""); }}><option value="google">Google Keyword Planner</option><option value="dataforseo">DataForSEO (SEO difficulty)</option></select></label>
           {keywordSource === "google" ? <>
             <label className="kw-f-country"><span>Country</span><select value={keywordGeo} onChange={(event) => { setKeywordGeo(event.target.value); setKwRegion(null); setKwRegionQuery(""); }}>{COUNTRIES.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>
