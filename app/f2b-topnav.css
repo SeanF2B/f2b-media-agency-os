@@ -90,7 +90,7 @@
   border-radius: 12px !important; background: rgba(255,255,255,.55) !important; border: 1px solid rgba(20,30,40,.1) !important; position: relative; }
 .app-shell.dark-mode .tn-right .theme-toggle, .app-shell.dark-mode .tn-right .notes-quick-trigger, .app-shell.dark-mode .tn-right .activity-quick-trigger, .app-shell.dark-mode .tn-right .ai-assistant-quick-link {
   background: rgba(255,255,255,.08) !important; border-color: rgba(255,255,255,.14) !important; color: #eef3f6; }
-.tn-right .notes-quick-trigger > span { position: absolute; top: -5px; right: -5px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 99px; font-size: 10px; display: inline-flex; align-items: center; justify-content: center; }
+.tn-right .notes-quick-trigger > span:not(.f2b-ico) { position: absolute; top: -5px; right: -5px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 99px; font-size: 10px; display: inline-flex; align-items: center; justify-content: center; }
 .tn-right .preview-mode-badge { white-space: nowrap; }
 .tn-right .activity-quick-popover, .tn-right .profile-menu { z-index: 130; }
 
