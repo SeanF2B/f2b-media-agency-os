@@ -2,6 +2,11 @@
 // More specific words come first so "Bathroom Fitters" gets the bath, not the generic builder icon.
 import type { LucideIcon } from "lucide-react";
 import {
+  Axe, BrickWall, BriefcaseBusiness, ChartLine, CircleCheck, Coins, Drill, Droplet, Handshake, Mail, Map as MapIcon,
+  Package, Phone, Plug, Rocket, Settings, ShowerHead, Smartphone, Snowflake, Star, Thermometer, TreeDeciduous, Wind,
+  Calendar, Eraser, Utensils,
+} from "lucide-react";
+import {
   Activity, AppWindow, Baby, Bath, Beer, BedDouble, Bone, BookOpen, Brain, Briefcase, Brush, Bug, Building2, Calculator,
   Camera, Car, CarFront, Coffee, Construction, CookingPot, Croissant, Dumbbell, DraftingCompass, Ear, Eye, Fence, Flame,
   Flower, Flower2, Footprints, Glasses, GraduationCap, Hammer, HandHeart, Heart, House, KeyRound, Landmark, Laptop,
@@ -43,4 +48,23 @@ export function businessIconFor(...texts: Array<string | undefined>): LucideIcon
 export function BusinessIcon({ name, niche, color }: { name?: string; niche?: string; color?: string }) {
   const Icon = businessIconFor(name, niche);
   return <Icon size={17} strokeWidth={1.9} color={color} aria-hidden="true" />;
+}
+
+
+// Icons offered in the ICP profile picker, keyed by the emoji stored on the profile.
+export const LEAD_PICKER_ICONS: Record<string, LucideIcon> = {
+  "🎯": Target, "🏢": Building2, "🏠": House, "🏗": Construction, "🧰": BriefcaseBusiness, "🛠": Wrench, "🔧": Wrench,
+  "🔨": Hammer, "⚙": Settings, "🪛": Drill, "🔥": Flame, "❄": Snowflake, "🌬": Wind, "🌡": Thermometer, "💧": Droplet,
+  "🚿": ShowerHead, "⚡": Zap, "🔌": Plug, "🧱": BrickWall, "🪚": Axe, "🚗": Car, "🚚": Truck, "🌳": TreeDeciduous,
+  "🧹": Eraser, "🦷": Smile, "🍽": Utensils, "💇": Scissors, "🏋": Dumbbell, "🐾": PawPrint, "📚": BookOpen, "⚖": Scale,
+  "💻": Laptop, "📱": Smartphone, "📈": ChartLine, "💰": Coins, "🧮": Calculator, "📣": Megaphone, "✉": Mail, "📞": Phone,
+  "🤝": Handshake, "⭐": Star, "🚀": Rocket, "✅": CircleCheck, "🛡": Shield, "🔑": KeyRound, "📦": Package, "🗺": MapIcon,
+  "📅": Calendar,
+};
+
+export const pickerIconFor = (emoji?: string) => LEAD_PICKER_ICONS[(emoji || "").replace(/[︎️]/g, "")];
+
+export function LeadPickerIcon({ emoji, color, size = 18 }: { emoji?: string; color?: string; size?: number }) {
+  const Icon = pickerIconFor(emoji) || Target;
+  return <Icon size={size} strokeWidth={1.9} color={color} aria-hidden="true" />;
 }

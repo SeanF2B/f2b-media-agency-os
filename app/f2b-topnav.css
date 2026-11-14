@@ -516,3 +516,15 @@ html body .app-shell.client-scoped.topnav-layout .tn-nav .tn-item.tn-item.tn-ite
 /* Lead Factory inside Leads: the Leads header carries the title */
 html body .app-shell .leads-factory-wrap .lead-module-heading > div:first-child { display: none !important; }
 html body .app-shell .leads-factory-wrap .lead-module-heading { justify-content: flex-end; margin-top: 0; min-height: 0; }
+
+/* Lead Factory ICP cards and icon picker: real line icons, matching action buttons */
+html body .app-shell .lead-profile-card-actions { display:flex; gap:6px; justify-content:flex-end; }
+html body .app-shell .lead-profile-card-actions > button { width:30px !important; height:30px !important; min-width:30px; padding:0 !important; display:inline-grid !important; place-items:center; border-radius:9px !important; border:1px solid #e3e8ef !important; background:#fff !important; color:#475467 !important; font-size:0 !important; }
+html body .app-shell .lead-profile-card-actions > button.task-delete { color:#d92d20 !important; border-color:#fecdca !important; background:#fff5f4 !important; }
+html body .app-shell .lead-profile-card-actions > button:disabled { opacity:.4; cursor:not-allowed; }
+html body .app-shell .lead-profile-card-actions > button svg { width:14px; height:14px; }
+html body .app-shell .lead-profile-select > span { display:inline-grid; place-items:center; opacity:1 !important; }
+html body .app-shell .lead-profile-select > span svg { width:18px; height:18px; opacity:1; }
+html body .app-shell .lead-icon-options button > span { display:grid; place-items:center; width:100%; height:100%; border-radius:8px; }
+html body .app-shell .lead-icon-options button > span svg { width:19px; height:19px; }
+html.dark body .app-shell .lead-profile-card-actions > button, html[data-theme="dark"] body .app-shell .lead-profile-card-actions > button { background:rgba(255,255,255,.06) !important; border-color:rgba(255,255,255,.14) !important; color:#d0d5dd !important; }
