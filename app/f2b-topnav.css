@@ -115,3 +115,8 @@
   .tn-right .notes-quick-trigger { display: none !important; }
 }
 @media (prefers-reduced-motion: reduce) { .tn-item { transition: none; } }
+/* Picker text must stay readable (beats older .client-scope rules) */
+html body .app-shell.topnav-layout .tn-bar .client-scope .client-scope-trigger, html body .app-shell.topnav-layout .tn-bar .client-scope .client-scope-name { color: #1f2a33 !important; }
+html body .app-shell.dark-mode.topnav-layout .tn-bar .client-scope .client-scope-trigger, html body .app-shell.dark-mode.topnav-layout .tn-bar .client-scope .client-scope-name { color: #f2f6f8 !important; }
+html body .app-shell.dark-mode.topnav-layout .tn-bar .client-scope-menu, html body .app-shell.dark-mode.topnav-layout .tn-bar .client-scope-menu button { color: #f2f6f8 !important; }
+html body .app-shell.topnav-layout:not(.dark-mode) .tn-bar .client-scope-menu button { color: #1f2a33 !important; }
