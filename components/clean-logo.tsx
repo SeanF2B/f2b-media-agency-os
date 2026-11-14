@@ -53,7 +53,7 @@ async function stripBackground(src: string): Promise<string> {
     const x = p % w, y = (p / w) | 0;
     if (x > 0) stack.push(p - 1); if (x < w - 1) stack.push(p + 1); if (y > 0) stack.push(p - w); if (y < h - 1) stack.push(p + w);
   }
-  if (cleared > w * h * 0.97) return src; // would erase the whole logo
+  if (cleared > w * h * 0.997) return src; // would erase the whole logo (small marks on big squares are fine)
   ctx.putImageData(data, 0, 0);
   return cropped();
 }
