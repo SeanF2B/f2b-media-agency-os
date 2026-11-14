@@ -427,3 +427,12 @@ html body .app-shell.dark-mode .bs select { background-image: url("data:image/sv
 .tt-date:hover { border-color: color-mix(in srgb, var(--brand-secondary-ink, #1e3a8a) 45%, transparent) !important; background: rgba(127,127,127,.08); }
 .app-shell.dark-mode .tt-date:hover { border-color: color-mix(in srgb, var(--brand-secondary-ink-dark, #9fb3ff) 50%, transparent) !important; }
 .tt-date input, .tt-date input:hover { border: 0 !important; box-shadow: none !important; transform: none !important; }
+
+/* Client workroom: notes, logins and files as icons at the top */
+.workroom-icons { display: inline-flex; gap: 6px; padding: 4px; border-radius: 14px; background: rgba(0,0,0,.05); margin-right: 6px; }
+.app-shell.dark-mode .workroom-icons { background: rgba(255,255,255,.06); }
+.workroom-icon { position: relative; display: inline-flex; align-items: center; gap: 7px; padding: 8px 12px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.workroom-icon.active { background: var(--brand-primary, #3b82f6); color: #fff; }
+.workroom-icon i { font-style: normal; font-size: 11px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px; display: inline-flex; align-items: center; justify-content: center; background: rgba(0,0,0,.1); }
+.workroom-icon.active i { background: rgba(255,255,255,.25); }
+.app-shell.dark-mode .workroom-icon i { background: rgba(255,255,255,.12); }
