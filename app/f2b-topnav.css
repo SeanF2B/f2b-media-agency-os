@@ -672,3 +672,16 @@ html body .app-shell.dark-mode .ca-form-rule-card li { background:rgba(255,255,2
 /* Dropdowns (Radix select/popover menus) always open above pop-ups like the AI Assistant */
 html body [data-radix-popper-content-wrapper] { z-index: 3000 !important; }
 html body [data-slot="select-content"], html body [data-slot="popover-content"], html body [data-slot="dropdown-menu-content"] { z-index: 3000 !important; }
+
+/* Media Library: project details for local SEO + AI generate */
+html body .ml-project-toggle { margin-left: 10px; }
+html body .ml-project-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px 14px; padding: 14px; margin: 4px 0 14px; border: 1px solid #e7ebf0; border-radius: 14px; background: #fff; }
+html body .ml-project-form > .ml-hint { grid-column: 1 / -1; margin: 0; }
+html body .ml-project-form .ml-project-notes { grid-column: span 2; }
+html body .ml-project-fields { display: grid; gap: 8px; margin: 6px 0 4px; padding: 12px; border: 1px solid #e7ebf0; border-radius: 12px; }
+html body .ml-project-fields legend { padding: 0 6px; font-size: 12.5px; font-weight: 700; color: #475467; }
+html body .ml-project-fields .ml-hint { margin: 0; }
+html body .ml-card-meta .ml-card-geo { display: block; color: var(--brand-secondary, #0b74b8); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html body .ml-ai-panel { display: grid; gap: 12px; min-width: min(560px, 86vw); }
+html body .ml-ai-panel .ml-error { color: #b42318; margin: 0; }
+html body .app-shell.dark-mode .ml-project-form { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.1); }

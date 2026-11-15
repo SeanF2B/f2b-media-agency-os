@@ -22,6 +22,7 @@ export const MEDIA_SCHEMA_SQL = [
     source_url TEXT NOT NULL DEFAULT '',
     credit TEXT NOT NULL DEFAULT '',
     alt TEXT NOT NULL DEFAULT '',
+    project TEXT NOT NULL DEFAULT '{}',
     created_by TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL

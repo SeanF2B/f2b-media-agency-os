@@ -1,11 +1,24 @@
 import { allowedStockHost, cleanFolder, cleanName, detectMediaType, driveFileIdFromLink, isStockProvider, MEDIA_MAX_BYTES, MEDIA_PAGE_SIZE, newFileKey, normalizeOpenverse, normalizePexels, normalizePixabay, normalizeUnsplash, publicMediaUrl, STOCK_PROVIDERS, type StockProvider, type StockResult } from "../../../lib/media-library/core";
+import { env } from "cloudflare:workers";
+import { aiConfigured, aiEndpoint, aiHeaders, aiImageModel, resolveAiProvider } from "../../../lib/ai-provider";
 import { driveAccessToken, driveConnection, driveOAuthReady, mediaAccess, ok, reply, stockKey, type MediaAccess } from "../../../lib/media-library/server";
 
 export const dynamic = "force-dynamic";
 
-type Row = { id: string; scope_id: string; name: string; folder: string; kind: string; mime: string; size: number; width: number | null; height: number | null; file_key: string; source: string; source_url: string; credit: string; alt: string; created_by: string; created_at: string };
-const COLUMNS = "id, scope_id, name, folder, kind, mime, size, width, height, file_key, source, source_url, credit, alt, created_by, created_at";
-const toItem = (row: Row) => ({ id: row.id, scopeId: row.scope_id, name: row.name, folder: row.folder, kind: row.kind, mime: row.mime, size: Number(row.size) || 0, width: row.width, height: row.height, url: publicMediaUrl(row.file_key), source: row.source, sourceUrl: row.source_url, credit: row.credit, alt: row.alt, createdBy: row.created_by, createdAt: row.created_at });
+type Row = { id: string; scope_id: string; name: string; folder: string; kind: string; mime: string; size: number; width: number | null; height: number | null; file_key: string; source: string; source_url: string; credit: string; alt: string; project?: string; created_by: string; created_at: string };
+const COLUMNS = "id, scope_id, name, folder, kind, mime, size, width, height, file_key, source, source_url, credit, alt, project, created_by, created_at";
+const toItem = (row: Row) => ({ id: row.id, scopeId: row.scope_id, name: row.name, folder: row.folder, kind: row.kind, mime: row.mime, size: Number(row.size) || 0, width: row.width, height: row.height, url: publicMediaUrl(row.file_key), source: row.source, sourceUrl: row.source_url, credit: row.credit, alt: row.alt, project: parseProject(row.project), createdBy: row.created_by, createdAt: row.created_at });
+
+/** Project details used for local SEO / geo: where and what the job was. */
+type Project = { location?: string; service?: string; date?: string; notes?: string; lat?: number; lng?: number };
+function parseProject(raw: unknown): Project {
+  let value: Record<string, unknown> = {};
+  try { value = typeof raw === "string" ? JSON.parse(raw || "{}") : (raw && typeof raw === "object" ? raw as Record<string, unknown> : {}); } catch { value = {}; }
+  const text = (v: unknown, n: number) => String(v ?? "").trim().slice(0, n);
+  const num = (v: unknown, lim: number) => { const x = Number(v); return Number.isFinite(x) && Math.abs(x) <= lim && v !== "" && v !== null ? Math.round(x * 1e6) / 1e6 : undefined; };
+  const out: Project = { location: text(value.location, 160), service: text(value.service, 120), date: /^\d{4}-\d{2}-\d{2}$/.test(String(value.date || "")) ? String(value.date) : "", notes: text(value.notes, 600), lat: num(value.lat, 90), lng: num(value.lng, 180) };
+  return Object.fromEntries(Object.entries(out).filter(([, v]) => v !== undefined && v !== "")) as Project;
+}
 
 /** "agency" / "" = the agency's shared library. Returns null when the person can't use that library. */
 function scopeOf(value: unknown, access: MediaAccess) {
@@ -14,7 +27,7 @@ function scopeOf(value: unknown, access: MediaAccess) {
   return access.allowedScopes.has(scope) ? scope : null;
 }
 
-async function store(access: MediaAccess, bytes: Uint8Array, meta: { scope: string; name: string; folder?: string; source: string; sourceId?: string; sourceUrl?: string; credit?: string; alt?: string; width?: number; height?: number }) {
+async function store(access: MediaAccess, bytes: Uint8Array, meta: { project?: Project; scope: string; name: string; folder?: string; source: string; sourceId?: string; sourceUrl?: string; credit?: string; alt?: string; width?: number; height?: number }) {
   if (bytes.byteLength < 1) throw new Error("That file is empty.");
   if (bytes.byteLength > MEDIA_MAX_BYTES) throw new Error("Files must be 50 MB or smaller.");
   const type = detectMediaType(bytes);
@@ -27,10 +40,10 @@ async function store(access: MediaAccess, bytes: Uint8Array, meta: { scope: stri
   const width = Number.isFinite(meta.width) && meta.width! > 0 ? Math.round(meta.width!) : null;
   const height = Number.isFinite(meta.height) && meta.height! > 0 ? Math.round(meta.height!) : null;
   try {
-    await access.db.prepare(`INSERT INTO media_library_items (id, owner_id, scope_id, name, folder, kind, mime, size, width, height, file_key, source, source_id, source_url, credit, alt, created_by, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?18)`)
-      .bind(id, access.ownerId, meta.scope, name, cleanFolder(meta.folder), type.kind, type.mime, bytes.byteLength, width, height, key, meta.source, String(meta.sourceId || "").slice(0, 200), String(meta.sourceUrl || "").slice(0, 600), String(meta.credit || "").slice(0, 300), String(meta.alt || "").slice(0, 300), access.userLabel.slice(0, 120), now).run();
+    await access.db.prepare(`INSERT INTO media_library_items (id, owner_id, scope_id, name, folder, kind, mime, size, width, height, file_key, source, source_id, source_url, credit, alt, created_by, created_at, updated_at, project) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?18, ?19)`)
+      .bind(id, access.ownerId, meta.scope, name, cleanFolder(meta.folder), type.kind, type.mime, bytes.byteLength, width, height, key, meta.source, String(meta.sourceId || "").slice(0, 200), String(meta.sourceUrl || "").slice(0, 600), String(meta.credit || "").slice(0, 300), String(meta.alt || "").slice(0, 300), access.userLabel.slice(0, 120), now, JSON.stringify(parseProject(meta.project || {}))).run();
   } catch (error) { await access.bucket.delete(key).catch(() => undefined); throw error; }
-  return toItem({ id, scope_id: meta.scope, name, folder: cleanFolder(meta.folder), kind: type.kind, mime: type.mime, size: bytes.byteLength, width, height, file_key: key, source: meta.source, source_url: String(meta.sourceUrl || ""), credit: String(meta.credit || ""), alt: String(meta.alt || ""), created_by: access.userLabel, created_at: now });
+  return toItem({ id, scope_id: meta.scope, name, folder: cleanFolder(meta.folder), kind: type.kind, mime: type.mime, size: bytes.byteLength, width, height, file_key: key, source: meta.source, source_url: String(meta.sourceUrl || ""), credit: String(meta.credit || ""), alt: String(meta.alt || ""), project: JSON.stringify(parseProject(meta.project || {})), created_by: access.userLabel, created_at: now });
 }
 
 async function fetchBytes(url: string, init: RequestInit = {}) {
@@ -185,7 +198,7 @@ export async function PUT(request: Request) {
   if (Number(request.headers.get("content-length") || 0) > MEDIA_MAX_BYTES) return reply("Files must be 50 MB or smaller.", 413);
   try {
     const bytes = new Uint8Array(await request.arrayBuffer());
-    const item = await store(access, bytes, { scope, name: url.searchParams.get("name") || "Upload", folder: url.searchParams.get("folder") || "", source: "upload", width: Number(url.searchParams.get("w")) || undefined, height: Number(url.searchParams.get("h")) || undefined });
+    const item = await store(access, bytes, { scope, name: url.searchParams.get("name") || "Upload", folder: url.searchParams.get("folder") || "", source: "upload", project: parseProject(url.searchParams.get("project") || "{}"), width: Number(url.searchParams.get("w")) || undefined, height: Number(url.searchParams.get("h")) || undefined });
     return ok({ item });
   } catch (error) { return reply(error instanceof Error ? error.message : "The upload failed.", 400); }
 }
@@ -205,10 +218,29 @@ export async function POST(request: Request) {
       const item = await store(access, bytes, { scope, name: photo.alt ? cleanName(photo.alt).slice(0, 80) : `${body.provider} ${photo.id}`, folder: String(body.folder || ""), source: body.provider, sourceId: photo.id, sourceUrl: photo.pageUrl, credit: photo.credit, alt: photo.alt, width: photo.width, height: photo.height });
       return ok({ item });
     }
+    if (action === "generate") {
+      const scope = scopeOf(body.scope, access); if (scope === null) return reply("You don't have access to that client's media.", 403);
+      const prompt = String(body.prompt || "").trim().slice(0, 1500);
+      if (prompt.length < 4) return reply("Describe the image you want.");
+      const provider = await resolveAiProvider(env as never, access.ownerId);
+      if (!aiConfigured(env as never, provider)) return reply("Connect an AI provider in Settings → API Keys to generate images.", 503);
+      const size = ["1024x1024", "1536x1024", "1024x1536"].includes(String(body.size)) ? String(body.size) : "1536x1024";
+      const response = await fetch(aiEndpoint(env as never, "images", provider)!, { method: "POST", headers: aiHeaders(env as never, provider)!, body: JSON.stringify({ model: aiImageModel(env as never, provider), prompt, size, quality: "medium", n: 1 }), signal: AbortSignal.timeout(120000) });
+      if (!response.ok) return reply(response.status === 429 ? "The image service is busy or out of quota. Try again shortly." : "The image couldn’t be generated. Try a different description.", 502);
+      const data = await response.json() as { data?: Array<{ b64_json?: string; url?: string }> };
+      const first = data.data?.[0];
+      let bytes: Uint8Array | null = null;
+      if (first?.b64_json) bytes = Uint8Array.from(atob(first.b64_json), (c) => c.charCodeAt(0));
+      else if (first?.url && /^https:/.test(first.url)) bytes = (await fetchBytes(first.url)).bytes;
+      if (!bytes) return reply("The image service returned no image.", 502);
+      const [w, h] = size.split("x").map(Number);
+      const item = await store(access, bytes, { scope, name: `AI · ${prompt.slice(0, 60)}`, folder: String(body.folder || "AI images"), source: "ai", credit: "AI generated", alt: prompt.slice(0, 300), width: w, height: h, project: parseProject(body.project) });
+      return ok({ item });
+    }
     if (action === "importDrive") {
       const scope = scopeOf(body.scope, access); if (scope === null) return reply("You don't have access to that client's media.", 403);
       const file = await driveImport(access, String(body.link || body.fileId || ""));
-      const item = await store(access, file.bytes, { scope, name: String(body.name || file.name), folder: String(body.folder || ""), source: "google-drive", sourceId: file.fileId, sourceUrl: `https://drive.google.com/file/d/${file.fileId}/view`, width: file.width, height: file.height });
+      const item = await store(access, file.bytes, { scope, name: String(body.name || file.name), folder: String(body.folder || ""), project: parseProject(body.project), source: "google-drive", sourceId: file.fileId, sourceUrl: `https://drive.google.com/file/d/${file.fileId}/view`, width: file.width, height: file.height });
       return ok({ item });
     }
     if (action === "importUrl") {
@@ -230,8 +262,8 @@ export async function POST(request: Request) {
       if (!row || !access.allowedScopes.has(row.scope_id)) return reply("That file could not be found.", 404);
       let nextScope = row.scope_id;
       if (body.scope !== undefined) { const scope = scopeOf(body.scope, access); if (scope === null) return reply("You don't have access to that client's media.", 403); nextScope = scope; }
-      await access.db.prepare("UPDATE media_library_items SET name = COALESCE(?3, name), folder = COALESCE(?4, folder), alt = COALESCE(?5, alt), scope_id = ?6, updated_at = ?7 WHERE id = ?1 AND owner_id = ?2")
-        .bind(id, access.ownerId, body.name === undefined ? null : cleanName(body.name), body.folder === undefined ? null : cleanFolder(body.folder), body.alt === undefined ? null : String(body.alt).slice(0, 300), nextScope, new Date().toISOString()).run();
+      await access.db.prepare("UPDATE media_library_items SET name = COALESCE(?3, name), folder = COALESCE(?4, folder), alt = COALESCE(?5, alt), scope_id = ?6, updated_at = ?7, project = COALESCE(?8, project) WHERE id = ?1 AND owner_id = ?2")
+        .bind(id, access.ownerId, body.name === undefined ? null : cleanName(body.name), body.folder === undefined ? null : cleanFolder(body.folder), body.alt === undefined ? null : String(body.alt).slice(0, 300), nextScope, new Date().toISOString(), body.project === undefined ? null : JSON.stringify(parseProject(body.project))).run();
       const updated = await access.db.prepare(`SELECT ${COLUMNS} FROM media_library_items WHERE id = ?1 AND owner_id = ?2`).bind(id, access.ownerId).first<Row>();
       return ok({ item: updated ? toItem(updated) : null });
     }

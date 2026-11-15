@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 import "./media-library.css";
+import { readPhotoGeo } from "@/lib/media-library/exif";
 
 type Client = { id: string; name: string; logo?: string; color?: string };
-type MediaItem = { id: string; scopeId: string; name: string; folder: string; kind: "image" | "video" | "document"; mime: string; size: number; width: number | null; height: number | null; url: string; source: string; sourceUrl: string; credit: string; alt: string; createdBy: string; createdAt: string };
+type MediaItem = { id: string; scopeId: string; name: string; folder: string; kind: "image" | "video" | "document"; mime: string; size: number; width: number | null; height: number | null; url: string; source: string; sourceUrl: string; credit: string; alt: string; project?: Project; createdBy: string; createdAt: string };
+type Project = { location?: string; service?: string; date?: string; notes?: string; lat?: number; lng?: number };
 type Provider = { id: "unsplash" | "pexels" | "pixabay" | "openverse"; label: string; ready: boolean; signup: string };
 type Status = { providers: Provider[]; drive: { available: boolean; connected: boolean; email: string }; clients: Array<{ id: string; name: string }>; canUseAgency: boolean; isAdmin: boolean };
 type StockResult = { provider: Provider["id"]; id: string; thumb: string; preview: string; width: number; height: number; alt: string; credit: string; creditUrl: string; pageUrl: string };
@@ -13,7 +15,7 @@ type Upload = { id: string; name: string; progress: number; error?: string; done
 
 const KINDS = [{ id: "", label: "All" }, { id: "image", label: "Images" }, { id: "video", label: "Videos" }, { id: "document", label: "PDFs" }] as const;
 const formatSize = (bytes: number) => bytes >= 1_000_000 ? `${(bytes / 1_000_000).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1000))} KB`;
-const sourceLabel: Record<string, string> = { upload: "Uploaded", "google-drive": "Google Drive", unsplash: "Unsplash", pexels: "Pexels", pixabay: "Pixabay", openverse: "Openverse", link: "Imported link" };
+const sourceLabel: Record<string, string> = { upload: "Uploaded", "google-drive": "Google Drive", unsplash: "Unsplash", pexels: "Pexels", pixabay: "Pixabay", openverse: "Openverse", link: "Imported link", ai: "AI generated" };
 const driveMessages: Record<string, string> = { connected: "Google Drive connected. Pick files to add.", cancelled: "Google Drive connection was cancelled.", "admin-required": "Only an agency owner or admin can connect Google Drive.", "not-configured": "Google sign-in isn't set up on the server yet (the same Google app used for Google Ads/Calendar).", "refresh-token-missing": "Google didn't return long-term access. Remove the app at myaccount.google.com/permissions and connect again.", "scope-missing": "Drive access wasn't granted. Connect again and tick “See and download your Google Drive files”.", "oauth-failed": "Google Drive could not be connected. Make sure the Google Drive API is enabled for the Google Cloud project, then try again.", "sign-in-required": "Sign in before connecting Google Drive.", "workspace-unavailable": "The workspace couldn't be loaded. Try again." };
 
 async function api<T>(input: string, init?: RequestInit) {
@@ -53,9 +55,11 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
   const [search, setSearch] = useState("");
   const [folder, setFolder] = useState("");
   const [uploadFolder, setUploadFolder] = useState("");
+  const [uploadProject, setUploadProject] = useState<Project>({});
+  const [projectOpen, setProjectOpen] = useState(false);
   const [uploads, setUploads] = useState<Upload[]>([]);
   const [selected, setSelected] = useState<MediaItem | null>(null);
-  const [panel, setPanel] = useState<"" | "stock" | "drive" | "link" | "mobile">("");
+  const [panel, setPanel] = useState<"" | "stock" | "drive" | "link" | "mobile" | "ai">("");
   const [dragOver, setDragOver] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
@@ -109,7 +113,7 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
   const folders = useMemo(() => [...new Set(items.map((item) => item.folder).filter(Boolean))].sort((a, b) => a.localeCompare(b)), [items]);
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return items.filter((item) => (!folder || item.folder === folder) && (!term || [item.name, item.folder, item.alt, item.credit].some((value) => value.toLowerCase().includes(term))));
+    return items.filter((item) => (!folder || item.folder === folder) && (!term || [item.name, item.folder, item.alt, item.credit, item.project?.location || "", item.project?.service || "", item.project?.notes || ""].some((value) => value.toLowerCase().includes(term))));
   }, [items, folder, search]);
 
   const addItem = (item: MediaItem) => {
@@ -130,6 +134,10 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
         const query = new URLSearchParams({ scope: uploadScope, name: file.name || "Photo" });
         if (uploadFolder.trim()) query.set("folder", uploadFolder.trim());
         if (size) { query.set("w", String(size.w)); query.set("h", String(size.h)); }
+        // Project details for local SEO: what was typed above, plus GPS and date from the photo itself when present.
+        const geo = await readPhotoGeo(file);
+        const project = { ...uploadProject, ...(geo.lat != null ? { lat: geo.lat, lng: geo.lng } : {}), date: uploadProject.date || geo.takenAt || "" };
+        if (Object.values(project).some((value) => value !== "" && value != null)) query.set("project", JSON.stringify(project));
         const item = await uploadFile(file, query, (progress) => setUploads((current) => current.map((entry) => entry.id === id ? { ...entry, progress } : entry)));
         addItem(item);
         setUploads((current) => current.map((entry) => entry.id === id ? { ...entry, progress: 100, done: true } : entry));
@@ -145,7 +153,7 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
   const copy = async (text: string, label = "Link copied") => { try { await navigator.clipboard.writeText(text); flash(label); } catch { window.prompt("Copy this link:", text); } };
   const absolute = (path: string) => `${window.location.origin}${path}`;
 
-  const saveItem = async (patch: Partial<Pick<MediaItem, "name" | "folder" | "alt">> & { scope?: string }) => {
+  const saveItem = async (patch: Partial<Pick<MediaItem, "name" | "folder" | "alt" | "project">> & { scope?: string }) => {
     if (!selected) return;
     try {
       const data = await api<{ item: MediaItem | null }>("/api/media-library", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "update", id: selected.id, ...patch }) });
@@ -191,7 +199,7 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
         <button type="button" className="primary-button" onClick={() => fileInput.current?.click()} disabled={!uploadScope}>⬆ Upload</button>
         <button type="button" className="secondary-button ml-camera" onClick={() => cameraInput.current?.click()} disabled={!uploadScope}>📷 Take photo</button>
         <button type="button" className="secondary-button" onClick={() => setPanel("drive")}>🟢 Google Drive</button>
-        <button type="button" className="secondary-button" onClick={() => setPanel("stock")}>🖼 Stock photos</button>
+        <button type="button" className="secondary-button" onClick={() => setPanel("ai")} disabled={!uploadScope}>✨ AI generate</button>
         <button type="button" className="secondary-button" onClick={() => setPanel("link")}>🔗 Import link</button>
         <button type="button" className="secondary-button" onClick={() => setPanel("mobile")}>📱 Mobile link</button>
         <input ref={fileInput} type="file" hidden multiple accept="image/*,video/mp4,video/quicktime,video/webm,application/pdf" onChange={(event) => { const files = event.currentTarget.files; if (files) void uploadFiles(files); event.currentTarget.value = ""; }} />
@@ -200,7 +208,15 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
       <p className="ml-target">New files go to <b>{uploadScopeName}</b>{" "}
         <label className="ml-folder-input">· folder <input value={uploadFolder} onChange={(event) => setUploadFolder(event.target.value)} placeholder="optional, e.g. Job photos" maxLength={60} list="ml-folders" /></label>
         <datalist id="ml-folders">{folders.map((name) => <option key={name} value={name} />)}</datalist>
+        <button type="button" className="text-button ml-project-toggle" onClick={() => setProjectOpen(!projectOpen)}>{projectOpen ? "Hide project details" : `📍 Project details${uploadProject.location || uploadProject.service ? ` · ${[uploadProject.service, uploadProject.location].filter(Boolean).join(", ")}` : ""}`}</button>
       </p>
+      {projectOpen && <div className="ml-project-form"><p className="ml-hint">Added to every file you upload now. Used for local SEO: where the job was, what it was, and when. Phone photos also add their GPS location automatically.</p>
+        <label className="field"><span>Location</span><input value={uploadProject.location || ""} onChange={(event) => setUploadProject({ ...uploadProject, location: event.target.value })} placeholder="e.g. Salthill, Galway" maxLength={160} /></label>
+        <label className="field"><span>Service / job</span><input value={uploadProject.service || ""} onChange={(event) => setUploadProject({ ...uploadProject, service: event.target.value })} placeholder="e.g. Slate roof replacement" maxLength={120} /></label>
+        <label className="field"><span>Date of job</span><input type="date" value={uploadProject.date || ""} onChange={(event) => setUploadProject({ ...uploadProject, date: event.target.value })} /></label>
+        <label className="field ml-project-notes"><span>Notes</span><input value={uploadProject.notes || ""} onChange={(event) => setUploadProject({ ...uploadProject, notes: event.target.value })} placeholder="e.g. Before / after, materials used, customer quote" maxLength={600} /></label>
+        {(uploadProject.location || uploadProject.service || uploadProject.date || uploadProject.notes) && <button type="button" className="text-button" onClick={() => setUploadProject({})}>Clear</button>}
+      </div>}
 
       {uploads.length > 0 && <ul className="ml-uploads" aria-live="polite">{uploads.map((entry) => <li key={entry.id} className={entry.error ? "is-error" : entry.done ? "is-done" : ""}><span>{entry.name}</span>{entry.error ? <small>{entry.error} <button type="button" className="text-button" onClick={() => setUploads((current) => current.filter((item) => item.id !== entry.id))}>Dismiss</button></small> : <i style={{ width: `${entry.progress}%` }} />}</li>)}</ul>}
       {error && <p className="form-error ml-error" role="alert">{error} <button type="button" className="text-button" onClick={() => setError("")}>Dismiss</button></p>}
@@ -219,7 +235,7 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
             <span className="ml-thumb">
               {item.kind === "image" ? <img src={item.url} alt={item.alt || item.name} loading="lazy" /> : item.kind === "video" ? <><video src={`${item.url}#t=0.5`} preload="metadata" muted playsInline /><em>▶</em></> : <span className="ml-doc">PDF</span>}
             </span>
-            <span className="ml-card-meta"><b>{item.name}</b><small>{listScope === "all" ? `${scopeName(item.scopeId)} · ` : ""}{formatSize(item.size)}{item.folder ? ` · ${item.folder}` : ""}</small></span>
+            <span className="ml-card-meta"><b>{item.name}</b><small>{listScope === "all" ? `${scopeName(item.scopeId)} · ` : ""}{formatSize(item.size)}{item.folder ? ` · ${item.folder}` : ""}</small>{(item.project?.location || item.project?.lat != null) && <small className="ml-card-geo">📍 {item.project?.location || "GPS from photo"}{item.project?.service ? ` · ${item.project.service}` : ""}</small>}</span>
           </button>
         ))}
         {!loading && visible.length === 0 && (
@@ -235,6 +251,7 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
       {selected && <DetailPanel item={selected} canMove={!inSubAccount} scopes={[...(status?.canUseAgency !== false ? [{ id: "agency", name: "Agency library" }] : []), ...allowedClients.map((client) => ({ id: client.id, name: client.name }))]} scopeName={scopeName} onClose={() => setSelected(null)} onSave={saveItem} onDelete={deleteItem} onCopy={(text, label) => void copy(text, label)} absolute={absolute} />}
       {panel === "stock" && status && <StockPanel providers={status.providers} isAdmin={status.isAdmin} target={uploadScope} targetName={uploadScopeName} folder={uploadFolder} onClose={() => setPanel("")} onAdded={(item) => { addItem(item); flash(`Added to ${uploadScopeName}`); }} onKeysChanged={() => setStatus(null)} />}
       {panel === "drive" && status && <DrivePanel drive={status.drive} isAdmin={status.isAdmin} target={uploadScope} targetName={uploadScopeName} folder={uploadFolder} onClose={() => setPanel("")} onAdded={(item) => { addItem(item); flash(`Added to ${uploadScopeName}`); }} />}
+      {panel === "ai" && <AiPanel target={uploadScope} targetName={uploadScopeName} folder={uploadFolder} project={uploadProject} onClose={() => setPanel("")} onAdded={(item) => { addItem(item); flash(`Added to ${uploadScopeName}`); setPanel(""); setSelected(item); }} />}
       {panel === "link" && <LinkPanel target={uploadScope} targetName={uploadScopeName} folder={uploadFolder} onClose={() => setPanel("")} onAdded={(item) => { addItem(item); flash(`Added to ${uploadScopeName}`); setPanel(""); }} />}
       {panel === "mobile" && <MobilePanel clientId={inSubAccount ? scopeClientId : picker !== "all" && picker !== "agency" ? picker : ""} clientName={inSubAccount ? scopeName(scopeClientId) : picker !== "all" && picker !== "agency" ? scopeName(picker) : ""} onClose={() => setPanel("")} onCopy={(text) => void copy(text)} />}
     </section>
@@ -246,13 +263,14 @@ function Modal({ title, onClose, children, wide = false }: { title: string; onCl
   return <div className="ml-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><div className={`ml-modal${wide ? " is-wide" : ""}`} role="dialog" aria-modal="true" aria-label={title}><header><h2>{title}</h2><button type="button" className="ml-close" onClick={onClose} aria-label="Close">✕</button></header><div className="ml-modal-body">{children}</div></div></div>;
 }
 
-function DetailPanel({ item, canMove, scopes, scopeName, onClose, onSave, onDelete, onCopy, absolute }: { item: MediaItem; canMove: boolean; scopes: Array<{ id: string; name: string }>; scopeName: (id: string) => string; onClose: () => void; onSave: (patch: { name?: string; folder?: string; alt?: string; scope?: string }) => void; onDelete: (item: MediaItem) => void; onCopy: (text: string, label?: string) => void; absolute: (path: string) => string }) {
+function DetailPanel({ item, canMove, scopes, scopeName, onClose, onSave, onDelete, onCopy, absolute }: { item: MediaItem; canMove: boolean; scopes: Array<{ id: string; name: string }>; scopeName: (id: string) => string; onClose: () => void; onSave: (patch: { name?: string; folder?: string; alt?: string; scope?: string; project?: Project }) => void; onDelete: (item: MediaItem) => void; onCopy: (text: string, label?: string) => void; absolute: (path: string) => string }) {
   const [name, setName] = useState(item.name);
   const [folder, setFolder] = useState(item.folder);
   const [alt, setAlt] = useState(item.alt);
-  useEffect(() => { setName(item.name); setFolder(item.folder); setAlt(item.alt); }, [item]);
+  const [project, setProject] = useState<Project>(item.project || {});
+  useEffect(() => { setName(item.name); setFolder(item.folder); setAlt(item.alt); setProject(item.project || {}); }, [item]);
   const link = absolute(item.url);
-  const dirty = name !== item.name || folder !== item.folder || alt !== item.alt;
+  const dirty = name !== item.name || folder !== item.folder || alt !== item.alt || JSON.stringify(project) !== JSON.stringify(item.project || {});
   return (
     <Modal title={item.name} onClose={onClose} wide>
       <div className="ml-detail">
@@ -261,7 +279,14 @@ function DetailPanel({ item, canMove, scopes, scopeName, onClose, onSave, onDele
           <label className="field"><span>Name</span><input value={name} onChange={(event) => setName(event.target.value)} maxLength={140} /></label>
           <label className="field"><span>Folder</span><input value={folder} onChange={(event) => setFolder(event.target.value)} maxLength={60} placeholder="e.g. Job photos" /></label>
           {item.kind === "image" && <label className="field"><span>Alt text (for SEO)</span><input value={alt} onChange={(event) => setAlt(event.target.value)} maxLength={300} placeholder="Describe the image" /></label>}
-          {dirty && <button type="button" className="primary-button" onClick={() => onSave({ name, folder, alt })}>Save changes</button>}
+          <fieldset className="ml-project-fields"><legend>📍 Project details (local SEO)</legend>
+            <label className="field"><span>Location</span><input value={project.location || ""} onChange={(event) => setProject({ ...project, location: event.target.value })} placeholder="e.g. Salthill, Galway" maxLength={160} /></label>
+            <label className="field"><span>Service / job</span><input value={project.service || ""} onChange={(event) => setProject({ ...project, service: event.target.value })} placeholder="e.g. Slate roof replacement" maxLength={120} /></label>
+            <label className="field"><span>Date of job</span><input type="date" value={project.date || ""} onChange={(event) => setProject({ ...project, date: event.target.value })} /></label>
+            <label className="field"><span>Notes</span><input value={project.notes || ""} onChange={(event) => setProject({ ...project, notes: event.target.value })} placeholder="Before / after, materials, details" maxLength={600} /></label>
+            {project.lat != null && project.lng != null ? <p className="ml-hint">GPS from photo: <a href={`https://www.google.com/maps?q=${project.lat},${project.lng}`} target="_blank" rel="noreferrer">{project.lat}, {project.lng}</a> <button type="button" className="text-button" onClick={() => { const next = { ...project }; delete next.lat; delete next.lng; setProject(next); }}>Remove</button></p> : <p className="ml-hint">No GPS in this file. Phone photos usually include it.</p>}
+          </fieldset>
+          {dirty && <button type="button" className="primary-button" onClick={() => onSave({ name, folder, alt, project })}>Save changes</button>}
           {canMove && <label className="field"><span>Client library</span><select value={item.scopeId || "agency"} onChange={(event) => onSave({ scope: event.target.value })}>{scopes.map((scope) => <option key={scope.id} value={scope.id}>{scope.name}</option>)}</select></label>}
           <dl className="ml-facts">
             <div><dt>Library</dt><dd>{scopeName(item.scopeId)}</dd></div>
@@ -450,6 +475,33 @@ function MobilePanel({ clientId, clientName, onClose, onCopy }: { clientId: stri
           </div>
           <small className="ml-hint">On your phone, tap Share → <b>Add to Home Screen</b> for a one-tap icon. Long-pressing the installed F2B app icon also shows a “Media Library” shortcut. You'll sign in with your usual work email.</small>
         </div>
+      </div>
+    </Modal>
+  );
+}
+
+function AiPanel({ target, targetName, folder, project, onClose, onAdded }: { target: string; targetName: string; folder: string; project: Project; onClose: () => void; onAdded: (item: MediaItem) => void }) {
+  const [prompt, setPrompt] = useState("");
+  const [size, setSize] = useState("1536x1024");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const generate = async () => {
+    if (prompt.trim().length < 4) { setError("Describe the image you want."); return; }
+    setBusy(true); setError("");
+    try {
+      const data = await api<{ item: MediaItem }>("/api/media-library", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "generate", scope: target, folder: folder || "AI images", prompt: prompt.trim(), size, project }) });
+      onAdded(data.item);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "The image couldn’t be generated."); }
+    finally { setBusy(false); }
+  };
+  return (
+    <Modal title="✨ Generate an image with AI" onClose={onClose}>
+      <div className="ml-ai-panel">
+        <label className="field"><span>Describe the image</span><textarea rows={4} value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="e.g. Bright modern kitchen with oak cabinets and a white island, natural daylight, photo style" maxLength={1500} autoFocus /></label>
+        <label className="field"><span>Shape</span><select value={size} onChange={(event) => setSize(event.target.value)}><option value="1536x1024">Landscape (web banners, ads)</option><option value="1024x1024">Square (social posts)</option><option value="1024x1536">Portrait (stories, posters)</option></select></label>
+        <p className="ml-hint">Saved to <b>{targetName}</b>{folder ? ` · ${folder}` : " · AI images"}. AI images are illustrations — don’t present them as real completed jobs.</p>
+        {error && <p className="ml-error" role="alert">{error}</p>}
+        <div className="ml-detail-actions"><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button type="button" className="primary-button" disabled={busy || !target} onClick={() => void generate()}>{busy ? "Generating… (up to a minute)" : "Generate image"}</button></div>
       </div>
     </Modal>
   );

@@ -12,7 +12,7 @@ type WorkspaceSlice = { ownerId?: string; adminEmail?: string; clients?: Array<{
 
 let schemaReady: Promise<void> | null = null;
 export function ensureMediaTables(db: D1Database) {
-  if (!schemaReady) schemaReady = db.batch(MEDIA_SCHEMA_SQL.map((sql) => db.prepare(sql))).then(() => undefined).catch((error) => { schemaReady = null; throw error; });
+  if (!schemaReady) schemaReady = db.batch(MEDIA_SCHEMA_SQL.map((sql) => db.prepare(sql))).then(() => db.prepare("ALTER TABLE media_library_items ADD COLUMN project TEXT NOT NULL DEFAULT '{}'").run().catch(() => undefined)).then(() => undefined).catch((error) => { schemaReady = null; throw error; });
   return schemaReady;
 }
 
