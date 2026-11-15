@@ -10,7 +10,9 @@ export type OwReply = { id: string; threadId: string; createdAt: string };
 export type OwInvoice = { id: string; number: string; clientName: string; status: string; dueDate: string; sentAt: string; paidAt: string; total: number; currency: string; createdAt: string };
 export type OwBooking = { id: string; name: string; startAt: string; status: string; createdAt: string };
 export type OwTask = { id: string; title: string; status: string; priority: string; due: string; completedAt: string; createdAt: string };
-export type OwExpense = { id: string; description: string; amount: number; date: string; hasReceipt: boolean };
+export type OwExpense = { id: string; description: string; amount: number; date: string; hasReceipt: boolean; category?: string };
+export type OwContact = { id: string; name: string; createdAt: string };
+export type OwActivity = { id: string; type: string; createdAt: string };
 export type OwSnapshot = {
   now: string;
   leads: OwLead[];
@@ -20,13 +22,17 @@ export type OwSnapshot = {
   bookings: OwBooking[];
   tasks: OwTask[];
   expenses: OwExpense[];
+  contacts?: OwContact[];
+  activities?: OwActivity[];
   hasCalendars: boolean;
   /** Which data sources could actually be read. A missing source is shown as "not connected", never as zero activity. */
   sources: Record<"crm" | "conversations" | "invoicing" | "scheduling" | "tasks" | "books", boolean>;
 };
 
 // ───────────────────────────── Rewards (virtual only — never real money) ─────────────────────────────
-export type RewardKind = "lead_responded" | "follow_up" | "appointment_booked" | "receipt_recorded" | "invoice_sent" | "invoice_paid" | "job_won";
+export type RewardKind = "lead_responded" | "follow_up" | "appointment_booked" | "receipt_recorded" | "invoice_sent" | "invoice_paid" | "job_won" | "contact_added" | "note_logged" | "invoice_created" | "expense_recorded" | "ad_spend_logged" | "appointment_completed";
+/** Bookkeeping category the ads sync uses for ad spend. */
+export const AD_SPEND_CATEGORY = "Advertising & marketing";
 export const REWARDS: Record<RewardKind, { coins: number; xp: number; label: string }> = {
   lead_responded: { coins: 20, xp: 20, label: "Lead responded to" },
   follow_up: { coins: 20, xp: 20, label: "Follow-up completed" },
@@ -35,6 +41,13 @@ export const REWARDS: Record<RewardKind, { coins: number; xp: number; label: str
   invoice_sent: { coins: 50, xp: 50, label: "Invoice sent" },
   invoice_paid: { coins: 40, xp: 60, label: "Payment confirmed" },
   job_won: { coins: 100, xp: 100, label: "Job won" },
+  // Little things add up too.
+  contact_added: { coins: 5, xp: 5, label: "New contact added" },
+  note_logged: { coins: 5, xp: 5, label: "Note logged" },
+  invoice_created: { coins: 10, xp: 10, label: "Invoice drafted" },
+  expense_recorded: { coins: 10, xp: 10, label: "Expense recorded" },
+  ad_spend_logged: { coins: 10, xp: 10, label: "Ad spend logged in Books" },
+  appointment_completed: { coins: 20, xp: 20, label: "Appointment completed" },
 };
 /** Anti-farming: at most this many rewards of one kind per calendar day. */
 export const DAILY_REWARD_CAP = 25;
@@ -75,8 +88,18 @@ export function achievementsFromSnapshot(snap: OwSnapshot, since: string): Achie
   }
   for (const b of snap.bookings) if (b.status !== "cancelled" && after(b.createdAt, since)) add(`booking:${b.id}`, "appointment_booked", b.createdAt, b.name);
   for (const t of snap.tasks) if (/^done$/i.test(t.status) && t.completedAt && after(t.completedAt, since)) add(`task:${t.id}`, "follow_up", t.completedAt, t.title);
-  // Expenses have no timestamp, only a date: count those dated on/after the start day that carry a receipt.
-  for (const e of snap.expenses) if (e.hasReceipt && e.date >= dayOf(since)) add(`receipt:${e.id}`, "receipt_recorded", `${e.date}T12:00:00Z`, e.description);
+  // Expenses have no timestamp, only a date: count those dated on/after the start day.
+  for (const e of snap.expenses) {
+    if (e.date < dayOf(since)) continue;
+    const at = `${e.date}T12:00:00Z`;
+    if (e.category === AD_SPEND_CATEGORY) add(`adspend:${e.id}`, "ad_spend_logged", at, e.description);
+    else if (e.hasReceipt) add(`receipt:${e.id}`, "receipt_recorded", at, e.description);
+    else add(`expense:${e.id}`, "expense_recorded", at, e.description);
+  }
+  for (const inv of snap.invoices) if (inv.createdAt && after(inv.createdAt, since)) add(`inv-new:${inv.id}`, "invoice_created", inv.createdAt, inv.number);
+  for (const b of snap.bookings) if (b.status === "completed" && after(b.createdAt, since)) add(`booking-done:${b.id}`, "appointment_completed", b.startAt, b.name);
+  for (const c of snap.contacts || []) if (after(c.createdAt, since)) add(`contact:${c.id}`, "contact_added", c.createdAt, c.name);
+  for (const a of snap.activities || []) if (after(a.createdAt, since)) add(`note:${a.id}`, "note_logged", a.createdAt, "");
   // Daily cap per kind.
   const perDay = new Map<string, number>();
   return out.sort((a, b) => a.at.localeCompare(b.at)).filter((a) => {
@@ -109,23 +132,60 @@ export function stageForLevel(level: number) {
   return { ...stage, next };
 }
 
-// Cosmetic shop. Coins buy looks only; levels gate them.
-export type ShopItem = { id: string; name: string; price: number; minLevel: number; slot: "garden" | "sign" | "vehicle" | "decor" | "outfit" };
-export const SHOP: ShopItem[] = [
-  { id: "flowers", name: "Flower beds", price: 60, minLevel: 1, slot: "garden" },
-  { id: "bench", name: "Coffee bench", price: 80, minLevel: 1, slot: "decor" },
-  { id: "tree", name: "Oak tree", price: 120, minLevel: 2, slot: "garden" },
-  { id: "neon-sign", name: "Premium signage", price: 200, minLevel: 3, slot: "sign" },
-  { id: "van", name: "Branded van", price: 300, minLevel: 4, slot: "vehicle" },
-  { id: "fountain", name: "Fountain", price: 450, minLevel: 6, slot: "decor" },
-  { id: "gold-outfit", name: "Gold-trim workwear", price: 500, minLevel: 8, slot: "outfit" },
-  { id: "truck", name: "Branded truck", price: 800, minLevel: 10, slot: "vehicle" },
+// Upgrade tracks. Coins buy visible upgrades only (never real-world assets); levels gate each tier.
+// Each tier changes the scene. Purchases are stored as "<track>:<tier>".
+export type UpgradeTier = { tier: number; name: string; price: number; minLevel: number; perk: string };
+export type UpgradeTrack = { id: string; name: string; tiers: UpgradeTier[] };
+export const UPGRADES: UpgradeTrack[] = [
+  { id: "hq", name: "Headquarters", tiers: [
+    { tier: 1, name: "Established office", price: 500, minLevel: 5, perk: "Second floor and a bigger footprint" },
+    { tier: 2, name: "Expanding business", price: 1500, minLevel: 10, perk: "Third floor" },
+    { tier: 3, name: "Growing company", price: 3000, minLevel: 15, perk: "Fourth floor" },
+    { tier: 4, name: "Market leader tower", price: 6000, minLevel: 20, perk: "Fifth floor" },
+    { tier: 5, name: "Business empire", price: 12000, minLevel: 30, perk: "Sixth floor" },
+    { tier: 6, name: "Industry legend", price: 25000, minLevel: 50, perk: "Seventh floor — the skyline is yours" } ] },
+  { id: "reception", name: "Reception", tiers: [
+    { tier: 1, name: "Polished desk", price: 80, minLevel: 1, perk: "A proper front desk for Rosie" },
+    { tier: 2, name: "Waiting lounge", price: 250, minLevel: 3, perk: "Sofas and plants for waiting customers" },
+    { tier: 3, name: "Concierge counter", price: 600, minLevel: 6, perk: "Marble counter and a welcome mat" } ] },
+  { id: "garden", name: "Grounds", tiers: [
+    { tier: 1, name: "Flower beds", price: 60, minLevel: 1, perk: "Colour along the path" },
+    { tier: 2, name: "Oak trees", price: 150, minLevel: 2, perk: "Shade either side of HQ" },
+    { tier: 3, name: "Fountain", price: 450, minLevel: 5, perk: "A fountain out front" } ] },
+  { id: "workshop", name: "Workshop", tiers: [
+    { tier: 1, name: "Tool shed", price: 150, minLevel: 2, perk: "Somewhere for the kit" },
+    { tier: 2, name: "Workshop", price: 400, minLevel: 5, perk: "A branded workshop beside HQ" },
+    { tier: 3, name: "Warehouse", price: 1000, minLevel: 12, perk: "Full warehouse with roller door" } ] },
+  { id: "fleet", name: "Fleet", tiers: [
+    { tier: 1, name: "Branded van", price: 300, minLevel: 4, perk: "Your logo on the road" },
+    { tier: 2, name: "Branded truck", price: 800, minLevel: 10, perk: "A bigger truck for bigger jobs" },
+    { tier: 3, name: "Second van", price: 1500, minLevel: 15, perk: "A two-vehicle fleet" } ] },
+  { id: "signage", name: "Signage", tiers: [
+    { tier: 1, name: "Premium sign", price: 200, minLevel: 3, perk: "Dark sign with a brand outline" },
+    { tier: 2, name: "Rooftop neon", price: 500, minLevel: 7, perk: "Glowing name on the roof" } ] },
+  { id: "cafe", name: "Staff café", tiers: [
+    { tier: 1, name: "Coffee bench", price: 80, minLevel: 1, perk: "A bench and a coffee cart" },
+    { tier: 2, name: "Café corner", price: 300, minLevel: 4, perk: "Parasol tables for the team" } ] },
+  { id: "outfit", name: "Your outfit", tiers: [
+    { tier: 1, name: "New workwear", price: 100, minLevel: 2, perk: "Fresh branded kit" },
+    { tier: 2, name: "Gold-trim workwear", price: 500, minLevel: 8, perk: "Gold trim for the boss" } ] },
 ];
-export function canBuy(item: ShopItem | undefined, owned: string[], balance: number, level: number): string | null {
-  if (!item) return "That item doesn't exist.";
-  if (owned.includes(item.id)) return "You already own that.";
-  if (level < item.minLevel) return `Unlocks at level ${item.minLevel}.`;
-  if (balance < item.price) return `You need ${item.price - balance} more coins.`;
+/** Highest tier owned on a track (0 = none). */
+export function upgradeTier(owned: string[], trackId: string) {
+  let tier = 0;
+  for (const id of owned) { const [t, n] = id.split(":"); if (t === trackId && Number(n) > tier) tier = Number(n); }
+  return tier;
+}
+export function nextUpgrade(trackId: string, owned: string[]) {
+  const track = UPGRADES.find((t) => t.id === trackId);
+  return track ? track.tiers.find((t) => t.tier === upgradeTier(owned, trackId) + 1) || null : null;
+}
+export function canBuy(trackId: string, owned: string[], balance: number, level: number): string | null {
+  if (!UPGRADES.some((t) => t.id === trackId)) return "That upgrade doesn't exist.";
+  const next = nextUpgrade(trackId, owned);
+  if (!next) return "Fully upgraded.";
+  if (level < next.minLevel) return `Unlocks at level ${next.minLevel}.`;
+  if (balance < next.price) return `You need ${next.price - balance} more coins.`;
   return null;
 }
 
@@ -299,10 +359,31 @@ export function reactionLine(kind: RewardKind, seed: string) {
     invoice_sent: ["Invoice is out the door!", "Sent! Now we wait for the cha-ching.", "That invoice is on its way."],
     invoice_paid: ["CHA-CHING! We've just been paid, boss!", "Payment confirmed — real money in!", "Paid in full. Lovely stuff."],
     job_won: ["We got it! The team's going to be busy!", "Another job won!", "Get the van ready — we won the job!"],
+    contact_added: ["New face in the address book!", "Another contact saved.", "The little black book grows."],
+    note_logged: ["Notes keep us sharp!", "Good shout writing that down.", "Logged. Future you says thanks."],
+    invoice_created: ["Invoice drafted — ready when you are.", "Fresh invoice on my desk!", "Drafted and waiting for a send."],
+    expense_recorded: ["Expense noted. Pop a receipt on it for bonus coins!", "Books updated.", "Another one for the accounts."],
+    ad_spend_logged: ["Ad spend synced into the books — no typing needed!", "Ads costs logged automatically.", "Marketing spend tracked. Tidy."],
+    appointment_completed: ["Appointment done and dusted!", "Another visit completed.", "Job well done out there."],
   };
   return pick(lines[kind], seed);
 }
-export const EMPLOYEE_FOR_REWARD: Record<RewardKind, EmployeeId> = { lead_responded: "receptionist", follow_up: "projects", appointment_booked: "calendar", receipt_recorded: "accountant", invoice_sent: "accountant", invoice_paid: "accountant", job_won: "sales" };
+export const EMPLOYEE_FOR_REWARD: Record<RewardKind, EmployeeId> = { lead_responded: "receptionist", follow_up: "projects", appointment_booked: "calendar", receipt_recorded: "accountant", invoice_sent: "accountant", invoice_paid: "accountant", job_won: "sales", contact_added: "receptionist", note_logged: "sales", invoice_created: "accountant", expense_recorded: "accountant", ad_spend_logged: "marketing", appointment_completed: "calendar" };
+
+/** "Welcome back" walkthrough: one step per employee explaining exactly which real work earned the coins. */
+export type WalkStep = { employee: EmployeeId; line: string; items: string[]; coins: number; xp: number; keys: string[] };
+export function rewardWalkthrough(pending: Array<{ key: string; kind: string; coins: number; xp: number; label: string }>, seed: string): WalkStep[] {
+  const by = new Map<EmployeeId, WalkStep>();
+  for (const p of pending) {
+    const kind = (p.kind in REWARDS ? p.kind : "follow_up") as RewardKind;
+    const emp = EMPLOYEE_FOR_REWARD[kind];
+    const step = by.get(emp) || { employee: emp, line: "", items: [], coins: 0, xp: 0, keys: [] };
+    step.items.push(`${p.label} (+${p.coins})`); step.coins += p.coins; step.xp += p.xp; step.keys.push(p.key);
+    if (!step.line) step.line = reactionLine(kind, seed + p.key);
+    by.set(emp, step);
+  }
+  return [...by.values()].sort((a, b) => b.coins - a.coins);
+}
 
 // ───────────────────────────── Character (industry → outfit) ─────────────────────────────
 export type Industry = "construction" | "roofing" | "electrician" | "plumber" | "tattoo" | "dentist" | "hairdresser" | "mechanic" | "interiors" | "agency" | "general";

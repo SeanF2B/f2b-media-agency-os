@@ -886,3 +886,9 @@ html body .app-shell.dark-mode .app-dialog-body p { color:#c7ccd4; } html body .
 html body .app-shell.dark-mode .app-dialog-input { background:#14171c; border-color:rgba(255,255,255,.16); color:#fff; }
 @keyframes app-dialog-fade { from { opacity:0; } }
 @keyframes app-dialog-pop { from { opacity:0; transform:translateY(6px) scale(.98); } }
+
+/* Operating World — game controller in the middle of the bar */
+html body .app-shell .tn-item .tn-gamepad { transform-origin: 50% 60%; }
+html body .app-shell .tn-item:hover .tn-gamepad, html body .app-shell .tn-item.active .tn-gamepad { animation: tn-gamepad-wiggle .5s ease; }
+@keyframes tn-gamepad-wiggle { 25% { transform: rotate(-10deg); } 75% { transform: rotate(10deg); } }
+@media (prefers-reduced-motion: reduce) { html body .app-shell .tn-item .tn-gamepad { animation: none !important; } }

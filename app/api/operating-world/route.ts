@@ -4,7 +4,7 @@ import { aiConfigured, aiEndpoint, aiHeaders, aiModel, resolveAiProvider } from 
 import { OPERATING_WORLD_SCHEMA } from "@/lib/operating-world/schema-sql";
 import {
   achievementsFromSnapshot, briefing, canBuy, financialSummary, guessIndustry, INDUSTRIES, levelFromXp, operationalHealth, parseCommand,
-  PANELS, SHOP, stageForLevel, type Industry, type OwSnapshot, type PanelKind,
+  PANELS, UPGRADES, nextUpgrade, stageForLevel, type Industry, type OwSnapshot, type PanelKind,
 } from "@/lib/operating-world/engine";
 
 // Operating World: the game layer over the CRM. This route never writes CRM records itself —
@@ -43,7 +43,8 @@ async function snapshot(ctx: Ctx): Promise<OwSnapshot & { leadsExtra: Record<str
   const { db, ownerId, scopeId, ws, client } = ctx;
   const now = new Date().toISOString();
   const since120 = new Date(Date.now() - 120 * 86_400_000).toISOString();
-  const [opps, threads, replies, invoices, bookings, calendars] = await Promise.all([
+  const since30 = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  const [opps, threads, replies, invoices, bookings, calendars, contacts, activities] = await Promise.all([
     safe(async () => (await db.prepare(`SELECT o.id, o.title, o.value, o.currency, o.created_at, o.updated_at, o.pipeline_id, s.name AS stage, s.position, s.category, c.first_name, c.last_name, c.email, c.phone,
         (SELECT MIN(x.position) FROM crm_pipeline_stages x WHERE x.owner_id=o.owner_id AND x.pipeline_id=o.pipeline_id) AS first_pos,
         (SELECT y.id FROM crm_pipeline_stages y WHERE y.owner_id=o.owner_id AND y.pipeline_id=o.pipeline_id AND y.position>s.position AND y.category='open' ORDER BY y.position LIMIT 1) AS next_id,
@@ -57,6 +58,12 @@ async function snapshot(ctx: Ctx): Promise<OwSnapshot & { leadsExtra: Record<str
     scopeId ? Promise.resolve({ ok: false, value: null }) : safe(async () => (await db.prepare("SELECT id, number, client_name, status, due_date, sent_at, paid_at, total, currency, created_at FROM inv_invoices WHERE owner_id=?1 AND status<>'void' AND (status IN ('draft','sent') OR created_at>=?2 OR paid_at>=?3) ORDER BY created_at DESC LIMIT 300").bind(ownerId, since120, since120.slice(0, 10)).all<any>()).results || []),
     safe(async () => (await db.prepare("SELECT id, name, start_at, status, created_at FROM sched_bookings WHERE owner_id=?1 AND client_id=?2 AND start_at>=?3 AND start_at<=?4 ORDER BY start_at LIMIT 300").bind(ownerId, scopeId, new Date(Date.now() - 30 * 86_400_000).toISOString(), new Date(Date.now() + 30 * 86_400_000).toISOString()).all<any>()).results || []),
     safe(async () => (await db.prepare("SELECT COUNT(*) AS n FROM sched_calendars WHERE owner_id=?1 AND client_id=?2").bind(ownerId, scopeId).first<{ n: number }>())?.n || 0),
+    // Little things: contacts added and notes written by people (not automations), last 30 days.
+    safe(async () => (await db.prepare("SELECT id, first_name, last_name, created_at FROM crm_contacts WHERE owner_id=?1 AND COALESCE(client_id,'')=?2 AND source<>'client' AND updated_at>=?3 AND created_at>=?3 ORDER BY updated_at DESC LIMIT 200").bind(ownerId, scopeId, since30).all<any>()).results || []),
+    safe(async () => (await db.prepare(`SELECT a.id, a.activity_type, a.created_at FROM crm_activities a
+      LEFT JOIN crm_opportunities o ON o.id=a.opportunity_id AND o.owner_id=a.owner_id LEFT JOIN crm_pipelines p ON p.id=o.pipeline_id AND p.owner_id=a.owner_id
+      LEFT JOIN crm_contacts c ON c.id=a.contact_id AND c.owner_id=a.owner_id
+      WHERE a.owner_id=?1 AND a.created_at>=?3 AND a.created_by LIKE '%@%' AND COALESCE(p.client_id, c.client_id, '')=?2 ORDER BY a.created_at DESC LIMIT 200`).bind(ownerId, scopeId, since30).all<any>()).results || []),
   ]);
   const today = now.slice(0, 10);
   const tasks = (ws.tasks || []).filter((t) => String(t.clientId || "") === scopeId).slice(0, 2000);
@@ -71,7 +78,9 @@ async function snapshot(ctx: Ctx): Promise<OwSnapshot & { leadsExtra: Record<str
     invoices: (invoices.value || []).map((r: any) => ({ id: String(r.id), number: String(r.number), clientName: String(r.client_name || ""), status: r.status === "sent" && r.due_date < today ? "overdue" : String(r.status), dueDate: String(r.due_date), sentAt: String(r.sent_at || ""), paidAt: String(r.paid_at || ""), total: Number(r.total) || 0, currency: String(r.currency || "EUR"), createdAt: String(r.created_at) })),
     bookings: (bookings.value || []).map((b: any) => ({ id: String(b.id), name: String(b.name || ""), startAt: String(b.start_at), status: String(b.status), createdAt: String(b.created_at) })),
     tasks: tasks.map((t: any) => ({ id: String(t.id), title: String(t.title || ""), status: String(t.status || ""), priority: String(t.priority || ""), due: String(t.due || "").slice(0, 10), completedAt: String(t.completedAt || ""), createdAt: String(t.createdAt || "") })),
-    expenses: expenses.filter((e: any) => e.kind === "Expense").slice(0, 2000).map((e: any) => ({ id: String(e.id), description: String(e.description || ""), amount: Number(e.amount) || 0, date: String(e.date || ""), hasReceipt: Boolean(e.receiptFileId) })),
+    expenses: expenses.filter((e: any) => e.kind === "Expense").slice(0, 2000).map((e: any) => ({ id: String(e.id), description: String(e.description || ""), amount: Number(e.amount) || 0, date: String(e.date || ""), hasReceipt: Boolean(e.receiptFileId), category: String(e.category || "") })),
+    contacts: (contacts.value || []).map((c: any) => ({ id: String(c.id), name: [c.first_name, c.last_name].filter(Boolean).join(" "), createdAt: String(c.created_at) })),
+    activities: (activities.value || []).map((a: any) => ({ id: String(a.id), type: String(a.activity_type || "note"), createdAt: String(a.created_at) })),
     hasCalendars: Number(calendars.value) > 0,
     sources: { crm: opps.ok, conversations: threads.ok, invoicing: invoices.ok, scheduling: bookings.ok, tasks: true, books: true },
     leadsExtra,
@@ -88,16 +97,23 @@ async function loadState(ctx: Ctx) {
 
 async function wallet(ctx: Ctx) {
   const { db, ownerId, scopeId } = ctx;
-  const [earned, spent, owned, recent, log] = await Promise.all([
-    db.prepare("SELECT COALESCE(SUM(coins),0) AS coins, COALESCE(SUM(xp),0) AS xp FROM ow_ledger WHERE owner_id=?1 AND scope_id=?2").bind(ownerId, scopeId).first<{ coins: number; xp: number }>(),
+  // Only collected coins/XP count. Uncollected ones float over the staff in the scene until tapped.
+  const [earned, spent, owned, pending, recent, log] = await Promise.all([
+    db.prepare("SELECT COALESCE(SUM(coins),0) AS coins, COALESCE(SUM(xp),0) AS xp FROM ow_ledger WHERE owner_id=?1 AND scope_id=?2 AND collected_at<>''").bind(ownerId, scopeId).first<{ coins: number; xp: number }>(),
     db.prepare("SELECT COALESCE(SUM(coins),0) AS coins FROM ow_purchases WHERE owner_id=?1 AND scope_id=?2").bind(ownerId, scopeId).first<{ coins: number }>(),
     db.prepare("SELECT item_id FROM ow_purchases WHERE owner_id=?1 AND scope_id=?2").bind(ownerId, scopeId).all<{ item_id: string }>(),
-    db.prepare("SELECT reward_key, kind, coins, xp, label, created_at FROM ow_ledger WHERE owner_id=?1 AND scope_id=?2 ORDER BY created_at DESC LIMIT 20").bind(ownerId, scopeId).all<any>(),
+    db.prepare("SELECT reward_key, kind, coins, xp, label FROM ow_ledger WHERE owner_id=?1 AND scope_id=?2 AND collected_at='' ORDER BY created_at LIMIT 80").bind(ownerId, scopeId).all<{ reward_key: string; kind: string; coins: number; xp: number; label: string }>(),
+    db.prepare("SELECT reward_key, kind, coins, xp, label, created_at, collected_at FROM ow_ledger WHERE owner_id=?1 AND scope_id=?2 ORDER BY created_at DESC LIMIT 20").bind(ownerId, scopeId).all<any>(),
     db.prepare("SELECT id, actor, action, reason, records, status, created_at FROM ow_action_log WHERE owner_id=?1 AND scope_id=?2 ORDER BY created_at DESC LIMIT 30").bind(ownerId, scopeId).all<any>(),
   ]);
   const xp = Number(earned?.xp) || 0;
   const lvl = levelFromXp(xp);
-  return { coins: (Number(earned?.coins) || 0) - (Number(spent?.coins) || 0), xp, ...lvl, stage: stageForLevel(lvl.level), owned: (owned.results || []).map((r) => r.item_id), recentRewards: recent.results || [], actions: (log.results || []).map((r: any) => ({ ...r, records: (() => { try { return JSON.parse(r.records); } catch { return []; } })() })) };
+  return {
+    coins: (Number(earned?.coins) || 0) - (Number(spent?.coins) || 0), xp, ...lvl, stage: stageForLevel(lvl.level), owned: (owned.results || []).map((r) => r.item_id),
+    pending: (pending.results || []).map((r) => ({ key: r.reward_key, kind: r.kind, coins: Number(r.coins) || 0, xp: Number(r.xp) || 0, label: r.label })),
+    recentRewards: recent.results || [],
+    actions: (log.results || []).map((r: any) => ({ ...r, records: (() => { try { return JSON.parse(r.records); } catch { return []; } })() })),
+  };
 }
 
 async function logAction(ctx: Ctx, actor: string, action: string, reason: string, records: string[], status = "done") {
@@ -133,7 +149,7 @@ export async function GET(request: Request) {
       scopeId: ctx.scopeId, state: { mode: state.mode, autopilotPaused: state.autopilotPaused, startedAt: state.startedAt }, profile: businessProfile(ctx, state.profile),
       wallet: await wallet(ctx), freshRewards: fresh, approaches, health: operationalHealth(plain), finance: financialSummary(plain), sources: plain.sources,
       customers: urgent, counts: { leads: plain.leads.filter((l) => l.category === "open").length, unread: plain.threads.filter((t) => t.unread > 0).length, bookingsUpcoming: plain.bookings.filter((b) => b.status === "booked" && b.startAt >= now).length, openTasks: plain.tasks.filter((t) => !/^done$/i.test(t.status)).length },
-      upcoming: plain.bookings.filter((b) => b.status === "booked" && b.startAt >= now).slice(0, 8), shop: SHOP, industries: Object.entries(INDUSTRIES).map(([id, v]) => ({ id, label: v.label })),
+      upcoming: plain.bookings.filter((b) => b.status === "booked" && b.startAt >= now).slice(0, 8), shop: UPGRADES, industries: Object.entries(INDUSTRIES).map(([id, v]) => ({ id, label: v.label })),
       aiReady: aiConfigured(env, await resolveAiProvider(env, ctx.ownerId)),
     });
   } catch (error) { console.error("operating-world GET", error); return respond({ error: "Operating World couldn't load. Your CRM data is safe; try again." }, 500); }
@@ -178,17 +194,27 @@ export async function POST(request: Request) {
       await logAction(ctx, "Owner", `AI mode set to ${mode}${mode === "autopilot" ? (paused ? " (paused)" : " (running)") : ""}`, "Owner changed AI operating mode", []);
       return respond({ ok: true, mode, autopilotPaused: Boolean(paused) });
     }
+    if (action === "collect") {
+      const keys = Array.isArray(body.keys) ? (body.keys as unknown[]).map((k) => str(k, 160)).filter(Boolean).slice(0, 80) : [];
+      const now = new Date().toISOString();
+      const result = keys.length
+        ? await ctx.db.prepare(`UPDATE ow_ledger SET collected_at=?3 WHERE owner_id=?1 AND scope_id=?2 AND collected_at='' AND reward_key IN (${keys.map((_, i) => `?${i + 4}`).join(",")})`).bind(ctx.ownerId, ctx.scopeId, now, ...keys).run()
+        : await ctx.db.prepare("UPDATE ow_ledger SET collected_at=?3 WHERE owner_id=?1 AND scope_id=?2 AND collected_at=''").bind(ctx.ownerId, ctx.scopeId, now).run();
+      return respond({ ok: true, collected: result.meta.changes || 0, wallet: await wallet(ctx) });
+    }
     if (action === "buy") {
-      const item = SHOP.find((i) => i.id === str(body.itemId, 40));
+      const trackId = str(body.itemId, 40);
       const w = await wallet(ctx);
-      const problem = canBuy(item, w.owned, w.coins, w.level);
+      const problem = canBuy(trackId, w.owned, w.coins, w.level);
       if (problem) return respond({ error: problem }, 400);
-      // Conditional insert: only succeeds if the balance still covers it at write time (no double-spend race).
+      const next = nextUpgrade(trackId, w.owned)!;
+      const track = UPGRADES.find((t) => t.id === trackId)!;
+      // Conditional insert: only succeeds if the collected balance still covers it at write time (no double-spend race).
       const result = await ctx.db.prepare(`INSERT OR IGNORE INTO ow_purchases (owner_id, scope_id, item_id, coins, created_at)
-        SELECT ?1, ?2, ?3, ?4, ?5 WHERE (SELECT COALESCE(SUM(coins),0) FROM ow_ledger WHERE owner_id=?1 AND scope_id=?2) - (SELECT COALESCE(SUM(coins),0) FROM ow_purchases WHERE owner_id=?1 AND scope_id=?2) >= ?4`).bind(ctx.ownerId, ctx.scopeId, item!.id, item!.price, new Date().toISOString()).run();
+        SELECT ?1, ?2, ?3, ?4, ?5 WHERE (SELECT COALESCE(SUM(coins),0) FROM ow_ledger WHERE owner_id=?1 AND scope_id=?2 AND collected_at<>'') - (SELECT COALESCE(SUM(coins),0) FROM ow_purchases WHERE owner_id=?1 AND scope_id=?2) >= ?4`).bind(ctx.ownerId, ctx.scopeId, `${trackId}:${next.tier}`, next.price, new Date().toISOString()).run();
       if (!result.meta.changes) return respond({ error: "Not enough coins (or already bought)." }, 409);
-      await logAction(ctx, "Owner", `Bought ${item!.name}`, `${item!.price} virtual coins spent`, []);
-      return respond({ ok: true, wallet: await wallet(ctx) });
+      await logAction(ctx, "Owner", `Upgraded ${track.name}: ${next.name}`, `${next.price} virtual coins spent`, []);
+      return respond({ ok: true, upgraded: { track: track.name, name: next.name }, wallet: await wallet(ctx) });
     }
     if (action === "log") {
       await logAction(ctx, str(body.actor, 80) || "Owner", str(body.what, 200), str(body.reason, 500), Array.isArray(body.records) ? (body.records as unknown[]).map((r) => str(r, 120)).filter(Boolean) : [], str(body.status, 20) || "done");
