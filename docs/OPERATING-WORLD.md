@@ -48,6 +48,10 @@ Legend: ✅ in the game · 🔗 opens the existing screen inside the game · ⏳
 
 ## Gameplay
 
+- **Art:** Clash-of-Clans-style isometric island in the account's brand colours and logo. Each department is a tappable building (Headquarters → upgrades, Reception → leads, Accounts → invoices/books, Calendar tower → scheduling, Workshop → tasks, Sales → pipeline, Billboard → marketing). Characters are original bean-style mascots with their own accessories and idle animations (no skin tones); tap them for a speech bubble.
+- **Lead farm:** every open lead is a crop that grows with its pipeline stage, wilts when neglected and ripens when the job is won. New leads queue outside reception, longest wait first, getting impatient → bored → fed up.
+- **Town life:** AI agents walk around while running tasks and snooze (z z z) while scheduled; staff with work in progress walk between buildings; leads further down the pipeline visit Sales or the Calendar tower. The Tax Man knocks when this month's expenses are missing receipts. Long grass grows while work piles up.
+
 - **Employees** (one AI, six personalities): Rosie (reception), Sam (sales), Ada (accounts), Pete (projects), Mia (marketing), Cal (calendar). The most urgent one walks over with a line built from real counts and 2–4 options (open a screen, show the most urgent item, let AI prepare, remind me later).
 - **Character** reflects the industry (hard hat + hammer for roofing/construction, cap + drill for electricians, scrubs for dentists, apron + scissors for hairdressers…), in the account's brand colours. Industry is guessed from the business name and can be corrected.
 - **Collecting coins:** rewards appear as coin stacks over the employee who handled the work. Tap a stack (or *Collect all*) to bank coins and XP, with coin sounds and a fly-to-wallet animation. On each visit a *Welcome back* walkthrough explains, employee by employee, exactly which real work earned the coins, then collects them.

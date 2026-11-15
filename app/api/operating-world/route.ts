@@ -4,7 +4,7 @@ import { aiConfigured, aiEndpoint, aiHeaders, aiModel, resolveAiProvider } from 
 import { OPERATING_WORLD_SCHEMA } from "@/lib/operating-world/schema-sql";
 import {
   achievementsFromSnapshot, briefing, canBuy, financialSummary, guessIndustry, INDUSTRIES, levelFromXp, operationalHealth, parseCommand,
-  PANELS, UPGRADES, nextUpgrade, stageForLevel, type Industry, type OwSnapshot, type PanelKind,
+  PANELS, UPGRADES, nextUpgrade, stageForLevel, workingHoursBetween, type Industry, type OwSnapshot, type PanelKind,
 } from "@/lib/operating-world/engine";
 
 // Operating World: the game layer over the CRM. This route never writes CRM records itself —
@@ -149,6 +149,26 @@ export async function GET(request: Request) {
       scopeId: ctx.scopeId, state: { mode: state.mode, autopilotPaused: state.autopilotPaused, startedAt: state.startedAt }, profile: businessProfile(ctx, state.profile),
       wallet: await wallet(ctx), freshRewards: fresh, approaches, health: operationalHealth(plain), finance: financialSummary(plain), sources: plain.sources,
       customers: urgent, counts: { leads: plain.leads.filter((l) => l.category === "open").length, unread: plain.threads.filter((t) => t.unread > 0).length, bookingsUpcoming: plain.bookings.filter((b) => b.status === "booked" && b.startAt >= now).length, openTasks: plain.tasks.filter((t) => !/^done$/i.test(t.status)).length },
+      // Who is busy right now: AI agents running/scheduled tasks and staff with work in progress (this account only).
+      ...(() => {
+        const tasks = (ctx.ws.tasks || []).filter((t: any) => String(t.clientId || "") === ctx.scopeId && !/^done$/i.test(String(t.status || "")));
+        const staff = (ctx.ws.staff || []) as any[];
+        const agents = staff.filter((m) => m.isBot && (ctx.scopeId ? m.botLevel !== "admin" : true)).map((m) => {
+          const running = tasks.find((t: any) => t.assigneeId === m.id && t.aiRunState === "running");
+          const scheduled = tasks.find((t: any) => t.assigneeId === m.id && (t.aiRunState === "scheduled" || t.aiRunState === "paused"));
+          return { id: String(m.id), name: String(m.name || "AI agent"), state: running ? "working" : scheduled ? "scheduled" : "idle", task: String((running || scheduled)?.title || "").slice(0, 80) };
+        }).filter((a) => a.state !== "idle").slice(0, 5);
+        const people = staff.filter((m) => !m.isBot).map((m) => { const t = tasks.find((x: any) => x.assigneeId === m.id && /in progress|doing/i.test(String(x.status || ""))); return t ? { id: String(m.id), name: String(m.name || "Team"), task: String(t.title || "").slice(0, 80) } : null; }).filter(Boolean).slice(0, 4);
+        return { agents, staffAtWork: people };
+      })(),
+      // Leads further down the pipeline walk around town (to sales, the calendar, etc.).
+      visitors: plain.leads.filter((l) => l.category === "open" && l.stagePosition > l.firstPosition).slice(0, 6).map((l) => ({ id: l.id, name: l.name || l.title, stage: l.stage })),
+      taxman: plain.expenses.some((e) => !e.hasReceipt && e.category !== "Advertising & marketing" && e.date.slice(0, 7) === now.slice(0, 7)),
+      // Farm: each open lead is a crop; won jobs (last 7 days) are ripe for harvest.
+      crops: plain.leads.filter((l) => l.category === "open" || (l.category === "won" && Date.now() - Date.parse(l.updatedAt) < 7 * 86_400_000)).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 12).map((l) => {
+        const fresh = l.stagePosition <= l.firstPosition;
+        return { id: l.id, name: l.name || l.title, growth: Math.max(0, l.stagePosition - l.firstPosition), ripe: l.category === "won", wilting: l.category === "open" && (fresh ? workingHoursBetween(l.createdAt, now) >= 24 : workingHoursBetween(l.updatedAt, now) >= 120) };
+      }),
       upcoming: plain.bookings.filter((b) => b.status === "booked" && b.startAt >= now).slice(0, 8), shop: UPGRADES, industries: Object.entries(INDUSTRIES).map(([id, v]) => ({ id, label: v.label })),
       aiReady: aiConfigured(env, await resolveAiProvider(env, ctx.ownerId)),
     });

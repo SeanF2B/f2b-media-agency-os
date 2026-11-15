@@ -135,40 +135,67 @@ export function stageForLevel(level: number) {
 // Upgrade tracks. Coins buy visible upgrades only (never real-world assets); levels gate each tier.
 // Each tier changes the scene. Purchases are stored as "<track>:<tier>".
 export type UpgradeTier = { tier: number; name: string; price: number; minLevel: number; perk: string };
-export type UpgradeTrack = { id: string; name: string; tiers: UpgradeTier[] };
+export type UpgradeTrack = { id: string; name: string; group: "business" | "lifestyle"; tiers: UpgradeTier[] };
 export const UPGRADES: UpgradeTrack[] = [
-  { id: "hq", name: "Headquarters", tiers: [
+  { id: "hq", group: "business", name: "Headquarters", tiers: [
     { tier: 1, name: "Established office", price: 500, minLevel: 5, perk: "Second floor and a bigger footprint" },
     { tier: 2, name: "Expanding business", price: 1500, minLevel: 10, perk: "Third floor" },
     { tier: 3, name: "Growing company", price: 3000, minLevel: 15, perk: "Fourth floor" },
     { tier: 4, name: "Market leader tower", price: 6000, minLevel: 20, perk: "Fifth floor" },
     { tier: 5, name: "Business empire", price: 12000, minLevel: 30, perk: "Sixth floor" },
     { tier: 6, name: "Industry legend", price: 25000, minLevel: 50, perk: "Seventh floor — the skyline is yours" } ] },
-  { id: "reception", name: "Reception", tiers: [
+  { id: "reception", group: "business", name: "Reception", tiers: [
     { tier: 1, name: "Polished desk", price: 80, minLevel: 1, perk: "A proper front desk for Rosie" },
     { tier: 2, name: "Waiting lounge", price: 250, minLevel: 3, perk: "Sofas and plants for waiting customers" },
     { tier: 3, name: "Concierge counter", price: 600, minLevel: 6, perk: "Marble counter and a welcome mat" } ] },
-  { id: "garden", name: "Grounds", tiers: [
+  { id: "garden", group: "lifestyle", name: "Grounds", tiers: [
     { tier: 1, name: "Flower beds", price: 60, minLevel: 1, perk: "Colour along the path" },
     { tier: 2, name: "Oak trees", price: 150, minLevel: 2, perk: "Shade either side of HQ" },
     { tier: 3, name: "Fountain", price: 450, minLevel: 5, perk: "A fountain out front" } ] },
-  { id: "workshop", name: "Workshop", tiers: [
+  { id: "workshop", group: "business", name: "Workshop", tiers: [
     { tier: 1, name: "Tool shed", price: 150, minLevel: 2, perk: "Somewhere for the kit" },
     { tier: 2, name: "Workshop", price: 400, minLevel: 5, perk: "A branded workshop beside HQ" },
     { tier: 3, name: "Warehouse", price: 1000, minLevel: 12, perk: "Full warehouse with roller door" } ] },
-  { id: "fleet", name: "Fleet", tiers: [
+  { id: "fleet", group: "business", name: "Fleet", tiers: [
     { tier: 1, name: "Branded van", price: 300, minLevel: 4, perk: "Your logo on the road" },
     { tier: 2, name: "Branded truck", price: 800, minLevel: 10, perk: "A bigger truck for bigger jobs" },
     { tier: 3, name: "Second van", price: 1500, minLevel: 15, perk: "A two-vehicle fleet" } ] },
-  { id: "signage", name: "Signage", tiers: [
+  { id: "signage", group: "business", name: "Signage", tiers: [
     { tier: 1, name: "Premium sign", price: 200, minLevel: 3, perk: "Dark sign with a brand outline" },
     { tier: 2, name: "Rooftop neon", price: 500, minLevel: 7, perk: "Glowing name on the roof" } ] },
-  { id: "cafe", name: "Staff café", tiers: [
+  { id: "cafe", group: "business", name: "Staff café", tiers: [
     { tier: 1, name: "Coffee bench", price: 80, minLevel: 1, perk: "A bench and a coffee cart" },
     { tier: 2, name: "Café corner", price: 300, minLevel: 4, perk: "Parasol tables for the team" } ] },
-  { id: "outfit", name: "Your outfit", tiers: [
-    { tier: 1, name: "New workwear", price: 100, minLevel: 2, perk: "Fresh branded kit" },
-    { tier: 2, name: "Gold-trim workwear", price: 500, minLevel: 8, perk: "Gold trim for the boss" } ] },
+  { id: "renovation", group: "business", name: "Renovation", tiers: [
+    { tier: 1, name: "Fresh paint", price: 300, minLevel: 3, perk: "HQ walls in your brand colours" },
+    { tier: 2, name: "Glass frontage", price: 1200, minLevel: 9, perk: "Floor-to-ceiling glass" },
+    { tier: 3, name: "Luxury facade", price: 4000, minLevel: 17, perk: "Dark stone with gold trim" } ] },
+  { id: "interior", group: "business", name: "Interior", tiers: [
+    { tier: 1, name: "Warm lighting", price: 150, minLevel: 2, perk: "Windows glow at all hours" },
+    { tier: 2, name: "Plants & art", price: 500, minLevel: 5, perk: "Greenery in every window" },
+    { tier: 3, name: "Designer interior", price: 1500, minLevel: 11, perk: "Chandeliers that sparkle" } ] },
+  { id: "home", group: "lifestyle", name: "Your home", tiers: [
+    { tier: 1, name: "Cottage", price: 400, minLevel: 3, perk: "A cosy place to come home to" },
+    { tier: 2, name: "Villa", price: 2500, minLevel: 12, perk: "Two storeys and a balcony" },
+    { tier: 3, name: "Mansion", price: 10000, minLevel: 25, perk: "Columns, gates and a grand entrance" } ] },
+  { id: "pool", group: "lifestyle", name: "Swimming pool", tiers: [
+    { tier: 1, name: "Garden pool", price: 600, minLevel: 6, perk: "A splash of blue" },
+    { tier: 2, name: "Infinity pool", price: 2000, minLevel: 12, perk: "Bigger, with sun loungers" },
+    { tier: 3, name: "Pool party deck", price: 4500, minLevel: 18, perk: "Deck, parasols and an inflatable" } ] },
+  { id: "car", group: "lifestyle", name: "Your car", tiers: [
+    { tier: 1, name: "Hatchback", price: 250, minLevel: 2, perk: "Reliable and branded" },
+    { tier: 2, name: "SUV", price: 700, minLevel: 5, perk: "Room for the whole crew" },
+    { tier: 3, name: "Sports car", price: 1800, minLevel: 9, perk: "Low, fast and shiny" },
+    { tier: 4, name: "Supercar", price: 5000, minLevel: 16, perk: "Gold wheels. Obviously." } ] },
+  { id: "air", group: "lifestyle", name: "Air travel", tiers: [
+    { tier: 1, name: "Helipad", price: 900, minLevel: 8, perk: "Somewhere to land" },
+    { tier: 2, name: "Helicopter", price: 3000, minLevel: 14, perk: "Rotors spinning on the pad" },
+    { tier: 3, name: "Private jet", price: 9000, minLevel: 22, perk: "Flyovers in your colours" } ] },
+  { id: "wardrobe", group: "lifestyle", name: "Wardrobe", tiers: [
+    { tier: 1, name: "Branded kit", price: 100, minLevel: 2, perk: "Fresh workwear" },
+    { tier: 2, name: "Smart suit", price: 400, minLevel: 5, perk: "Sharp tie for meetings" },
+    { tier: 3, name: "Designer shades", price: 1000, minLevel: 10, perk: "Too cool for school" },
+    { tier: 4, name: "Golden crown", price: 5000, minLevel: 20, perk: "Business royalty" } ] },
 ];
 /** Highest tier owned on a track (0 = none). */
 export function upgradeTier(owned: string[], trackId: string) {

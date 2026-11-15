@@ -101,15 +101,17 @@
 .ow-quick { display: flex; flex-wrap: wrap; gap: 6px; }
 .ow-quick button { background: #fff !important; color: #111827 !important; border-color: #d1d5db !important; font-size: 12px !important; padding: 6px 10px !important; }
 
-.ow-toasts { position: fixed; right: 18px; bottom: 18px; display: flex; flex-direction: column; gap: 8px; z-index: 60; }
+.ow-toasts { position: fixed; right: 18px; bottom: 18px; display: flex; flex-direction: column; gap: 8px; z-index: 3600; }
 .ow-toast { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 14px; background: #fff; color: #111827; box-shadow: 0 10px 28px rgba(15,23,42,.2); max-width: 360px; animation: ow-pop .3s ease-out; }
 .ow-toast p { margin: 0; flex: 1; font-weight: 600; font-size: 13px; }
 .ow-toast b { display: inline-flex; align-items: center; gap: 3px; color: #92400e; }
 .ow-levelup { padding: 28px 36px; max-width: 420px; border-radius: 20px; background: #fff; color: #111827; text-align: center; box-shadow: 0 20px 60px rgba(15,23,42,.35); animation: ow-pop .4s ease-out; }
 .ow-levelup h2 { margin: 8px 0 4px; }
 
-.ow-panel { position: fixed; inset: 0; z-index: 80; display: flex; flex-direction: column; background: var(--background, #fff); }
-.ow-panel > header { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: var(--ow-secondary); color: #fff; }
+.ow-panel { position: fixed; inset: 0; z-index: 3500; display: flex; flex-direction: column; background: var(--background, #fff); }
+.ow-panel > header { display: flex; align-items: center; gap: 12px; padding: 12px 18px; background: var(--ow-secondary); color: #fff; box-shadow: 0 4px 16px rgba(0,0,0,.2); }
+.ow-panel { background: #f8fafc; }
+.dark-mode .ow-panel, html.f2b-dark .ow-panel { background: #181a1f; }
 .ow-panel > header b { flex: 1; text-align: center; font-size: 16px; }
 .ow-panel > header button { background: rgba(255,255,255,.16) !important; color: #fff !important; }
 .ow-panel-body { flex: 1; overflow: auto; padding: 16px; }
@@ -177,7 +179,7 @@ html:has(.ow-panel) .toast { z-index: 95; }
 .ow-fresh .ow-person-body > rect:nth-of-type(3) { filter: saturate(1.2) brightness(1.05); }
 
 /* ── Modals (solid white) ── */
-.ow-modal-scrim { position: fixed; inset: 0; z-index: 85; display: grid; place-items: center; padding: 20px; background: rgba(15,23,42,.45); backdrop-filter: blur(3px); animation: ow-fade .2s ease-out; }
+.ow-modal-scrim { position: fixed; inset: 0; z-index: 3400; display: grid; place-items: center; padding: 20px; background: rgba(15,23,42,.45); backdrop-filter: blur(3px); animation: ow-fade .2s ease-out; }
 .ow-modal-scrim.drawer { display: block; padding: 0; }
 @keyframes ow-fade { from { opacity: 0; } }
 .ow-options.center { justify-content: center; margin-top: 12px; }
@@ -225,3 +227,107 @@ html:has(.ow-panel) .toast { z-index: 95; }
 .ow-book select, .ow-book textarea { border: 1px solid #d1d5db; border-radius: 10px; padding: 8px 10px; font: inherit; color: #111827; background: #fff; }
 .ow-slots { display: flex; flex-wrap: wrap; gap: 6px; }
 .ow-check { flex-direction: row !important; align-items: center; font-weight: 500 !important; }
+
+/* ═════════ Clash-style island ═════════ */
+.ow-stage { background: linear-gradient(#7dd3fc, #e0f2fe); padding: 0; }
+.ow-stage-wrap { position: relative; width: 100%; max-width: calc(min(68vh, 640px) * 1000 / 560); aspect-ratio: 1000 / 560; margin: 0 auto; }
+.ow-stage-wrap svg { width: 100%; height: 100%; display: block; }
+.ow-water { animation: ow-water 6s ease-in-out infinite; transform-origin: 500px 318px; }
+@keyframes ow-water { 50% { transform: scale(1.015); opacity: .45; } }
+
+/* Buildings: lift on hover, squash on tap, name plate on hover/focus */
+.ow-spot { cursor: pointer; outline: none; }
+.ow-spot-body { transition: transform .18s ease, filter .18s ease; transform-box: fill-box; transform-origin: 50% 100%; }
+.ow-spot:hover .ow-spot-body, .ow-spot:focus-visible .ow-spot-body { transform: translateY(-4px); filter: drop-shadow(0 0 6px color-mix(in srgb, var(--ow-secondary) 70%, #fff)) brightness(1.04); }
+.ow-spot.poked .ow-spot-body { animation: ow-squash .42s ease; }
+@keyframes ow-squash { 30% { transform: scale(1.06, .92); } 60% { transform: scale(.97, 1.04) translateY(-6px); } }
+.ow-plate { opacity: 0; transition: opacity .15s ease, transform .15s ease; pointer-events: none; }
+.ow-spot:hover .ow-plate, .ow-spot:focus-visible .ow-plate { opacity: 1; }
+.ow-badge { animation: ow-pulse-badge 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes ow-pulse-badge { 50% { transform: scale(1.15); } }
+.ow-flag path { animation: ow-flag 1.4s ease-in-out infinite; transform-box: fill-box; transform-origin: 0% 50%; }
+@keyframes ow-flag { 50% { transform: scaleX(.8) skewY(4deg); } }
+.ow-clock-hand { animation: ow-spin-slow 8s linear infinite; transform-box: view-box; }
+@keyframes ow-spin-slow { to { transform: rotate(360deg); } }
+.ow-coin-sign { animation: ow-coin-turn 3s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes ow-coin-turn { 50% { transform: scaleX(.3); } }
+.ow-rotor { animation: ow-rotor .25s linear infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes ow-rotor { 50% { transform: scaleX(.15); } }
+.ow-jet { animation: ow-jet 16s linear infinite; }
+@keyframes ow-jet { 0% { transform: translate(-140px, 0); } 60%, 100% { transform: translate(1140px, -30px); } }
+.ow-splash { animation: ow-splash 1.2s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 100%; }
+@keyframes ow-splash { 50% { transform: scaleY(1.3); opacity: .7; } }
+.ow-sparkle { animation: ow-twinkle 1.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes ow-twinkle { 50% { transform: scale(.4) rotate(45deg); opacity: .5; } }
+.ow-float { animation: ow-bob 2.4s ease-in-out infinite; }
+.ow-tree circle { animation: ow-sway 4s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 100%; }
+@keyframes ow-sway { 50% { transform: rotate(2deg); } }
+.ow-grass-tuft { animation: ow-sway 2.6s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 100%; }
+.ow-storm { animation: ow-drift 6s ease-in-out infinite alternate; }
+
+/* Crops */
+.ow-crop { cursor: pointer; }
+.ow-crop-body { transform-box: fill-box; transform-origin: 50% 100%; animation: ow-sway 3s ease-in-out infinite; }
+.ow-crop:hover .ow-crop-body { transform: scale(1.25); }
+.ow-crop.wilting .ow-crop-body { animation: none; transform: rotate(14deg); }
+.ow-crop.ripe .ow-crop-body { animation: ow-hop 1.4s ease-in-out infinite; }
+
+/* Characters */
+.ow-bean { cursor: default; outline: none; }
+.ow-bean[role="button"] { cursor: pointer; }
+.ow-bean-body { transform-box: fill-box; transform-origin: 50% 100%; animation: ow-breathe 2.8s ease-in-out infinite; }
+@keyframes ow-breathe { 50% { transform: scale(1.03, .97); } }
+.ow-bean.staff.idle-sales .ow-bean-body, .ow-bean.staff.idle-marketing .ow-bean-body { animation: ow-bounce-idle 1.9s ease-in-out infinite; }
+@keyframes ow-bounce-idle { 50% { transform: translateY(-3px); } }
+.ow-bean.staff.idle-projects .ow-bean-body { animation: ow-step 2.6s ease-in-out infinite; }
+@keyframes ow-step { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+.ow-eyes { animation: ow-blink 4.6s infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes ow-blink { 0%, 94%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.1); } }
+.ow-bean.talking .ow-bean-body { animation: ow-hop .7s ease-in-out infinite; }
+.ow-bean.impatient .ow-bean-body { animation: ow-step .5s ease-in-out infinite; }
+.ow-bean.poked .ow-bean-body { animation: ow-squash .42s ease; }
+.ow-bean[role="button"]:hover .ow-bean-body, .ow-bean[role="button"]:focus-visible .ow-bean-body { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--ow-secondary) 70%, #fff)); }
+.ow-alert { animation: ow-bob 1s ease-in-out infinite; }
+.ow-name { paint-order: stroke; stroke: rgba(255,255,255,.7); stroke-width: 3px; pointer-events: none; }
+.ow-customer { animation: ow-walkin .7s ease-out both; }
+
+/* Speech bubble */
+.ow-bubble { position: absolute; transform: translate(-50%, -100%); max-width: 240px; padding: 8px 12px; border-radius: 14px; background: #fff; color: #111827; font-size: 13px; font-weight: 700; line-height: 1.35; box-shadow: 0 8px 22px rgba(15,23,42,.25); pointer-events: none; animation: ow-bubble .25s cubic-bezier(.3,1.6,.5,1); z-index: 2; }
+.ow-bubble::after { content: ""; position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%); border: 7px solid transparent; border-top-color: #fff; border-bottom: 0; }
+@keyframes ow-bubble { from { transform: translate(-50%, -80%) scale(.6); opacity: 0; } }
+
+/* Game-style pop-up card (lead cards) */
+.ow-card-modal { width: min(760px, 100%); max-height: 88vh; overflow: auto; padding: 18px; border-radius: 22px; background: #fff; color: #111827; box-shadow: 0 30px 80px rgba(15,23,42,.4); border: 4px solid color-mix(in srgb, var(--ow-primary) 35%, #fff); animation: ow-bubble .3s cubic-bezier(.3,1.5,.5,1); }
+.ow-card-modal > header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.ow-card-modal > header b { font-size: 18px; color: #111827; }
+
+/* Chunky game HUD */
+.ow-hud { border: 1px solid rgba(15,23,42,.06); }
+.ow-coins { border: 2px solid #f59e0b; box-shadow: inset 0 -3px 0 rgba(180,83,9,.25); font-size: 16px; }
+.ow-root button:not(.ghost):not(.ow-hud-actions button) { box-shadow: inset 0 -3px 0 rgba(0,0,0,.18); }
+.ow-xp { height: 22px; border: 2px solid #e5e7eb; }
+.ow-xp div { background: linear-gradient(90deg, #a855f7, #6366f1); }
+
+/* Upgrade groups */
+.ow-group-title { margin: 12px 0 6px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: #6b7280; }
+
+/* Town life */
+.ow-robot { cursor: pointer; }
+.ow-robot .ow-bean-body { animation: ow-bounce-idle .6s ease-in-out infinite; }
+.ow-robot.sleeping .ow-bean-body { animation: ow-breathe 3.4s ease-in-out infinite; }
+.ow-led { animation: ow-pulse 1.2s ease-in-out infinite; }
+.ow-zzz { animation: ow-zzz 2.4s ease-in-out infinite; }
+@keyframes ow-zzz { 0% { opacity: 0; transform: translate(0, 4px); } 40% { opacity: 1; } 100% { opacity: 0; transform: translate(6px, -10px); } }
+.ow-taxman { cursor: pointer; }
+.ow-knock { animation: ow-knock .9s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 100%; }
+@keyframes ow-knock { 0%, 60%, 100% { transform: rotate(0); } 70% { transform: rotate(-25deg); } 80% { transform: rotate(0); } 90% { transform: rotate(-25deg); } }
+.ow-sweat { animation: ow-sweat 1.6s ease-in infinite; }
+@keyframes ow-sweat { 0% { opacity: 0; transform: translateY(-2px); } 30% { opacity: 1; } 100% { opacity: 0; transform: translateY(8px); } }
+.ow-steam circle { animation: ow-zzz 1.2s ease-out infinite; }
+.q-angry .ow-bean-body { animation: ow-step .3s ease-in-out infinite !important; }
+.walker .ow-bean-body { animation: ow-bounce-idle .45s ease-in-out infinite; }
+
+/* Upgrade cards with pictures */
+.ow-track-row { display: flex; gap: 12px; align-items: flex-start; }
+.ow-track-info { flex: 1; display: grid; gap: 6px; min-width: 0; }
+.ow-up-art { flex: 0 0 auto; border-radius: 12px; box-shadow: inset 0 -3px 0 rgba(0,0,0,.06); }

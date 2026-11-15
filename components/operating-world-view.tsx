@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, Bot, Coins, Gauge, History, Mic, Pause, Play, Send, Settings2, Sparkles, Volume2, VolumeX, Wand2, X, Zap, CalendarDays, Copy, Check, Loader2, Eye, EyeOff, Hammer, Lock, ChevronRight } from "lucide-react";
-import { EMPLOYEES, EMPLOYEE_FOR_REWARD, REWARDS, UPGRADES, allClearLine, briefing, levelFromXp, nextUpgrade, reactionLine, rewardWalkthrough, stageForLevel, upgradeTier, type Approach, type BriefingOption, type EmployeeId, type OwSnapshot, type PanelKind, type RewardKind, type UpgradeTrack, type WalkStep } from "@/lib/operating-world/engine";
+import { EMPLOYEES, EMPLOYEE_FOR_REWARD, REWARDS, UPGRADES, allClearLine, briefing, levelFromXp, nextUpgrade, reactionLine, rewardWalkthrough, stageForLevel, upgradeTier, workingHoursBetween, type Approach, type BriefingOption, type EmployeeId, type OwSnapshot, type PanelKind, type RewardKind, type UpgradeTrack, type WalkStep } from "@/lib/operating-world/engine";
 import "./operating-world.css";
 
 type Outfit = { hat: string; tool: string; outfit: string; label: string };
@@ -20,7 +20,7 @@ type WorldData = {
   freshRewards: Array<{ key: string; kind: RewardKind; coins: number; xp: number; label: string }>; approaches: Approach[];
   health: { score: number; mood: string; issues: string[] }; finance: { paidThisMonth: Record<string, number>; outstanding: Record<string, number>; overdueCount: number };
   sources: Record<string, boolean>; customers: Customer[]; counts: { leads: number; unread: number; bookingsUpcoming: number; openTasks: number };
-  upcoming: Array<{ id: string; name: string; startAt: string }>; shop: UpgradeTrack[]; industries: Array<{ id: string; label: string }>; aiReady: boolean;
+  upcoming: Array<{ id: string; name: string; startAt: string }>; crops?: Crop[]; agents?: Array<{ id: string; name: string; state: string; task: string }>; staffAtWork?: Array<{ id: string; name: string; task: string }>; visitors?: Array<{ id: string; name: string; stage: string }>; taxman?: boolean; shop: UpgradeTrack[]; industries: Array<{ id: string; label: string }>; aiReady: boolean;
 };
 type Toast = { id: number; employee: EmployeeId; text: string; coins: number };
 export type OperatingWorldPanelRenderer = (kind: PanelKind, options: { focusId?: string; onDone: () => void }) => ReactNode;
@@ -51,76 +51,239 @@ function chime(kind: "coin" | "level" | "pop" | "shower") {
   } catch { /* audio blocked until the first tap */ }
 }
 
-// ───────────── Characters (original SVG art) ─────────────
-function Person({ x, y, body, skin = "#f2c9a0", hat = "none", tool = "none", outfit = "casual", trim, scale = 1, mood, label, className = "" }: { x: number; y: number; body: string; skin?: string; hat?: string; tool?: string; outfit?: string; trim?: string; scale?: number; mood?: string; label?: string; className?: string }) {
-  const s = scale;
-  // Position lives on the outer group; animations target the inner group so CSS transforms never override placement.
-  return <g className={`ow-person ${className}`} transform={`translate(${x} ${y}) scale(${s})`} aria-label={label}><g className="ow-person-body">
-    <ellipse cx="0" cy="34" rx="14" ry="4" fill="rgba(0,0,0,.18)" />
-    <rect x="-8" y="16" width="6" height="16" rx="3" fill="#2b3442" /><rect x="2" y="16" width="6" height="16" rx="3" fill="#2b3442" />
-    <rect x="-12" y="-6" width="24" height="26" rx="9" fill={outfit === "scrubs" ? "#5ec4c4" : body} />
-    {outfit === "hivis" && <><rect x="-12" y="2" width="24" height="3.5" fill="#fff9" /><rect x="-12" y="10" width="24" height="3.5" fill="#fff9" /></>}
-    {outfit === "overalls" && <><rect x="-7" y="-4" width="2.5" height="12" fill="#0003" /><rect x="4.5" y="-4" width="2.5" height="12" fill="#0003" /><rect x="-8" y="6" width="16" height="12" rx="3" fill="#0002" /></>}
-    {outfit === "apron" && <rect x="-8" y="2" width="16" height="18" rx="4" fill="#1f2937cc" />}
-    {outfit === "smart" && <path d="M-3 -6 L0 4 L3 -6 Z" fill={trim || "#fff"} />}
-    {trim && outfit !== "smart" && <rect x="-12" y="17" width="24" height="3" fill={trim} />}
-    <circle cx="0" cy="-16" r="11" fill={skin} />
-    <circle cx="-4" cy="-17" r="1.6" fill="#1b1b1b" /><circle cx="4" cy="-17" r="1.6" fill="#1b1b1b" />
-    {mood === "panicked" ? <ellipse cx="0" cy="-10" rx="3" ry="3.4" fill="#5b1f1f" /> : mood === "concerned" ? <path d="M-4 -10 q4 -3 8 0" stroke="#5b1f1f" strokeWidth="1.6" fill="none" /> : <path d="M-4 -11 q4 4 8 0" stroke="#5b1f1f" strokeWidth="1.6" fill="none" />}
-    {hat === "hardhat" && <><path d="M-12 -21 a12 11 0 0 1 24 0 z" fill="#facc15" /><rect x="-14" y="-22" width="28" height="3.5" rx="1.5" fill="#eab308" /></>}
-    {hat === "cap" && <><path d="M-11 -22 a11 9 0 0 1 22 0 z" fill={trim || body} /><rect x="2" y="-23" width="13" height="3" rx="1.5" fill={trim || body} /></>}
-    {hat === "beanie" && <path d="M-11 -20 a11 11 0 0 1 22 0 z" fill="#111827" />}
-    {tool === "hammer" && <g transform="translate(15 2) rotate(25)"><rect x="-1.5" y="-2" width="3" height="18" fill="#8b5a2b" /><rect x="-6" y="-5" width="12" height="5" rx="1" fill="#6b7280" /></g>}
-    {tool === "drill" && <g transform="translate(14 4)"><rect x="0" y="-4" width="12" height="7" rx="2" fill="#f59e0b" /><rect x="2" y="3" width="4" height="9" rx="1" fill="#111827" /><rect x="12" y="-2" width="5" height="2" fill="#9ca3af" /></g>}
-    {tool === "wrench" && <g transform="translate(16 2) rotate(30)"><rect x="-1.5" y="0" width="3" height="16" rx="1.5" fill="#9ca3af" /><circle cx="0" cy="-1" r="4" fill="none" stroke="#9ca3af" strokeWidth="3" /></g>}
-    {tool === "tattoo" && <g transform="translate(15 4) rotate(-20)"><rect x="-2" y="-2" width="5" height="12" rx="2" fill="#374151" /><rect x="-0.5" y="10" width="1.5" height="5" fill="#d1d5db" /></g>}
-    {tool === "mirror" && <g transform="translate(16 2) rotate(20)"><rect x="-1" y="0" width="2" height="14" fill="#d1d5db" /><circle cx="0" cy="-2" r="3" fill="#e0f2fe" stroke="#9ca3af" /></g>}
-    {tool === "scissors" && <g transform="translate(16 4)"><circle cx="-2" cy="8" r="2.5" fill="none" stroke="#ef4444" strokeWidth="1.5" /><circle cx="3" cy="8" r="2.5" fill="none" stroke="#ef4444" strokeWidth="1.5" /><path d="M-1 6 L5 -4 M2 6 L-4 -4" stroke="#9ca3af" strokeWidth="1.5" /></g>}
-    {tool === "swatch" && <g transform="translate(14 0)"><rect x="0" y="0" width="5" height="12" fill="#f87171" /><rect x="4" y="1" width="5" height="12" fill="#60a5fa" /><rect x="8" y="2" width="5" height="12" fill="#34d399" /></g>}
-    {tool === "laptop" && <g transform="translate(10 6)"><rect x="0" y="0" width="14" height="9" rx="1" fill="#1f2937" /><rect x="-2" y="9" width="18" height="2" rx="1" fill="#6b7280" /></g>}
-    {tool === "clipboard" && <g transform="translate(13 2)"><rect x="0" y="0" width="10" height="13" rx="1.5" fill="#f5deb3" /><rect x="3" y="-1.5" width="4" height="3" rx="1" fill="#6b7280" /></g>}
-  </g></g>;
+// ───────────── Isometric art (original, Clash-of-Clans-inspired) ─────────────
+const T = 30; // half a tile's width in px
+const iso = (x: number, y: number, z = 0): [number, number] => [500 + (x - y) * T, 110 + (x + y) * (T / 2) - z];
+const pts = (list: Array<[number, number]>) => list.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+function shade(hex: string, amount: number) {
+  const n = parseInt((/^#[0-9a-f]{6}$/i.test(hex) ? hex : "#3b82f6").slice(1), 16);
+  const f = (c: number) => Math.max(0, Math.min(255, Math.round(amount >= 0 ? c + (255 - c) * amount : c * (1 + amount))));
+  return `#${[f((n >> 16) & 255), f((n >> 8) & 255), f(n & 255)].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+}
+const lerp = (a: [number, number], b: [number, number], t: number): [number, number] => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+
+/** A 3D block: top + the two faces that face the viewer. */
+function IsoBox({ x, y, w, d, h, z = 0, color, topColor }: { x: number; y: number; w: number; d: number; h: number; z?: number; color: string; topColor?: string }) {
+  const A = iso(x, y, z + h), B = iso(x + w, y, z + h), C = iso(x + w, y + d, z + h), D = iso(x, y + d, z + h);
+  const Bb = iso(x + w, y, z), Cb = iso(x + w, y + d, z), Db = iso(x, y + d, z);
+  return <g><polygon points={pts([D, C, Cb, Db])} fill={shade(color, -0.12)} /><polygon points={pts([C, B, Bb, Cb])} fill={shade(color, -0.28)} /><polygon points={pts([A, B, C, D])} fill={topColor || shade(color, 0.12)} /></g>;
+}
+/** Chunky pyramid roof with eaves. */
+function IsoRoof({ x, y, w, d, z, rise, color }: { x: number; y: number; w: number; d: number; z: number; rise: number; color: string }) {
+  const e = 0.18, A = iso(x - e, y - e, z), B = iso(x + w + e, y - e, z), C = iso(x + w + e, y + d + e, z), D = iso(x - e, y + d + e, z), P = iso(x + w / 2, y + d / 2, z + rise);
+  return <g><polygon points={pts([A, B, P])} fill={shade(color, 0.05)} /><polygon points={pts([D, C, P])} fill={shade(color, -0.05)} /><polygon points={pts([C, B, P])} fill={shade(color, -0.25)} /><polyline points={pts([D, C, B])} fill="none" stroke={shade(color, -0.45)} strokeWidth="2.5" strokeLinejoin="round" /></g>;
+}
+/** Door on the left (front-left) face of a block. */
+function IsoDoor({ x, y, w, d, h, color }: { x: number; y: number; w: number; d: number; h: number; color: string }) {
+  const Db = iso(x, y + d), Cb = iso(x + w, y + d), u1 = lerp(Db, Cb, 0.38), u2 = lerp(Db, Cb, 0.62);
+  return <g><polygon points={pts([u1, u2, [u2[0], u2[1] - h], [u1[0], u1[1] - h]])} fill={color} /><circle cx={u2[0] - 4} cy={u2[1] - h / 2} r="1.6" fill="#fde68a" /></g>;
+}
+/** Windows on the right face of a block, one row per floor. */
+function IsoWindows({ x, y, w, d, floors, floorH, base = 10, glow = false }: { x: number; y: number; w: number; d: number; floors: number; floorH: number; base?: number; glow?: boolean }) {
+  const Cb = iso(x + w, y + d), Bb = iso(x + w, y), out: ReactNode[] = [];
+  for (let f = 0; f < floors; f++) for (const t of [0.25, 0.62]) {
+    const a = lerp(Cb, Bb, t), b = lerp(Cb, Bb, t + 0.18), z = base + f * floorH;
+    out.push(<polygon key={`${f}-${t}`} points={pts([[a[0], a[1] - z], [b[0], b[1] - z], [b[0], b[1] - z - floorH * 0.5], [a[0], a[1] - z - floorH * 0.5]])} fill={glow ? "#fde68a" : "#bae6fd"} stroke="rgba(0,0,0,.18)" strokeWidth="1" />);
+  }
+  return <>{out}</>;
+}
+function IsoTile({ x, y, w = 1, d = 1, fill, opacity = 1 }: { x: number; y: number; w?: number; d?: number; fill: string; opacity?: number }) {
+  return <polygon points={pts([iso(x, y), iso(x + w, y), iso(x + w, y + d), iso(x, y + d)])} fill={fill} opacity={opacity} />;
 }
 
-function Building({ floors, primary, secondary, name, logo, sign }: { floors: number; primary: string; secondary: string; name: string; logo: string; sign: number }) {
-  // Ground floor (door + sign) is fixed; each Headquarters tier adds a floor of windows above it.
-  const ground = 100, floorH = 44, h = ground + (floors - 1) * floorH + 30, top = 330 - h, w = 260 + Math.min(floors, 4) * 30, x = 500 - w / 2;
-  const cols = Math.max(3, Math.floor((w - 30) / 56));
-  return <g className="ow-building">
-    <rect x={x + 10} y={top + 10} width={w} height={h} rx="10" fill="rgba(0,0,0,.12)" />
-    <rect x={x} y={top} width={w} height={h} rx="10" fill="#f8f4ec" stroke="#d8cdb8" strokeWidth="2" />
-    <path d={`M${x - 12} ${top} L500 ${top - 46} L${x + w + 12} ${top} Z`} fill={secondary} />
-    {sign >= 2 && <g className="ow-neon"><rect x={500 - 80} y={top - 40} width="160" height="22" rx="6" fill="#111827" stroke={primary} strokeWidth="2" /><text x="500" y={top - 25} textAnchor="middle" fontSize="11" fontWeight="800" fill="#fff">{name.slice(0, 22).toUpperCase()}</text></g>}
-    <rect x={x + 14} y={top + 12} width={w - 28} height="6" rx="3" fill={primary} opacity=".85" />
-    {Array.from({ length: floors - 1 }).map((_, f) => <g key={f}>{Array.from({ length: cols }).map((__, i) => <rect key={i} x={x + 15 + i * ((w - 30) / cols) + ((w - 30) / cols - 34) / 2} y={330 - ground - (f + 1) * floorH + 6} width="34" height="26" rx="4" fill="#bfe3f5" stroke="#9cc6dc" />)}</g>)}
-    <rect x={x + 22} y="282" width="44" height="30" rx="4" fill="#bfe3f5" stroke="#9cc6dc" /><rect x={x + w - 66} y="282" width="44" height="30" rx="4" fill="#bfe3f5" stroke="#9cc6dc" />
-    <rect x="470" y="272" width="60" height="58" rx="6" fill={primary} /><circle cx="520" cy="302" r="3" fill="#fff" />
-    <rect x={500 - 110} y="240" width="220" height="26" rx="8" fill={sign >= 1 ? "#111827" : secondary} stroke={sign >= 1 ? primary : "none"} strokeWidth="2.5" />
-    {logo ? <image href={logo} x={500 - 104} y="243" width="20" height="20" preserveAspectRatio="xMidYMid meet" /> : null}
-    <text x={logo ? 512 : 500} y="258" textAnchor="middle" fontSize="13" fontWeight="700" fill="#fff">{name.slice(0, 26)}</text>
+/** A tappable building: lifts on hover, squashes on tap, shows its name plate. */
+function Spot({ id, label, poked, onTap, children, labelAt, badge }: { id: string; label: string; poked: string; onTap: () => void; children: ReactNode; labelAt: [number, number]; badge?: number }) {
+  return <g className={`ow-spot${poked === id ? " poked" : ""}`} role="button" tabIndex={0} aria-label={label} onClick={onTap} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onTap(); } }}>
+    <g className="ow-spot-body">{children}</g>
+    <g className="ow-plate" transform={`translate(${labelAt[0]} ${labelAt[1]})`}><rect x={-label.length * 3.6 - 10} y="-12" width={label.length * 7.2 + 20} height="22" rx="11" fill="#111827" opacity=".85" /><text y="3.5" textAnchor="middle" fontSize="11" fontWeight="800" fill="#fff">{label}</text></g>
+    {badge ? <g transform={`translate(${labelAt[0] + 34} ${labelAt[1] - 16})`} className="ow-badge"><circle r="10" fill="#ef4444" stroke="#fff" strokeWidth="2" /><text y="4" textAnchor="middle" fontSize="11" fontWeight="900" fill="#fff">{badge > 9 ? "9+" : badge}</text></g> : null}
   </g>;
 }
 
-function Workshop({ tier, primary, secondary }: { tier: number; primary: string; secondary: string }) {
-  if (!tier) return null;
-  if (tier === 1) return <g><rect x="150" y="285" width="70" height="45" rx="4" fill="#a16207" /><path d="M144 287 L185 262 L226 287 Z" fill="#78350f" /><rect x="175" y="302" width="20" height="28" fill="#451a03" /></g>;
-  const w = tier === 2 ? 130 : 170, x = 250 - w;
-  return <g><rect x={x} y={tier === 2 ? 262 : 240} width={w} height={tier === 2 ? 68 : 90} rx="6" fill="#e5e7eb" stroke="#cbd5e1" strokeWidth="2" /><rect x={x} y={tier === 2 ? 262 : 240} width={w} height="12" rx="6" fill={secondary} />
-    <rect x={x + 14} y={tier === 2 ? 286 : 268} width={w - 28} height={tier === 2 ? 44 : 62} rx="3" fill="#9ca3af" />{Array.from({ length: tier === 2 ? 5 : 7 }).map((_, i) => <rect key={i} x={x + 14} y={(tier === 2 ? 290 : 272) + i * 8} width={w - 28} height="2" fill="#6b7280" />)}
-    <text x={x + w / 2} y={tier === 2 ? 283 : 263} textAnchor="middle" fontSize="9" fontWeight="800" fill={primary}>{tier === 2 ? "WORKSHOP" : "WAREHOUSE"}</text></g>;
+type BeanLook = { color: string; accessory?: "headset" | "tie" | "glasses" | "hardhat" | "beret" | "clock" | "crown"; hat?: string; tool?: string; trim?: string; tie?: boolean; shades?: boolean; crown?: boolean };
+/** Original bean-style characters: single colour, big eyes, own accessory — no skin tones. */
+function Bean({ at, look, mood = "calm", scale = 1, className = "", label, onTap, alert }: { at: [number, number]; look: BeanLook; mood?: string; scale?: number; className?: string; label: string; onTap?: () => void; alert?: boolean }) {
+  const c = look.color, belly = shade(c, 0.35), dark = shade(c, -0.35);
+  const brows = mood === "panicked" || mood === "concerned";
+  return <g className={`ow-bean ${className}`} transform={`translate(${at[0]} ${at[1]}) scale(${scale})`} role={onTap ? "button" : undefined} tabIndex={onTap ? 0 : undefined} aria-label={label} onClick={onTap} onKeyDown={onTap ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onTap(); } } : undefined}>
+    <ellipse cx="0" cy="1" rx="13" ry="4.5" fill="rgba(0,0,0,.22)" />
+    <g className="ow-bean-body">
+      <ellipse cx="-6" cy="0" rx="5" ry="3" fill={dark} /><ellipse cx="6" cy="0" rx="5" ry="3" fill={dark} />
+      <rect x="-13" y="-36" width="26" height="35" rx="13" fill={c} stroke={dark} strokeWidth="1.5" />
+      <ellipse cx="0" cy="-12" rx="8" ry="9" fill={belly} opacity=".8" />
+      <g className="ow-eyes"><ellipse cx="-5" cy="-25" rx="4.2" ry="5" fill="#fff" /><ellipse cx="5" cy="-25" rx="4.2" ry="5" fill="#fff" />
+        <circle cx={mood === "panicked" ? -5 : -4.3} cy="-24.5" r="2.2" fill="#111827" /><circle cx={mood === "panicked" ? 5 : 5.7} cy="-24.5" r="2.2" fill="#111827" /></g>
+      {brows && <><path d="M-9 -32 L-2 -30" stroke="#111827" strokeWidth="1.6" strokeLinecap="round" /><path d="M9 -32 L2 -30" stroke="#111827" strokeWidth="1.6" strokeLinecap="round" /></>}
+      {mood === "panicked" ? <ellipse cx="0" cy="-16" rx="2.6" ry="3" fill="#111827" /> : mood === "concerned" ? <path d="M-3.5 -15 q3.5 -2.5 7 0" stroke="#111827" strokeWidth="1.6" fill="none" strokeLinecap="round" /> : <path d="M-4 -17 q4 4 8 0" stroke="#111827" strokeWidth="1.6" fill="none" strokeLinecap="round" />}
+      {look.accessory === "headset" && <><path d="M-12 -27 a12 12 0 0 1 24 0" stroke="#111827" strokeWidth="2.2" fill="none" /><rect x="-14.5" y="-29" width="4" height="7" rx="2" fill="#111827" /><path d="M-12.5 -22 q0 6 7 6" stroke="#111827" strokeWidth="1.5" fill="none" /></>}
+      {look.accessory === "tie" && <><path d="M-2.5 -8 L2.5 -8 L1.5 2 L0 4 L-1.5 2 Z" fill="#dc2626" transform="translate(0 -6)" /><path d="M-6 -36 q6 -6 12 0" fill={dark} /></>}
+      {look.accessory === "glasses" && <><circle cx="-5" cy="-25" r="5.6" fill="none" stroke="#111827" strokeWidth="1.5" /><circle cx="5" cy="-25" r="5.6" fill="none" stroke="#111827" strokeWidth="1.5" /><path d="M-0.5 -25 h1" stroke="#111827" strokeWidth="1.5" /></>}
+      {look.accessory === "hardhat" && <><path d="M-12 -33 a12 10 0 0 1 24 0 z" fill="#facc15" /><rect x="-14" y="-34" width="28" height="3.5" rx="1.7" fill="#eab308" /></>}
+      {look.accessory === "beret" && <><ellipse cx="2" cy="-35" rx="11" ry="4.5" fill="#be185d" /><circle cx="3" cy="-39" r="1.8" fill="#be185d" /></>}
+      {look.accessory === "clock" && <><circle cx="0" cy="-10" r="5.5" fill="#fff" stroke="#111827" strokeWidth="1.2" /><path d="M0 -10 V-13.5 M0 -10 H2.5" stroke="#111827" strokeWidth="1.2" strokeLinecap="round" /></>}
+      {look.tie && <path d="M-2.5 -14 L2.5 -14 L1.5 -4 L0 -2 L-1.5 -4 Z" fill="#111827" />}
+      {look.shades && <><rect x="-10" y="-28" width="8.5" height="5.5" rx="2" fill="#111827" /><rect x="1.5" y="-28" width="8.5" height="5.5" rx="2" fill="#111827" /><path d="M-1.5 -26 h3" stroke="#111827" strokeWidth="1.5" /></>}
+      {look.crown && <path d="M-8 -38 L-8 -45 L-4 -41 L0 -47 L4 -41 L8 -45 L8 -38 Z" fill="#fbbf24" stroke="#b45309" strokeWidth="1" />}
+      {look.accessory === "crown" && <path d="M-8 -36 L-8 -43 L-4 -39 L0 -45 L4 -39 L8 -43 L8 -36 Z" fill="#fbbf24" stroke="#b45309" strokeWidth="1" />}
+      {look.hat === "hardhat" && <><path d="M-12 -33 a12 10 0 0 1 24 0 z" fill="#facc15" /><rect x="-14" y="-34" width="28" height="3.5" rx="1.7" fill="#eab308" /></>}
+      {look.hat === "cap" && <><path d="M-12 -32 a12 9 0 0 1 24 0 z" fill={look.trim || dark} /><rect x="2" y="-33" width="14" height="3" rx="1.5" fill={look.trim || dark} /></>}
+      {look.hat === "beanie" && <><path d="M-12 -31 a12 11 0 0 1 24 0 z" fill="#111827" /><circle cx="0" cy="-42" r="2.5" fill="#111827" /></>}
+      {look.tool === "hammer" && <g transform="translate(15 -14) rotate(25)"><rect x="-1.5" y="-2" width="3" height="16" rx="1" fill="#92400e" /><rect x="-6" y="-5" width="12" height="5" rx="1.5" fill="#6b7280" /></g>}
+      {look.tool === "drill" && <g transform="translate(13 -14)"><rect x="0" y="-4" width="12" height="7" rx="2" fill="#f59e0b" /><rect x="2" y="3" width="4" height="8" rx="1" fill="#111827" /><rect x="12" y="-2" width="5" height="2" fill="#9ca3af" /></g>}
+      {look.tool === "wrench" && <g transform="translate(16 -14) rotate(30)"><rect x="-1.5" y="0" width="3" height="14" rx="1.5" fill="#9ca3af" /><circle cx="0" cy="-1" r="4" fill="none" stroke="#9ca3af" strokeWidth="3" /></g>}
+      {look.tool === "laptop" && <g transform="translate(8 -12)"><rect x="0" y="0" width="14" height="9" rx="1.5" fill="#1f2937" /><rect x="-2" y="9" width="18" height="2" rx="1" fill="#6b7280" /></g>}
+      {(look.tool === "clipboard" || look.tool === "swatch" || look.tool === "mirror" || look.tool === "scissors" || look.tool === "tattoo") && <g transform="translate(12 -16)"><rect x="0" y="0" width="10" height="13" rx="1.5" fill="#fde68a" stroke="#92400e" strokeWidth="1" /><rect x="3" y="-1.5" width="4" height="3" rx="1" fill="#6b7280" /></g>}
+    </g>
+    {alert && <g className="ow-alert" transform="translate(0 -52)"><circle r="8" fill="#ef4444" stroke="#fff" strokeWidth="2" /><text y="4" textAnchor="middle" fontSize="11" fontWeight="900" fill="#fff">!</text></g>}
+  </g>;
 }
 
-function Vehicle({ x, y, primary, name, big }: { x: number; y: number; primary: string; name: string; big?: boolean }) {
-  const w = big ? 120 : 92;
-  return <g transform={`translate(${x} ${y})`}><rect x="0" y="0" width={w} height="40" rx="8" fill={primary} /><rect x="6" y="6" width="28" height="16" rx="3" fill="#bfe3f5" /><text x={big ? 62 : 50} y="27" fontSize="9" fill="#fff" fontWeight="700">{name.slice(0, 12)}</text><circle cx="20" cy="42" r="9" fill="#1f2937" /><circle cx={w - 20} cy="42" r="9" fill="#1f2937" /></g>;
-}
-
-/** A tappable stack of coins floating over an employee — real rewards waiting to be collected. */
+/** Tappable coin stack over whoever earned it. */
 function CoinBubble({ x, y, amount, onCollect, label }: { x: number; y: number; amount: number; onCollect: () => void; label: string }) {
   return <g className="ow-coin-bubble" transform={`translate(${x} ${y})`} role="button" tabIndex={0} aria-label={label} onClick={onCollect} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onCollect(); } }}>
-    <g className="ow-coin-bob"><circle r="17" fill="#fff" stroke="#f59e0b" strokeWidth="2.5" /><circle r="11" fill="#fbbf24" stroke="#d97706" strokeWidth="2" /><text y="4" textAnchor="middle" fontSize="11" fontWeight="900" fill="#78350f">★</text>
-      <rect x="-20" y="18" width="40" height="15" rx="7.5" fill="#78350f" /><text y="29" textAnchor="middle" fontSize="10" fontWeight="800" fill="#fff">+{amount}</text></g>
+    <g className="ow-coin-bob"><circle r="15" fill="#fbbf24" stroke="#b45309" strokeWidth="2.5" /><circle r="10" fill="none" stroke="#fde68a" strokeWidth="2" /><path d="M-4 -6 L4 -6 L1.5 6 L-1.5 6 Z" fill="#b45309" opacity=".0" /><text y="5" textAnchor="middle" fontSize="13" fontWeight="900" fill="#92400e">★</text>
+      <rect x="-19" y="16" width="38" height="16" rx="8" fill="#78350f" stroke="#fff" strokeWidth="1.5" /><text y="28" textAnchor="middle" fontSize="10.5" fontWeight="900" fill="#fff">+{amount}</text></g>
   </g>;
+}
+
+// Where everyone lives on the island (grid units, 0–12).
+const EMP_SPOTS: Record<EmployeeId, [number, number]> = { receptionist: [8.3, 10.9], accountant: [4.3, 11.4], calendar: [2.3, 6.8], projects: [2.9, 11.7], sales: [9.0, 7.0], marketing: [7.7, 2.0] };
+const GRASS_SPOTS: Array<[number, number]> = [[1.2, 8.2], [8.2, 2.2], [3.6, 3.6], [8.6, 6.8], [0.9, 10.8], [11.2, 5.6], [4.0, 0.8], [6.9, 10.4], [2.2, 11.6], [10.8, 11.5]];
+const EMP_LOOK: Record<EmployeeId, BeanLook> = {
+  receptionist: { color: "#f472b6", accessory: "headset" }, sales: { color: "#f59e0b", accessory: "tie" }, accountant: { color: "#10b981", accessory: "glasses" },
+  projects: { color: "#6366f1", accessory: "hardhat" }, marketing: { color: "#a855f7", accessory: "beret" }, calendar: { color: "#0ea5e9", accessory: "clock" },
+};
+const IDLE_LINES: Record<EmployeeId, string[]> = {
+  receptionist: ["Phones are quiet… for now.", "I'll shout the second someone walks in!", "Reception's spotless, boss."],
+  sales: ["Got my lucky tie on today.", "Every lead is a future job!", "Let's close something big."],
+  accountant: ["Books are balanced. Bliss.", "Receipts in, coins out!", "I love a tidy spreadsheet."],
+  projects: ["Kit's sorted and ready.", "Hard hat on, let's build.", "On site and on time."],
+  marketing: ["Our brand's looking sharp!", "Thinking up the next big idea…", "Reviews feed isn't connected yet — I'm ready when it is."],
+  calendar: ["Diary's under control.", "Want me to fill tomorrow?", "Tick-tock, I've got the times."],
+};
+
+/** A crop = a real open lead. Grows with its pipeline stage, wilts when neglected, ripens when the job is won. */
+type Crop = { id: string; name: string; growth: number; ripe: boolean; wilting: boolean };
+function CropPlant({ at, crop, onTap }: { at: [number, number]; crop: Crop; onTap?: () => void }) {
+  const leaf = crop.wilting ? "#a3a35a" : "#22c55e", leafDark = crop.wilting ? "#8a7f3d" : "#15803d";
+  const g = crop.ripe ? 4 : Math.min(3, crop.growth);
+  return <g className={`ow-crop${crop.ripe ? " ripe" : ""}${crop.wilting ? " wilting" : ""}`} transform={`translate(${at[0]} ${at[1]})`} role={onTap ? "button" : undefined} tabIndex={onTap ? 0 : undefined} aria-label={`${crop.name}: ${crop.ripe ? "job won — ready to harvest" : crop.wilting ? "wilting, needs attention" : ["just planted", "sprouting", "growing", "nearly there"][g]}`} onClick={onTap} onKeyDown={onTap ? (e) => { if (e.key === "Enter") onTap(); } : undefined}>
+    <ellipse cx="0" cy="0" rx="9" ry="4" fill="#7c2d12" opacity=".55" />
+    <g className="ow-crop-body">
+      {g === 0 && <ellipse cx="0" cy="-2" rx="5" ry="3" fill="#92400e" />}
+      {g >= 1 && <path d="M0 0 V-8" stroke={leafDark} strokeWidth="2" />}
+      {g >= 1 && <><ellipse cx="-4" cy="-9" rx="4" ry="2.2" fill={leaf} transform="rotate(-30 -4 -9)" /><ellipse cx="4" cy="-9" rx="4" ry="2.2" fill={leaf} transform="rotate(30 4 -9)" /></>}
+      {g >= 2 && <><path d="M0 -8 V-18" stroke={leafDark} strokeWidth="2" /><ellipse cx="-5" cy="-16" rx="5" ry="2.6" fill={leaf} transform="rotate(-35 -5 -16)" /><ellipse cx="5" cy="-17" rx="5" ry="2.6" fill={leaf} transform="rotate(35 5 -17)" /></>}
+      {g >= 3 && !crop.ripe && <circle cx="0" cy="-21" r="3.5" fill={crop.wilting ? "#a16207" : "#fde047"} />}
+      {crop.ripe && <><circle cx="0" cy="-23" r="7" fill="#f97316" stroke="#c2410c" strokeWidth="1.5" /><path d="M0 -30 V-27" stroke="#15803d" strokeWidth="2" /><path className="ow-sparkle" d="M10 -30 l1.5 3 3 1.5 -3 1.5 -1.5 3 -1.5 -3 -3 -1.5 3 -1.5z" fill="#fde047" /></>}
+    </g>
+  </g>;
+}
+
+
+// ───────────── Lifestyle upgrades ─────────────
+function Home({ tier, primary, secondary }: { tier: number; primary: string; secondary: string }) {
+  if (!tier) return <IsoTile x={8.8} y={0.8} w={2.2} d={1.8} fill="#ffffff" opacity={0.12} />;
+  if (tier === 1) return <g><IsoBox x={9.0} y={1.0} w={1.6} d={1.4} h={26} color="#fde68a" /><IsoRoof x={9.0} y={1.0} w={1.6} d={1.4} z={26} rise={22} color="#b91c1c" /><IsoDoor x={9.0} y={1.0} w={1.6} d={1.4} h={16} color="#7c2d12" /><IsoWindows x={9.0} y={1.0} w={1.6} d={1.4} floors={1} floorH={18} base={6} glow /></g>;
+  if (tier === 2) return <g><IsoBox x={8.8} y={0.8} w={2.2} d={1.8} h={50} color="#f8fafc" /><IsoRoof x={8.8} y={0.8} w={2.2} d={1.8} z={50} rise={18} color={secondary} /><IsoWindows x={8.8} y={0.8} w={2.2} d={1.8} floors={2} floorH={20} base={8} glow /><IsoDoor x={8.8} y={0.8} w={2.2} d={1.8} h={18} color={primary} /><polyline points={pts([iso(8.7, 2.7, 26), iso(11.1, 2.7, 26)])} stroke="#94a3b8" strokeWidth="3" /></g>;
+  const L = iso(8.6, 2.8), R = iso(11.3, 2.8);
+  return <g><IsoBox x={8.6} y={0.6} w={2.7} d={2.2} h={62} color="#f5f5f4" /><IsoRoof x={8.6} y={0.6} w={2.7} d={2.2} z={62} rise={20} color="#1f2937" /><IsoWindows x={8.6} y={0.6} w={2.7} d={2.2} floors={2} floorH={24} base={10} glow />
+    {[0.2, 0.4, 0.6, 0.8].map((t) => { const c = lerp(L, R, t); return <rect key={t} x={c[0] - 2.5} y={c[1] - 58} width="5" height="58" fill="#fff" stroke="#d6d3d1" />; })}
+    <IsoDoor x={8.6} y={0.6} w={2.7} d={2.2} h={26} color="#a16207" /><polyline points={pts([iso(8.4, 3.2, 10), iso(11.5, 3.2, 10)])} stroke="#fbbf24" strokeWidth="2.5" strokeDasharray="3 3" /></g>;
+}
+function Pool({ tier, primary }: { tier: number; primary: string }) {
+  if (!tier) return null;
+  const w = tier >= 2 ? 2.0 : 1.4;
+  return <g className="ow-pool"><IsoTile x={8.7} y={3.2} w={w + 0.3} d={1.0} fill={tier >= 3 ? "#d6a77a" : "#e5e7eb"} /><IsoTile x={8.85} y={3.35} w={w} d={0.7} fill="#38bdf8" /><IsoTile x={8.95} y={3.42} w={w - 0.3} d={0.25} fill="#bae6fd" opacity={0.7} />
+    {tier >= 2 && [0, 1].map((i) => { const [sx, sy] = iso(8.9 + i * 0.7, 4.35); return <rect key={i} x={sx - 9} y={sy - 4} width="18" height="5" rx="2" fill="#fff" stroke="#cbd5e1" />; })}
+    {tier >= 3 && (() => { const [sx, sy] = iso(9.6, 3.7); return <g className="ow-float"><ellipse cx={sx} cy={sy} rx="7" ry="4" fill="none" stroke="#f472b6" strokeWidth="3.5" /><path d={`M${sx + 22} ${sy - 30} Q${sx + 36} ${sy - 44} ${sx + 50} ${sy - 30} Z`} fill={primary} /><rect x={sx + 35} y={sy - 30} width="2" height="24" fill="#6b7280" /></g>; })()}
+  </g>;
+}
+function Car({ tier, primary }: { tier: number; primary: string }) {
+  if (!tier) return null;
+  const [x, y] = iso(8.4, 8.0);
+  const body = tier >= 3 ? (tier >= 4 ? "#111827" : "#dc2626") : primary;
+  const len = tier === 2 ? 44 : 38, tall = tier === 2 ? 20 : tier >= 3 ? 11 : 15;
+  return <g className="ow-car" transform={`translate(${x} ${y}) rotate(26.6)`}>
+    <ellipse cx="0" cy="4" rx={len / 2 + 4} ry="5" fill="rgba(0,0,0,.2)" />
+    <rect x={-len / 2} y={-tall} width={len} height={tall} rx={tier >= 3 ? 6 : 4} fill={body} />
+    <path d={tier >= 3 ? `M${-len / 6} ${-tall} L${-len / 12} ${-tall - 7} L${len / 5} ${-tall - 7} L${len / 3} ${-tall} Z` : `M${-len / 4} ${-tall} L${-len / 6} ${-tall - 9} L${len / 4} ${-tall - 9} L${len / 3} ${-tall} Z`} fill={tier >= 4 ? "#fbbf24" : "#bae6fd"} opacity=".9" />
+    {[-len / 3, len / 3].map((cx) => <circle key={cx} cx={cx} cy="0" r="4.5" fill="#111827" stroke={tier >= 4 ? "#fbbf24" : "#9ca3af"} strokeWidth="2" />)}
+  </g>;
+}
+function Air({ tier, primary, reduced }: { tier: number; primary: string; reduced: boolean }) {
+  if (!tier) return null;
+  const [hx, hy] = iso(1.1, 8.0);
+  return <g>
+    <IsoTile x={0.3} y={7.2} w={1.6} d={1.6} fill="#475569" /><IsoTile x={0.45} y={7.35} w={1.3} d={1.3} fill="#64748b" />
+    <text x={hx} y={hy + 5} textAnchor="middle" fontSize="14" fontWeight="900" fill="#fbbf24">H</text>
+    {tier >= 2 && <g transform={`translate(${hx} ${hy - 8})`}><ellipse cx="0" cy="0" rx="16" ry="9" fill={primary} stroke={shade(primary, -0.4)} strokeWidth="1.5" /><ellipse cx="5" cy="-2" rx="7" ry="5" fill="#bae6fd" /><rect x="-30" y="-3" width="18" height="3" rx="1.5" fill={shade(primary, -0.3)} /><rect x="-1" y="-14" width="2" height="6" fill="#374151" /><g className={reduced ? "" : "ow-rotor"}><rect x="-26" y="-16" width="52" height="2.5" rx="1.2" fill="#1f2937" /></g></g>}
+    {tier >= 3 && <g className="ow-jet"><g transform="translate(0 40)"><path d="M0 0 L46 -4 L58 0 L46 4 Z" fill="#fff" stroke="#94a3b8" /><path d="M20 -2 L30 -16 L36 -2 Z" fill={primary} /><path d="M20 2 L30 16 L36 2 Z" fill={primary} /><path d="M2 0 L-6 -10 L6 -2 Z" fill={primary} /><circle cx="48" cy="0" r="1.6" fill="#38bdf8" /></g></g>}
+  </g>;
+}
+
+
+// ───────────── Town life: walkers, agents, the Tax Man ─────────────
+/** Moves its children along a route forever (SVG animateMotion). Static at the start point when motion is reduced. */
+function Walker({ route, dur, reduced, delay = 0, children }: { route: Array<[number, number]>; dur: number; reduced: boolean; delay?: number; children: ReactNode }) {
+  const d = `M${route.map((p) => `${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" L")}`;
+  if (reduced) return <g transform={`translate(${route[0][0]} ${route[0][1]})`}>{children}</g>;
+  return <g>{children}<animateMotion dur={`${dur}s`} begin={`${-delay}s`} repeatCount="indefinite" path={d} calcMode="linear" /></g>;
+}
+const there = (a: [number, number], b: [number, number]) => [iso(...a), iso(...b), iso(...b), iso(...a), iso(...a)];
+const ROUTES: Array<Array<[number, number]>> = [
+  there([6.0, 8.2], [4.6, 10.9]), there([7.2, 8.0], [9.2, 6.8]), there([5.2, 8.1], [2.4, 6.9]), there([8.6, 6.6], [10.4, 9.9]), there([8.5, 4.2], [8.2, 2.6]),
+];
+function Robot({ sleeping, label, onTap }: { sleeping?: boolean; label: string; onTap?: () => void }) {
+  return <g className={`ow-robot${sleeping ? " sleeping" : ""}`} role="button" tabIndex={0} aria-label={label} onClick={onTap} onKeyDown={(e) => { if (e.key === "Enter") onTap?.(); }}>
+    <ellipse cx="0" cy="1" rx="10" ry="3.5" fill="rgba(0,0,0,.2)" />
+    <g className="ow-bean-body">
+      <rect x="-10" y="-26" width="20" height="24" rx="6" fill="#e2e8f0" stroke="#64748b" strokeWidth="1.5" />
+      <rect x="-7" y="-22" width="14" height="9" rx="3" fill="#0f172a" />
+      {sleeping ? <><path d="M-5 -17 h3 M2 -17 h3" stroke="#38bdf8" strokeWidth="1.6" strokeLinecap="round" /></> : <><circle cx="-3" cy="-17.5" r="1.8" fill="#38bdf8" className="ow-led" /><circle cx="3" cy="-17.5" r="1.8" fill="#38bdf8" className="ow-led" /></>}
+      <path d="M0 -26 V-32" stroke="#64748b" strokeWidth="1.5" /><circle cx="0" cy="-33" r="2.2" fill="#f43f5e" className="ow-led" />
+      {!sleeping && <rect x="8" y="-14" width="8" height="10" rx="1" fill="#fde68a" stroke="#92400e" strokeWidth=".8" />}
+    </g>
+    {sleeping && <text x="10" y="-30" fontSize="11" fontWeight="900" fill="#475569" className="ow-zzz">z z z</text>}
+  </g>;
+}
+function TaxMan({ at, onTap }: { at: [number, number]; onTap: () => void }) {
+  return <g className="ow-taxman" transform={`translate(${at[0]} ${at[1]})`} role="button" tabIndex={0} aria-label="The Tax Man: expenses are missing receipts" onClick={onTap} onKeyDown={(e) => { if (e.key === "Enter") onTap(); }}>
+    <ellipse cx="0" cy="1" rx="13" ry="4.5" fill="rgba(0,0,0,.22)" />
+    <g className="ow-bean-body">
+      <rect x="-12" y="-36" width="24" height="35" rx="12" fill="#334155" stroke="#0f172a" strokeWidth="1.5" />
+      <path d="M-3 -20 L0 -8 L3 -20 Z" fill="#fff" /><path d="M-1.5 -19 L0 -15 L1.5 -19 Z" fill="#b91c1c" />
+      <ellipse cx="-4.5" cy="-27" rx="3.6" ry="4.2" fill="#fff" /><ellipse cx="4.5" cy="-27" rx="3.6" ry="4.2" fill="#fff" /><circle cx="-4" cy="-26.5" r="1.8" fill="#111827" /><circle cx="5" cy="-26.5" r="1.8" fill="#111827" />
+      <circle cx="4.5" cy="-27" r="5" fill="none" stroke="#fbbf24" strokeWidth="1.4" /><path d="M9.5 -27 q3 6 1 12" stroke="#fbbf24" strokeWidth="1" fill="none" />
+      <path d="M-6 -33 q6 3 12 0" stroke="#e5e7eb" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+      <rect x="-9" y="-50" width="18" height="14" rx="2" fill="#111827" /><rect x="-13" y="-37" width="26" height="3.5" rx="1.5" fill="#111827" /><rect x="-9" y="-41" width="18" height="2.5" fill="#b91c1c" />
+      <g className="ow-knock"><rect x="-17" y="-24" width="6" height="12" rx="3" fill="#334155" /><circle cx="-14" cy="-26" r="3.4" fill="#e5e7eb" /></g>
+      <rect x="9" y="-16" width="9" height="12" rx="1" fill="#f8fafc" stroke="#64748b" strokeWidth=".8" />
+    </g>
+    <g className="ow-alert" transform="translate(0 -62)"><rect x="-18" y="-9" width="36" height="16" rx="8" fill="#b91c1c" stroke="#fff" strokeWidth="1.5" /><text y="3" textAnchor="middle" fontSize="9" fontWeight="900" fill="#fff">KNOCK</text></g>
+  </g>;
+}
+
+/** Picture for each upgrade track in the shop. */
+function UpgradeArt({ id, tier, primary, secondary }: { id: string; tier: number; primary: string; secondary: string }) {
+  const g = (children: ReactNode) => <svg viewBox="0 0 80 60" width="80" height="60" aria-hidden="true" className="ow-up-art"><rect width="80" height="60" rx="12" fill="#e0f2fe" /><ellipse cx="40" cy="50" rx="30" ry="6" fill="#86d36b" />{children}</svg>;
+  switch (id) {
+    case "hq": return g(<><rect x="20" y={22 - tier * 2} width="40" height={28 + tier * 2} rx="3" fill="#f5efe3" stroke="#d6cfc2" /><path d={`M16 ${23 - tier * 2} L40 ${8 - tier * 2} L64 ${23 - tier * 2} Z`} fill={secondary} /><rect x="35" y="38" width="10" height="12" fill={primary} />{Array.from({ length: Math.min(3, 1 + tier) }).map((_, i) => <g key={i}><rect x="24" y={26 - tier * 2 + i * 8} width="8" height="5" fill="#bae6fd" /><rect x="48" y={26 - tier * 2 + i * 8} width="8" height="5" fill="#bae6fd" /></g>)}</>);
+    case "reception": return g(<><rect x="16" y="32" width="48" height="16" rx="3" fill={tier >= 3 ? "#f1f5f9" : "#a16207"} stroke="#78350f" /><rect x="14" y="28" width="52" height="6" rx="2" fill={primary} /><circle cx="52" cy="22" r="6" fill="#16a34a" /><rect x="22" y="36" width="20" height="3" rx="1.5" fill="#fbbf24" /></>);
+    case "garden": return g(<>{tier >= 3 ? <><ellipse cx="40" cy="44" rx="20" ry="7" fill="#60a5fa" stroke="#cbd5e1" strokeWidth="3" /><rect x="38" y="26" width="4" height="16" fill="#e2e8f0" /><circle cx="40" cy="24" r="5" fill="#bfdbfe" /></> : tier >= 2 ? <><rect x="37" y="30" width="6" height="18" fill="#78350f" /><circle cx="40" cy="24" r="14" fill="#22c55e" /></> : <>{[22, 34, 46, 58].map((x, i) => <g key={x}><rect x={x - 1} y="38" width="2" height="10" fill="#4d7c0f" /><circle cx={x} cy="36" r="5" fill={i % 2 ? "#facc15" : "#f472b6"} /></g>)}</>}</>);
+    case "workshop": return g(<><rect x="14" y="24" width="52" height="26" rx="2" fill="#e5e7eb" stroke="#94a3b8" /><rect x="14" y="20" width="52" height="7" rx="2" fill={secondary} /><rect x="22" y="31" width="36" height="19" fill="#9ca3af" />{[34, 38, 42, 46].map((y) => <line key={y} x1="22" x2="58" y1={y} y2={y} stroke="#6b7280" />)}</>);
+    case "fleet": return g(<><rect x="12" y="28" width="46" height="18" rx="4" fill={primary} /><rect x="56" y="32" width="12" height="14" rx="3" fill={primary} /><rect x="58" y="34" width="8" height="6" rx="1" fill="#bae6fd" /><circle cx="24" cy="48" r="5" fill="#111827" /><circle cx="56" cy="48" r="5" fill="#111827" /></>);
+    case "signage": return g(<><rect x="12" y="20" width="56" height="20" rx="6" fill="#111827" stroke={primary} strokeWidth="2.5" /><text x="40" y="34" textAnchor="middle" fontSize="10" fontWeight="900" fill="#fff">OPEN</text><rect x="38" y="40" width="4" height="10" fill="#57534e" /></>);
+    case "cafe": return g(<><path d="M20 30 Q40 12 60 30 Z" fill={primary} /><rect x="39" y="30" width="2" height="16" fill="#6b7280" /><ellipse cx="40" cy="47" rx="16" ry="4" fill="#f1f5f9" /><rect x="52" y="36" width="8" height="9" rx="2" fill="#78350f" /></>);
+    case "renovation": return g(<><rect x="18" y="16" width="34" height="34" fill={tier >= 3 ? "#292524" : tier >= 2 ? "#7dd3fc" : "#f5efe3"} stroke="#94a3b8" /><g transform="translate(50 20) rotate(30)"><rect x="0" y="0" width="16" height="8" rx="2" fill={primary} /><rect x="6" y="8" width="4" height="16" fill="#78350f" /></g></>);
+    case "interior": return g(<><rect x="14" y="14" width="52" height="36" rx="4" fill="#fef3c7" /><path d="M40 14 V22" stroke="#92400e" /><path d="M32 22 h16 l-4 6 h-8 z" fill="#fbbf24" /><rect x="18" y="34" width="22" height="12" rx="3" fill={primary} /><circle cx="56" cy="38" r="6" fill="#16a34a" /><rect x="54" y="42" width="4" height="6" fill="#92400e" /></>);
+    case "home": return g(<>{tier >= 3 ? <><rect x="12" y="20" width="56" height="30" fill="#f5f5f4" stroke="#d6d3d1" />{[20, 32, 44, 56].map((x) => <rect key={x} x={x} y="24" width="3" height="26" fill="#fff" stroke="#d6d3d1" />)}<path d="M8 21 L40 8 L72 21 Z" fill="#1f2937" /></> : <><rect x="22" y="28" width="36" height="22" fill="#fde68a" /><path d="M18 29 L40 14 L62 29 Z" fill="#b91c1c" /><rect x="36" y="38" width="8" height="12" fill="#7c2d12" /></>}</>);
+    case "pool": return g(<><rect x="12" y="30" width="56" height="18" rx="6" fill="#e5e7eb" /><rect x="16" y="33" width="48" height="12" rx="4" fill="#38bdf8" /><path d="M20 38 q6 -4 12 0 t12 0 t12 0" stroke="#bae6fd" strokeWidth="2" fill="none" /><ellipse cx="54" cy="38" rx="5" ry="3" fill="none" stroke="#f472b6" strokeWidth="2.5" /></>);
+    case "car": return g(<><rect x="14" y="32" width="52" height={tier >= 3 ? 10 : 14} rx="6" fill={tier >= 4 ? "#111827" : tier >= 3 ? "#dc2626" : primary} /><path d={tier >= 3 ? "M28 32 L34 24 L50 24 L56 32 Z" : "M24 32 L30 20 L50 20 L58 32 Z"} fill="#bae6fd" /><circle cx="26" cy="46" r="6" fill="#111827" stroke={tier >= 4 ? "#fbbf24" : "#9ca3af"} strokeWidth="2" /><circle cx="54" cy="46" r="6" fill="#111827" stroke={tier >= 4 ? "#fbbf24" : "#9ca3af"} strokeWidth="2" /></>);
+    case "air": return g(tier >= 3 ? <><path d="M10 30 L58 26 L72 30 L58 34 Z" fill="#fff" stroke="#94a3b8" /><path d="M34 28 L46 12 L52 28 Z" fill={primary} /><path d="M34 32 L46 48 L52 32 Z" fill={primary} /></> : tier >= 2 ? <><ellipse cx="40" cy="32" rx="16" ry="9" fill={primary} /><ellipse cx="45" cy="30" rx="7" ry="5" fill="#bae6fd" /><rect x="10" y="29" width="16" height="3" fill={primary} /><rect x="14" y="18" width="52" height="2.5" fill="#1f2937" /></> : <><ellipse cx="40" cy="42" rx="24" ry="9" fill="#475569" /><text x="40" y="46" textAnchor="middle" fontSize="12" fontWeight="900" fill="#fbbf24">H</text></>);
+    case "wardrobe": return g(<><path d="M28 18 L36 14 L44 14 L52 18 L58 28 L52 30 L52 50 L28 50 L28 30 L22 28 Z" fill={primary} />{tier >= 2 && <path d="M38 16 L42 16 L41 34 L40 36 L39 34 Z" fill="#111827" />}{tier >= 4 && <path d="M30 12 L30 6 L35 9 L40 4 L45 9 L50 6 L50 12 Z" fill="#fbbf24" />}{tier >= 3 && <rect x="30" y="24" width="20" height="4" rx="2" fill="#111827" />}</>);
+    default: return g(null);
+  }
 }
 
 // ───────────── Demo scenario (clearly labelled; never touches real data) ─────────────
@@ -164,6 +327,9 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
   const [demoState, setDemoState] = useState<DemoState>(DEMO_START);
   const [walk, setWalk] = useState<{ steps: WalkStep[]; at: number } | null>(null);
   const [collecting, setCollecting] = useState(false);
+  const [poked, setPoked] = useState("");
+  const [bubble, setBubble] = useState<{ text: string; at: [number, number]; n: number } | null>(null);
+  const bubbleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastLevel = useRef(0);
   const toastId = useRef(0);
   const prefs = useRef({ sound, reduced }); prefs.current = { sound, reduced }; // read in callbacks so toggling never triggers a reload
@@ -306,12 +472,37 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
 
   const p = data.profile; const w = wallet;
   const tier = (id: string) => upgradeTier(w.owned, id);
+  const say = (id: string, text: string, at: [number, number]) => {
+    setPoked(id); setTimeout(() => setPoked((cur) => (cur === id ? "" : cur)), 450);
+    setBubble({ text, at, n: Date.now() });
+    if (bubbleTimer.current) clearTimeout(bubbleTimer.current);
+    bubbleTimer.current = setTimeout(() => setBubble(null), 3800);
+    if (prefs.current.sound) chime("pop");
+  };
+  const openLead = (id: string) => setPanel({ kind: "lead-detail", focusId: id });
+  const tapEmployee = (id: EmployeeId) => {
+    const own = approaches.findIndex((a) => a.employee === id);
+    if (own >= 0) setIndex(own);
+    const lines = IDLE_LINES[id];
+    say(id, own >= 0 ? approaches[own].line : lines[Math.floor(Math.random() * lines.length)], ((at) => [at[0], at[1] - 48] as [number, number])(iso(...EMP_SPOTS[id])));
+  };
+  const tapOwner = () => { const at = iso(7.0, 11.5); say("owner", approaches.length ? `${approaches.length} thing${approaches.length === 1 ? "" : "s"} need${approaches.length === 1 ? "s" : ""} me. Let's go!` : "Business is booming. Coffee time!", [at[0], at[1] - 58]); };
+  const tapBuilding = (which: EmployeeId | "hq" | "farm") => {
+    if (demo && which !== "hq") { say(`b-${which}`, "Demo: buildings open your real screens outside the demo.", [500, 200]); return; }
+    setPoked(`b-${which === "receptionist" ? "reception" : which === "accountant" ? "accounts" : which}`); setTimeout(() => setPoked(""), 450);
+    if (prefs.current.sound) chime("pop");
+    if (which === "hq") { setDrawer("upgrades"); return; }
+    if (which === "marketing") { say("b-marketing", IDLE_LINES.marketing[2], ((at) => [at[0], at[1]] as [number, number])(iso(6, 1.3, 80))); return; }
+    const target: Record<string, PanelKind> = { receptionist: customers.length ? "lead-replies" : "conversations", accountant: data.scopeId ? "books" : "invoicing", calendar: "scheduling", projects: "tasks", sales: "leads", farm: "leads" };
+    setPanel({ kind: target[which] });
+  };
   const floors = 1 + tier("hq");
   const customers = demo ? demoSnapshot().leads : data.customers;
   const waitingIds = new Set(customers.filter((c) => Date.now() - Date.parse(c.createdAt) > 24 * 3_600_000).map((c) => c.id));
   const healthMood = demo ? "busy" : data.health.mood;
   const approaching = current?.employee;
-  const stations: Record<EmployeeId, [number, number]> = { receptionist: [342, 366], sales: [640, 400], accountant: [740, 380], projects: [255, 392], marketing: [150, 440], calendar: [860, 440] };
+  const crops: Crop[] = demo ? demoSnapshot().leads.map((l, i) => ({ id: l.id, name: l.name, growth: i % 4, ripe: i === 4, wilting: i === 0 })) : (data.crops || []);
+  const grassTufts: Array<[number, number]> = (healthMood === "struggling" ? GRASS_SPOTS : healthMood === "busy" ? GRASS_SPOTS.slice(0, 6) : healthMood === "steady" ? GRASS_SPOTS.slice(0, 2) : []);
   const pendingByEmployee = new Map<EmployeeId, Pending[]>();
   for (const item of w.pending) { const emp = EMPLOYEE_FOR_REWARD[item.kind as RewardKind] || "receptionist"; pendingByEmployee.set(emp, [...(pendingByEmployee.get(emp) || []), item]); }
   const pendingTotal = sumCoins(w.pending);
@@ -344,45 +535,133 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
 
     <div className="ow-layout">
       <section className="ow-stage" aria-label="Your business">
+        <div className="ow-stage-wrap">
         <svg viewBox="0 0 1000 560" role="img" aria-label={`${p.name} headquarters with ${customers.length} customers waiting`}>
-          <defs><linearGradient id="ow-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#bfe7ff" /><stop offset="1" stopColor="#eaf7ff" /></linearGradient></defs>
+          <defs>
+            <linearGradient id="ow-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#7dd3fc" /><stop offset="1" stopColor="#e0f2fe" /></linearGradient>
+            <linearGradient id="ow-grass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#86d36b" /><stop offset="1" stopColor="#5fb64a" /></linearGradient>
+          </defs>
           <rect width="1000" height="560" fill="url(#ow-sky)" className="ow-sky" />
-          <circle cx="900" cy="70" r="34" fill="#ffe27a" className="ow-sun" />
-          <g className="ow-clouds"><ellipse cx="160" cy="80" rx="60" ry="18" fill="#fff" /><ellipse cx="200" cy="70" rx="40" ry="16" fill="#fff" /><ellipse cx="640" cy="60" rx="50" ry="14" fill="#fff" /></g>
-          <path d="M0 330 Q500 300 1000 330 L1000 560 L0 560 Z" fill="#9bd77f" className="ow-grass" />
-          <path d="M470 330 L420 560 L580 560 L530 330 Z" fill="#e8dcc4" />
-          <Workshop tier={tier("workshop")} primary={p.primary} secondary={p.secondary} />
-          {tier("garden") >= 2 && <g>{[[40, 300], [790, 300]].map(([tx, ty]) => <g key={tx}><rect x={tx - 6} y={ty - 10} width="12" height="45" fill="#7c4a1e" /><circle cx={tx} cy={ty - 26} r="30" fill="#4ade80" /><circle cx={tx - 16} cy={ty - 12} r="18" fill="#22c55e" /></g>)}</g>}
-          <Building floors={floors} primary={p.primary} secondary={p.secondary} name={p.name} logo={p.logo} sign={tier("signage")} />
-          {/* Reception: desk → lounge → concierge */}
-          {tier("reception") >= 2 && <g><rect x="250" y="452" width="56" height="18" rx="7" fill="#7c3aed" opacity=".75" /><rect x="250" y="446" width="56" height="10" rx="5" fill="#6d28d9" opacity=".75" /><circle cx="318" cy="452" r="9" fill="#16a34a" /><rect x="315" y="458" width="6" height="12" fill="#92400e" /></g>}
-          <rect x="370" y="372" width="110" height="26" rx="6" fill={tier("reception") >= 3 ? "#f1f5f9" : tier("reception") >= 1 ? "#a16207" : "#c9a77c"} stroke={tier("reception") >= 3 ? "#cbd5e1" : "none"} strokeWidth="2" />
-          <text x="425" y="389" textAnchor="middle" fontSize="11" fill={tier("reception") >= 3 ? "#334155" : "#fff"} fontWeight="800">RECEPTION</text>
-          {tier("reception") >= 3 && <rect x="460" y="336" width="80" height="8" rx="4" fill={p.primary} opacity=".8" />}
-          {(tier("garden") >= 1 || healthMood === "thriving") && <g className="ow-flowers">{[90, 130, 170, 830, 870, 910].map((fx) => <g key={fx}><rect x={fx - 1} y="345" width="2" height="12" fill="#4d7c0f" /><circle cx={fx} cy="343" r="6" fill={fx % 3 ? "#f472b6" : "#facc15"} /></g>)}</g>}
-          {tier("garden") >= 3 && <g className="ow-fountain"><ellipse cx="900" cy="520" rx="46" ry="13" fill="#93c5fd" stroke="#60a5fa" strokeWidth="3" /><rect x="896" y="492" width="8" height="28" fill="#cbd5e1" /><circle cx="900" cy="488" r="8" fill="#bfdbfe" /></g>}
-          {tier("cafe") >= 1 && <g><rect x="680" y="500" width="64" height="8" rx="3" fill="#8b5a2b" /><rect x="685" y="508" width="5" height="12" fill="#5b3a1a" /><rect x="734" y="508" width="5" height="12" fill="#5b3a1a" /><rect x="752" y="482" width="22" height="28" rx="4" fill="#78350f" /><circle cx="763" cy="478" r="6" fill="#fde68a" /></g>}
-          {tier("cafe") >= 2 && <g>{[640, 790].map((cx) => <g key={cx}><path d={`M${cx - 26} 470 Q${cx} 446 ${cx + 26} 470 Z`} fill={p.primary} /><rect x={cx - 1.5} y="470" width="3" height="30" fill="#6b7280" /><ellipse cx={cx} cy="502" rx="16" ry="5" fill="#e5e7eb" /></g>)}</g>}
-          {tier("fleet") >= 1 && <g className="ow-van"><Vehicle x={0} y={0} primary={p.primary} name={p.name} big={tier("fleet") >= 2} /></g>}
-          {tier("fleet") >= 3 && <Vehicle x={20} y={392} primary={p.secondary} name={p.name} />}
-          {(healthMood === "busy" || healthMood === "struggling") && <g className="ow-paper"><rect x="455" y="362" width="22" height="6" fill="#fff" stroke="#ccc" /><rect x="457" y="356" width="22" height="6" fill="#fff" stroke="#ccc" />{healthMood === "struggling" && <rect x="454" y="350" width="22" height="6" fill="#fff" stroke="#ccc" />}</g>}
-          {/* Customers = real new leads */}
-          {customers.slice(0, 8).map((c, i) => { const waiting = waitingIds.has(c.id); const cx = 330 + (i % 4) * 34, cy = 440 + Math.floor(i / 4) * 52; return <g key={c.id} className={`ow-customer${waiting ? " impatient" : ""}`} style={{ animationDelay: `${i * 0.15}s` }} onClick={() => { if (!demo) setPanel({ kind: "lead-detail", focusId: c.id }); }} role="button" tabIndex={0} aria-label={`${c.name || c.title}${waiting ? ", waiting over a day" : ""}`} onKeyDown={(e) => { if (e.key === "Enter" && !demo) setPanel({ kind: "lead-detail", focusId: c.id }); }}>
-            <Person x={cx} y={cy} body={["#60a5fa", "#a78bfa", "#fb7185", "#34d399", "#fbbf24"][i % 5]} skin={["#f2c9a0", "#c68642", "#8d5524", "#e0ac69"][i % 4]} mood={waiting ? "concerned" : "calm"} scale={0.9} label={c.name} />
-            {waiting && <g transform={`translate(${cx} ${cy - 32})`}><circle r="8" fill="#ef4444" /><text y="4" textAnchor="middle" fontSize="11" fill="#fff" fontWeight="800">!</text></g>}
+          <g className="ow-clouds"><ellipse cx="140" cy="70" rx="58" ry="16" fill="#fff" opacity=".9" /><ellipse cx="180" cy="60" rx="36" ry="15" fill="#fff" opacity=".9" /><ellipse cx="820" cy="54" rx="50" ry="13" fill="#fff" opacity=".85" /><ellipse cx="860" cy="46" rx="30" ry="12" fill="#fff" opacity=".85" /></g>
+          <ellipse cx="500" cy="318" rx="430" ry="214" fill="#38bdf8" opacity=".35" className="ow-water" />
+          {/* Island */}
+          <polygon points={pts([iso(0, 12), iso(12, 12), iso(12, 12, -28), iso(0, 12, -28)])} fill="#a16207" />
+          <polygon points={pts([iso(12, 12), iso(12, 0), iso(12, 0, -28), iso(12, 12, -28)])} fill="#854d0e" />
+          <polygon points={pts([iso(0, 12, -2), iso(12, 12, -2), iso(12, 0, -2)])} fill="none" stroke="#4d7c0f" strokeWidth="4" />
+          <polygon points={pts([iso(0, 0), iso(12, 0), iso(12, 12), iso(0, 12)])} fill="url(#ow-grass)" className="ow-grass" />
+          {Array.from({ length: 72 }).map((_, i) => { const gx = (i % 6) * 2 + (Math.floor(i / 6) % 2), gy = Math.floor(i / 6); return <IsoTile key={i} x={gx} y={gy} fill="#ffffff" opacity={0.06} />; })}
+          {/* Path from HQ door to the shore, and the plaza */}
+          <IsoTile x={5.4} y={7.5} w={1.2} d={4.5} fill="#e7d3a8" />
+          <IsoTile x={4.2} y={7.5} w={3.6} d={0.9} fill="#e7d3a8" />
+          {tier("reception") >= 3 && <IsoTile x={5.65} y={7.6} w={0.7} d={4.4} fill="#dc2626" opacity={0.85} />}
+          {(tier("garden") >= 1 || healthMood === "thriving") && <g className="ow-flowers">{[[0.5, 11.3], [1.4, 11.4], [11.3, 1.2], [11.4, 2.4], [0.6, 2.0], [11.2, 8.8], [4.6, 11.4], [9.2, 0.6]].map(([fx, fy], i) => { const [sx, sy] = iso(fx, fy); return <g key={i}><circle cx={sx - 5} cy={sy} r="4.5" fill="#f472b6" /><circle cx={sx + 5} cy={sy - 1} r="4.5" fill="#facc15" /><circle cx={sx} cy={sy + 3} r="4.5" fill="#fb7185" /></g>; })}</g>}
+
+          {/* Marketing billboard (Mia) */}
+          <Spot id="b-marketing" label="Marketing" poked={poked} labelAt={iso(6, 1.3, 78)} onTap={() => tapBuilding("marketing")}>
+            <IsoBox x={5.2} y={1.25} w={0.12} d={0.12} h={30} color="#57534e" /><IsoBox x={6.7} y={1.25} w={0.12} d={0.12} h={30} color="#57534e" />
+            <polygon points={pts([iso(4.9, 1.4, 28), iso(7.1, 1.4, 28), iso(7.1, 1.4, 66), iso(4.9, 1.4, 66)])} fill={p.primary} stroke={shade(p.primary, -0.4)} strokeWidth="2.5" />
+            {p.logo && (() => { const [lx, ly] = iso(5.25, 1.4, 47); return <image href={p.logo} x={lx - 11} y={ly - 11} width="22" height="22" preserveAspectRatio="xMidYMid meet" transform={`rotate(26.6 ${lx} ${ly})`} />; })()}
+            {(() => { const [bx, by] = iso(6, 1.4, 47); return <text x={bx} y={by + 4} textAnchor="middle" fontSize="11" fontWeight="900" fill="#fff" transform={`rotate(26.6 ${bx} ${by})`}>{p.name.length > 13 ? `${p.name.slice(0, 12)}…` : p.name}</text>; })()}
+          </Spot>
+          {/* Workshop (Pete) — site tent → shed → workshop → warehouse */}
+          <Spot id="b-projects" label={tier("workshop") >= 3 ? "Warehouse" : tier("workshop") >= 2 ? "Workshop" : tier("workshop") >= 1 ? "Tool shed" : "Site office"} poked={poked} labelAt={iso(1.5, 10.5, tier("workshop") >= 2 ? 80 : 62)} onTap={() => tapBuilding("projects")}>
+            {tier("workshop") === 0 ? <IsoRoof x={0.8} y={9.9} w={1.4} d={1.3} z={0} rise={32} color="#16a34a" />
+              : tier("workshop") === 1 ? <><IsoBox x={0.8} y={9.9} w={1.5} d={1.3} h={24} color="#b45309" /><IsoRoof x={0.8} y={9.9} w={1.5} d={1.3} z={24} rise={18} color="#78350f" /><IsoDoor x={0.8} y={9.9} w={1.5} d={1.3} h={16} color="#451a03" /></>
+              : (() => { const ww = tier("workshop") >= 3 ? 2.2 : 1.8, hh = tier("workshop") >= 3 ? 44 : 32; const Db = iso(0.5, 11.4), Cb = iso(0.5 + ww, 11.4), a = lerp(Db, Cb, 0.2), b = lerp(Db, Cb, 0.8), dh = hh - 10; return <><IsoBox x={0.5} y={9.6} w={ww} d={1.8} h={hh} color="#e5e7eb" /><IsoRoof x={0.5} y={9.6} w={ww} d={1.8} z={hh} rise={14} color={p.secondary} /><polygon points={pts([a, b, [b[0], b[1] - dh], [a[0], a[1] - dh]])} fill="#9ca3af" />{Array.from({ length: 5 }).map((_, i) => <line key={i} x1={a[0]} y1={a[1] - (i + 1) * dh / 6} x2={b[0]} y2={b[1] - (i + 1) * dh / 6} stroke="#6b7280" strokeWidth="1.5" />)}</>; })()}
+          </Spot>
+          {tier("garden") >= 2 && [[0.6, 0.7], [3.6, 0.5], [0.5, 3.6], [11.4, 6.4]].map(([tx, ty]) => { const [sx, sy] = iso(tx, ty); return <g key={`${tx}-${ty}`} className="ow-tree"><rect x={sx - 3.5} y={sy - 22} width="7" height="22" rx="2" fill="#78350f" /><circle cx={sx} cy={sy - 34} r="18" fill="#22c55e" /><circle cx={sx - 9} cy={sy - 26} r="12" fill="#16a34a" /><circle cx={sx + 8} cy={sy - 40} r="10" fill="#4ade80" /></g>; })}
+          {tier("garden") >= 3 && (() => { const [fx, fy] = iso(3.9, 3.7); return <g className="ow-fountain"><ellipse cx={fx} cy={fy} rx="30" ry="15" fill="#cbd5e1" /><ellipse cx={fx} cy={fy - 3} rx="25" ry="11.5" fill="#60a5fa" /><rect x={fx - 3} y={fy - 26} width="6" height="22" fill="#e2e8f0" /><circle cx={fx} cy={fy - 30} r="7" fill="#bfdbfe" className="ow-splash" /></g>; })()}
+          {/* Lifestyle: home, pool, helipad */}
+          <Spot id="b-home" label={tier("home") ? UPGRADES.find((u) => u.id === "home")!.tiers[tier("home") - 1].name : "Build your home"} poked={poked} labelAt={iso(9.9, 1.8, tier("home") >= 2 ? 96 : 70)} onTap={() => tapBuilding("hq")}><Home tier={tier("home")} primary={p.primary} secondary={p.secondary} /></Spot>
+          <Pool tier={tier("pool")} primary={p.primary} />
+          <Air tier={tier("air")} primary={p.primary} reduced={reduced} />
+          {/* Calendar tower (Cal) */}
+          <Spot id="b-calendar" label="Calendar" poked={poked} labelAt={iso(1.1, 5.7, 128)} onTap={() => tapBuilding("calendar")}>
+            <IsoBox x={0.4} y={5.0} w={1.4} d={1.4} h={76} color="#e0f2fe" /><IsoRoof x={0.4} y={5.0} w={1.4} d={1.4} z={76} rise={30} color="#0369a1" />
+            {(() => { const c = lerp(iso(0.4, 6.4), iso(1.8, 6.4), 0.5); return <g><circle cx={c[0]} cy={c[1] - 58} r="11" fill="#fff" stroke="#0369a1" strokeWidth="3" /><path d={`M${c[0]} ${c[1] - 58} V${c[1] - 65} M${c[0]} ${c[1] - 58} H${c[0] + 5}`} stroke="#111827" strokeWidth="2" strokeLinecap="round" className="ow-clock-hand" /></g>; })()}
+            <IsoDoor x={0.4} y={5.0} w={1.4} d={1.4} h={18} color="#075985" />
+          </Spot>
+          {/* Headquarters — grows with each Headquarters tier */}
+          {(() => { const t = tier("hq"), w = t >= 2 ? 3.4 : 3, h = 54 + t * 22, x0 = 4.5, y0 = 4.5; const L = iso(x0, y0 + w), R = iso(x0 + w, y0 + w); const b1 = lerp(L, R, 0.18), b2 = lerp(L, R, 0.82); const apex = iso(x0 + w / 2, y0 + w / 2, h + 40); return <Spot id="b-hq" label="Headquarters" poked={poked} labelAt={[apex[0], apex[1] - 34]} onTap={() => tapBuilding("hq")}>
+            <IsoBox x={x0 - 0.15} y={y0 - 0.15} w={w + 0.3} d={w + 0.3} h={8} color="#a8a29e" />
+            <IsoBox x={x0} y={y0} w={w} d={w} h={h} z={8} color={tier("renovation") >= 3 ? "#292524" : tier("renovation") >= 2 ? "#7dd3fc" : tier("renovation") >= 1 ? shade(p.primary, 0.75) : "#f5efe3"} />
+            {tier("renovation") >= 3 && <polyline points={pts([iso(x0, y0 + w, h + 8), iso(x0 + w, y0 + w, h + 8), iso(x0 + w, y0, h + 8)])} fill="none" stroke="#fbbf24" strokeWidth="3" />}
+            <IsoWindows x={x0} y={y0} w={w} d={w} floors={1 + t} floorH={22} base={22} glow={tier("interior") >= 1 || healthMood === "thriving"} />
+            {tier("interior") >= 2 && Array.from({ length: 1 + t }).map((_, f) => [0.3, 0.67].map((u) => { const a = lerp(iso(x0 + w, y0 + w), iso(x0 + w, y0), u); return <circle key={`${f}-${u}`} cx={a[0]} cy={a[1] - 22 - f * 22 - 4} r="3" fill="#16a34a" />; }))}
+            {tier("interior") >= 3 && (() => { const a = lerp(iso(x0 + w, y0 + w), iso(x0 + w, y0), 0.5); return <path className="ow-sparkle" d={`M${a[0]} ${a[1] - 40} l2 4 4 2 -4 2 -2 4 -2 -4 -4 -2 4 -2z`} fill="#fde047" />; })()}
+            <IsoRoof x={x0} y={y0} w={w} d={w} z={h + 8} rise={40} color={p.secondary} />
+            <IsoDoor x={x0} y={y0} w={w} d={w} h={26} color={p.primary} />
+            <polygon points={pts([[b1[0], b1[1] - h + 2], [b2[0], b2[1] - h + 2], [b2[0], b2[1] - h + 20], [b1[0], b1[1] - h + 20]])} fill={tier("signage") >= 1 ? "#111827" : shade(p.secondary, -0.1)} stroke={tier("signage") >= 1 ? p.primary : "none"} strokeWidth="2" />
+            {p.logo && (() => { const m = lerp(b1, b2, 0.08); return <image href={p.logo} x={m[0] - 2} y={m[1] - h + 2} width="16" height="16" preserveAspectRatio="xMidYMid meet" transform={`rotate(26.6 ${m[0] + 6} ${m[1] - h + 10})`} />; })()}
+            {(() => { const m = lerp(b1, b2, 0.5); return <text x={m[0]} y={m[1] - h + 15} textAnchor="middle" fontSize="9.5" fontWeight="900" fill="#fff" transform={`rotate(26.6 ${m[0]} ${m[1] - h + 11})`}>{p.name.length > 16 ? `${p.name.slice(0, 15)}…` : p.name}</text>; })()}
+            <g className="ow-flag" transform={`translate(${apex[0]} ${apex[1]})`}><rect x="-1.2" y="-30" width="2.4" height="30" fill="#57534e" /><path d="M1 -30 L22 -24 L1 -18 Z" fill={p.primary} /></g>
+            {tier("signage") >= 2 && <g className="ow-neon" transform={`translate(${apex[0]} ${apex[1] + 22})`}><rect x="-62" y="-12" width="124" height="20" rx="6" fill="#111827" stroke={p.primary} strokeWidth="2" /><text y="3" textAnchor="middle" fontSize="10" fontWeight="900" fill="#fff">{p.name.slice(0, 18).toUpperCase()}</text></g>}
+            {healthMood === "struggling" && <g className="ow-storm" transform={`translate(${apex[0]} ${apex[1] - 60})`}><ellipse cx="0" cy="0" rx="36" ry="13" fill="#64748b" /><ellipse cx="-20" cy="4" rx="20" ry="10" fill="#475569" /></g>}
+          </Spot>; })()}
+          {/* Sales office (Sam) */}
+          <Spot id="b-sales" label="Sales" poked={poked} labelAt={iso(9.9, 5.3, 96)} onTap={() => tapBuilding("sales")}>
+            <IsoBox x={9.0} y={4.4} w={1.8} d={1.8} h={40} color="#fef3c7" /><IsoRoof x={9.0} y={4.4} w={1.8} d={1.8} z={40} rise={26} color="#d97706" />
+            <IsoWindows x={9.0} y={4.4} w={1.8} d={1.8} floors={1} floorH={22} base={12} />
+            <IsoDoor x={9.0} y={4.4} w={1.8} d={1.8} h={20} color="#92400e" />
+          </Spot>
+          {/* Staff café */}
+          {tier("cafe") >= 1 && (() => { const [cx, cy] = iso(3.1, 7.7); return <g><rect x={cx - 22} y={cy - 8} width="44" height="6" rx="3" fill="#92400e" /><rect x={cx - 18} y={cy - 2} width="4" height="8" fill="#78350f" /><rect x={cx + 14} y={cy - 2} width="4" height="8" fill="#78350f" />
+            {tier("cafe") >= 2 && [-34, 34].map((dx) => <g key={dx}><path d={`M${cx + dx - 20} ${cy - 30} Q${cx + dx} ${cy - 46} ${cx + dx + 20} ${cy - 30} Z`} fill={p.primary} /><rect x={cx + dx - 1.2} y={cy - 30} width="2.4" height="26" fill="#6b7280" /><ellipse cx={cx + dx} cy={cy - 4} rx="11" ry="4" fill="#f1f5f9" /></g>)}</g>; })()}
+          {/* Reception (Rosie) — desk → lounge → concierge */}
+          <Spot id="b-reception" label="Reception" poked={poked} labelAt={iso(8.1, 9.4, 86)} badge={customers.length || undefined} onTap={() => tapBuilding("receptionist")}>
+            <IsoBox x={7.2} y={8.6} w={1.8} d={1.6} h={34} color={tier("reception") >= 3 ? "#f8fafc" : "#fff7ed"} /><IsoRoof x={7.2} y={8.6} w={1.8} d={1.6} z={34} rise={22} color={p.primary} />
+            <IsoDoor x={7.2} y={8.6} w={1.8} d={1.6} h={20} color={shade(p.primary, -0.35)} />
+            {tier("reception") >= 1 && <polyline points={pts([iso(7.0, 10.4, 34), iso(9.2, 10.4, 34), iso(9.2, 8.4, 34)])} fill="none" stroke="#fbbf24" strokeWidth="3" />}
+            {tier("reception") >= 2 && (() => { const [sx, sy] = iso(9.6, 9.6); return <g><rect x={sx - 18} y={sy - 12} width="36" height="12" rx="5" fill="#7c3aed" /><rect x={sx - 18} y={sy - 18} width="36" height="8" rx="4" fill="#6d28d9" /><circle cx={sx + 26} cy={sy - 12} r="8" fill="#16a34a" /><rect x={sx + 23} y={sy - 6} width="6" height="8" fill="#92400e" /></g>; })()}
+          </Spot>
+          {/* Accounts (Ada) — the bank */}
+          <Spot id="b-accounts" label="Accounts" poked={poked} labelAt={iso(3.9, 9.9, 92)} onTap={() => tapBuilding("accountant")}>
+            <IsoBox x={3.0} y={9.0} w={1.8} d={1.8} h={38} color="#e2e8f0" /><IsoRoof x={3.0} y={9.0} w={1.8} d={1.8} z={38} rise={24} color="#0f766e" />
+            {(() => { const [cx, cy] = iso(3.9, 9.9, 66); return <g className="ow-coin-sign"><circle cx={cx} cy={cy} r="9" fill="#fbbf24" stroke="#b45309" strokeWidth="2" /><text x={cx} y={cy + 4} textAnchor="middle" fontSize="10" fontWeight="900" fill="#92400e">★</text></g>; })()}
+            <IsoDoor x={3.0} y={9.0} w={1.8} d={1.8} h={22} color="#134e4a" />
+            {(healthMood === "busy" || healthMood === "struggling") && (() => { const [px, py] = iso(5.0, 11.0); return <g className="ow-paper">{[0, 1, healthMood === "struggling" ? 2 : -1].filter((n) => n >= 0).map((n) => <rect key={n} x={px - 10 + n} y={py - 6 - n * 5} width="20" height="5" fill="#fff" stroke="#cbd5e1" />)}</g>; })()}
+          </Spot>
+          <Car tier={tier("car")} primary={p.primary} />
+          {/* Fleet */}
+          {tier("fleet") >= 1 && <g className="ow-van-iso"><IsoBox x={9.7} y={10.3} w={tier("fleet") >= 2 ? 1.6 : 1.2} d={0.7} h={20} z={4} color={p.primary} /><IsoBox x={9.4} y={10.3} w={0.35} d={0.7} h={14} z={4} color={shade(p.primary, -0.15)} />{[[9.8, 11.0], [10.7, 11.0]].map(([wx, wy]) => { const [sx, sy] = iso(wx, wy); return <ellipse key={wx} cx={sx} cy={sy} rx="5" ry="3.5" fill="#111827" />; })}</g>}
+          {tier("fleet") >= 3 && <g><IsoBox x={10.6} y={8.9} w={1.0} d={0.6} h={18} z={4} color={p.secondary} /></g>}
+
+          {/* Farm: every crop is a real open lead */}
+          <Spot id="b-farm" label={`Lead farm · ${crops.length}`} poked={poked} labelAt={iso(10.8, 8.6, 46)} onTap={() => tapBuilding("farm")}>
+            <IsoTile x={9.9} y={7.3} w={1.9} d={2.7} fill="#92400e" />
+            {Array.from({ length: 6 }).map((_, r) => <IsoTile key={r} x={9.95} y={7.4 + r * 0.44} w={1.8} d={0.2} fill="#7c2d12" opacity={0.6} />)}
+            <polyline points={pts([iso(9.85, 10.05, 6), iso(11.85, 10.05, 6), iso(11.85, 7.25, 6)])} fill="none" stroke="#a16207" strokeWidth="2.5" strokeDasharray="5 4" />
+          </Spot>
+          {crops.slice(0, 12).map((c, i) => <CropPlant key={c.id} at={iso(10.25 + (i % 3) * 0.6, 7.6 + Math.floor(i / 3) * 0.62)} crop={c} onTap={demo ? undefined : () => openLead(c.id)} />)}
+          {/* Long grass grows while work piles up */}
+          {grassTufts.map(([gx, gy], i) => { const [sx, sy] = iso(gx, gy); return <g key={i} className="ow-grass-tuft"><path d={`M${sx - 6} ${sy} q2 -14 4 0 M${sx - 1} ${sy} q1 -18 3 0 M${sx + 3} ${sy} q3 -13 5 0`} fill="#3f8f2f" stroke="#2f6f22" strokeWidth="1" /></g>; })}
+          {/* Customers = real new leads queuing outside. Longest wait at the front; the longer they wait, the more fed up they get. */}
+          {[...customers].sort((x, y) => x.createdAt.localeCompare(y.createdAt)).slice(0, 8).map((c, i) => { const hrs = c.createdAt ? workingHoursBetween(c.createdAt, new Date().toISOString()) : 0; const mood = hrs >= 72 ? "angry" : hrs >= 24 ? "bored" : hrs >= 4 ? "impatient" : "calm"; const at = iso(6, 8.5 + i * 0.47); const label = `${c.name || c.title}: ${mood === "calm" ? "just arrived" : mood === "impatient" ? "getting impatient" : mood === "bored" ? "bored — waiting over a working day" : "fed up — waiting over three working days"}`; return <g key={c.id} className={`ow-customer q-${mood}`} style={{ animationDelay: `${i * 0.12}s` }}>
+            <Bean at={at} look={{ color: mood === "angry" ? "#f87171" : ["#93c5fd", "#c4b5fd", "#fda4af", "#86efac", "#fcd34d", "#a5b4fc"][i % 6] }} mood={mood === "calm" ? "calm" : mood === "impatient" ? "concerned" : "panicked"} scale={0.78} className={mood === "calm" ? "" : "impatient"} alert={mood === "angry" || mood === "bored"} label={label} onTap={demo ? undefined : () => openLead(c.id)} />
+            {mood === "bored" && <path className="ow-sweat" d={`M${at[0] + 10} ${at[1] - 30} q3 5 0 7 q-3 -2 0 -7z`} fill="#60a5fa" />}
+            {mood === "angry" && <g className="ow-steam">{[-6, 6].map((dx) => <circle key={dx} cx={at[0] + dx} cy={at[1] - 40} r="3.5" fill="#e5e7eb" />)}</g>}
           </g>; })}
-          {/* Employees — the AI agent's personalities */}
-          {(Object.keys(EMPLOYEES) as EmployeeId[]).map((id) => { const [ex, ey] = stations[id]; const active = id === approaching; const tx = active ? 520 : ex, ty = active ? 470 : ey; return <g key={id} className={`ow-employee${active ? " approaching" : ""} mood-${active ? current?.mood : "calm"}`} style={{ transform: `translate(${tx - ex}px, ${ty - ey}px)` }}>
-            <Person x={ex} y={ey} body={EMPLOYEES[id].colour} mood={active ? current?.mood : healthMood === "struggling" ? "concerned" : "calm"} tool={id === "accountant" || id === "projects" ? "clipboard" : id === "marketing" ? "laptop" : "none"} label={`${EMPLOYEES[id].name}, ${EMPLOYEES[id].title}`} />
-            <text x={ex} y={ey + 50} textAnchor="middle" fontSize="10" fill="#1f2937" fontWeight="700">{EMPLOYEES[id].name}</text>
+          {/* The Tax Man knocks when this month's expenses are missing receipts */}
+          {(demo || data.taxman) && <TaxMan at={iso(6.9, 8.1)} onTap={() => { if (demo) { say("taxman", "Receipts, please! (demo)", ((a) => [a[0], a[1] - 70] as [number, number])(iso(6.9, 8.1))); return; } say("taxman", "Ahem. Some expenses this month have no receipts.", ((a) => [a[0], a[1] - 70] as [number, number])(iso(6.9, 8.1))); setTimeout(() => setPanel({ kind: "expense" }), 700); }} />}
+          {/* Town life: AI agents at work (or snoozing until their scheduled run), staff on jobs, leads visiting */}
+          {(demo ? [{ id: "d-a1", name: "SEO agent", state: "working", task: "Monthly SEO audit" }, { id: "d-a2", name: "Ads agent", state: "scheduled", task: "Weekly Google Ads check" }] : data.agents || []).map((a, i) => a.state === "working"
+            ? <Walker key={a.id} route={ROUTES[i % ROUTES.length]} dur={13 + i * 2} delay={i * 3} reduced={reduced}><Robot label={`${a.name}: working on ${a.task}`} onTap={() => say(`agent-${a.id}`, `${a.name}: working on “${a.task}”`, [500, 210])} /></Walker>
+            : <g key={a.id} transform={`translate(${iso(4.1 + i * 0.5, 8.3)[0]} ${iso(4.1 + i * 0.5, 8.3)[1]})`}><Robot sleeping label={`${a.name}: scheduled — ${a.task}`} onTap={() => say(`agent-${a.id}`, `${a.name}: snoozing until “${a.task}” is due`, [iso(4.1 + i * 0.5, 8.3)[0], iso(4.1 + i * 0.5, 8.3)[1] - 44])} /></g>)}
+          {(data.staffAtWork || []).map((m, i) => <Walker key={m.id} route={ROUTES[(i + 2) % ROUTES.length].slice().reverse()} dur={15 + i * 2} delay={i * 4 + 2} reduced={reduced}><Bean at={[0, 0]} scale={0.85} look={{ color: "#14b8a6", tie: true }} className="walker" label={`${m.name}: ${m.task}`} onTap={() => say(`staff-${m.id}`, `${m.name}: ${m.task}`, [500, 210])} /></Walker>)}
+          {(data.visitors || []).map((v, i) => { const route = /appoint|visit|consult|book/i.test(v.stage) ? there([5.0, 8.4], [2.4, 6.8]) : /propos|quote|negot/i.test(v.stage) ? there([7.4, 8.3], [9.0, 6.8]) : there([8.6, 7.0], [9.6, 9.6]); return <Walker key={v.id} route={route} dur={16 + i * 3} delay={i * 5} reduced={reduced}><Bean at={[0, 0]} scale={0.7} look={{ color: ["#fcd34d", "#a5b4fc", "#86efac", "#fda4af"][i % 4] }} className="walker" label={`${v.name} (${v.stage})`} onTap={demo ? undefined : () => openLead(v.id)} /></Walker>; })}
+          {/* Employees — one AI, six personalities */}
+          {(Object.keys(EMPLOYEES) as EmployeeId[]).sort((a, b) => (EMP_SPOTS[a][0] + EMP_SPOTS[a][1]) - (EMP_SPOTS[b][0] + EMP_SPOTS[b][1])).map((id) => { const at = iso(...EMP_SPOTS[id]); const talking = id === approaching; return <g key={id}>
+            <Bean at={at} look={EMP_LOOK[id]} mood={talking ? current?.mood : healthMood === "struggling" ? "concerned" : "calm"} className={`staff ${talking ? "talking" : ""} ${poked === id ? "poked" : ""} idle-${id}`} label={`${EMPLOYEES[id].name}, ${EMPLOYEES[id].title}`} onTap={() => tapEmployee(id)} alert={talking && (current?.urgency || 0) >= 75} />
+            <text x={at[0]} y={at[1] + 16} textAnchor="middle" fontSize="10" fontWeight="800" fill="#14532d" className="ow-name">{EMPLOYEES[id].name}</text>
           </g>; })}
-          {/* Collectable coins over each employee */}
-          {[...pendingByEmployee.entries()].map(([id, items]) => { const [ex, ey] = stations[id]; const active = id === approaching; return <CoinBubble key={id} x={active ? 520 : ex} y={(active ? 470 : ey) - 58} amount={sumCoins(items)} label={`Collect ${sumCoins(items)} coins from ${EMPLOYEES[id].name}`} onCollect={() => void collect(items.map((x) => x.key))} />; })}
           {/* The owner */}
-          <Person x={580} y={470} body={p.secondary} trim={tier("outfit") >= 2 ? "#d4a017" : p.primary} hat={p.outfit.hat} tool={p.outfit.tool} outfit={p.outfit.outfit} scale={1.25} label={`${p.characterName} (you)`} className={tier("outfit") >= 2 ? "ow-gold" : tier("outfit") >= 1 ? "ow-fresh" : ""} />
-          <text x="580" y="530" textAnchor="middle" fontSize="12" fontWeight="800" fill="#111827">{p.characterName}</text>
-          {coinBurst > 0 && !reduced && <g key={coinBurst} className="ow-coin-fly">{[0, 1, 2, 3, 4, 5].map((k) => <circle key={k} cx={500 + k * 14} cy={420} r="8" fill="#fbbf24" stroke="#d97706" strokeWidth="2" style={{ animationDelay: `${k * 0.06}s` }} />)}</g>}
+          {(() => { const at = iso(7.0, 11.5); return <g><Bean at={at} scale={1.2} look={{ color: tier("wardrobe") >= 1 ? shade(p.primary, -0.08) : p.primary, trim: p.secondary, hat: tier("wardrobe") >= 4 ? undefined : p.outfit.hat, tool: p.outfit.tool, tie: tier("wardrobe") >= 2, shades: tier("wardrobe") >= 3, crown: tier("wardrobe") >= 4 }} className={`owner ${poked === "owner" ? "poked" : ""}`} label={`${p.characterName} (you)`} onTap={() => tapOwner()} /><text x={at[0]} y={at[1] + 18} textAnchor="middle" fontSize="11" fontWeight="900" fill="#14532d">{p.characterName}</text></g>; })()}
+          {/* Collectable coins */}
+          {[...pendingByEmployee.entries()].map(([id, items]) => { const at = iso(...EMP_SPOTS[id]); return <CoinBubble key={id} x={at[0]} y={at[1] - 70} amount={sumCoins(items)} label={`Collect ${sumCoins(items)} coins from ${EMPLOYEES[id].name}`} onCollect={() => void collect(items.map((x) => x.key))} />; })}
+          {coinBurst > 0 && !reduced && <g key={coinBurst} className="ow-coin-fly">{[0, 1, 2, 3, 4, 5].map((k) => <circle key={k} cx={480 + k * 10} cy={380} r="8" fill="#fbbf24" stroke="#b45309" strokeWidth="2" style={{ animationDelay: `${k * 0.06}s` }} />)}</g>}
         </svg>
+        {bubble && <div className="ow-bubble" style={{ left: `${bubble.at[0] / 10}%`, top: `${bubble.at[1] / 5.6}%` }} key={bubble.n}>{bubble.text}</div>}
+        </div>
 
         <div className={`ow-dialogue${current ? "" : " clear"}`} aria-live="polite">
           {current ? <>
@@ -435,13 +714,13 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
 
     {drawer && <Drawer kind={drawer} data={data} wallet={w} demo={demo} onClose={() => setDrawer("")} post={post} buy={buy} onChanged={() => void load(true)} />}
 
-    {panel && <div className="ow-panel" role="dialog" aria-label={PANEL_TITLES[panel.kind]}>
+    {panel && (panel.kind === "lead-replies" || panel.kind === "lead-detail") && <div className="ow-modal-scrim" onClick={(e) => { if (e.target === e.currentTarget) closePanel(); }}><div className="ow-card-modal" role="dialog" aria-label={PANEL_TITLES[panel.kind]}>
+      <header><b>{panel.kind === "lead-detail" ? "Customer" : "AI-prepared replies"}</b><button type="button" className="ghost" onClick={closePanel} aria-label="Close"><X size={18} /></button></header>
+      <LeadReplies scope={scope} focusId={panel.kind === "lead-detail" ? panel.focusId : undefined} customers={[...data.customers, ...(data.crops || []).filter((c) => !data.customers.some((x) => x.id === c.id)).map((c) => ({ id: c.id, title: c.name, name: c.name, createdAt: "", stage: "", value: 0, currency: "EUR" }))]} mode={data.state.mode} post={post} onOpen={(k) => setPanel({ kind: k })} />
+    </div></div>}
+    {panel && panel.kind !== "lead-replies" && panel.kind !== "lead-detail" && <div className="ow-panel" role="dialog" aria-label={PANEL_TITLES[panel.kind]}>
       <header><button type="button" onClick={closePanel}><ArrowLeft size={18} /> Back to {p.name}</button><b>{PANEL_TITLES[panel.kind]}</b><button type="button" onClick={closePanel} aria-label="Close"><X size={18} /></button></header>
-      <div className="ow-panel-body">
-        {panel.kind === "lead-replies" || panel.kind === "lead-detail"
-          ? <LeadReplies scope={scope} focusId={panel.kind === "lead-detail" ? panel.focusId : undefined} customers={data.customers} mode={data.state.mode} post={post} onOpen={(k) => setPanel({ kind: k })} />
-          : renderPanel(panel.kind, { focusId: panel.focusId, onDone: closePanel })}
-      </div>
+      <div className="ow-panel-body">{renderPanel(panel.kind, { focusId: panel.focusId, onDone: closePanel })}</div>
     </div>}
   </div>;
 }
@@ -557,13 +836,13 @@ function Drawer({ kind, data, wallet: w, demo, onClose, post, buy, onChanged }: 
     {kind === "upgrades" && <>
       <div className="ow-balance"><Coins size={18} /> <b>{w.coins.toLocaleString("en-IE")}</b> coins · Level {w.level}</div>
       <p className="ow-muted">Earn coins from real work, collect them from your team, then spend them here. Levels unlock higher tiers.</p>
-      <ul className="ow-tracks">{UPGRADES.map((t) => { const have = upgradeTier(w.owned, t.id); const next = nextUpgrade(t.id, w.owned); const locked = next ? w.level < next.minLevel : false; const short = next ? w.coins < next.price : false; return <li key={t.id}>
-        <div className="ow-track-top"><b>{t.name}</b><span className="ow-pips" aria-label={`Tier ${have} of ${t.tiers.length}`}>{t.tiers.map((x) => <i key={x.tier} className={x.tier <= have ? "on" : ""} />)}</span></div>
+      {(["business", "lifestyle"] as const).map((group) => <div key={group}><h4 className="ow-group-title">{group === "business" ? "Your business" : "Your lifestyle"}</h4><ul className="ow-tracks">{UPGRADES.filter((t) => t.group === group).map((t) => { const have = upgradeTier(w.owned, t.id); const next = nextUpgrade(t.id, w.owned); const locked = next ? w.level < next.minLevel : false; const short = next ? w.coins < next.price : false; return <li key={t.id}>
+        <div className="ow-track-row"><UpgradeArt id={t.id} tier={Math.max(1, Math.min(t.tiers.length, have + 1))} primary={data.profile.primary} secondary={data.profile.secondary} /><div className="ow-track-info"><div className="ow-track-top"><b>{t.name}</b><span className="ow-pips" aria-label={`Tier ${have} of ${t.tiers.length}`}>{t.tiers.map((x) => <i key={x.tier} className={x.tier <= have ? "on" : ""} />)}</span></div>
         <small>{have ? `Now: ${t.tiers[have - 1].name}` : "Not built yet"}</small>
         {next ? <div className="ow-track-next"><div><b>{next.name}</b><small>{next.perk}</small></div>
           <button type="button" disabled={locked || short || busy === t.id} className={locked || short ? "ghost" : ""} onClick={() => void upgrade(t.id)}>{locked ? <><Lock size={13} /> Level {next.minLevel}</> : busy === t.id ? <Loader2 size={13} className="ow-spin" /> : <><Coins size={13} /> {next.price.toLocaleString("en-IE")}</>}</button></div>
           : <small className="ow-ok">Fully upgraded</small>}
-      </li>; })}</ul>
+      </div></div></li>; })}</ul></div>)}
     </>}
     {kind === "settings" && <>
       <h4>Character & branding</h4>
