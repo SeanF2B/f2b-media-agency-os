@@ -509,3 +509,24 @@ html.f2b-world .page-content { max-width: none !important; padding: 0 !important
 .ow-ideas li { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 12px; background: #f0f9ff; border: 1px solid #bae6fd; color: #0c4a6e; font-size: 13px; animation: ow-rise .35s var(--ow-smooth) both; }
 .ow-ideas li span { flex: 1; color: #0c4a6e; }
 .ow-ideas li button { padding: 6px 10px !important; font-size: 12px !important; }
+
+/* ═════════ Stability: no hover-lift loops, calm scene ═════════ */
+.ow-spot:hover .ow-spot-body, .ow-spot:focus-visible .ow-spot-body { transform: none !important; }
+.ow-plot:hover .ow-plot-body, .ow-crop:hover .ow-crop-body, .ow-coin-bubble:hover .ow-coin-bob { transform: none !important; }
+.ow-stage .ow-bean-body, .ow-water, .ow-tree circle, .ow-grass-tuft, .ow-crop-body, .ow-clock-hand, .ow-coin-sign, .ow-flowers *, .ow-sparkle, .ow-splash, .ow-led, .ow-zone.on, .ow-screen, .ow-flag path { animation: none !important; }
+.ow-spot:hover .ow-spot-body { filter: brightness(1.06) drop-shadow(0 0 4px rgba(255,255,255,.85)); }
+.ow-walker, .walker .ow-bean-body { animation: none !important; }
+.ow-full .ow-stage-wrap > svg { padding: 96px 0 min(22vh, 180px); }
+
+/* ═════════ Cleaner panels, close buttons, onboarding chip ═════════ */
+.ow-dialogue, .ow-dept-panel, .ow-card-modal, .ow-walk, .ow-levelup { animation: ow-fade .2s ease-out both; }
+@keyframes ow-fade { from { opacity: 0; } }
+.ow-dept-feed li { animation: none; }
+.ow-close { position: absolute; top: 10px; right: 10px; width: 30px; height: 30px; padding: 0; display: grid; place-items: center; border-radius: 999px; }
+.ow-dept-head { padding-right: 36px; }
+.ow-dialogue { padding-right: 46px; }
+.ow-dialogue .ow-next { right: 10px; bottom: 10px; top: auto; }
+.ow-brief-pill { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 15; padding: 10px 18px; border-radius: 999px; border: 0; background: #111827; color: #fff; font-weight: 700; font-size: 13px; box-shadow: 0 8px 22px rgba(15,23,42,.25); cursor: pointer; }
+.ow-next-unlock { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: rgba(255,255,255,.9); color: #44403c; font-size: 12px; font-weight: 700; white-space: nowrap; }
+@media (max-width: 900px) { .ow-next-unlock { display: none; } }
+.ow-full .ow-dept-panel { max-height: min(30vh, 260px); }

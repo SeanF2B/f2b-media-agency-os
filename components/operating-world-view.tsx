@@ -173,7 +173,7 @@ function Spot({ id, label, poked, onTap, children, labelAt, badge, badgeAt, badg
   </g>;
 }
 
-type BeanLook = { hair?: string; top?: "jacket" | "polo" | "hivis"; glasses?: boolean; color: string; accessory?: "headset" | "tie" | "glasses" | "hardhat" | "beret" | "clock" | "crown"; hat?: string; tool?: string; trim?: string; tie?: boolean; shades?: boolean; crown?: boolean };
+type BeanLook = { figure?: "male" | "female"; hair?: string; top?: "jacket" | "polo" | "hivis"; glasses?: boolean; color: string; accessory?: "headset" | "tie" | "glasses" | "hardhat" | "beret" | "clock" | "crown"; hat?: string; tool?: string; trim?: string; tie?: boolean; shades?: boolean; crown?: boolean };
 /** Adult characters: realistic proportions, role-based clothing, one neutral stylised tone (no skin tones), understated faces. */
 function Bean({ at, look, mood = "calm", scale = 1, className = "", label, onTap, alert }: { at: [number, number]; look: BeanLook; mood?: string; scale?: number; className?: string; label: string; onTap?: () => void; alert?: boolean }) {
   const jacket = look.color, jacketDark = shade(jacket, -0.28), skin = "#d6d3d1", skinShade = "#bcb8b4", hair = "#3f3f46";
@@ -190,7 +190,7 @@ function Bean({ at, look, mood = "calm", scale = 1, className = "", label, onTap
       {/* torso + arms */}
       <rect x="-10.5" y="-34" width="3.4" height="15" rx="1.7" fill={jacketDark} /><rect x="7.1" y="-34" width="3.4" height="15" rx="1.7" fill={jacketDark} />
       <circle cx="-8.8" cy="-18.5" r="1.8" fill={skin} /><circle cx="8.8" cy="-18.5" r="1.8" fill={skin} />
-      <path d="M-8 -35 h16 a2 2 0 0 1 2 2 v15 h-20 v-15 a2 2 0 0 1 2 -2z" fill={jacket} />
+      {look.figure === "female" ? <><path d="M-7 -35 h14 a2 2 0 0 1 2 2 l-1.4 7 l1.4 8 h-17 l1.4 -8 l-1.4 -7 a2 2 0 0 1 2 -2z" fill={jacket} /><path d="M-8.5 -19 h17 l2 8 h-21z" fill={shade(trousers, 0.05)} /></> : <path d="M-8 -35 h16 a2 2 0 0 1 2 2 v15 h-20 v-15 a2 2 0 0 1 2 -2z" fill={jacket} />}
       {!hivis && look.top !== "polo" && <path d="M-3.2 -35 L0 -29 L3.2 -35 Z" fill="#f8fafc" />}
       {look.top === "polo" && <path d="M-3.4 -35 L0 -32 L3.4 -35 L2 -31 L-2 -31 Z" fill={shade(jacket, 0.25)} />}
       {hivis && <><rect x="-8" y="-29" width="16" height="2" fill="#fef08a" opacity=".9" /><rect x="-8" y="-23" width="16" height="2" fill="#fef08a" opacity=".9" /></>}
@@ -203,6 +203,7 @@ function Bean({ at, look, mood = "calm", scale = 1, className = "", label, onTap
       {hairStyle === "part" && <path d="M-5.6 -43.5 q0 -7 6 -6.6 q5.6 0.4 5.2 6 q-3 -3.4 -6.4 -3.2 q-3 0.2 -4.8 3.8z" fill={hair} />}
       {hairStyle === "bob" && <path d="M-6 -40 q-1 -10 6 -10 q7 0 6 10 l-1.6 0 q0 -5 -4.4 -6 q-4 1 -4.4 6z" fill={hair} />}
       {hairStyle === "wave" && <path d="M-5.8 -44 q1 -7 6 -6.6 q5 0 5.6 6.4 q-1.8 -2 -3 -1 q-1.5 -2 -3 -0.6 q-1.6 -1.6 -3 0 q-1.4 -1.4 -2.6 1.8z" fill={hair} />}
+      {hairStyle === "long" && <path d="M-6 -36 q-1.4 -14 6 -14 q7.4 0 6 14 l-2 0 q0.4 -8 -4 -9 q-4.4 1 -4 9z" fill={hair} />}
       {hairStyle === "short" && !look.hat && !hivis && <path d="M-5.4 -44 a5.4 5.4 0 0 1 10.8 0 q-5.4 -2.4 -10.8 0z" fill={hair} />}
       {mood === "tired" ? <><path d="M-3 -43 h2" stroke="#27272a" strokeWidth=".8" /><path d="M1 -43 h2" stroke="#27272a" strokeWidth=".8" /></> : <><circle cx="-2" cy="-43" r="0.9" fill="#27272a" /><circle cx="2" cy="-43" r="0.9" fill="#27272a" /></>}
       {brows && <><path d="M-3.4 -45.6 L-0.8 -45" stroke="#27272a" strokeWidth=".8" strokeLinecap="round" /><path d="M3.4 -45.6 L0.8 -45" stroke="#27272a" strokeWidth=".8" strokeLinecap="round" /></>}
@@ -314,9 +315,9 @@ function Pool({ tier, primary }: { tier: number; primary: string }) {
     {tier >= 3 && (() => { const [sx, sy] = iso(9.6, 3.7); return <g className="ow-float"><ellipse cx={sx} cy={sy} rx="7" ry="4" fill="none" stroke="#f472b6" strokeWidth="3.5" /><path d={`M${sx + 22} ${sy - 30} Q${sx + 36} ${sy - 44} ${sx + 50} ${sy - 30} Z`} fill={primary} /><rect x={sx + 35} y={sy - 30} width="2" height="24" fill="#6b7280" /></g>; })()}
   </g>;
 }
-function Car({ tier, primary }: { tier: number; primary: string }) {
+function Car({ tier, primary, at }: { tier: number; primary: string; at?: [number, number] }) {
   if (!tier) return null;
-  const [x, y] = iso(8.4, 8.0);
+  const [x, y] = at || iso(8.4, 8.0);
   const body = tier >= 3 ? (tier >= 4 ? "#111827" : "#dc2626") : primary;
   const len = tier === 2 ? 44 : 38, tall = tier === 2 ? 20 : tier >= 3 ? 11 : 15;
   return <g className="ow-car" transform={`translate(${x} ${y}) rotate(26.6)`}>
@@ -476,7 +477,7 @@ function HQInterior({ data, wallet, approaches, selected, onSelect, reduced, cus
     {art >= 1 && [[0, 3.3], [0, 6.4]].map(([, t], i) => { const a = isoIn(0, t, 50), b = isoIn(0, t + 1.0, 50); return <polygon key={`art${i}`} points={ptsIn([a, b, [b[0], b[1] - 34], [a[0], a[1] - 34]])} fill={art >= 2 ? (i ? "#7c3aed" : "#0f766e") : "#f5f5f4"} stroke={art >= 2 ? "#d4a017" : "#a8a29e"} strokeWidth="2.5" />; })}
     {art >= 3 && (() => { const c = isoIn(5.0, 6.2); return <g><rect x={c[0] - 7} y={c[1] - 14} width="14" height="14" fill="#e7e5e4" /><path d={`M${c[0] - 8} ${c[1] - 14} q8 -30 16 0 z`} fill="#d4a017" /></g>; })()}
     {/* zone rugs (tap a department) */}
-    {(Object.keys(ZONES) as Array<RoomId | "break">).filter((id) => agency ? id !== "break" : id !== "leadgen").map((id) => { const z = ZONES[id]; const col = id === "break" ? "#a8a29e" : id === "boss" ? p.primary : id === "leadgen" ? "#0e7490" : EMPLOYEES[id].colour; const on = id === selected; return <polygon key={id} className={`ow-zone${on ? " on" : ""}`} points={ptsIn([isoIn(z.x + 0.15, z.y + 0.15), isoIn(z.x + z.w - 0.15, z.y + 0.15), isoIn(z.x + z.w - 0.15, z.y + z.d - 0.15), isoIn(z.x + 0.15, z.y + z.d - 0.15)])} fill={shade(col, 0.55)} opacity={on ? 0.95 : 0.7} stroke={on ? col : "none"} strokeWidth="3" onClick={id === "break" ? undefined : zoneTap(id)} role={id === "break" ? undefined : "button"} aria-label={id === "break" ? "Break room" : ROOM_NAME[id]} />; })}
+    {(Object.keys(ZONES) as Array<RoomId | "break">).filter((id) => agency ? id !== "break" : id !== "leadgen").map((id) => { const z = ZONES[id]; const col = id === "break" ? "#a8a29e" : id === "boss" ? p.primary : id === "leadgen" ? "#0e7490" : EMPLOYEES[id].colour; const on = id === selected; return <polygon key={id} className={`ow-zone${on ? " on" : ""}`} points={ptsIn([isoIn(z.x + 0.15, z.y + 0.15), isoIn(z.x + z.w - 0.15, z.y + 0.15), isoIn(z.x + z.w - 0.15, z.y + z.d - 0.15), isoIn(z.x + 0.15, z.y + z.d - 0.15)])} fill={shade(col, 0.62)} opacity={on ? 0.9 : 0.5} stroke={on ? col : "none"} strokeWidth="3" onClick={id === "break" ? undefined : zoneTap(id)} role={id === "break" ? undefined : "button"} aria-label={id === "break" ? "Break room" : ROOM_NAME[id]} />; })}
     {/* boss office glass */}
     {office >= 2 && <g opacity=".55"><polygon points={ptsIn([isoIn(0.3, 6.6), isoIn(6.4, 6.6), isoIn(6.4, 6.6, 70), isoIn(0.3, 6.6, 70)])} fill="#bae6fd" /><polygon points={ptsIn([isoIn(6.4, 6.6), isoIn(6.4, 9.7), isoIn(6.4, 9.7, 70), isoIn(6.4, 6.6, 70)])} fill="#bae6fd" /></g>}
     {/* break room */}
@@ -490,13 +491,13 @@ function HQInterior({ data, wallet, approaches, selected, onSelect, reduced, cus
       </g>; })}
     {/* meeting room in your office */}
     {meeting >= 1 && <g><BoxIn x={3.6} y={7.3} w={meeting >= 2 ? 2.2 : 1.4} d={1.2} h={14} color={meeting >= 2 ? "#3b2a1e" : "#a8a29e"} />{Array.from({ length: meeting >= 2 ? 6 : 4 }).map((_, i) => { const c = isoIn(3.5 + (i % (meeting >= 2 ? 3 : 2)) * 0.8, i < (meeting >= 2 ? 3 : 2) ? 7.1 : 8.7); return <rect key={i} x={c[0] - 4} y={c[1] - 9} width="8" height="8" rx="2" fill="#27272a" />; })}{meeting >= 3 && (() => { const a = isoIn(0, 8.6, 40), b = isoIn(0, 9.8, 40); return <polygon points={ptsIn([a, b, [b[0], b[1] - 36], [a[0], a[1] - 36]])} fill="#0f172a" stroke={p.primary} strokeWidth="2" className="ow-screen" />; })()}</g>}
-    {/* department name plates */}
-    {(Object.keys(ROOM_NAME) as RoomId[]).filter((id) => agency || id !== "leadgen").map((id) => { const z = ZONES[id]; const c = isoIn(z.x + 0.35, z.y + 0.35, 2); const label = ROOM_NAME[id].toUpperCase(); const n = id === "boss" || id === "leadgen" ? 0 : (boards?.[id as EmployeeId]?.stats?.[0]?.value || ""); return <g key={`pl-${id}`} className="ow-plate-in" onClick={zoneTap(id)} transform={`translate(${c[0]} ${c[1] - 6})`}><rect x={-label.length * 4.1 - 12} y="-12" width={label.length * 8.2 + 24} height="23" rx="11.5" fill={id === selected ? (id === "boss" ? p.primary : id === "leadgen" ? "#0e7490" : EMPLOYEES[id as EmployeeId].colour) : "rgba(17,24,39,.82)"} stroke="#fff" strokeWidth="1.5" /><text y="4" textAnchor="middle" fontSize="11.5" fontWeight="900" letterSpacing=".6" fill="#fff">{label}</text>{n && n !== "0" && /^\d+$/.test(String(n)) ? <g transform={`translate(${label.length * 4.1 + 13} -11)`}><circle r="8" fill="#dc2626" stroke="#fff" strokeWidth="1.5" /><text y="3.5" textAnchor="middle" fontSize="9" fontWeight="900" fill="#fff">{n}</text></g> : null}</g>; })}
     {/* decor */}
     {decor >= 2 && [[0.3, 3.2], [3.2, 0.3], [9.6, 3.2], [0.3, 9.4], [6.4, 0.3]].map(([px, py], i) => { const c = isoIn(px, py); return <g key={i}><rect x={c[0] - 5} y={c[1] - 10} width="10" height="10" rx="2" fill="#78716c" /><circle cx={c[0]} cy={c[1] - 18} r="9" fill="#3f6212" /><circle cx={c[0] - 5} cy={c[1] - 13} r="6" fill="#4d7c0f" /></g>; })}
     {decor >= 1 && [[2, 2], [5, 2], [8, 2], [2, 5], [5, 5], [8, 5], [8, 8]].map(([lx, ly], i) => { const c = isoIn(lx, ly, H - 18); return <g key={i}><line x1={c[0]} y1={c[1] - 14} x2={c[0]} y2={c[1]} stroke="#52525b" /><circle cx={c[0]} cy={c[1] + 3} r="5" fill="#fde68a" className={decor >= 3 ? "ow-sparkle" : ""} /><circle cx={c[0]} cy={c[1] + 3} r="14" fill="#fde68a" opacity=".15" /></g>; })}
     {/* Lead generation team (agency): Leo runs Lead Factory, Olive runs Outreach */}
     {agency && LEADGEN_TEAM.map((m, i) => { const z = ZONES.leadgen; const cx = z.x + 0.15 + i * 1.45, cy = z.y + z.d / 2 - 0.2; const at = isoIn(cx + 0.55, cy - 0.35); return <g key={m.name} className="ow-dept" onClick={zoneTap("leadgen")} role="button" tabIndex={0} aria-label={`Lead generation: ${m.name}, ${m.title}`} onKeyDown={(e) => { if (e.key === "Enter") onSelect("leadgen"); }}><Bean at={at} scale={1.5} look={m.look} mood={bare ? "tired" : "calm"} className={`staff ${bare ? "slouch" : ""}`} label="" /><Desk x={cx} y={cy} furniture={furniture} tech={tech} primary={p.primary} /></g>; })}
+    {/* department name plates */}
+    {(Object.keys(ROOM_NAME) as RoomId[]).filter((id) => agency || id !== "leadgen").map((id) => { const z = ZONES[id]; const c = isoIn(z.x + z.w / 2, z.y + z.d / 2 - 0.55, 104); const label = ROOM_NAME[id].toUpperCase(); const n = id === "boss" || id === "leadgen" ? 0 : (boards?.[id as EmployeeId]?.stats?.[0]?.value || ""); return <g key={`pl-${id}`} className="ow-plate-in" onClick={zoneTap(id)} transform={`translate(${c[0]} ${c[1] - 6})`}><rect x={-label.length * 3.4 - 10} y="-10" width={label.length * 6.8 + 20} height="19" rx="9.5" fill={id === selected ? (id === "boss" ? p.primary : id === "leadgen" ? "#0e7490" : EMPLOYEES[id as EmployeeId].colour) : "rgba(17,24,39,.82)"} stroke="none" /><text y="3.4" textAnchor="middle" fontSize="9.5" fontWeight="800" letterSpacing=".8" fill="#fff">{label}</text>{n && n !== "0" && /^\d+$/.test(String(n)) ? <g transform={`translate(${label.length * 3.4 + 11} -9)`}><circle r="8" fill="#dc2626" stroke="none" /><text y="3.5" textAnchor="middle" fontSize="9" fontWeight="900" fill="#fff">{n}</text></g> : null}</g>; })}
     {/* AI agents at work (or snoozing in the break room) and team members on jobs */}
     {(data.agents || []).map((a, i) => { const at = a.state === "working" ? isoIn(1.2 + (i % 3) * 0.8, 2.9 + Math.floor(i / 3) * 0.6) : isoIn(4.2 + i * 0.6, 5.9); return <g key={a.id} transform={`translate(${at[0]} ${at[1]}) scale(1.3)`}><Robot sleeping={a.state !== "working"} label={`${a.name}: ${a.state === "working" ? "working on" : "scheduled —"} ${a.task}`} /></g>; })}
     {(data.staffAtWork || []).map((m, i) => <Bean key={m.id} at={isoIn(7.2 + i * 0.6, 6.1)} scale={1.4} look={{ color: "#3f5f6f", tie: true }} className="staff" label={`${m.name}: ${m.task}`} />)}
@@ -508,7 +509,7 @@ function HQInterior({ data, wallet, approaches, selected, onSelect, reduced, cus
 }
 
 /** Live board for a department: real stats, latest activity and buttons into the CRM. */
-function DeptPanel({ id, data, wallet, approach, onOpen, onAct, onCharacter, post, demo }: { id: RoomId; data: WorldData; wallet: Wallet; approach?: Approach; onOpen: (k: PanelKind) => void; onAct: (a: "upgrades" | "history" | "settings") => void; onCharacter: () => void; post: (p: Record<string, unknown>) => Promise<any>; demo: boolean }) {
+function DeptPanel({ id, data, wallet, approach, onOpen, onAct, onCharacter, post, demo, onClose }: { onClose: () => void; id: RoomId; data: WorldData; wallet: Wallet; approach?: Approach; onOpen: (k: PanelKind) => void; onAct: (a: "upgrades" | "history" | "settings") => void; onCharacter: () => void; post: (p: Record<string, unknown>) => Promise<any>; demo: boolean }) {
   const [ideas, setIdeas] = useState<Array<{ text: string; panel: PanelKind }> | null>(null);
   const [thinking, setThinking] = useState(false); const [ideaErr, setIdeaErr] = useState("");
   const [hidden, setHidden] = useState<number[]>([]);
@@ -527,7 +528,7 @@ function DeptPanel({ id, data, wallet, approach, onOpen, onAct, onCharacter, pos
     boss: [{ label: "Customise character", act: "character" }, { label: "Upgrades", act: "upgrades" }, { label: "Rewards & history", act: "history" }, { label: "Settings", act: "settings" }],
   };
   return <div className="ow-dept-panel" key={id}>
-    <div className="ow-dept-head">{id === "boss" ? <Portrait look={ownerLookFrom(data.profile, data.profile.look || {}, upgradeTier(wallet.owned, "wardrobe"))} bg={data.profile.primary} size={52} /> : id === "leadgen" ? <Portrait look={LEADGEN_TEAM[0].look} bg="#0e7490" size={52} /> : staffPortrait(id, 52)}<div><small>{ROOM_NAME[id]} · {person.name}, {person.title}</small><p className={approach && approach.urgency >= 75 ? "shout" : ""}>{approach ? approach.line : board ? board.headline : `${wallet.coins.toLocaleString("en-IE")} coins · Level ${wallet.level}`}</p></div><span className="ow-live"><i /> Live</span></div>
+    <div className="ow-dept-head">{id === "boss" ? <Portrait look={ownerLookFrom(data.profile, data.profile.look || {}, upgradeTier(wallet.owned, "wardrobe"))} bg={data.profile.primary} size={52} /> : id === "leadgen" ? <Portrait look={LEADGEN_TEAM[0].look} bg="#0e7490" size={52} /> : staffPortrait(id, 52)}<div><small>{ROOM_NAME[id]} · {person.name}, {person.title}</small><p className={approach && approach.urgency >= 75 ? "shout" : ""}>{approach ? approach.line : board ? board.headline : `${wallet.coins.toLocaleString("en-IE")} coins · Level ${wallet.level}`}</p></div><span className="ow-live"><i /> Live</span><button type="button" className="ghost ow-close" onClick={onClose} aria-label="Close panel"><X size={16} /></button></div>
     {board && <div className="ow-dept-stats">{board.stats.map((s) => <div key={s.label}><b>{s.value}</b><small>{s.label}</small></div>)}</div>}
     {upgradeTier(wallet.owned, "furniture") === 0 && id !== "boss" && id !== "leadgen" && <p className="ow-hint">Working off cardboard boxes… Upgrade <b>Office furniture</b> and <b>Office tech</b> to give {person.name} a proper desk.</p>}
     {board && board.feed.length > 0 && <ul className="ow-dept-feed">{board.feed.map((f, i) => <li key={i}><span>{f.text}</span><time>{new Date(f.at).toLocaleString("en-IE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</time></li>)}</ul>}
@@ -545,18 +546,19 @@ function DeptPanel({ id, data, wallet, approach, onOpen, onAct, onCharacter, pos
 
 // ───────────── Character editor ─────────────
 const CHAR_OPTIONS = {
-  hair: [{ v: "short", label: "Short" }, { v: "part", label: "Side part" }, { v: "bun", label: "Bun" }, { v: "bob", label: "Bob" }, { v: "wave", label: "Wavy" }, { v: "none", label: "Shaved" }],
+  figure: [{ v: "male", label: "Male" }, { v: "female", label: "Female" }],
+  hair: [{ v: "long", label: "Long" }, { v: "short", label: "Short" }, { v: "part", label: "Side part" }, { v: "bun", label: "Bun" }, { v: "bob", label: "Bob" }, { v: "wave", label: "Wavy" }, { v: "none", label: "Shaved" }],
   top: [{ v: "jacket", label: "Blazer" }, { v: "polo", label: "Polo" }, { v: "hivis", label: "Hi-vis" }],
   colour: [{ v: "primary", label: "Brand" }, { v: "secondary", label: "Brand dark" }, { v: "#1f2937", label: "Charcoal" }, { v: "#1e3a5f", label: "Navy" }, { v: "#f5f5f4", label: "White" }, { v: "#3f6212", label: "Olive" }],
   hat: [{ v: "auto", label: "Trade hat" }, { v: "none", label: "None" }, { v: "cap", label: "Cap" }, { v: "hardhat", label: "Hard hat" }, { v: "beanie", label: "Beanie" }],
   extra: [{ v: "glasses", label: "Glasses", min: 0 }, { v: "tie", label: "Tie", min: 2 }, { v: "shades", label: "Designer shades", min: 3 }, { v: "crown", label: "Golden crown", min: 4 }],
 };
-export type CharLook = { hair?: string; top?: string; colour?: string; hat?: string; extras?: string[] };
+export type CharLook = { figure?: string; hair?: string; top?: string; colour?: string; hat?: string; extras?: string[] };
 function ownerLookFrom(p: Profile, look: CharLook, wardrobe: number): BeanLook {
   const colour = look.colour === "secondary" ? p.secondary : look.colour && look.colour !== "primary" ? look.colour : p.primary;
   const ex = new Set((look.extras || []).filter((e) => (CHAR_OPTIONS.extra.find((o) => o.v === e)?.min || 0) <= wardrobe));
   const hat = look.hat === "none" ? undefined : look.hat && look.hat !== "auto" ? look.hat : p.outfit.hat === "none" ? undefined : p.outfit.hat;
-  return { color: colour, trim: p.secondary, hat: ex.has("crown") ? undefined : hat, tool: p.outfit.tool, hair: look.hair || "short", top: (look.top as BeanLook["top"]) || (p.outfit.outfit === "hivis" ? "hivis" : "jacket"), glasses: ex.has("glasses"), tie: ex.has("tie"), shades: ex.has("shades"), crown: ex.has("crown") };
+  return { figure: look.figure === "female" ? "female" : "male", color: colour, trim: p.secondary, hat: ex.has("crown") ? undefined : hat, tool: p.outfit.tool, hair: look.hair || "short", top: (look.top as BeanLook["top"]) || (p.outfit.outfit === "hivis" ? "hivis" : "jacket"), glasses: ex.has("glasses"), tie: ex.has("tie"), shades: ex.has("shades"), crown: ex.has("crown") };
 }
 function CharacterEditor({ data, wardrobe, onSave, onClose }: { data: WorldData; wardrobe: number; onSave: (look: CharLook) => Promise<void>; onClose: () => void }) {
   const [look, setLook] = useState<CharLook>(() => ({ ...(data.profile.look || {}) }));
@@ -564,12 +566,13 @@ function CharacterEditor({ data, wardrobe, onSave, onClose }: { data: WorldData;
   const set = (k: keyof CharLook, v: string) => setLook((l) => ({ ...l, [k]: v }));
   const toggle = (v: string) => setLook((l) => { const ex = new Set(l.extras || []); if (ex.has(v)) ex.delete(v); else ex.add(v); return { ...l, extras: [...ex] }; });
   const preview = ownerLookFrom(data.profile, look, wardrobe);
-  const Chips = ({ k, list }: { k: "hair" | "top" | "colour" | "hat"; list: Array<{ v: string; label: string }> }) => <div className="ow-chips">{list.map((o) => <button type="button" key={o.v} className={(look[k] || (k === "hat" ? "auto" : k === "colour" ? "primary" : k === "top" ? "" : "short")) === o.v ? "" : "ghost"} onClick={() => set(k, o.v)}>{k === "colour" && <i className="ow-swatch" style={{ background: o.v === "primary" ? data.profile.primary : o.v === "secondary" ? data.profile.secondary : o.v }} />}{o.label}</button>)}</div>;
+  const Chips = ({ k, list }: { k: "figure" | "hair" | "top" | "colour" | "hat"; list: Array<{ v: string; label: string }> }) => <div className="ow-chips">{list.map((o) => <button type="button" key={o.v} className={(look[k] || (k === "figure" ? "male" : k === "hat" ? "auto" : k === "colour" ? "primary" : k === "top" ? "" : "short")) === o.v ? "" : "ghost"} onClick={() => set(k, o.v)}>{k === "colour" && <i className="ow-swatch" style={{ background: o.v === "primary" ? data.profile.primary : o.v === "secondary" ? data.profile.secondary : o.v }} />}{o.label}</button>)}</div>;
   return <div className="ow-modal-scrim" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}><div className="ow-card-modal ow-char" role="dialog" aria-label="Customise your character">
     <header><b>Customise {data.profile.characterName}</b><button type="button" className="ghost" onClick={onClose} aria-label="Close"><X size={18} /></button></header>
     <div className="ow-char-grid">
       <div className="ow-char-preview"><svg viewBox="-50 -110 100 120" aria-hidden="true"><ellipse cx="0" cy="2" rx="34" ry="8" fill="#e7e5e4" /><Bean at={[0, 0]} scale={2.1} look={preview} label="" className="staff" /></svg><small>Wardrobe tier {wardrobe} · unlock more in Upgrades</small></div>
       <div className="ow-char-options">
+        <h4>Character</h4><Chips k="figure" list={CHAR_OPTIONS.figure} />
         <h4>Hair</h4><Chips k="hair" list={CHAR_OPTIONS.hair} />
         <h4>Outfit</h4><Chips k="top" list={CHAR_OPTIONS.top} />
         <h4>Colour</h4><Chips k="colour" list={CHAR_OPTIONS.colour} />
@@ -612,11 +615,10 @@ function ReceiptRush({ stolen, demo, onDone, sound }: { stolen: number; demo: bo
   </div>;
 }
 
-// ───────────── Guided tour with voice-over ─────────────
+// ───────────── Guided tour ─────────────
 type TourStep = { sel?: string; title: string; text: string };
 function GuidedTour({ steps, onClose }: { steps: TourStep[]; onClose: () => void }) {
   const [i, setI] = useState(0);
-  const [voice, setVoice] = useState(() => readPref("ow-voice", "on") === "on");
   const [rect, setRect] = useState<DOMRect | null>(null);
   const step = steps[i];
   useEffect(() => {
@@ -624,15 +626,6 @@ function GuidedTour({ steps, onClose }: { steps: TourStep[]; onClose: () => void
     const update = () => setRect(el ? el.getBoundingClientRect() : null);
     update(); window.addEventListener("resize", update); return () => window.removeEventListener("resize", update);
   }, [step]);
-  useEffect(() => {
-    if (!voice || typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    const synth = window.speechSynthesis; synth.cancel();
-    const u = new SpeechSynthesisUtterance(`${step.title}. ${step.text}`);
-    const v = synth.getVoices().find((x) => /en-(GB|IE)/i.test(x.lang) && /natural|neural|google|daniel|serena|libby|sonia/i.test(x.name)) || synth.getVoices().find((x) => /en-(GB|IE)/i.test(x.lang));
-    if (v) u.voice = v; u.rate = 1.02; u.pitch = 1; synth.speak(u);
-    return () => synth.cancel();
-  }, [i, voice, step]);
-  useEffect(() => () => { try { window.speechSynthesis?.cancel(); } catch { /* ignore */ } }, []);
   const pad = 8;
   const below = rect ? rect.bottom + 200 < window.innerHeight : false;
   const cardStyle = rect ? { left: Math.min(Math.max(12, rect.left), window.innerWidth - 392), top: below ? rect.bottom + 14 : Math.max(12, rect.top - 190) } : { left: "50%", top: "50%", transform: "translate(-50%, -50%)" };
@@ -640,7 +633,7 @@ function GuidedTour({ steps, onClose }: { steps: TourStep[]; onClose: () => void
     {rect ? <div className="ow-tour-spot" style={{ left: rect.left - pad, top: rect.top - pad, width: rect.width + pad * 2, height: rect.height + pad * 2 }} /> : <div className="ow-tour-dim" />}
     <div className="ow-tour-card" style={cardStyle as CSSProperties}>
       <small>Step {i + 1} of {steps.length}</small><b>{step.title}</b><p>{step.text}</p>
-      <div className="ow-options"><button type="button" className="ghost" onClick={() => { const n = !voice; setVoice(n); writePref("ow-voice", n ? "on" : "off"); if (!n) window.speechSynthesis?.cancel(); }} aria-label={voice ? "Mute voice-over" : "Turn voice-over on"}>{voice ? <Volume2 size={14} /> : <VolumeX size={14} />} Voice</button>
+      <div className="ow-options">
         {i > 0 && <button type="button" className="ghost" onClick={() => setI(i - 1)}>Back</button>}
         {i < steps.length - 1 ? <button type="button" onClick={() => setI(i + 1)}>Next <ChevronRight size={14} /></button> : <button type="button" onClick={onClose}>Let's play</button>}
         <button type="button" className="ghost" onClick={onClose}>Skip</button></div>
@@ -693,12 +686,15 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
   const [poked, setPoked] = useState("");
   const [view, setView] = useState<"town" | "hq">("town");
   const [room, setRoom] = useState<RoomId>("receptionist");
+  const lastFocusLoad = useRef(Date.now());
+  const [deptOpen, setDeptOpen] = useState(true);
+  const [briefOpen, setBriefOpen] = useState(true);
   const [zooming, setZooming] = useState(false);
   const [charOpen, setCharOpen] = useState(false);
   const [sideOpen, setSideOpen] = useState(false);
   const [defence, setDefence] = useState<{ keys: string[]; stolen: number; demo: boolean } | null>(null);
   const [tour, setTour] = useState(false);
-  const [music, setMusic] = useState<MusicStyle>(() => readPref("ow-music", "off") as MusicStyle);
+  const [music, setMusic] = useState<MusicStyle>(() => readPref("ow-music", "chill") as MusicStyle);
   const [speech, setSpeech] = useState(() => readPref("ow-speech", "off") === "on");
   const [barColour, setBarColour] = useState("");
   const [raid, setRaid] = useState<{ coins: number; count: number; n: number } | null>(null);
@@ -753,7 +749,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
 
   useEffect(() => { void load(); }, [load]);
   // Two-way sync: work done in the normal CRM screens shows up when the owner comes back to the tab.
-  useEffect(() => { const onFocus = () => { if (!panel && !demo) void load(true); }; window.addEventListener("focus", onFocus); return () => window.removeEventListener("focus", onFocus); }, [load, panel, demo]);
+  useEffect(() => { const onFocus = () => { if (panel || demo || Date.now() - lastFocusLoad.current < 120_000) return; lastFocusLoad.current = Date.now(); void load(true); }; window.addEventListener("focus", onFocus); return () => window.removeEventListener("focus", onFocus); }, [load, panel, demo]);
   // When the app finishes saving (e.g. an expense or task added from its own pop-up), re-read so rewards and the briefing update.
   const wasSaving = useRef(saving);
   useEffect(() => { if (wasSaving.current && !saving && !panel && !demo) void load(true); wasSaving.current = saving; }, [saving, panel, demo, load]);
@@ -776,7 +772,6 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
   useEffect(() => { setIndex(0); }, [approaches.length]);
   // Speech: the person talking reads their line aloud.
   const lastSpoken = useRef("");
-  useEffect(() => { if (!speech || tour || !current || view !== "town") return; const key = `${current.id}:${current.line}`; if (lastSpoken.current === key) return; lastSpoken.current = key; const t = setTimeout(() => speak(current.line, current.employee), 500); return () => clearTimeout(t); }, [speech, current, tour, view]);
 
   // ── Wallet (real or demo) ──
   const wallet = useMemo(() => {
@@ -875,7 +870,6 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
   const say = (id: string, text: string, at: [number, number]) => {
     setPoked(id); setTimeout(() => setPoked((cur) => (cur === id ? "" : cur)), 450);
     setBubble({ text, at, n: Date.now() });
-    if (readPref("ow-speech", "off") === "on") speak(text, id in EMPLOYEES ? id : "owner");
     if (bubbleTimer.current) clearTimeout(bubbleTimer.current);
     bubbleTimer.current = setTimeout(() => setBubble(null), 3800);
     if (prefs.current.sound) chime("pop");
@@ -931,8 +925,9 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
     <header className="ow-hud">
       <div className="ow-hud-id">{p.logo ? <img src={p.logo} alt="" /> : <span className="ow-hud-dot" />}<div><b>{p.name}</b><small>Level {w.level} · {w.stage.name}</small></div></div>
       <div className="ow-xp" aria-label={`Experience: ${w.xpIntoLevel} of ${w.xpForNext} to the next level`}><div style={{ width: `${Math.round(w.progress * 100)}%` }} /><span>{w.xpIntoLevel} / {w.xpForNext} XP</span></div>
-      <div className={`ow-coins${coinBurst ? " bump" : ""}${raid ? " robbed" : ""}`} key={`${coinBurst}-${raid?.n || 0}`} title="Virtual game coins — not real money"><Coins size={18} /> {w.coins.toLocaleString("en-IE")}</div>
+      <div className={`ow-coins${coinBurst ? " bump" : ""}${raid ? " robbed" : ""}`} title="Virtual game coins — not real money"><Coins size={18} /> {w.coins.toLocaleString("en-IE")}</div>
       {pendingTotal > 0 && <button type="button" className="ow-collect-all" onClick={() => void collect()} disabled={collecting}><Sparkles size={16} /> Collect {pendingTotal}</button>}
+      {(() => { const nx = UPGRADES.map((u) => ({ name: u.name, lvl: u.tiers[0].minLevel })).filter((u) => u.lvl > w.level).sort((a, b) => a.lvl - b.lvl)[0]; return nx ? <div className="ow-next-unlock" title="New things unlock as you level up"><Lock size={13} /> Next: {nx.name} · Lv {nx.lvl}</div> : null; })()}
       <div className="ow-hud-actions">
         <button type="button" className={upgradesReady ? "has-dot" : ""} onClick={() => setDrawer(drawer === "upgrades" ? "" : "upgrades")} aria-label={`Upgrades${upgradesReady ? `, ${upgradesReady} ready` : ""}`} title="Upgrades"><Hammer size={18} />{upgradesReady > 0 && <i>{upgradesReady}</i>}</button>
         <button type="button" onClick={() => setTour(true)} aria-label="Guided tour" title="Guided tour"><HelpCircle size={18} /></button>
@@ -955,36 +950,37 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
     <div className="ow-layout">
       <section className="ow-stage" aria-label="Your business">
         {view === "hq" ? <div className="ow-stage-wrap ow-interior-wrap">
-          <HQInterior data={data} wallet={w} approaches={approaches} selected={room} onSelect={(r) => { setRoom(r); if (prefs.current.sound) chime("select"); }} reduced={reduced} customers={customers} ownerLook={ownerLook} />
+          <HQInterior data={data} wallet={w} approaches={approaches} selected={room} onSelect={(r) => { setRoom(r); setDeptOpen(true); if (prefs.current.sound) chime("select"); }} reduced={reduced} customers={customers} ownerLook={ownerLook} />
           <button type="button" className="ow-exit" onClick={exitHQ}><ArrowLeft size={16} /> Back outside</button>
           <div className="ow-room-tag">Inside {p.name} HQ · tap a department</div>
         </div> : <div className={`ow-stage-wrap${zooming ? " zooming" : ""}`}>
-        <svg viewBox="0 0 1000 560" role="img" aria-label={`${p.name} headquarters with ${customers.length} customers waiting`}>
+        <svg viewBox="10 30 980 540" role="img" aria-label={`${p.name} headquarters with ${customers.length} customers waiting`}>
           <defs>
             <linearGradient id="ow-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#a5c8dc" /><stop offset="1" stopColor="#e8f0f4" /></linearGradient>
             <linearGradient id="ow-grass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#93b878" /><stop offset="1" stopColor="#6f9a5a" /></linearGradient>
           </defs>
           
-          <g className="ow-clouds"><ellipse cx="140" cy="70" rx="58" ry="16" fill="#fff" opacity=".9" /><ellipse cx="180" cy="60" rx="36" ry="15" fill="#fff" opacity=".9" /><ellipse cx="820" cy="54" rx="50" ry="13" fill="#fff" opacity=".85" /><ellipse cx="860" cy="46" rx="30" ry="12" fill="#fff" opacity=".85" /></g>
-          <ellipse cx="500" cy="318" rx="430" ry="214" fill="#7fa9c0" opacity=".35" className="ow-water" />
           {/* Island */}
-          <polygon points={pts([iso(0, 12), iso(12, 12), iso(12, 12, -28), iso(0, 12, -28)])} fill="#8a6a4a" />
-          <polygon points={pts([iso(12, 12), iso(12, 0), iso(12, 0, -28), iso(12, 12, -28)])} fill="#6f5439" />
-          <polygon points={pts([iso(0, 12, -2), iso(12, 12, -2), iso(12, 0, -2)])} fill="none" stroke="#557a45" strokeWidth="4" />
-          <polygon points={pts([iso(0, 0), iso(12, 0), iso(12, 12), iso(0, 12)])} fill="url(#ow-grass)" className="ow-grass" />
-          {Array.from({ length: 72 }).map((_, i) => { const gx = (i % 6) * 2 + (Math.floor(i / 6) % 2), gy = Math.floor(i / 6); return <IsoTile key={i} x={gx} y={gy} fill="#ffffff" opacity={0.06} />; })}
+          <polygon points={pts([iso(-2, 14), iso(14, 14), iso(14, 14, -28), iso(-2, 14, -28)])} fill="#8a6a4a" />
+          <polygon points={pts([iso(14, 14), iso(14, -2), iso(14, -2, -28), iso(14, 14, -28)])} fill="#6f5439" />
+          <polygon points={pts([iso(-2, 14, -2), iso(14, 14, -2), iso(14, -2, -2)])} fill="none" stroke="#557a45" strokeWidth="4" />
+          <polygon points={pts([iso(-2, -2), iso(14, -2), iso(14, 14), iso(-2, 14)])} fill="url(#ow-grass)" className="ow-grass" />
+          {Array.from({ length: 128 }).map((_, i) => { const gx = -2 + (i % 8) * 2 + (Math.floor(i / 8) % 2), gy = -2 + Math.floor(i / 8); return <IsoTile key={i} x={gx} y={gy} fill="#ffffff" opacity={0.06} />; })}
           {/* Path from HQ door to the shore, and the plaza */}
           <IsoTile x={5.4} y={7.7} w={1.2} d={4.3} fill="#e2d6bd" />
           <IsoTile x={3.6} y={7.7} w={5.2} d={1.6} fill="#e2d6bd" />
           {tier("reception") >= 3 && <IsoTile x={5.65} y={7.8} w={0.7} d={4.2} fill="#9f1239" opacity={0.85} />}{tier("reception") >= 2 && (() => { const [sx, sy] = iso(8.4, 9.0); return <g><rect x={sx - 16} y={sy - 10} width="32" height="10" rx="4" fill="#57534e" /><rect x={sx - 16} y={sy - 15} width="32" height="7" rx="3" fill="#44403c" /><circle cx={sx + 22} cy={sy - 10} r="7" fill="#3f6212" /></g>; })()}
           {(tier("garden") >= 1 || healthMood === "thriving") && <g className="ow-flowers">{[[0.5, 11.3], [1.4, 11.4], [11.3, 1.2], [11.4, 2.4], [0.6, 2.0], [11.2, 8.8], [4.6, 11.4], [9.2, 0.6]].map(([fx, fy], i) => { const [sx, sy] = iso(fx, fy); return <g key={i}><circle cx={sx - 4} cy={sy} r="3.5" fill="#c084a0" /><circle cx={sx + 4} cy={sy - 1} r="3.5" fill="#e3c26a" /><circle cx={sx} cy={sy + 2.5} r="3.5" fill="#5f8f4a" /></g>; })}</g>}
 
+          {/* Streetscape: lamps along the path and a small car park */}
+          {[[5.2, 9.0], [6.8, 9.6], [5.2, 10.6], [6.8, 11.4]].map(([lx, ly]) => { const [sx, sy] = iso(lx, ly); return <g key={`lamp-${lx}-${ly}`}><rect x={sx - 1} y={sy - 30} width="2" height="30" fill="#52525b" /><rect x={sx - 4} y={sy - 33} width="8" height="4" rx="2" fill="#fde68a" /></g>; })}
+          <IsoTile x={7.6} y={10.4} w={1.6} d={1.4} fill="#a8a29e" />
+          {[10.75, 11.1, 11.45].map((ly) => <polyline key={ly} points={pts([iso(7.7, ly), iso(9.1, ly)])} stroke="#f5f5f4" strokeWidth="1.2" />)}
           {/* Marketing billboard (Mia) */}
           <Spot id="b-marketing" label="Marketing" poked={poked} labelAt={iso(6, 1.3, 78)} onTap={() => tapBuilding("marketing")}>
             <IsoBox x={5.2} y={1.25} w={0.12} d={0.12} h={30} color="#57534e" /><IsoBox x={6.7} y={1.25} w={0.12} d={0.12} h={30} color="#57534e" />
             <polygon points={pts([iso(4.9, 1.4, 28), iso(7.1, 1.4, 28), iso(7.1, 1.4, 66), iso(4.9, 1.4, 66)])} fill={p.primary} stroke={shade(p.primary, -0.4)} strokeWidth="2.5" />
-            {p.logo && (() => { const [lx, ly] = iso(5.25, 1.4, 47); return <image href={p.logo} x={lx - 11} y={ly - 11} width="22" height="22" preserveAspectRatio="xMidYMid meet" transform={`rotate(26.6 ${lx} ${ly})`} />; })()}
-            {(() => { const [bx, by] = iso(6, 1.4, 47); return <text x={bx} y={by + 4} textAnchor="middle" fontSize="11" fontWeight="900" fill="#fff" transform={`rotate(26.6 ${bx} ${by})`}>{p.name.length > 13 ? `${p.name.slice(0, 12)}…` : p.name}</text>; })()}
+            {p.logo ? (() => { const [lx, ly] = iso(6, 1.4, 47); return <g transform={`rotate(26.6 ${lx} ${ly})`}><rect x={lx - 30} y={ly - 13} width="60" height="26" rx="3" fill="#fff" /><image href={p.logo} x={lx - 27} y={ly - 10} width="54" height="20" preserveAspectRatio="xMidYMid meet" /></g>; })() : (() => { const [bx, by] = iso(6, 1.4, 47); return <text x={bx} y={by + 4} textAnchor="middle" fontSize="11" fontWeight="900" fill="#fff" transform={`rotate(26.6 ${bx} ${by})`}>{p.name.length > 13 ? `${p.name.slice(0, 12)}…` : p.name}</text>; })()}
           </Spot>
           {/* Workshop (Pete) — site tent → shed → workshop → warehouse */}
           <Spot id="b-projects" label={tier("workshop") >= 3 ? "Warehouse" : tier("workshop") >= 2 ? "Workshop" : tier("workshop") >= 1 ? "Tool shed" : "Site office"} poked={poked} labelAt={iso(1.5, 10.5, tier("workshop") >= 2 ? 80 : 62)} onTap={() => tapBuilding("projects")}>
@@ -999,9 +995,8 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
           <Pool tier={tier("pool")} primary={p.primary} />
           <Air tier={tier("air")} primary={p.primary} reduced={reduced} />
           {/* Headquarters — grows with each Headquarters tier */}
-          <IndustryProps industry={p.industry} primary={p.primary} secondary={p.secondary} />
           {/* Headquarters: run-down shop → offices → glass skyscraper (each Headquarters tier) */}
-          {(() => { const t = tier("hq"); const tower = t >= 4; const w = tower ? 3.0 : t >= 2 ? 4.0 : 3.6, h = tower ? 150 + (t - 4) * 46 : 58 + t * 22, x0 = tower ? 4.5 : 4.2, y0 = tower ? 4.4 : 4.1; const shabbyHq = t === 0; const L = iso(x0, y0 + w), R = iso(x0 + w, y0 + w); const b1 = lerp(L, R, 0.18), b2 = lerp(L, R, 0.82); const apex = iso(x0 + w / 2, y0 + w / 2, h + (tower ? 18 : 40)); const brandWall = barColour || p.secondary; const wall = tower ? "#7dd3fc" : tier("renovation") >= 3 ? "#292524" : tier("renovation") >= 2 ? "#7dd3fc" : tier("renovation") >= 1 ? shade(brandWall, 0.25) : shabbyHq ? shade(brandWall, 0.35) : shade(brandWall, 0.12); return <Spot id="b-hq" label="Enter headquarters" poked={poked} labelAt={[apex[0], apex[1] - 34]} badge={customers.length || undefined} badgeText="waiting" badgeAt={((d) => [d[0], d[1] - 44] as [number, number])(iso(x0 + w / 2, y0 + w, 0))} onTap={() => tapBuilding("hq")}>
+          {(() => { const t = tier("hq"); const tower = t >= 4; const w = tower ? 2.3 : t >= 2 ? 2.9 : 2.6, h = tower ? 120 + (t - 4) * 40 : 46 + t * 18, x0 = 6 - w / 2, y0 = 6 - w / 2; const shabbyHq = t === 0; const L = iso(x0, y0 + w), R = iso(x0 + w, y0 + w); const b1 = lerp(L, R, 0.18), b2 = lerp(L, R, 0.82); const apex = iso(x0 + w / 2, y0 + w / 2, h + (tower ? 18 : 30)); const brandWall = barColour || p.secondary; const wall = tower ? "#7dd3fc" : tier("renovation") >= 3 ? "#292524" : tier("renovation") >= 2 ? "#7dd3fc" : tier("renovation") >= 1 ? shade(brandWall, 0.25) : shabbyHq ? shade(brandWall, 0.35) : shade(brandWall, 0.12); return <Spot id="b-hq" label="Enter headquarters" poked={poked} labelAt={[apex[0], apex[1] - 34]} badge={customers.length || undefined} badgeText="waiting" badgeAt={((d) => [d[0], d[1] - 44] as [number, number])(iso(x0 + w / 2, y0 + w, 0))} onTap={() => tapBuilding("hq")}>
             <IsoBox x={x0 - 0.15} y={y0 - 0.15} w={w + 0.3} d={w + 0.3} h={8} color={tower ? "#e2e8f0" : "#a8a29e"} />
             <IsoBox x={x0} y={y0} w={w} d={w} h={h} z={8} color={wall} />
             {tower ? <>
@@ -1009,31 +1004,45 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
               {[0.25, 0.5, 0.75].map((u) => { const a = lerp(iso(x0, y0 + w), iso(x0 + w, y0 + w), u), b = lerp(iso(x0 + w, y0 + w), iso(x0 + w, y0), u); return <g key={u}><line x1={a[0]} y1={a[1] - 8} x2={a[0]} y2={a[1] - 8 - h} stroke="#bae6fd" strokeWidth="1" /><line x1={b[0]} y1={b[1] - 8} x2={b[0]} y2={b[1] - 8 - h} stroke="#93c5fd" strokeWidth="1" /></g>; })}
               <IsoBox x={x0 + 0.3} y={y0 + 0.3} w={w - 0.6} d={w - 0.6} h={14} z={h + 8} color="#e2e8f0" />
               {(() => { const c = iso(x0 + w / 2, y0 + w / 2, h + 22); return <g><rect x={c[0] - 1.5} y={c[1] - 44} width="3" height="44" fill="#94a3b8" /><circle cx={c[0]} cy={c[1] - 46} r="3" fill="#ef4444" className="ow-led" /></g>; })()}
-              {p.logo && (() => { const c = lerp(iso(x0 + w, y0 + w), iso(x0 + w, y0), 0.5); return <image href={p.logo} x={c[0] - 24} y={c[1] - h + 10} width="48" height="40" preserveAspectRatio="xMidYMid meet" />; })()}
+              {p.logo && (() => { const c = lerp(iso(x0 + w, y0 + w), iso(x0 + w, y0), 0.5); return <image href={p.logo} x={c[0] - 16} y={c[1] - h + 12} width="32" height="26" preserveAspectRatio="xMidYMid meet" />; })()}
             </> : <>
-              <IsoWindows x={x0} y={y0} w={w} d={w} floors={1 + t} floorH={22} base={22} glow={tier("interior") >= 1 || healthMood === "thriving"} />
-              {(Object.keys(EMPLOYEES) as EmployeeId[]).map((id, i) => { const a = lerp(iso(x0 + w, y0 + w), iso(x0 + w, y0), 0.06 + i * 0.155), b2x = lerp(iso(x0 + w, y0 + w), iso(x0 + w, y0), 0.06 + i * 0.155 + 0.12); return <polygon key={id} points={pts([[a[0], a[1] - 14], [b2x[0], b2x[1] - 14], [b2x[0], b2x[1] - 18], [a[0], a[1] - 18]])} fill={EMPLOYEES[id].colour} opacity=".9" />; })}
-              <IsoRoof x={x0} y={y0} w={w} d={w} z={h + 8} rise={40} color={shabbyHq ? shade(brandWall, -0.45) : shade(brandWall, -0.3)} />
+              <IsoWindows x={x0} y={y0} w={w} d={w} floors={1 + t} floorH={18} base={20} glow={tier("interior") >= 1 || healthMood === "thriving"} />
+              <IsoRoof x={x0} y={y0} w={w} d={w} z={h + 8} rise={30} color={shabbyHq ? shade(brandWall, -0.45) : shade(brandWall, -0.3)} />
             </>}
             {shabbyHq && <g className="ow-shabby">{(() => { const a = lerp(iso(x0 + w, y0 + w), iso(x0 + w, y0), 0.62); return <g><rect x={a[0] - 2} y={a[1] - 44} width="26" height="16" fill="#a16207" transform={`rotate(-8 ${a[0]} ${a[1] - 36})`} /><rect x={a[0] - 2} y={a[1] - 38} width="26" height="4" fill="#78350f" transform={`rotate(10 ${a[0]} ${a[1] - 36})`} /></g>; })()}
               {[0.3, 0.7].map((u) => { const a = lerp(L, R, u); return <path key={u} d={`M${a[0]} ${a[1] - 50} l4 8 -3 6 5 9`} stroke="#78716c" strokeWidth="1.3" fill="none" />; })}
               {[[x0 - 0.3, y0 + w + 0.1], [x0 + w + 0.1, y0 + 1]].map(([gx, gy], i) => { const [sx, sy] = iso(gx, gy); return <path key={i} d={`M${sx - 6} ${sy} q2 -12 4 0 M${sx} ${sy} q1 -15 3 0 M${sx + 4} ${sy} q3 -11 5 0`} fill="#4d7c0f" />; })}</g>}
             <IsoDoor x={x0} y={y0} w={w} d={w} h={26} color={tower ? "#0f172a" : p.primary} />
-            {!tower && <><polygon points={pts([[b1[0], b1[1] - h + 2], [b2[0], b2[1] - h + 2], [b2[0], b2[1] - h + 20], [b1[0], b1[1] - h + 20]])} fill={tier("signage") >= 1 ? "#111827" : shade(p.secondary, -0.1)} stroke={tier("signage") >= 1 ? p.primary : "none"} strokeWidth="2" />
-            {p.logo && (() => { const m = lerp(b1, b2, 0.08); const r = lerp(iso(x0 + w, y0 + w), iso(x0 + w, y0), 0.5); return <g><image href={p.logo} x={m[0] - 2} y={m[1] - h + 2} width="16" height="16" preserveAspectRatio="xMidYMid meet" transform={`rotate(26.6 ${m[0] + 6} ${m[1] - h + 10})`} /><rect x={r[0] - 24} y={r[1] - h + 2} width="48" height="38" rx="5" fill="#fff" opacity=".95" transform={`skewY(-26.6) translate(0 ${r[0] * Math.tan(26.6 * Math.PI / 180)})`} /><image href={p.logo} x={r[0] - 20} y={r[1] - h + 5} width="40" height="32" preserveAspectRatio="xMidYMid meet" transform={`skewY(-26.6) translate(0 ${r[0] * Math.tan(26.6 * Math.PI / 180)})`} /></g>; })()}
-            {(() => { const m = lerp(b1, b2, 0.5); return <text x={m[0]} y={m[1] - h + 15} textAnchor="middle" fontSize="9.5" fontWeight="900" fill="#fff" transform={`rotate(26.6 ${m[0]} ${m[1] - h + 11})`}>{p.name.length > 16 ? `${p.name.slice(0, 15)}…` : p.name}</text>; })()}</>}
+            {!tower && (() => { const m = lerp(b1, b2, 0.5); const sy = m[1] - h + 6; return <g transform={`rotate(26.6 ${m[0]} ${sy})`}><rect x={m[0] - 34} y={sy - 8} width="68" height="16" rx="3" fill={tier("signage") >= 1 ? "#111827" : "#fafaf9"} stroke={tier("signage") >= 1 ? p.primary : "#d6d3d1"} strokeWidth="1.2" />{p.logo ? <image href={p.logo} x={m[0] - 30} y={sy - 6} width="60" height="12" preserveAspectRatio="xMidYMid meet" /> : <text x={m[0]} y={sy + 3.2} textAnchor="middle" fontSize="8" fontWeight="800" fill={tier("signage") >= 1 ? "#fff" : "#111827"}>{p.name.length > 14 ? `${p.name.slice(0, 13)}…` : p.name}</text>}</g>; })()}
             <g className="ow-flag" transform={`translate(${apex[0]} ${apex[1]})`}><rect x="-1.2" y="-30" width="2.4" height="30" fill="#57534e" /><path d="M1 -30 L22 -24 L1 -18 Z" fill={p.primary} /></g>
-            {tier("signage") >= 2 && <g className="ow-neon" transform={`translate(${apex[0]} ${apex[1] + 22})`}><rect x="-62" y="-12" width="124" height="20" rx="6" fill="#111827" stroke={p.primary} strokeWidth="2" /><text y="3" textAnchor="middle" fontSize="10" fontWeight="900" fill="#fff">{p.name.slice(0, 18).toUpperCase()}</text></g>}
             {healthMood === "struggling" && <g className="ow-storm" transform={`translate(${apex[0]} ${apex[1] - 60})`}><ellipse cx="0" cy="0" rx="36" ry="13" fill="#64748b" /><ellipse cx="-20" cy="4" rx="20" ry="10" fill="#475569" /></g>}
           </Spot>; })()}
           {/* Staff café */}
           {tier("cafe") >= 1 && (() => { const [cx, cy] = iso(3.1, 7.7); return <g><rect x={cx - 22} y={cy - 8} width="44" height="6" rx="3" fill="#92400e" /><rect x={cx - 18} y={cy - 2} width="4" height="8" fill="#78350f" /><rect x={cx + 14} y={cy - 2} width="4" height="8" fill="#78350f" />
             {tier("cafe") >= 2 && [-34, 34].map((dx) => <g key={dx}><path d={`M${cx + dx - 20} ${cy - 30} Q${cx + dx} ${cy - 46} ${cx + dx + 20} ${cy - 30} Z`} fill={p.primary} /><rect x={cx + dx - 1.2} y={cy - 30} width="2.4" height="26" fill="#6b7280" /><ellipse cx={cx + dx} cy={cy - 4} rx="11" ry="4" fill="#f1f5f9" /></g>)}</g>; })()}
-          <Car tier={tier("car")} primary={p.primary} />
           {/* Fleet */}
           {tier("fleet") >= 1 && <g className="ow-van-iso"><IsoBox x={9.7} y={10.3} w={tier("fleet") >= 2 ? 1.6 : 1.2} d={0.7} h={20} z={4} color={p.primary} /><IsoBox x={9.4} y={10.3} w={0.35} d={0.7} h={14} z={4} color={shade(p.primary, -0.15)} />{[[9.8, 11.0], [10.7, 11.0]].map(([wx, wy]) => { const [sx, sy] = iso(wx, wy); return <ellipse key={wx} cx={sx} cy={sy} rx="5" ry="3.5" fill="#111827" />; })}</g>}
           {tier("fleet") >= 3 && <g><IsoBox x={10.6} y={8.9} w={1.0} d={0.6} h={18} z={4} color={p.secondary} /></g>}
 
+          {/* Assets & income streams: plots for sale until bought */}
+          {([
+            { id: "rental", at: [12.4, 2.2] as [number, number], label: "Rental property" },
+            { id: "sidehustle", at: [12.4, 5.6] as [number, number], label: "Side hustle" },
+            { id: "offshore", at: [-1.7, 2.0] as [number, number], label: "Offshore account" },
+            { id: "car", at: [-1.7, 9.6] as [number, number], label: "Car" },
+            { id: "academy", at: [-1.7, 5.8] as [number, number], label: "Training academy" },
+            { id: "branch", at: [12.4, 11.4] as [number, number], label: "Second branch" },
+          ]).map((slot) => { const t = tier(slot.id); const next = nextUpgrade(slot.id, w.owned); const firstLvl = UPGRADES.find((u) => u.id === slot.id)?.tiers[0].minLevel || 1; const locked = !t && w.level < firstLvl; const c = iso(slot.at[0] + 0.7, slot.at[1] + 0.7); return <Spot key={slot.id} id={`slot-${slot.id}`} label={t ? UPGRADES.find((u) => u.id === slot.id)!.tiers[t - 1].name : locked ? `${slot.label} · Lv ${firstLvl}` : `Build: ${slot.label}`} poked={poked} labelAt={[c[0], c[1] - 70]} onTap={() => { if (locked) { say(`slot-${slot.id}`, `${slot.label} unlocks at level ${firstLvl}. Keep doing real work to level up.`, [c[0], c[1] - 40]); return; } setDrawer("upgrades"); if (prefs.current.sound) chime("select"); }}>
+            <IsoTile x={slot.at[0]} y={slot.at[1]} w={1.5} d={1.5} fill={t ? "#d6d3d1" : locked ? "#9fbf8a" : "#e7e1d3"} />
+            {!t && <polygon points={pts([iso(slot.at[0] + 0.08, slot.at[1] + 0.08), iso(slot.at[0] + 1.42, slot.at[1] + 0.08), iso(slot.at[0] + 1.42, slot.at[1] + 1.42), iso(slot.at[0] + 0.08, slot.at[1] + 1.42)])} fill="none" stroke={locked ? "#6b8f57" : "#a8a29e"} strokeWidth="1.5" strokeDasharray="5 4" />}
+            {!t && <g transform={`translate(${c[0]} ${c[1] - 6})`}><circle r="11" fill={locked ? "#57534e" : "#fff"} stroke={locked ? "none" : "#a8a29e"} strokeWidth="1.5" />{locked ? <g fill="none" stroke="#fff" strokeWidth="1.8"><rect x="-4.5" y="-2" width="9" height="7" rx="1.5" fill="#fff" /><path d="M-3 -2 v-2.5 a3 3 0 0 1 6 0 v2.5" /></g> : <path d="M-5 0 h10 M0 -5 v10" stroke="#111827" strokeWidth="2.2" strokeLinecap="round" />}</g>}
+            {t > 0 && slot.id === "rental" && <g><IsoBox x={slot.at[0] + 0.2} y={slot.at[1] + 0.2} w={1.1} d={1.1} h={t >= 3 ? 64 : t >= 2 ? 34 : 22} color={t >= 3 ? "#cbd5e1" : "#fde68a"} /><IsoRoof x={slot.at[0] + 0.2} y={slot.at[1] + 0.2} w={1.1} d={1.1} z={t >= 3 ? 64 : t >= 2 ? 34 : 22} rise={14} color="#7f1d1d" /><IsoWindows x={slot.at[0] + 0.2} y={slot.at[1] + 0.2} w={1.1} d={1.1} floors={t >= 3 ? 4 : t} floorH={14} base={6} glow /></g>}
+            {t > 0 && slot.id === "sidehustle" && <g><IsoBox x={slot.at[0] + 0.25} y={slot.at[1] + 0.3} w={1.0} d={0.8} h={t >= 2 ? 30 : 18} color={p.primary} /><IsoRoof x={slot.at[0] + 0.25} y={slot.at[1] + 0.3} w={1.0} d={0.8} z={t >= 2 ? 30 : 18} rise={10} color={shade(p.primary, -0.35)} />{(() => { const cc = iso(slot.at[0] + 0.75, slot.at[1] + 1.1, 12); return <text x={cc[0]} y={cc[1]} textAnchor="middle" fontSize="8" fontWeight="900" fill="#fff">{t >= 3 ? "FRANCHISE" : t >= 2 ? "SHOP" : "TRUCK"}</text>; })()}</g>}
+            {t > 0 && slot.id === "offshore" && <g><IsoBox x={slot.at[0] + 0.3} y={slot.at[1] + 0.3} w={0.9} d={0.9} h={t >= 2 ? 30 : 20} color="#475569" /><circle cx={c[0]} cy={c[1] - 20} r="7" fill="#d4a017" stroke="#92400e" strokeWidth="1.5" />{t >= 3 && <path d={`M${c[0] - 18} ${c[1] - 34} Q${c[0]} ${c[1] - 62} ${c[0] + 18} ${c[1] - 34} Z`} fill="#16a34a" />}</g>}
+            {t > 0 && slot.id === "car" && <Car tier={t} primary={p.primary} at={c} />}
+            {t > 0 && slot.id === "academy" && <g><IsoBox x={slot.at[0] + 0.15} y={slot.at[1] + 0.2} w={1.2} d={1.0} h={t >= 2 ? 34 : 24} color="#f5f5f4" /><IsoRoof x={slot.at[0] + 0.15} y={slot.at[1] + 0.2} w={1.2} d={1.0} z={t >= 2 ? 34 : 24} rise={12} color={p.secondary} /><IsoWindows x={slot.at[0] + 0.15} y={slot.at[1] + 0.2} w={1.2} d={1.0} floors={t >= 2 ? 2 : 1} floorH={12} base={6} /></g>}
+            {t > 0 && slot.id === "branch" && <g><IsoBox x={slot.at[0] + 0.15} y={slot.at[1] + 0.15} w={1.2} d={1.2} h={t >= 3 ? 70 : t >= 2 ? 44 : 28} color={t >= 3 ? "#bae6fd" : "#f5f5f4"} /><IsoRoof x={slot.at[0] + 0.15} y={slot.at[1] + 0.15} w={1.2} d={1.2} z={t >= 3 ? 70 : t >= 2 ? 44 : 28} rise={10} color={barColour || p.secondary} /><IsoWindows x={slot.at[0] + 0.15} y={slot.at[1] + 0.15} w={1.2} d={1.2} floors={t >= 3 ? 5 : t + 1} floorH={12} base={6} glow /></g>}
+          </Spot>; })}
           {/* Deal yard: every open lead is a building going up */}
           <Spot id="b-farm" label={`Deal yard · ${crops.length}`} poked={poked} labelAt={iso(10.8, 8.6, 46)} onTap={() => tapBuilding("farm")}>
             <IsoTile x={9.9} y={7.3} w={1.9} d={2.7} fill="#b8b2a7" />
@@ -1054,7 +1063,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
           {/* Leads further down the pipeline visit Sales or the Calendar */}
           {(data.visitors || []).map((v, i) => { const route = /appoint|visit|consult|book/i.test(v.stage) ? there([5.0, 8.4], [2.4, 6.8]) : /propos|quote|negot/i.test(v.stage) ? there([7.4, 8.3], [9.0, 6.8]) : there([8.6, 7.0], [9.6, 9.6]); return <Walker key={v.id} route={route} dur={16 + i * 3} delay={i * 5} reduced={reduced}><Bean at={[0, 0]} scale={0.7} look={{ color: ["#8c7d5f", "#6a738c", "#5f8c76", "#8c6a5f"][i % 4] }} className="walker" label={`${v.name} (${v.stage})`} onTap={demo ? undefined : () => openLead(v.id)} /></Walker>; })}
           {/* Collectable coins */}
-          {[...pendingByEmployee.entries()].map(([id, items], i, arr) => { const at: [number, number] = [500 + (i - (arr.length - 1) / 2) * 52, 118]; return <CoinBubble key={id} x={at[0]} y={at[1]} amount={sumCoins(items)} label={`Collect ${sumCoins(items)} coins from ${EMPLOYEES[id].name}`} onCollect={() => void collect(items.map((x) => x.key))} />; })}
+          {[...pendingByEmployee.entries()].map(([id, items], i, arr) => { const at: [number, number] = [500 + (i - (arr.length - 1) / 2) * 52, 150]; return <CoinBubble key={id} x={at[0]} y={at[1]} amount={sumCoins(items)} label={`Collect ${sumCoins(items)} coins from ${EMPLOYEES[id].name}`} onCollect={() => void collect(items.map((x) => x.key))} />; })}
           {raid && (() => { const door = iso(6.2, 8.4), shore = iso(6.0, 12.8); return <g key={raid.n} className="ow-raid">
             <g><TaxMan at={[0, 0]} onTap={() => setPanel({ kind: "expense" })} />{!reduced && <animateMotion dur="5.6s" repeatCount="1" fill="freeze" keyPoints="0;0.5;0.5;1" keyTimes="0;0.38;0.6;1" calcMode="linear" path={`M${shore[0]} ${shore[1]} L${door[0]} ${door[1]} L${shore[0]} ${shore[1]}`} />}{reduced && <set attributeName="transform" to={`translate(${door[0]} ${door[1]})`} />}</g>
             <g className="ow-raid-coins" transform={`translate(${door[0]} ${door[1] - 70})`}>{[0, 1, 2, 3].map((k) => <circle key={k} cx={(k - 1.5) * 9} cy="0" r="6" fill="#fbbf24" stroke="#b45309" strokeWidth="1.5" style={{ animationDelay: `${2.1 + k * 0.08}s` }} />)}<text className="ow-raid-text" y="-14" textAnchor="middle" fontSize="16" fontWeight="900" fill="#b91c1c" stroke="#fff" strokeWidth="3" paintOrder="stroke">−{raid.coins}</text></g>
@@ -1064,7 +1073,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
         </svg>
         </div>}
 
-        {view === "hq" ? <DeptPanel id={room} data={data} wallet={w} approach={room === "boss" || room === "leadgen" ? undefined : approaches.find((a) => a.employee === room)} onOpen={(k) => { if (!demo) setPanel({ kind: k }); }} onAct={(a) => setDrawer(a)} onCharacter={() => setCharOpen(true)} post={post} demo={demo} /> :
+        {view === "hq" ? (deptOpen ? <DeptPanel onClose={() => setDeptOpen(false)} id={room} data={data} wallet={w} approach={room === "boss" || room === "leadgen" ? undefined : approaches.find((a) => a.employee === room)} onOpen={(k) => { if (!demo) setPanel({ kind: k }); }} onAct={(a) => setDrawer(a)} onCharacter={() => setCharOpen(true)} post={post} demo={demo} /> : null) : !briefOpen ? <button type="button" className="ow-brief-pill" onClick={() => setBriefOpen(true)}>{approaches.length ? `${approaches.length} update${approaches.length === 1 ? "" : "s"} from your team` : "Team briefing"}</button> :
         <div className={`ow-dialogue${current ? "" : " clear"}`} aria-live="polite">
           {current ? <>
             {staffPortrait(current.employee, 52)}
@@ -1074,6 +1083,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
               <span className="ow-detail">{current.detail}</span>
               <div className="ow-options">{current.options.map((o, oi) => <button type="button" key={o.label} className={o.dismiss ? "ghost ow-btn-dismiss" : oi === 0 ? "ow-btn-main" : "ghost"} onClick={() => choose(o, current)}>{o.label}</button>)}</div>
             </div>
+            <button type="button" className="ghost ow-close" onClick={() => setBriefOpen(false)} aria-label="Hide briefing"><X size={16} /></button>
             {approaches.length > 1 && <button type="button" className="ow-next ghost" onClick={() => setIndex((index + 1) % approaches.length)} aria-label="Next update"><ChevronRight size={20} /></button>}
           </> : <><div className="ow-speaker ok"><Check size={20} /></div><div className="ow-speech"><p>{allClearLine(today)}</p><span className="ow-detail">Nothing needs you right now. New enquiries, invoices and appointments will appear here as they happen.</span></div></>}
         </div>}
@@ -1270,9 +1280,8 @@ function Drawer({ kind, data, wallet: w, demo, onClose, post, buy, onChanged }: 
       <label>Website<input value={form.website} placeholder="https://…" onChange={(e) => setForm({ ...form, website: e.target.value })} /></label>
       <small className="ow-muted">Colours and logo come from the account's branding; changes here only affect the game.</small>
       <button type="button" onClick={() => void act({ action: "saveProfile", ...form }, "Saved.")}>Save character</button>
-      <h4>Sound & voices</h4>
+      <h4>Sound & music</h4>
       <div className="ow-modes">{(["off", "chill", "upbeat", "lofi"] as const).map((m) => <button type="button" key={m} className={readPref("ow-music", "off") === m ? "on" : "ghost"} onClick={() => { writePref("ow-music", m); window.dispatchEvent(new CustomEvent("ow-music", { detail: m })); setMsg({ ok: true, text: m === "off" ? "Music off" : `Music: ${m}` }); }}>{m === "off" ? "No music" : m === "lofi" ? "Lo-fi" : m[0].toUpperCase() + m.slice(1)}</button>)}</div>
-      <label className="ow-check"><input type="checkbox" defaultChecked={readPref("ow-speech", "off") === "on"} onChange={(e) => { writePref("ow-speech", e.target.checked ? "on" : "off"); window.dispatchEvent(new CustomEvent("ow-speech", { detail: e.target.checked })); if (e.target.checked) speak("Hi boss, I'll read things out from now on.", "receptionist"); }} /> Characters speak their lines out loud</label>
       <h4>AI operating mode</h4>
       <div className="ow-modes">{(["manual", "copilot"] as const).map((m) => <button type="button" key={m} className={(data.state.mode === "autopilot" ? "copilot" : data.state.mode) === m ? "on" : "ghost"} onClick={() => void act({ action: "setMode", mode: m, autopilotPaused: true }, `Mode: ${m}`)}>{m === "manual" ? "Manual" : "Copilot"}</button>)}</div>
       <p className="ow-muted">{data.state.mode === "manual" ? "AI spots what needs doing and recommends. You do the work." : "AI prepares replies and actions; you see each one and approve it before anything happens."}</p>

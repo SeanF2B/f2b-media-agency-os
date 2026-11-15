@@ -250,7 +250,7 @@ export async function POST(request: Request) {
         const pick = (v: unknown, allowed: string[]) => (typeof v === "string" && allowed.includes(v) ? v : undefined);
         const colour = typeof l.colour === "string" && (/^#[0-9a-f]{6}$/i.test(l.colour) || ["primary", "secondary"].includes(l.colour)) ? l.colour : undefined;
         const extras = Array.isArray(l.extras) ? (l.extras as unknown[]).filter((e): e is string => typeof e === "string" && ["glasses", "tie", "shades", "crown"].includes(e)) : [];
-        next.look = JSON.stringify({ hair: pick(l.hair, ["short", "part", "bun", "bob", "wave", "none"]), top: pick(l.top, ["jacket", "polo", "hivis"]), colour, hat: pick(l.hat, ["auto", "none", "cap", "hardhat", "beanie"]), extras });
+        next.look = JSON.stringify({ figure: pick(l.figure, ["male", "female"]), hair: pick(l.hair, ["long", "short", "part", "bun", "bob", "wave", "none"]), top: pick(l.top, ["jacket", "polo", "hivis"]), colour, hat: pick(l.hat, ["auto", "none", "cap", "hardhat", "beanie"]), extras });
       }
       await ctx.db.prepare("UPDATE ow_state SET profile=?3, updated_at=?4 WHERE owner_id=?1 AND scope_id=?2").bind(ctx.ownerId, ctx.scopeId, JSON.stringify(next), new Date().toISOString()).run();
       await logAction(ctx, "Owner", "Updated business character", "Manual correction of the game profile", []);

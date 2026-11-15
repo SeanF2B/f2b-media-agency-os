@@ -215,6 +215,25 @@ export const UPGRADES: UpgradeTrack[] = [
     { tier: 2, name: "SUV", price: 700, minLevel: 5, perk: "Room for the whole crew" },
     { tier: 3, name: "Sports car", price: 1800, minLevel: 9, perk: "Low, fast and shiny" },
     { tier: 4, name: "Supercar", price: 5000, minLevel: 16, perk: "Gold wheels. Obviously." } ] },
+  { id: "academy", group: "business", name: "Training academy", tiers: [
+    { tier: 1, name: "Training room", price: 600, minLevel: 5, perk: "Somewhere to train new starters" },
+    { tier: 2, name: "Training academy", price: 2200, minLevel: 12, perk: "A proper academy building" } ] },
+  { id: "branch", group: "business", name: "Second branch", tiers: [
+    { tier: 1, name: "Satellite office", price: 1500, minLevel: 7, perk: "A second location on the map" },
+    { tier: 2, name: "Regional branch", price: 4500, minLevel: 14, perk: "A bigger second office" },
+    { tier: 3, name: "Branch tower", price: 12000, minLevel: 25, perk: "A tower of your own across town" } ] },
+  { id: "rental", group: "lifestyle", name: "Rental property", tiers: [
+    { tier: 1, name: "Buy-to-let flat", price: 800, minLevel: 4, perk: "Your first rental on the island" },
+    { tier: 2, name: "Family house", price: 2400, minLevel: 9, perk: "A bigger rental" },
+    { tier: 3, name: "Apartment block", price: 7000, minLevel: 16, perk: "A whole block of rentals" } ] },
+  { id: "sidehustle", group: "lifestyle", name: "Side hustle", tiers: [
+    { tier: 1, name: "Food truck", price: 500, minLevel: 3, perk: "A second stream of income (in the game)" },
+    { tier: 2, name: "Online shop", price: 1800, minLevel: 8, perk: "A shopfront for your side business" },
+    { tier: 3, name: "Franchise", price: 6000, minLevel: 15, perk: "Your brand, in other towns" } ] },
+  { id: "offshore", group: "lifestyle", name: "Offshore account", tiers: [
+    { tier: 1, name: "Savings safe", price: 400, minLevel: 3, perk: "Somewhere for your coins to sit (virtual only)" },
+    { tier: 2, name: "Investment vault", price: 1500, minLevel: 8, perk: "A proper vault" },
+    { tier: 3, name: "Island vault", price: 5000, minLevel: 14, perk: "Palm trees included" } ] },
   { id: "air", group: "lifestyle", name: "Air travel", tiers: [
     { tier: 1, name: "Helipad", price: 900, minLevel: 8, perk: "Somewhere to land" },
     { tier: 2, name: "Helicopter", price: 3000, minLevel: 14, perk: "Rotors spinning on the pad" },
