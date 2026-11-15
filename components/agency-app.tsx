@@ -1466,7 +1466,7 @@ export function AgencyApp() {
   const setClientScope = (id: string) => { setClientScopeState(id); try { document.cookie = `f2b_client=${encodeURIComponent(id || "agency")}; Path=/; Max-Age=31536000; SameSite=Lax; Secure`; window.dispatchEvent(new CustomEvent("f2b-scope", { detail: id })); } catch { /* cookie unavailable */ } try { if (id) window.localStorage.setItem("f2b-client-scope", id); else window.localStorage.removeItem("f2b-client-scope"); } catch { /* storage unavailable */ } if (id) setSelectedClient(id); else setSelectedClient(""); if (id && page === "Lead Factory") setPage("Overview"); };
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("page") === "Scheduling") { setPage("Scheduling"); params.delete("page"); const rest = params.toString(); window.history.replaceState({}, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`); return; }
+    if (params.get("page") === "Scheduling") { setPage("Scheduling"); try { sessionStorage.setItem("f2b-open-page", "Scheduling"); } catch { /* optional */ } params.delete("page"); const rest = params.toString(); window.history.replaceState({}, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`); return; }
     if (params.get("page") !== "Media Library") return;
     const linkedClient = params.get("client");
     if (linkedClient) setClientScope(linkedClient);
@@ -1486,6 +1486,8 @@ export function AgencyApp() {
   const viewHasClientScope = previewMember ? Array.isArray(previewMember.clientAccessIds) : hasClientScope;
   const viewIsAdmin = previewMember ? false : isAdmin;
   useEffect(() => { if (page === "Operations" && (activeScopeId || !viewIsAdmin)) setPage("Overview"); }, [page, activeScopeId, viewIsAdmin]);
+  // Deep links (e.g. back from Google Calendar sign-in) re-apply once the workspace has loaded and picked its start page.
+  useEffect(() => { if (!ready) return; try { const pending = sessionStorage.getItem("f2b-open-page"); if (pending) { sessionStorage.removeItem("f2b-open-page"); setPage(pending); } } catch { /* optional */ } }, [ready]);
   const viewAccess = previewMember ? previewPermissions : access;
   const canViewActivity = viewAccess.overview || viewAccess.clientActivity || viewAccess.allActivity;
   const recentActivityPreview = (viewWorkspace.activity || []).slice().sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime()).slice(0, 4);
