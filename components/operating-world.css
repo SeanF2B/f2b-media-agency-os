@@ -545,3 +545,27 @@ svg.ow-carrying { cursor: crosshair; }
 .ow-stage .ow-person-adult .ow-bean-body > * { stroke: rgba(15,23,42,.22); stroke-width: .45; paint-order: stroke; }
 .ow-stage .ow-person-adult { filter: drop-shadow(0 1px 1.5px rgba(15,23,42,.18)); }
 .ow-hq-sign { filter: drop-shadow(0 3px 5px rgba(15,23,42,.25)); }
+
+/* ═════════ Compact department panel (no scrolling) + encounters + dev ═════════ */
+.ow-full .ow-dept-panel { max-height: none; overflow: visible; padding: 12px 14px; gap: 8px; width: min(860px, calc(100% - 28px)); }
+.ow-dept-panel .ow-dept-head p { font-size: 15px; }
+.ow-dept-stats { gap: 6px; }
+.ow-dept-stats > div { padding: 6px 10px; }
+.ow-dept-stats b { font-size: 16px; }
+.ow-dept-stats small { font-size: 11px; }
+.ow-dept-panel .ow-dept-feed { max-height: 64px; overflow: hidden; }
+.ow-dept-panel .ow-dept-feed li:nth-child(n+3) { display: none; }
+.ow-dept-panel > p, .ow-dept-panel .ow-hint { font-size: 12px; padding: 6px 10px; margin: 0; }
+.ow-dept:focus, .ow-dept:focus-visible, .ow-tag:focus, .ow-spot:focus { outline: none; }
+.ow-encounter, .ow-enc-menu, .ow-dev { width: min(520px, 94vw); display: grid; gap: 12px; }
+.ow-enc-head { display: flex; gap: 12px; align-items: center; } .ow-enc-head h3 { margin: 2px 0 0; font-size: 18px; } .ow-enc-head small { color: #78716c; }
+.ow-enc-text { margin: 0; font-size: 15px; line-height: 1.45; }
+.ow-enc-choices { display: grid; gap: 8px; } .ow-enc-choices button { text-align: left; padding: 11px 14px; border-radius: 12px; font-weight: 600; }
+.ow-enc-result { display: grid; gap: 8px; padding: 14px; border-radius: 14px; background: #f5f5f4; } .ow-enc-result.s3 { background: #ecfdf5; } .ow-enc-result.s0 { background: #fef2f2; }
+.ow-enc-result p { margin: 0; }
+.ow-stars span { font-size: 22px; color: #d6d3d1; margin-right: 2px; } .ow-stars span.on { color: #f59e0b; }
+.ow-enc-list { display: grid; gap: 6px; } .ow-enc-list button { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 12px; text-align: left; } .ow-enc-list button span:nth-of-type(1), .ow-enc-list button > span:not(.ow-enc-tax) { flex: 1; font-weight: 600; }
+.ow-enc-tax { font-size: 20px; width: 28px; text-align: center; }
+.ow-enc-prompt { position: fixed; right: 18px; bottom: 18px; z-index: 3400; display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 16px; background: #111827; color: #fff; box-shadow: 0 14px 34px rgba(0,0,0,.35); animation: ow-fade .25s ease-out both; }
+.ow-enc-prompt div { display: grid; } .ow-enc-prompt span { font-size: 13px; opacity: .85; } .ow-enc-prompt .ghost { color: #fff; border-color: rgba(255,255,255,.3); background: transparent; }
+.ow-dev h4, .ow-enc-menu h4 { margin: 4px 0 0; font-size: 13px; }

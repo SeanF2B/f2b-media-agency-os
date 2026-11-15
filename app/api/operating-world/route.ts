@@ -140,6 +140,16 @@ function businessProfile(ctx: Ctx, saved: Record<string, string>) {
 
 export async function GET(request: Request) {
   const ctx = await context(request); if ("response" in ctx) return ctx.response;
+  if (new URL(request.url).searchParams.get("logo")) {
+    // Same-origin copy of the business logo so the game can read its colours.
+    try {
+      const state = await loadState(ctx); const logo = businessProfile(ctx, state.profile).logo;
+      if (!/^https?:\/\//i.test(logo)) return new Response(null, { status: 404 });
+      const r = await fetch(logo, { cf: { cacheTtl: 86400 } } as RequestInit); const type = r.headers.get("content-type") || "";
+      if (!r.ok || !type.startsWith("image/")) return new Response(null, { status: 404 });
+      return new Response(r.body, { headers: { "content-type": type, "cache-control": "private, max-age=86400" } });
+    } catch { return new Response(null, { status: 404 }); }
+  }
   try {
     const state = await loadState(ctx);
     const snap = await snapshot(ctx);
@@ -208,9 +218,9 @@ export async function GET(request: Request) {
       visitors: plain.leads.filter((l) => l.category === "open" && l.stagePosition > l.firstPosition).slice(0, 6).map((l) => ({ id: l.id, name: l.name || l.title, stage: l.stage })),
       taxman: plain.expenses.some((e) => !e.hasReceipt && e.category !== "Advertising & marketing" && e.date.slice(0, 7) === now.slice(0, 7)),
       // Farm: each open lead is a crop; won jobs (last 7 days) are ripe for harvest.
-      crops: plain.leads.filter((l) => l.category === "open" || (l.category === "won" && Date.now() - Date.parse(l.updatedAt) < 7 * 86_400_000)).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 12).map((l) => {
+      crops: plain.leads.filter((l) => l.category === "open" || (l.category === "won" && Date.now() - Date.parse(l.updatedAt) < 7 * 86_400_000)).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 40).map((l) => {
         const fresh = l.stagePosition <= l.firstPosition;
-        return { id: l.id, name: l.name || l.title, growth: Math.max(0, l.stagePosition - l.firstPosition), ripe: l.category === "won", wilting: l.category === "open" && (fresh ? workingHoursBetween(l.createdAt, now) >= 24 : workingHoursBetween(l.updatedAt, now) >= 120) };
+        return { id: l.id, name: l.name || l.title, stage: l.stage, position: l.stagePosition, growth: Math.max(0, l.stagePosition - l.firstPosition), ripe: l.category === "won", wilting: l.category === "open" && (fresh ? workingHoursBetween(l.createdAt, now) >= 24 : workingHoursBetween(l.updatedAt, now) >= 120) };
       }),
       upcoming: plain.bookings.filter((b) => b.status === "booked" && b.startAt >= now).slice(0, 8), shop: UPGRADES, industries: Object.entries(INDUSTRIES).map(([id, v]) => ({ id, label: v.label })),
       aiReady: aiConfigured(env, await resolveAiProvider(env, ctx.ownerId)),
@@ -292,10 +302,20 @@ export async function POST(request: Request) {
       }
       return respond({ ok: true, won, wallet: await wallet(ctx) });
     }
+    if (action === "dev") {
+      // Developer/testing grants: game-only coins and XP, always labelled so they never pass as earned rewards.
+      const now = new Date().toISOString();
+      if (body.clear === true) { await ctx.db.prepare("DELETE FROM ow_ledger WHERE owner_id=?1 AND scope_id=?2 AND kind='dev_grant'").bind(ctx.ownerId, ctx.scopeId).run(); await logAction(ctx, "Owner", "Removed developer grants", "Developer menu", []); return respond({ ok: true, wallet: await wallet(ctx) }); }
+      const coins = Math.max(0, Math.min(1_000_000, Math.round(Number(body.coins) || 0))), xp = Math.max(0, Math.min(2_000_000, Math.round(Number(body.xp) || 0)));
+      if (!coins && !xp) return respond({ error: "Nothing to add." }, 400);
+      await ctx.db.prepare("INSERT INTO ow_ledger (owner_id, scope_id, reward_key, kind, coins, xp, label, earned_at, created_at, collected_at) VALUES (?1,?2,?3,'dev_grant',?4,?5,?6,?7,?7,?7)").bind(ctx.ownerId, ctx.scopeId, `dev:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`, coins, xp, `Developer grant${coins ? ` · ${coins} coins` : ""}${xp ? ` · ${xp} XP` : ""}`, now).run();
+      await logAction(ctx, "Owner", "Developer grant", `${coins} coins, ${xp} XP from the developer menu`, []);
+      return respond({ ok: true, wallet: await wallet(ctx) });
+    }
     if (action === "buy") {
       const trackId = str(body.itemId, 40);
       const w = await wallet(ctx);
-      const problem = canBuy(trackId, w.owned, w.coins, w.level);
+      const problem = canBuy(trackId, w.owned, w.coins, ctx.scopeId ? w.level : 999); // agency: everything unlocked
       if (problem) return respond({ error: problem }, 400);
       const next = nextUpgrade(trackId, w.owned)!;
       const track = UPGRADES.find((t) => t.id === trackId)!;
