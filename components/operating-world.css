@@ -504,3 +504,8 @@ html.f2b-world .page-content { max-width: none !important; padding: 0 !important
 .ow-root button.ow-btn-main { background: var(--ow-secondary) !important; color: #fff !important; }
 .ow-root button.ow-btn-dismiss { color: #b91c1c !important; border-color: #fecaca !important; background: #fff !important; }
 .ow-root .ow-dialogue .ow-options button:not(.ow-btn-main):not(.ow-btn-dismiss) { background: #fff !important; color: #111827 !important; border: 1px solid #d1d5db !important; }
+.ow-ideas { display: grid; gap: 6px; }
+.ow-ideas ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ow-ideas li { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 12px; background: #f0f9ff; border: 1px solid #bae6fd; color: #0c4a6e; font-size: 13px; animation: ow-rise .35s var(--ow-smooth) both; }
+.ow-ideas li span { flex: 1; color: #0c4a6e; }
+.ow-ideas li button { padding: 6px 10px !important; font-size: 12px !important; }

@@ -412,7 +412,7 @@ function UpgradeArt({ id, tier, primary, secondary }: { id: string; tier: number
 
 // ───────────── Inside HQ: an open-plan office you walk into ─────────────
 type RoomId = EmployeeId | "boss" | "leadgen";
-const ROOM_NAME: Record<RoomId, string> = { receptionist: "Reception", sales: "Sales", accountant: "Accounts", calendar: "Scheduling", projects: "Projects", marketing: "Marketing", boss: "Your office", leadgen: "Lead generation" };
+const ROOM_NAME: Record<RoomId, string> = { receptionist: "Reception", sales: "Sales", accountant: "Accounts", calendar: "Scheduling", projects: "Projects", marketing: "Marketing", boss: "Your office", leadgen: "Lead gen" };
 const LEADGEN_TEAM = [{ name: "Leo", title: "Lead Factory", look: { color: "#155e75", accessory: "glasses" as const, hair: "part" } }, { name: "Olive", title: "Outreach", look: { color: "#9a3412", accessory: "headset" as const, hair: "bob" } }];
 const isoIn = (x: number, y: number, z = 0): [number, number] => [500 + (x - y) * 38, 92 + (x + y) * 19 - z];
 const ptsIn = (list: Array<[number, number]>) => list.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
@@ -508,7 +508,12 @@ function HQInterior({ data, wallet, approaches, selected, onSelect, reduced, cus
 }
 
 /** Live board for a department: real stats, latest activity and buttons into the CRM. */
-function DeptPanel({ id, data, wallet, approach, onOpen, onAct, onCharacter }: { id: RoomId; data: WorldData; wallet: Wallet; approach?: Approach; onOpen: (k: PanelKind) => void; onAct: (a: "upgrades" | "history" | "settings") => void; onCharacter: () => void }) {
+function DeptPanel({ id, data, wallet, approach, onOpen, onAct, onCharacter, post, demo }: { id: RoomId; data: WorldData; wallet: Wallet; approach?: Approach; onOpen: (k: PanelKind) => void; onAct: (a: "upgrades" | "history" | "settings") => void; onCharacter: () => void; post: (p: Record<string, unknown>) => Promise<any>; demo: boolean }) {
+  const [ideas, setIdeas] = useState<Array<{ text: string; panel: PanelKind }> | null>(null);
+  const [thinking, setThinking] = useState(false); const [ideaErr, setIdeaErr] = useState("");
+  const [hidden, setHidden] = useState<number[]>([]);
+  useEffect(() => { setIdeas(null); setHidden([]); setIdeaErr(""); }, [id]);
+  const ask = async () => { if (demo) { setIdeas([{ text: "Demo: reply to the two leads waiting longest, then book Sarah's site visit.", panel: "lead-replies" }]); return; } setThinking(true); setIdeaErr(""); try { const r = await post({ action: "deptSuggest", dept: id }); setIdeas(r.suggestions || []); } catch (e) { setIdeaErr(e instanceof Error ? e.message : "Couldn't get suggestions."); } finally { setThinking(false); } };
   const person = id === "boss" ? { name: data.profile.characterName, title: "Owner" } : id === "leadgen" ? { name: "Leo & Olive", title: "Lead generation" } : EMPLOYEES[id];
   const board = id === "boss" ? null : id === "leadgen" ? (data.leadgen ? { headline: "Finding and contacting new clients", stats: [...data.leadgen.factory.stats, { label: "Outreach", value: data.leadgen.outreach.live ? "Live" : "Not live yet" }], feed: data.leadgen.factory.feed } : null) : data.departments?.[id];
   const actions: Record<RoomId, Array<{ label: string; panel?: PanelKind; act?: "upgrades" | "history" | "settings" | "character" }>> = {
@@ -527,6 +532,13 @@ function DeptPanel({ id, data, wallet, approach, onOpen, onAct, onCharacter }: {
     {upgradeTier(wallet.owned, "furniture") === 0 && id !== "boss" && id !== "leadgen" && <p className="ow-hint">Working off cardboard boxes… Upgrade <b>Office furniture</b> and <b>Office tech</b> to give {person.name} a proper desk.</p>}
     {board && board.feed.length > 0 && <ul className="ow-dept-feed">{board.feed.map((f, i) => <li key={i}><span>{f.text}</span><time>{new Date(f.at).toLocaleString("en-IE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</time></li>)}</ul>}
     {board && !board.feed.length && <p className="ow-muted">Nothing new yet — updates appear here as they happen.</p>}
+    {id !== "boss" && id !== "leadgen" && <div className="ow-ideas">
+      {!ideas && !thinking && <button type="button" className="ow-btn-main" onClick={() => void ask()}><Sparkles size={14} /> Ask {person.name} for suggestions</button>}
+      {thinking && <p className="ow-muted" role="status"><Loader2 size={14} className="ow-spin" /> {person.name} is reviewing {ROOM_NAME[id].toLowerCase()}…</p>}
+      {ideaErr && <p className="ow-err">{ideaErr}</p>}
+      {ideas && <ul>{ideas.map((x, i) => hidden.includes(i) ? null : <li key={i}><Sparkles size={14} /><span>{x.text}</span><button type="button" className="ow-btn-main" onClick={() => onOpen(x.panel)}>Do it</button><button type="button" className="ghost ow-btn-dismiss" onClick={() => setHidden((h) => [...h, i])}>Not relevant</button></li>)}</ul>}
+      {ideas && <small className="ow-muted">Suggestions only — {person.name} never acts without you. “Do it” opens the screen so you can review first.</small>}
+    </div>}
     <div className="ow-options">{actions[id].map((a, i) => <button type="button" key={a.label} className={i === 0 ? "" : "ghost"} onClick={() => { if (a.panel) onOpen(a.panel); else if (a.act === "character") onCharacter(); else if (a.act) onAct(a.act); }}>{a.label}</button>)}</div>
   </div>;
 }
@@ -1054,7 +1066,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
         </svg>
         </div>}
 
-        {view === "hq" ? <DeptPanel id={room} data={data} wallet={w} approach={room === "boss" || room === "leadgen" ? undefined : approaches.find((a) => a.employee === room)} onOpen={(k) => { if (!demo) setPanel({ kind: k }); }} onAct={(a) => setDrawer(a)} onCharacter={() => setCharOpen(true)} /> :
+        {view === "hq" ? <DeptPanel id={room} data={data} wallet={w} approach={room === "boss" || room === "leadgen" ? undefined : approaches.find((a) => a.employee === room)} onOpen={(k) => { if (!demo) setPanel({ kind: k }); }} onAct={(a) => setDrawer(a)} onCharacter={() => setCharOpen(true)} post={post} demo={demo} /> :
         <div className={`ow-dialogue${current ? "" : " clear"}`} aria-live="polite">
           {current ? <>
             {staffPortrait(current.employee, 52)}
