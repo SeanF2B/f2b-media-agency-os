@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { HelpCircle, PanelRight, ArrowLeft, Bot, Coins, Gauge, History, Mic, Pause, Play, Send, Settings2, Sparkles, Volume2, VolumeX, Wand2, X, Zap, CalendarDays, Copy, Check, Loader2, Eye, EyeOff, Hammer, Lock, ChevronRight } from "lucide-react";
 import { EMPLOYEES, EMPLOYEE_FOR_REWARD, REWARDS, UPGRADES, allClearLine, briefing, levelFromXp, nextUpgrade, reactionLine, rewardWalkthrough, stageForLevel, upgradeTier, workingHoursBetween, type Approach, type BriefingOption, type EmployeeId, type OwSnapshot, type PanelKind, type RewardKind, type UpgradeTrack, type WalkStep, type DeptBoard } from "@/lib/operating-world/engine";
+import { appConfirm } from "./app-dialog";
 import "./operating-world.css";
 
 type Outfit = { hat: string; tool: string; outfit: string; label: string };
@@ -662,6 +663,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
   const [panel, setPanelState] = useState<{ kind: PanelKind; focusId?: string } | null>(null);
   const [index, setIndex] = useState(0);
   const [snoozed, setSnoozed] = useState<Record<string, string>>(() => { try { return JSON.parse(readPref(`ow-snooze:${scope}`, "{}")); } catch { return {}; } });
+  const [dismissed, setDismissed] = useState<Record<string, number>>(() => { try { return JSON.parse(readPref(`ow-dismiss:${scope}`, "{}")); } catch { return {}; } });
   const [sound, setSound] = useState(() => readPref("ow-sound", "on") === "on");
   const [reduced, setReduced] = useState(() => readPref("ow-motion", "") === "reduced" || (typeof window !== "undefined" && Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches)));
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -756,8 +758,8 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
   const today = new Date().toISOString().slice(0, 10);
   const approaches = useMemo(() => {
     const list = demo ? briefing(demoSnapshot()) : data?.approaches || [];
-    return list.filter((a) => snoozed[a.id] !== `${today}:${a.count}`);
-  }, [data, demo, snoozed, today]);
+    return list.filter((a) => snoozed[a.id] !== `${today}:${a.count}` && dismissed[a.id] !== a.count);
+  }, [data, demo, snoozed, dismissed, today]);
   const current = approaches[Math.min(index, Math.max(0, approaches.length - 1))];
   useEffect(() => { setIndex(0); }, [approaches.length]);
   // Speech: the person talking reads their line aloud.
@@ -812,6 +814,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
   };
 
   const choose = (option: BriefingOption, approach: Approach) => {
+    if (option.dismiss) { const next = { ...dismissed, [approach.id]: approach.count }; setDismissed(next); if (!demo) { writePref(`ow-dismiss:${scope}`, JSON.stringify(next)); void post({ action: "log", actor: "Owner", what: `Marked “${approach.line}” as not relevant`, reason: "Hidden until something changes", records: [] }).catch(() => undefined); } if (prefs.current.sound) chime("pop"); return; }
     if (option.snooze) { const next = { ...snoozed, [approach.id]: `${today}:${approach.count}` }; setSnoozed(next); if (!demo) writePref(`ow-snooze:${scope}`, JSON.stringify(next)); if (prefs.current.sound) chime("pop"); return; }
     if (demo) { demoAct(approach); return; }
     if (option.panel) setPanel({ kind: option.panel, focusId: option.focusId });
@@ -1036,21 +1039,12 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
           </g>; })}
           {/* The Tax Man knocks when this month's expenses are missing receipts */}
           {(demo || data.taxman) && <TaxMan at={iso(6.6, 8.3)} onTap={() => { if (demo) { say("taxman", "Receipts, please! (demo)", ((a) => [a[0], a[1] - 70] as [number, number])(iso(6.6, 8.3))); return; } say("taxman", "Ahem. Some expenses this month have no receipts.", ((a) => [a[0], a[1] - 70] as [number, number])(iso(6.6, 8.3))); setTimeout(() => setPanel({ kind: "expense" }), 700); }} />}
-          {/* Town life: AI agents at work (or snoozing until their scheduled run), staff on jobs, leads visiting */}
-          {(demo ? [{ id: "d-a1", name: "SEO agent", state: "working", task: "Monthly SEO audit" }, { id: "d-a2", name: "Ads agent", state: "scheduled", task: "Weekly Google Ads check" }] : data.agents || []).map((a, i) => a.state === "working"
-            ? <Walker key={a.id} route={ROUTES[i % ROUTES.length]} dur={13 + i * 2} delay={i * 3} reduced={reduced}><Robot label={`${a.name}: working on ${a.task}`} onTap={() => say(`agent-${a.id}`, `${a.name}: working on “${a.task}”`, [500, 210])} /></Walker>
-            : <g key={a.id} transform={`translate(${iso(4.1 + i * 0.5, 8.3)[0]} ${iso(4.1 + i * 0.5, 8.3)[1]})`}><Robot sleeping label={`${a.name}: scheduled — ${a.task}`} onTap={() => say(`agent-${a.id}`, `${a.name}: snoozing until “${a.task}” is due`, [iso(4.1 + i * 0.5, 8.3)[0], iso(4.1 + i * 0.5, 8.3)[1] - 44])} /></g>)}
-          {(data.staffAtWork || []).map((m, i) => <Walker key={m.id} route={ROUTES[(i + 2) % ROUTES.length].slice().reverse()} dur={15 + i * 2} delay={i * 4 + 2} reduced={reduced}><Bean at={[0, 0]} scale={0.85} look={{ color: "#3f5f6f", tie: true }} className="walker" label={`${m.name}: ${m.task}`} onTap={() => say(`staff-${m.id}`, `${m.name}: ${m.task}`, [500, 210])} /></Walker>)}
+          {/* Leads further down the pipeline visit Sales or the Calendar */}
           {(data.visitors || []).map((v, i) => { const route = /appoint|visit|consult|book/i.test(v.stage) ? there([5.0, 8.4], [2.4, 6.8]) : /propos|quote|negot/i.test(v.stage) ? there([7.4, 8.3], [9.0, 6.8]) : there([8.6, 7.0], [9.6, 9.6]); return <Walker key={v.id} route={route} dur={16 + i * 3} delay={i * 5} reduced={reduced}><Bean at={[0, 0]} scale={0.7} look={{ color: ["#8c7d5f", "#6a738c", "#5f8c76", "#8c6a5f"][i % 4] }} className="walker" label={`${v.name} (${v.stage})`} onTap={demo ? undefined : () => openLead(v.id)} /></Walker>; })}
-          {/* Employees — one AI, six personalities */}
-          {(Object.keys(EMPLOYEES) as EmployeeId[]).sort((a, b) => (EMP_SPOTS[a][0] + EMP_SPOTS[a][1]) - (EMP_SPOTS[b][0] + EMP_SPOTS[b][1])).map((id) => { const at = iso(...EMP_SPOTS[id]); const talking = id === approaching; return <g key={id}>
-            <Bean at={at} scale={1.25} look={EMP_LOOK[id]} mood={talking ? current?.mood : healthMood === "struggling" ? "concerned" : "calm"} className={`staff ${talking ? "talking" : ""} ${poked === id ? "poked" : ""} idle-${id}`} label={`${EMPLOYEES[id].name}, ${EMPLOYEES[id].title}`} onTap={() => tapEmployee(id)} alert={talking && (current?.urgency || 0) >= 75} />
-            <text x={at[0]} y={at[1] + 14} textAnchor="middle" fontSize="10" fontWeight="800" fill="#1c1917" className="ow-name">{EMPLOYEES[id].name}</text>
-          </g>; })}
           {/* The owner */}
           {(() => { const at = iso(7.0, 11.5); return <g><Bean at={at} scale={1.45} look={ownerLook} className={`owner ${poked === "owner" ? "poked" : ""}`} label={`${p.characterName} (you)`} onTap={() => tapOwner()} /><text x={at[0]} y={at[1] + 18} textAnchor="middle" fontSize="11" fontWeight="900" fill="#14532d">{p.characterName}</text></g>; })()}
           {/* Collectable coins */}
-          {[...pendingByEmployee.entries()].map(([id, items]) => { const at = iso(...EMP_SPOTS[id]); return <CoinBubble key={id} x={at[0]} y={at[1] - 84} amount={sumCoins(items)} label={`Collect ${sumCoins(items)} coins from ${EMPLOYEES[id].name}`} onCollect={() => void collect(items.map((x) => x.key))} />; })}
+          {[...pendingByEmployee.entries()].map(([id, items], i, arr) => { const at: [number, number] = [500 + (i - (arr.length - 1) / 2) * 52, 118]; return <CoinBubble key={id} x={at[0]} y={at[1]} amount={sumCoins(items)} label={`Collect ${sumCoins(items)} coins from ${EMPLOYEES[id].name}`} onCollect={() => void collect(items.map((x) => x.key))} />; })}
           {raid && (() => { const door = iso(6.2, 8.4), shore = iso(6.0, 12.8); return <g key={raid.n} className="ow-raid">
             <g><TaxMan at={[0, 0]} onTap={() => setPanel({ kind: "expense" })} />{!reduced && <animateMotion dur="5.6s" repeatCount="1" fill="freeze" keyPoints="0;0.5;0.5;1" keyTimes="0;0.38;0.6;1" calcMode="linear" path={`M${shore[0]} ${shore[1]} L${door[0]} ${door[1]} L${shore[0]} ${shore[1]}`} />}{reduced && <set attributeName="transform" to={`translate(${door[0]} ${door[1]})`} />}</g>
             <g className="ow-raid-coins" transform={`translate(${door[0]} ${door[1] - 70})`}>{[0, 1, 2, 3].map((k) => <circle key={k} cx={(k - 1.5) * 9} cy="0" r="6" fill="#fbbf24" stroke="#b45309" strokeWidth="1.5" style={{ animationDelay: `${2.1 + k * 0.08}s` }} />)}<text className="ow-raid-text" y="-14" textAnchor="middle" fontSize="16" fontWeight="900" fill="#b91c1c" stroke="#fff" strokeWidth="3" paintOrder="stroke">−{raid.coins}</text></g>
@@ -1068,7 +1062,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
               <small>{EMPLOYEES[current.employee].name} · {EMPLOYEES[current.employee].title}{approaches.length > 1 ? ` · ${Math.min(index, approaches.length - 1) + 1} of ${approaches.length}` : ""}</small>
               <p className={current.mood === "panicked" ? "shout" : ""}>{current.line}</p>
               <span className="ow-detail">{current.detail}</span>
-              <div className="ow-options">{current.options.map((o) => <button type="button" key={o.label} className={o.snooze ? "ghost" : ""} onClick={() => choose(o, current)}>{o.label}</button>)}</div>
+              <div className="ow-options">{current.options.map((o, oi) => <button type="button" key={o.label} className={o.dismiss ? "ghost ow-btn-dismiss" : oi === 0 ? "ow-btn-main" : "ghost"} onClick={() => choose(o, current)}>{o.label}</button>)}</div>
             </div>
             {approaches.length > 1 && <button type="button" className="ow-next ghost" onClick={() => setIndex((index + 1) % approaches.length)} aria-label="Next update"><ChevronRight size={20} /></button>}
           </> : <><div className="ow-speaker ok"><Check size={20} /></div><div className="ow-speech"><p>{allClearLine(today)}</p><span className="ow-detail">Nothing needs you right now. New enquiries, invoices and appointments will appear here as they happen.</span></div></>}
@@ -1118,7 +1112,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
       { sel: ".ow-coins", title: "Coins", text: "Every real piece of work earns coins: replying to leads, booking appointments, sending invoices, recording receipts. Coins are virtual — never real money." },
       { sel: ".ow-xp", title: "Levels", text: "Coins come with experience. Level up to unlock bigger headquarters and new upgrades." },
       { sel: '[aria-label="Enter headquarters"]', title: "Headquarters", text: "Tap headquarters to walk inside. Each department has its own desk, its own person and a live board of real numbers." },
-      { sel: ".ow-bean.staff", title: "Your team", text: "Tap anyone to hear what they're working on. They walk over when something needs you." },
+      { sel: '[aria-label="Enter headquarters"]', title: "Your team works inside", text: "Your staff and AI agents work at their desks inside headquarters. Coins they earn appear above the building — tap to collect." },
       { sel: '[aria-label^="Deal yard"]', title: "Deal yard", text: "Every open lead is a building going up. It grows as the deal moves through your pipeline and finishes when you win the job." },
       { sel: ".ow-dialogue", title: "Briefings", text: "Your team brings you what matters most, with one-tap options that open the right screen." },
       { sel: ".ow-command", title: "Just ask", text: "Type or speak a request, like who haven't we replied to, or record this receipt." },
@@ -1179,7 +1173,7 @@ function LeadReplies({ scope, focusId, customers, mode, post, onOpen }: { scope:
 
   return <div className="ow-replies">
     {focus && <article className="ow-lead-card"><h3>{focus.name || focus.title}</h3><p>{focus.title}</p><dl><dt>Stage</dt><dd>{focus.stage}</dd><dt>Waiting since</dt><dd>{new Date(focus.createdAt).toLocaleString("en-IE")}</dd>{focus.email && <><dt>Email</dt><dd><a href={`mailto:${focus.email}`}>{focus.email}</a></dd></>}{focus.phone && <><dt>Phone</dt><dd><a href={`tel:${focus.phone}`}>{focus.phone}</a></dd></>}{focus.value > 0 && <><dt>Value</dt><dd>{new Intl.NumberFormat("en-IE", { style: "currency", currency: focus.currency }).format(focus.value)}</dd></>}</dl>
-      <div className="ow-options"><button type="button" onClick={() => void prepare()} disabled={busy}><Wand2 size={14} /> Prepare a reply</button><button type="button" className={booking ? "" : "ghost"} onClick={() => setBooking(!booking)}><CalendarDays size={14} /> Book an appointment</button><button type="button" className="ghost" onClick={() => onOpen("leads")}>Open in Pipeline</button><button type="button" className="ghost" onClick={() => onOpen("conversations")}>Conversations</button></div>{booking && !booked && <BookingPicker scope={scope} customer={focus} onBooked={(t) => { setBooked(t); void post({ action: "log", actor: "Owner", what: `Booked ${focus.name || focus.title}`, reason: "Booked from the lead card in Operating World", records: [`opportunity:${focus.id}`] }).catch(() => undefined); }} onMore={() => onOpen("scheduling")} />}{booked && <p className="ow-ok">{booked} Coins will appear over Cal shortly.</p>}</article>}
+      <div className="ow-options"><button type="button" onClick={() => void prepare()} disabled={busy}><Wand2 size={14} /> Prepare a reply</button><button type="button" className={booking ? "" : "ghost"} onClick={() => setBooking(!booking)}><CalendarDays size={14} /> Book an appointment</button><button type="button" className="ghost" onClick={() => onOpen("leads")}>Open in Pipeline</button><button type="button" className="ghost" onClick={() => onOpen("conversations")}>Conversations</button><button type="button" className="ghost ow-btn-dismiss" onClick={async () => { if (!(await appConfirm(`Mark ${focus.name || focus.title} as not relevant? It will be flagged as spam in your CRM (with do-not-disturb) and leave the queue.`))) return; try { const r = await fetch(`/api/crm?clientId=${encodeURIComponent(scope)}`, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "setFlag", kind: "opportunity", refId: focus.id, flag: "spam" }) }); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Couldn\u2019t update the lead."); setBooked("Marked as not relevant (spam) in your CRM."); } catch (e) { setErr(e instanceof Error ? e.message : "Couldn\u2019t update the lead."); } }}>Not relevant</button></div>{booking && !booked && <BookingPicker scope={scope} customer={focus} onBooked={(t) => { setBooked(t); void post({ action: "log", actor: "Owner", what: `Booked ${focus.name || focus.title}`, reason: "Booked from the lead card in Operating World", records: [`opportunity:${focus.id}`] }).catch(() => undefined); }} onMore={() => onOpen("scheduling")} />}{booked && <p className="ow-ok">{booked} Coins will appear over Cal shortly.</p>}</article>}
     {!focus && <p className="ow-muted">Drafts only — nothing is sent until you approve each one. Replies go out through your normal Conversations email and appear there.</p>}
     {mode === "manual" && !focus && !drafts.length && <button type="button" onClick={() => void prepare()} disabled={busy}><Wand2 size={14} /> Prepare drafts</button>}
     {busy && <p className="ow-muted" role="status"><Loader2 size={14} className="ow-spin" /> The receptionist is drafting…</p>}

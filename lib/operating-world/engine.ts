@@ -319,7 +319,7 @@ export const EMPLOYEES: Record<EmployeeId, { name: string; title: string; colour
 };
 /** Where an option takes the owner. Every panel opens an EXISTING CRM screen inside the game. */
 export type PanelKind = "leads" | "contacts" | "conversations" | "scheduling" | "invoicing" | "books" | "expense" | "tasks" | "task" | "lead-replies" | "lead-detail" | "lead-factory" | "outreach";
-export type BriefingOption = { label: string; panel?: PanelKind; focusId?: string; snooze?: boolean };
+export type BriefingOption = { label: string; panel?: PanelKind; focusId?: string; snooze?: boolean; dismiss?: boolean };
 export type Approach = { id: string; employee: EmployeeId; urgency: number; mood: "panicked" | "concerned" | "cheerful" | "calm"; line: string; detail: string; count: number; options: BriefingOption[] };
 
 /** Small deterministic hash so dialogue varies by day but never randomly between refreshes. */
@@ -342,7 +342,7 @@ export function briefing(snap: OwSnapshot): Approach[] {
       : pick([`Boss, ${say(n)} fresh lead${n === 1 ? " just" : "s just"} came in.`, `New enquiry alert! ${cap(plural(n, "lead"))} waiting for a hello.`], seed + n);
     out.push({ id: "leads", employee: "receptionist", urgency: panic ? 100 : 70, mood: panic ? "panicked" : "concerned", count: n, line,
       detail: w ? `${plural(w, "lead")} waiting over 24 working hours. Oldest: ${s.waitingLeads[0].name || s.waitingLeads[0].title}.` : `Oldest: ${s.freshLeads[0].name || s.freshLeads[0].title}.`,
-      options: [{ label: "Sort them out", panel: "leads" }, { label: "Show the most urgent lead", panel: "lead-detail", focusId: s.freshLeads[0].id }, { label: "Let AI prepare all responses", panel: "lead-replies" }, { label: "Remind me later", snooze: true }] });
+      options: [{ label: "Let AI prepare all responses", panel: "lead-replies" }, { label: "Show the most urgent lead", panel: "lead-detail", focusId: s.freshLeads[0].id }, { label: "Open the pipeline", panel: "leads" }, { label: "Remind me later", snooze: true }] });
   }
   if (snap.sources.conversations && s.unreadThreads.length) {
     const n = s.unreadThreads.length;
@@ -396,6 +396,7 @@ export function briefing(snap: OwSnapshot): Approach[] {
     if (t === 0) out.push({ id: "quiet", employee: "calendar", urgency: 20, mood: "calm", count: 0, line: pick(["Tomorrow's looking quiet. Shall we fill the diary?", "Nothing booked for tomorrow yet, boss."], seed + "q"), detail: `${plural(s.bookingsToday.length, "appointment")} today.`, options: [{ label: "Open the calendar", panel: "scheduling" }, { label: "All good", snooze: true }] });
     else out.push({ id: "tomorrow", employee: "calendar", urgency: 15, mood: "cheerful", count: t, line: `${cap(plural(t, "appointment"))} in the diary for tomorrow!`, detail: s.bookingsTomorrow.slice(0, 3).map((b) => `${b.name} at ${b.startAt.slice(11, 16)}`).join(", "), options: [{ label: "View calendar", panel: "scheduling" }, { label: "Great", snooze: true }] });
   }
+  for (const a of out) a.options.push({ label: "Not relevant", dismiss: true });
   return out.sort((a, b) => b.urgency - a.urgency);
 }
 

@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
 import { authorizeAdmin, respond } from "@/lib/settings-auth";
+import { getChatGPTUser } from "../../chatgpt-auth";
 import { aiConfigured, aiEndpoint, aiHeaders, aiModel, resolveAiProvider } from "@/lib/ai-provider";
 import { OPERATING_WORLD_SCHEMA } from "@/lib/operating-world/schema-sql";
 import {
@@ -158,6 +159,17 @@ export async function GET(request: Request) {
       if (raids.length) await logAction(ctx, "The Tax Man", `Raided ${raids.reduce((n, r) => n + r.coins, 0)} coins`, `${raids.length} expense${raids.length === 1 ? "" : "s"} still without a receipt after 7 days`, raids.map((r) => r.key.replace("raid:", "expense:")));
     }
     const approaches = briefing(plain);
+    // Personal briefing: the signed-in person's own tasks and appointments to update.
+    const me = await getChatGPTUser().catch(() => null);
+    const myProfile = me ? ((ctx.ws.staff || []) as any[]).find((m) => !m.isBot && (m.id === me.userId || String(m.email || "").toLowerCase() === me.email.toLowerCase())) : null;
+    if (myProfile) {
+      const today = now.slice(0, 10);
+      const mine = ((ctx.ws.tasks || []) as any[]).filter((t) => t.assigneeId === myProfile.id && String(t.clientId || "") === ctx.scopeId && !/^done$/i.test(String(t.status || "")) && (!t.due || String(t.due).slice(0, 10) <= today));
+      const myBookings = await ctx.db.prepare("SELECT b.id, b.name, b.start_at FROM sched_booking_staff s JOIN sched_bookings b ON b.id=s.booking_id WHERE s.owner_id=?1 AND s.staff_id=?3 AND s.active=1 AND s.start_at<?4 AND s.start_at>=?5 AND b.client_id=?2 AND b.status='booked' ORDER BY s.start_at DESC LIMIT 10").bind(ctx.ownerId, ctx.scopeId, myProfile.id, new Date(Date.now() - 3_600_000).toISOString(), new Date(Date.now() - 30 * 86_400_000).toISOString()).all<{ id: string; name: string; start_at: string }>().then((r) => r.results || []).catch(() => [] as Array<{ id: string; name: string; start_at: string }>);
+      const first = String(myProfile.name || "").split(" ")[0] || "Boss";
+      if (myBookings.length) approaches.unshift({ id: "my-appointments", employee: "calendar", urgency: 88, mood: "calm", count: myBookings.length, line: `${first}, ${myBookings.length === 1 ? `how did ${myBookings[0].name || "your appointment"} go?` : `${myBookings.length} of your appointments need their status updated.`}`, detail: myBookings.slice(0, 3).map((b) => `${b.name || "Appointment"} · ${new Date(b.start_at).toLocaleDateString("en-IE", { day: "numeric", month: "short" })}`).join(", "), options: [{ label: "Update my appointments", panel: "scheduling" }, { label: "Remind me later", snooze: true }, { label: "Not relevant", dismiss: true }] });
+      if (mine.length) approaches.unshift({ id: "my-tasks", employee: "projects", urgency: 90, mood: mine.some((t) => t.due && String(t.due).slice(0, 10) < today) ? "concerned" : "calm", count: mine.length, line: `${first}, you've got ${mine.length === 1 ? "a task" : `${mine.length} tasks`} of your own to do${mine.some((t) => t.due && String(t.due).slice(0, 10) < today) ? " — some are overdue" : " today"}.`, detail: mine.slice(0, 3).map((t) => String(t.title || "Task")).join(", "), options: [{ label: "Open my tasks", panel: "tasks" }, { label: "Remind me later", snooze: true }, { label: "Not relevant", dismiss: true }] });
+    }
     const urgent = (plain.leads.filter((l) => l.category === "open" && l.stagePosition <= l.firstPosition)).sort((a, b) => a.createdAt.localeCompare(b.createdAt)).slice(0, 12).map((l) => ({ ...l, ...leadsExtra[l.id] }));
     // Who is busy right now: AI agents running/scheduled tasks and staff with work in progress (this account only).
     const activity = (() => {

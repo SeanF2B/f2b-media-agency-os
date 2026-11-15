@@ -501,3 +501,6 @@ html.f2b-world .page-content { max-width: none !important; padding: 0 !important
 .ow-tour-card { transition: left .35s ease, top .35s ease !important; }
 .ow-bean-body { animation-duration: 6s !important; }
 .ow-spot:hover .ow-spot-body { transform: translateY(-2px); }
+.ow-root button.ow-btn-main { background: var(--ow-secondary) !important; color: #fff !important; }
+.ow-root button.ow-btn-dismiss { color: #b91c1c !important; border-color: #fecaca !important; background: #fff !important; }
+.ow-root .ow-dialogue .ow-options button:not(.ow-btn-main):not(.ow-btn-dismiss) { background: #fff !important; color: #111827 !important; border: 1px solid #d1d5db !important; }
