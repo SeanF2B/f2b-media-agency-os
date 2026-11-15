@@ -537,3 +537,11 @@ html.f2b-world .page-content { max-width: none !important; padding: 0 !important
 .ow-build-items { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; order: 3; }
 .ow-build-items button { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 999px; font-size: 12px; }
 svg.ow-carrying { cursor: crosshair; }
+
+/* ═════════ Tidy, Sims-style tags and characters ═════════ */
+.ow-tag { cursor: pointer; filter: drop-shadow(0 2px 4px rgba(15,23,42,.18)); }
+.ow-tag text { font-family: inherit; letter-spacing: .1px; }
+.ow-tag:hover rect { stroke: rgba(15,23,42,.35); }
+.ow-stage .ow-person-adult .ow-bean-body > * { stroke: rgba(15,23,42,.22); stroke-width: .45; paint-order: stroke; }
+.ow-stage .ow-person-adult { filter: drop-shadow(0 1px 1.5px rgba(15,23,42,.18)); }
+.ow-hq-sign { filter: drop-shadow(0 3px 5px rgba(15,23,42,.25)); }
