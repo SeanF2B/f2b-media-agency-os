@@ -1048,3 +1048,18 @@ html body .ai-chat-ticket .primary-button { height:36px; padding:0 14px !importa
 html body.f2b-dark :is(.ai-chat-ticket, #f2b-ai-x) { background:#262b33 !important; border-color:rgba(255,255,255,.12) !important; }
 html body.f2b-dark .ai-chat-ticket :is(b, #f2b-ai-x) { color:#fff !important; -webkit-text-fill-color:#fff !important; }
 html body.f2b-dark .ai-chat-ticket :is(input, textarea, select, #f2b-ai-x) { background:#12151a !important; border-color:rgba(255,255,255,.16) !important; color:#fff !important; -webkit-text-fill-color:#fff !important; }
+/* Conversations: inbox fits the window (height set in JS); no forced min-height pushing the reply box off screen */
+html body .app-shell .cv-grid { min-height: 0 !important; }
+html body .app-shell .cv-chat { min-height: 0 !important; overflow: hidden; }
+html body .app-shell .cv-list { min-height: 0; overflow: auto; }
+html body .app-shell .cv-compose { flex-shrink: 0; }
+/* Lead cards: edit pencil fully visible, tags editable */
+html body .app-shell .crm-opportunity { position: relative !important; overflow: visible !important; }
+html body .app-shell .crm-opportunity .crm-card-edit-top { top: 8px !important; right: 8px !important; z-index: 2; }
+html body .app-shell .crm-opportunity .crm-card-top { padding-right: 34px !important; }
+html body .app-shell .crm-card-tag { display: inline-flex; align-items: center; gap: 3px; }
+html body .app-shell .crm-card-tag-x { border: 0; background: transparent; color: inherit; opacity: .55; cursor: pointer; padding: 0 0 0 2px; font-size: 13px; line-height: 1; }
+html body .app-shell .crm-card-tag-x:hover { opacity: 1; }
+html body .app-shell .crm-card-tag.add { border: 1px dashed currentColor; background: transparent; cursor: pointer; opacity: .65; font: inherit; font-size: 11px; }
+html body .app-shell .crm-card-tag.add:hover { opacity: 1; }
+html body .app-shell .cm-tag-add { border: 1px dashed #b8c4cc; background: transparent; cursor: pointer; color: #63727b; padding: 0 7px; }

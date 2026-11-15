@@ -18,6 +18,10 @@ const PAGE_HELP: Record<string, string[]> = {
   Operations: ["Create an SEO audit task for this client", "Draft this month’s Google Business posts", "Open the Launchpad"],
   Bookkeeping: ["Add expense: Canva €12.99 today, software", "Add income €450 from a client, website project", "Open invoicing"],
   "Media Library": ["Task to photograph the next finished job", "Open the Leads board"],
+  "Lead Factory": ["Find roofers in Galway with under 20 reviews", "Create an ICP for plumbers in Dublin with no website", "Which saved list should I contact first?"],
+  Conversations: ["Draft a reply to the latest quote request", "Which conversations are waiting on me?", "Open the Leads board"],
+  Scheduling: ["Book a call with a client next Tuesday at 11", "What’s on this week?"],
+  Invoicing: ["Create an invoice for €450 website work", "Which invoices are overdue?"],
   Clients: ["Add a new client: Murphy Plumbing, 087 123 4567", "Create an onboarding task for the newest client"],
 };
 const TOURS: Record<string, TourStep[]> = {
@@ -44,7 +48,8 @@ const TOURS: Record<string, TourStep[]> = {
 
 // Which waiting items matter on each page, so recommendations follow the page you're on.
 const PAGE_FOCUS: Record<string, RegExp> = { CRM: /lead|follow|conversation|reply/i, Tasks: /approv|overdue|ai|task/i, Operations: /approv|ai|seo|ads|audit/i, Bookkeeping: /invoice|expense|income|receipt|payment/i };
-const forPage = (list: Suggestion[], page: string) => { const focus = PAGE_FOCUS[page]; if (!focus) return list; const hits = list.filter((item) => focus.test(`${item.source || ""} ${item.title} ${item.why}`)); return hits.length ? hits : []; };
+// Only pages with a clear match get task recommendations; other pages get help for that page instead.
+const forPage = (list: Suggestion[], page: string) => { const focus = PAGE_FOCUS[page]; if (!focus) return []; const hits = list.filter((item) => focus.test(`${item.source || ""} ${item.title} ${item.why}`)); return hits.length ? hits : []; };
 
 export function AiChatWidget({ page, pageName, clientId, avatar, enabled, onCommand, onNavigate, onSuggestion, clients = [], onTicket }: { clients?: Array<{ id: string; name: string }>; onTicket?: () => void; page: string; pageName?: string; clientId?: string; avatar: ReactNode; enabled: boolean; onCommand: (command: AiCommand) => void; onNavigate: (page: string) => void; onSuggestion: (item: Suggestion) => void }) {
   const [open, setOpen] = useState(false);
@@ -130,7 +135,9 @@ export function AiChatWidget({ page, pageName, clientId, avatar, enabled, onComm
   // Recommendations for the page you're on.
   function recommendHere() {
     const here = forPage(suggestions, page);
-    if (here.length) say(`Recommended on ${label}:`, here.slice(0, 5).map((item) => ({ label: item.title, run: () => onSuggestion(item) })));
+    if (here.length) { say(`Recommended on ${label}:`, here.slice(0, 5).map((item) => ({ label: item.title, run: () => onSuggestion(item) }))); return; }
+    const help = PAGE_HELP[page];
+    if (help) say(`On ${label} I can help with:`, help.map((text) => ({ label: text, run: () => void ask(text) })));
   }
   function startTour(target: string) {
     setToast(null);
