@@ -700,3 +700,16 @@ html body .ml-ai-panel { min-width:0 !important; width:100%; box-sizing:border-b
 html body .ml-ai-panel textarea, html body .ml-ai-panel select { width:100%; box-sizing:border-box; }
 html body .ml-modal:not(.is-wide) { width:min(560px, 94vw); }
 html body .ml-modal .ml-modal-body, html body .ml-modal > div:last-child { overflow-x:hidden; }
+
+/* Books rows: softer red / green tints, calmer amount colours, action icons */
+html body .app-shell:not(.dark-mode) .finance-row:has(.finance-kind.expense), html body .app-shell:not(.dark-mode) .client-tax-list > div.expense { background: #fdf7f7 !important; }
+html body .app-shell:not(.dark-mode) .finance-row:has(.finance-kind.expense):nth-child(even), html body .app-shell:not(.dark-mode) .client-tax-list > div.expense:nth-child(even) { background: #faf1f1 !important; }
+html body .app-shell:not(.dark-mode) .finance-row:has(.finance-kind.income), html body .app-shell:not(.dark-mode) .finance-row.finance-client-income, html body .app-shell:not(.dark-mode) .client-tax-list > div.income { background: #f5faf7 !important; }
+html body .app-shell:not(.dark-mode) .finance-row:has(.finance-kind.income):nth-child(even), html body .app-shell:not(.dark-mode) .finance-row.finance-client-income:nth-child(even), html body .app-shell:not(.dark-mode) .client-tax-list > div.income:nth-child(even) { background: #eef7f1 !important; }
+html body .app-shell .client-tax-list > div.expense strong, html body .app-shell .finance-row .negative-value { color: #b42318 !important; }
+html body .app-shell .client-tax-list > div.income strong, html body .app-shell .finance-row .positive-value { color: #067647 !important; }
+html body .app-shell .client-tax-list > div { align-items: center; }
+html body .app-shell .client-tax-row-actions { display: inline-flex; gap: 6px; justify-self: end; }
+html body .app-shell .client-tax-row-actions .finance-icon-btn { width: 32px; height: 32px; display: inline-grid; place-items: center; padding: 0; border-radius: 9px; border: 1px solid #e3e8ef; background: #fff; color: #475467; cursor: pointer; }
+html body .app-shell .client-tax-row-actions .finance-icon-btn.danger { color: #b42318; border-color: #f4d4d0; }
+html body .app-shell.dark-mode .client-tax-row-actions .finance-icon-btn { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.14); color: #d0d5dd; }
