@@ -135,7 +135,7 @@ function businessProfile(ctx: Ctx, saved: Record<string, string>) {
   const branding = { ...(ctx.ws.settings?.branding || {}), ...(ctx.client?.branding || {}) } as Record<string, string>;
   const guessed = guessIndustry(`${name} ${source.wordpressSiteUrl || ""} ${(source.campaigns || []).map((c: any) => c?.landingPageUrl || "").join(" ")}`) as Industry;
   const industry = (saved.industry && saved.industry in INDUSTRIES ? saved.industry : ctx.scopeId ? guessed : "agency") as Industry;
-  return { name, logo: String(source.logo || branding.logo || ""), primary: String(saved.primary || branding.primary || "#3b82f6"), secondary: String(saved.secondary || branding.secondary || "#1e3a8a"), industry, industryGuessed: !saved.industry, industryLabel: INDUSTRIES[industry].label, outfit: INDUSTRIES[industry], characterName: String(saved.characterName || "Boss"), website: String(saved.website || source.wordpressSiteUrl || ""), look: (() => { try { return JSON.parse(saved.look || "{}"); } catch { return {}; } })() };
+  return { name, logo: String(source.logo || branding.logo || ""), primary: String(saved.primary || branding.primary || "#3b82f6"), secondary: String(saved.secondary || branding.secondary || "#1e3a8a"), industry, industryGuessed: !saved.industry, industryLabel: INDUSTRIES[industry].label, outfit: INDUSTRIES[industry], characterName: String(saved.characterName || "Boss"), website: String(saved.website || source.wordpressSiteUrl || ""), look: (() => { try { return JSON.parse(saved.look || "{}"); } catch { return {}; } })(), layout: (() => { try { return JSON.parse(saved.layout || "{}"); } catch { return {}; } })() };
 }
 
 export async function GET(request: Request) {
@@ -251,6 +251,11 @@ export async function POST(request: Request) {
         const colour = typeof l.colour === "string" && (/^#[0-9a-f]{6}$/i.test(l.colour) || ["primary", "secondary"].includes(l.colour)) ? l.colour : undefined;
         const extras = Array.isArray(l.extras) ? (l.extras as unknown[]).filter((e): e is string => typeof e === "string" && ["glasses", "tie", "shades", "crown"].includes(e)) : [];
         next.look = JSON.stringify({ figure: pick(l.figure, ["male", "female"]), hair: pick(l.hair, ["long", "short", "part", "bun", "bob", "wave", "none"]), top: pick(l.top, ["jacket", "polo", "hivis"]), colour, hat: pick(l.hat, ["auto", "none", "cap", "hardhat", "beanie"]), extras });
+      }
+      if (body.layout && typeof body.layout === "object") {
+        const allowed = ["offshore", "academy", "car", "rental", "sidehustle", "branch"]; const out: Record<string, [number, number]> = {};
+        for (const [k, v] of Object.entries(body.layout as Record<string, unknown>)) { if (!allowed.includes(k) || !Array.isArray(v) || v.length !== 2) continue; const [x, y] = v.map(Number); if (Number.isFinite(x) && Number.isFinite(y) && x >= -2 && y >= -2 && x <= 13 && y <= 13) out[k] = [Math.round(x * 2) / 2, Math.round(y * 2) / 2]; }
+        next.layout = JSON.stringify(out);
       }
       await ctx.db.prepare("UPDATE ow_state SET profile=?3, updated_at=?4 WHERE owner_id=?1 AND scope_id=?2").bind(ctx.ownerId, ctx.scopeId, JSON.stringify(next), new Date().toISOString()).run();
       await logAction(ctx, "Owner", "Updated business character", "Manual correction of the game profile", []);

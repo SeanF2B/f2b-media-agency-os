@@ -6,13 +6,13 @@
 // completed records (idempotent). The owner taps the coins over each employee to collect them.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { HelpCircle, PanelRight, ArrowLeft, Bot, Coins, Gauge, History, Mic, Pause, Play, Send, Settings2, Sparkles, Volume2, VolumeX, Wand2, X, Zap, CalendarDays, Copy, Check, Loader2, Eye, EyeOff, Hammer, Lock, ChevronRight } from "lucide-react";
+import { HelpCircle, PanelRight, ArrowLeft, Bot, Coins, Gauge, History, Mic, Pause, Play, Send, Settings2, Sparkles, Volume2, VolumeX, Wand2, X, Zap, CalendarDays, Copy, Check, Loader2, Eye, EyeOff, Hammer, Lock, ChevronRight, LayoutGrid } from "lucide-react";
 import { EMPLOYEES, EMPLOYEE_FOR_REWARD, REWARDS, UPGRADES, allClearLine, briefing, levelFromXp, nextUpgrade, reactionLine, rewardWalkthrough, stageForLevel, upgradeTier, workingHoursBetween, type Approach, type BriefingOption, type EmployeeId, type OwSnapshot, type PanelKind, type RewardKind, type UpgradeTrack, type WalkStep, type DeptBoard } from "@/lib/operating-world/engine";
 import { appConfirm } from "./app-dialog";
 import "./operating-world.css";
 
 type Outfit = { hat: string; tool: string; outfit: string; label: string };
-type Profile = { name: string; logo: string; primary: string; secondary: string; industry: string; industryGuessed: boolean; industryLabel: string; outfit: Outfit; characterName: string; website: string; look?: CharLook };
+type Profile = { name: string; logo: string; primary: string; secondary: string; industry: string; industryGuessed: boolean; industryLabel: string; outfit: Outfit; characterName: string; website: string; look?: CharLook; layout?: Record<string, [number, number]> };
 type Pending = { key: string; kind: string; coins: number; xp: number; label: string };
 type Wallet = { coins: number; xp: number; level: number; xpIntoLevel: number; xpForNext: number; progress: number; stage: { name: string; floors: number; next: { level: number; name: string } | null }; owned: string[]; pending: Pending[]; recentRewards: Array<{ reward_key: string; kind: RewardKind; coins: number; label: string; created_at: string; collected_at?: string }>; actions: Array<{ id: string; actor: string; action: string; reason: string; records: string[]; status: string; created_at: string }> };
 type Customer = { id: string; title: string; name: string; createdAt: string; stage: string; email?: string; phone?: string; nextStageId?: string; nextStage?: string; value: number; currency: string };
@@ -615,6 +615,27 @@ function ReceiptRush({ stolen, demo, onDone, sound }: { stolen: number; demo: bo
   </div>;
 }
 
+// ───────────── Free-build layout ─────────────
+const SLOTS: Array<{ id: string; label: string; at: [number, number] }> = [
+  { id: "offshore", label: "Offshore account", at: [1.0, 1.0] },
+  { id: "academy", label: "Training academy", at: [1.0, 4.6] },
+  { id: "car", label: "Car", at: [3.2, 10.6] },
+  { id: "rental", label: "Rental property", at: [8.8, 4.0] },
+  { id: "sidehustle", label: "Side hustle", at: [11.0, 4.6] },
+  { id: "branch", label: "Second branch", at: [11.4, 10.8] },
+];
+const SLOT_SIZE = 1.5;
+/** Fixed footprints nothing can be dropped on: HQ, paths, billboard, workshop, home, deal yard, car park, fleet. */
+const FIXED: Array<[number, number, number, number]> = [[4.5, 4.5, 3, 3], [5.4, 7.7, 1.2, 4.3], [3.6, 7.7, 5.2, 1.6], [4.9, 1.0, 2.3, 0.8], [0.5, 9.6, 2.2, 1.8], [8.8, 0.8, 2.2, 1.8], [9.9, 7.3, 1.9, 2.7], [7.6, 10.4, 1.6, 1.4], [9.4, 10.3, 1.6, 0.8]];
+const LAND_MIN = -1.8, LAND_MAX = 14 - SLOT_SIZE - 0.2;
+function overlaps(a: [number, number, number, number], b: [number, number, number, number]) { return a[0] < b[0] + b[2] && b[0] < a[0] + a[2] && a[1] < b[1] + b[3] && b[1] < a[1] + a[3]; }
+function canDrop(id: string, at: [number, number], layout: Record<string, [number, number]>) {
+  if (at[0] < LAND_MIN || at[1] < LAND_MIN || at[0] > LAND_MAX || at[1] > LAND_MAX) return false;
+  const box: [number, number, number, number] = [at[0], at[1], SLOT_SIZE, SLOT_SIZE];
+  if (FIXED.some((f) => overlaps(box, f))) return false;
+  return SLOTS.every((o) => o.id === id || !overlaps(box, [layout[o.id][0], layout[o.id][1], SLOT_SIZE, SLOT_SIZE]));
+}
+
 // ───────────── Guided tour ─────────────
 type TourStep = { sel?: string; title: string; text: string };
 function GuidedTour({ steps, onClose }: { steps: TourStep[]; onClose: () => void }) {
@@ -689,6 +710,10 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
   const lastFocusLoad = useRef(Date.now());
   const [deptOpen, setDeptOpen] = useState(true);
   const [briefOpen, setBriefOpen] = useState(true);
+  const [buildMode, setBuildMode] = useState(false);
+  const [carry, setCarry] = useState<string | null>(null);
+  const [ghost, setGhost] = useState<[number, number] | null>(null);
+  const [layoutEdits, setLayoutEdits] = useState<Record<string, [number, number]>>({});
   const [zooming, setZooming] = useState(false);
   const [charOpen, setCharOpen] = useState(false);
   const [sideOpen, setSideOpen] = useState(false);
@@ -867,6 +892,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
   const p = data.profile; const w = wallet;
   const tier = (id: string) => upgradeTier(w.owned, id);
   const ownerLook = ownerLookFrom(p, p.look || {}, tier("wardrobe"));
+  const layout: Record<string, [number, number]> = { ...Object.fromEntries(SLOTS.map((x) => [x.id, x.at])), ...(data?.profile.layout || {}), ...layoutEdits };
   const say = (id: string, text: string, at: [number, number]) => {
     setPoked(id); setTimeout(() => setPoked((cur) => (cur === id ? "" : cur)), 450);
     setBubble({ text, at, n: Date.now() });
@@ -930,6 +956,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
       {(() => { const nx = UPGRADES.map((u) => ({ name: u.name, lvl: u.tiers[0].minLevel })).filter((u) => u.lvl > w.level).sort((a, b) => a.lvl - b.lvl)[0]; return nx ? <div className="ow-next-unlock" title="New things unlock as you level up"><Lock size={13} /> Next: {nx.name} · Lv {nx.lvl}</div> : null; })()}
       <div className="ow-hud-actions">
         <button type="button" className={upgradesReady ? "has-dot" : ""} onClick={() => setDrawer(drawer === "upgrades" ? "" : "upgrades")} aria-label={`Upgrades${upgradesReady ? `, ${upgradesReady} ready` : ""}`} title="Upgrades"><Hammer size={18} />{upgradesReady > 0 && <i>{upgradesReady}</i>}</button>
+        {view === "town" && <button type="button" className={buildMode ? "on" : ""} onClick={() => { setBuildMode(!buildMode); setCarry(null); setGhost(null); }} aria-label={buildMode ? "Finish building" : "Build mode: move things around your land"} title="Build mode"><LayoutGrid size={18} /></button>}
         <button type="button" onClick={() => setTour(true)} aria-label="Guided tour" title="Guided tour"><HelpCircle size={18} /></button>
         <button type="button" className={sideOpen ? "on" : ""} onClick={() => setSideOpen(!sideOpen)} aria-label={sideOpen ? "Hide side panel" : "Show task queue, health and quick actions"} title="Panel"><PanelRight size={18} />{approaches.length > 0 && !sideOpen && <i>{approaches.length}</i>}</button>
         <button type="button" onClick={() => setDrawer(drawer === "history" ? "" : "history")} aria-label="Rewards and action history" title="History"><History size={18} /></button>
@@ -954,7 +981,10 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
           <button type="button" className="ow-exit" onClick={exitHQ}><ArrowLeft size={16} /> Back outside</button>
           <div className="ow-room-tag">Inside {p.name} HQ · tap a department</div>
         </div> : <div className={`ow-stage-wrap${zooming ? " zooming" : ""}`}>
-        <svg viewBox="10 30 980 540" role="img" aria-label={`${p.name} headquarters with ${customers.length} customers waiting`}>
+        {buildMode && <div className="ow-build-bar"><b>Build mode</b><span>{carry ? `Tap an empty spot to drop the ${SLOTS.find((x) => x.id === carry)?.label.toLowerCase()}.` : "Pick something to place, or tap a plot on the land to move it."}</span><div className="ow-build-items">{SLOTS.map((sl) => <button type="button" key={sl.id} className={carry === sl.id ? "" : "ghost"} onClick={() => setCarry(carry === sl.id ? null : sl.id)}>{tier(sl.id) ? <Check size={12} /> : w.level < (UPGRADES.find((u) => u.id === sl.id)?.tiers[0].minLevel || 1) ? <Lock size={12} /> : null}{sl.label}</button>)}</div><button type="button" className="ow-btn-main" onClick={() => { setBuildMode(false); setCarry(null); setGhost(null); }}>Done</button></div>}
+        <svg viewBox="10 30 980 540" role="img" className={carry ? "ow-carrying" : ""}
+          onPointerMove={carry ? (e) => { const svg = e.currentTarget; const m = svg.getScreenCTM(); if (!m) return; const pt = new DOMPoint(e.clientX, e.clientY).matrixTransform(m.inverse()); const u = (pt.x - 500) / 30, v = (pt.y - 110) / 15; const gx = Math.round(((u + v) / 2 - SLOT_SIZE / 2) * 2) / 2, gy = Math.round(((v - u) / 2 - SLOT_SIZE / 2) * 2) / 2; setGhost((g) => (g && g[0] === gx && g[1] === gy ? g : [gx, gy])); } : undefined}
+          onClick={carry ? () => { if (!ghost || !canDrop(carry, ghost, layout)) { if (prefs.current.sound) chime("steal"); return; } const next = { ...layout, [carry]: ghost }; setLayoutEdits(next); setCarry(null); setGhost(null); if (prefs.current.sound) chime("pop"); if (!demo) void post({ action: "saveProfile", layout: next }); } : undefined} aria-label={`${p.name} headquarters with ${customers.length} customers waiting`}>
           <defs>
             <linearGradient id="ow-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#a5c8dc" /><stop offset="1" stopColor="#e8f0f4" /></linearGradient>
             <linearGradient id="ow-grass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#93b878" /><stop offset="1" stopColor="#6f9a5a" /></linearGradient>
@@ -966,6 +996,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
           <polygon points={pts([iso(-2, 14, -2), iso(14, 14, -2), iso(14, -2, -2)])} fill="none" stroke="#557a45" strokeWidth="4" />
           <polygon points={pts([iso(-2, -2), iso(14, -2), iso(14, 14), iso(-2, 14)])} fill="url(#ow-grass)" className="ow-grass" />
           {Array.from({ length: 128 }).map((_, i) => { const gx = -2 + (i % 8) * 2 + (Math.floor(i / 8) % 2), gy = -2 + Math.floor(i / 8); return <IsoTile key={i} x={gx} y={gy} fill="#ffffff" opacity={0.06} />; })}
+          {buildMode && <g className="ow-build-grid" pointerEvents="none">{Array.from({ length: 16 }).flatMap((_, i) => [<polyline key={`a${i}`} points={pts([iso(-2 + i, -2), iso(-2 + i, 14)])} stroke="#fff" strokeOpacity=".35" strokeWidth="1" />, <polyline key={`b${i}`} points={pts([iso(-2, -2 + i), iso(14, -2 + i)])} stroke="#fff" strokeOpacity=".35" strokeWidth="1" />])}</g>}
           {/* Path from HQ door to the shore, and the plaza */}
           <IsoTile x={5.4} y={7.7} w={1.2} d={4.3} fill="#e2d6bd" />
           <IsoTile x={3.6} y={7.7} w={5.2} d={1.6} fill="#e2d6bd" />
@@ -1025,15 +1056,8 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
           {tier("fleet") >= 3 && <g><IsoBox x={10.6} y={8.9} w={1.0} d={0.6} h={18} z={4} color={p.secondary} /></g>}
 
           {/* Assets & income streams: plots for sale until bought */}
-          {([
-            { id: "rental", at: [12.4, 2.2] as [number, number], label: "Rental property" },
-            { id: "sidehustle", at: [12.4, 5.6] as [number, number], label: "Side hustle" },
-            { id: "offshore", at: [-1.7, 2.0] as [number, number], label: "Offshore account" },
-            { id: "car", at: [-1.7, 9.6] as [number, number], label: "Car" },
-            { id: "academy", at: [-1.7, 5.8] as [number, number], label: "Training academy" },
-            { id: "branch", at: [12.4, 11.4] as [number, number], label: "Second branch" },
-          ]).map((slot) => { const t = tier(slot.id); const next = nextUpgrade(slot.id, w.owned); const firstLvl = UPGRADES.find((u) => u.id === slot.id)?.tiers[0].minLevel || 1; const locked = !t && w.level < firstLvl; const c = iso(slot.at[0] + 0.7, slot.at[1] + 0.7); return <Spot key={slot.id} id={`slot-${slot.id}`} label={t ? UPGRADES.find((u) => u.id === slot.id)!.tiers[t - 1].name : locked ? `${slot.label} · Lv ${firstLvl}` : `Build: ${slot.label}`} poked={poked} labelAt={[c[0], c[1] - 70]} onTap={() => { if (locked) { say(`slot-${slot.id}`, `${slot.label} unlocks at level ${firstLvl}. Keep doing real work to level up.`, [c[0], c[1] - 40]); return; } setDrawer("upgrades"); if (prefs.current.sound) chime("select"); }}>
-            <IsoTile x={slot.at[0]} y={slot.at[1]} w={1.5} d={1.5} fill={t ? "#d6d3d1" : locked ? "#9fbf8a" : "#e7e1d3"} />
+          {SLOTS.map((sd) => ({ ...sd, at: (carry === sd.id && ghost ? ghost : layout[sd.id]) as [number, number] })).map((slot) => { const t = tier(slot.id); const next = nextUpgrade(slot.id, w.owned); const firstLvl = UPGRADES.find((u) => u.id === slot.id)?.tiers[0].minLevel || 1; const locked = !t && w.level < firstLvl; const lifted = carry === slot.id; const bad = lifted && !!ghost && !canDrop(slot.id, ghost, layout); const c = iso(slot.at[0] + 0.7, slot.at[1] + 0.7); return <Spot key={slot.id} id={`slot-${slot.id}`} label={t ? UPGRADES.find((u) => u.id === slot.id)!.tiers[t - 1].name : locked ? `${slot.label} · Lv ${firstLvl}` : `Build: ${slot.label}`} poked={poked} labelAt={[c[0], c[1] - 70]} onTap={() => { if (buildMode) { if (!carry) setCarry(slot.id); return; } if (locked) { say(`slot-${slot.id}`, `${slot.label} unlocks at level ${firstLvl}. Keep doing real work to level up.`, [c[0], c[1] - 40]); return; } setDrawer("upgrades"); if (prefs.current.sound) chime("select"); }}>
+            <g opacity={lifted ? 0.75 : 1}><IsoTile x={slot.at[0]} y={slot.at[1]} w={1.5} d={1.5} fill={bad ? "#fca5a5" : lifted ? "#bbf7d0" : t ? "#d6d3d1" : locked ? "#9fbf8a" : "#e7e1d3"} />
             {!t && <polygon points={pts([iso(slot.at[0] + 0.08, slot.at[1] + 0.08), iso(slot.at[0] + 1.42, slot.at[1] + 0.08), iso(slot.at[0] + 1.42, slot.at[1] + 1.42), iso(slot.at[0] + 0.08, slot.at[1] + 1.42)])} fill="none" stroke={locked ? "#6b8f57" : "#a8a29e"} strokeWidth="1.5" strokeDasharray="5 4" />}
             {!t && <g transform={`translate(${c[0]} ${c[1] - 6})`}><circle r="11" fill={locked ? "#57534e" : "#fff"} stroke={locked ? "none" : "#a8a29e"} strokeWidth="1.5" />{locked ? <g fill="none" stroke="#fff" strokeWidth="1.8"><rect x="-4.5" y="-2" width="9" height="7" rx="1.5" fill="#fff" /><path d="M-3 -2 v-2.5 a3 3 0 0 1 6 0 v2.5" /></g> : <path d="M-5 0 h10 M0 -5 v10" stroke="#111827" strokeWidth="2.2" strokeLinecap="round" />}</g>}
             {t > 0 && slot.id === "rental" && <g><IsoBox x={slot.at[0] + 0.2} y={slot.at[1] + 0.2} w={1.1} d={1.1} h={t >= 3 ? 64 : t >= 2 ? 34 : 22} color={t >= 3 ? "#cbd5e1" : "#fde68a"} /><IsoRoof x={slot.at[0] + 0.2} y={slot.at[1] + 0.2} w={1.1} d={1.1} z={t >= 3 ? 64 : t >= 2 ? 34 : 22} rise={14} color="#7f1d1d" /><IsoWindows x={slot.at[0] + 0.2} y={slot.at[1] + 0.2} w={1.1} d={1.1} floors={t >= 3 ? 4 : t} floorH={14} base={6} glow /></g>}
@@ -1041,7 +1065,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
             {t > 0 && slot.id === "offshore" && <g><IsoBox x={slot.at[0] + 0.3} y={slot.at[1] + 0.3} w={0.9} d={0.9} h={t >= 2 ? 30 : 20} color="#475569" /><circle cx={c[0]} cy={c[1] - 20} r="7" fill="#d4a017" stroke="#92400e" strokeWidth="1.5" />{t >= 3 && <path d={`M${c[0] - 18} ${c[1] - 34} Q${c[0]} ${c[1] - 62} ${c[0] + 18} ${c[1] - 34} Z`} fill="#16a34a" />}</g>}
             {t > 0 && slot.id === "car" && <Car tier={t} primary={p.primary} at={c} />}
             {t > 0 && slot.id === "academy" && <g><IsoBox x={slot.at[0] + 0.15} y={slot.at[1] + 0.2} w={1.2} d={1.0} h={t >= 2 ? 34 : 24} color="#f5f5f4" /><IsoRoof x={slot.at[0] + 0.15} y={slot.at[1] + 0.2} w={1.2} d={1.0} z={t >= 2 ? 34 : 24} rise={12} color={p.secondary} /><IsoWindows x={slot.at[0] + 0.15} y={slot.at[1] + 0.2} w={1.2} d={1.0} floors={t >= 2 ? 2 : 1} floorH={12} base={6} /></g>}
-            {t > 0 && slot.id === "branch" && <g><IsoBox x={slot.at[0] + 0.15} y={slot.at[1] + 0.15} w={1.2} d={1.2} h={t >= 3 ? 70 : t >= 2 ? 44 : 28} color={t >= 3 ? "#bae6fd" : "#f5f5f4"} /><IsoRoof x={slot.at[0] + 0.15} y={slot.at[1] + 0.15} w={1.2} d={1.2} z={t >= 3 ? 70 : t >= 2 ? 44 : 28} rise={10} color={barColour || p.secondary} /><IsoWindows x={slot.at[0] + 0.15} y={slot.at[1] + 0.15} w={1.2} d={1.2} floors={t >= 3 ? 5 : t + 1} floorH={12} base={6} glow /></g>}
+            {t > 0 && slot.id === "branch" && <g><IsoBox x={slot.at[0] + 0.15} y={slot.at[1] + 0.15} w={1.2} d={1.2} h={t >= 3 ? 70 : t >= 2 ? 44 : 28} color={t >= 3 ? "#bae6fd" : "#f5f5f4"} /><IsoRoof x={slot.at[0] + 0.15} y={slot.at[1] + 0.15} w={1.2} d={1.2} z={t >= 3 ? 70 : t >= 2 ? 44 : 28} rise={10} color={barColour || p.secondary} /><IsoWindows x={slot.at[0] + 0.15} y={slot.at[1] + 0.15} w={1.2} d={1.2} floors={t >= 3 ? 5 : t + 1} floorH={12} base={6} glow /></g>}</g>
           </Spot>; })}
           {/* Deal yard: every open lead is a building going up */}
           <Spot id="b-farm" label={`Deal yard · ${crops.length}`} poked={poked} labelAt={iso(10.8, 8.6, 46)} onTap={() => tapBuilding("farm")}>

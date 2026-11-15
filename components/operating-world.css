@@ -530,3 +530,10 @@ html.f2b-world .page-content { max-width: none !important; padding: 0 !important
 .ow-next-unlock { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: rgba(255,255,255,.9); color: #44403c; font-size: 12px; font-weight: 700; white-space: nowrap; }
 @media (max-width: 900px) { .ow-next-unlock { display: none; } }
 .ow-full .ow-dept-panel { max-height: min(30vh, 260px); }
+
+/* ═════════ Build mode ═════════ */
+.ow-build-bar { position: absolute; top: 104px; left: 50%; transform: translateX(-50%); z-index: 16; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; width: min(900px, calc(100% - 28px)); padding: 10px 14px; border-radius: 14px; background: rgba(255,255,255,.95); box-shadow: 0 8px 24px rgba(15,23,42,.18); font-size: 13px; color: #111827; }
+.ow-build-bar > span { color: #57534e; flex: 1; min-width: 200px; }
+.ow-build-items { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; order: 3; }
+.ow-build-items button { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 999px; font-size: 12px; }
+svg.ow-carrying { cursor: crosshair; }
