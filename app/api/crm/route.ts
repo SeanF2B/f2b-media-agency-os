@@ -89,8 +89,12 @@ async function scopedGuard(db: D1Database, ownerId: string, clientId: string, ac
 
 function clean(value: unknown, max = 500) { return typeof value === "string" ? value.trim().slice(0, max) : ""; }
 function stageCategory(name: string): StageCategory { return /^won$/i.test(name) ? "won" : /^lost$/i.test(name) ? "lost" : "open"; }
-async function ensureOrderTable(db: D1Database) {
-  await db.prepare("CREATE TABLE IF NOT EXISTS crm_opportunity_order (owner_id TEXT NOT NULL, opportunity_id TEXT NOT NULL, sort_order REAL NOT NULL, PRIMARY KEY (owner_id, opportunity_id))").run();
+// One-time setup is remembered per worker instance so normal CRM loads skip these extra database round trips.
+let orderTableReady: Promise<unknown> | null = null;
+const pipelineReady = new Set<string>();
+function ensureOrderTable(db: D1Database) {
+  orderTableReady ||= db.prepare("CREATE TABLE IF NOT EXISTS crm_opportunity_order (owner_id TEXT NOT NULL, opportunity_id TEXT NOT NULL, sort_order REAL NOT NULL, PRIMARY KEY (owner_id, opportunity_id))").run().catch((error: unknown) => { orderTableReady = null; throw error; });
+  return orderTableReady;
 }
 
 // Spam / do-not-disturb flags live in their own small table so no migration is needed.
@@ -113,12 +117,14 @@ async function readSmartLists(db: D1Database, ownerId: string, clientId: string 
 const cleanTag = (value: unknown) => clean(value, 40).replace(/\s+/g, " "); // case kept as typed; matching is case-insensitive
 
 async function ensurePipeline(db: D1Database, ownerId: string) {
+  if (pipelineReady.has(ownerId)) return;
   const existing = await db.prepare("SELECT id FROM crm_pipelines WHERE owner_id = ?1 AND archived = 0 ORDER BY created_at LIMIT 1").bind(ownerId).first<{ id: string }>();
-  if (existing) return;
+  if (existing) { pipelineReady.add(ownerId); return; }
   const now = new Date().toISOString(), id = crypto.randomUUID();
   const inserts = [db.prepare("INSERT INTO crm_pipelines (id, owner_id, name, description, created_at, updated_at) VALUES (?1, ?2, 'Sales pipeline', 'Default agency sales pipeline', ?3, ?3)").bind(id, ownerId, now)];
   stages.forEach((name, position) => inserts.push(db.prepare("INSERT INTO crm_pipeline_stages (id, owner_id, pipeline_id, name, position, category, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)").bind(crypto.randomUUID(), ownerId, id, name, position, stageCategory(name), now)));
   await db.batch(inserts);
+  pipelineReady.add(ownerId);
 }
 
 export async function GET(request: Request) {
@@ -126,8 +132,7 @@ export async function GET(request: Request) {
   if (access.scopeClientId) request = withClientScope(request, access.scopeClientId);
   const { db, ownerId, workspace } = access;
   try {
-    await ensurePipeline(db, ownerId);
-    await ensureOrderTable(db);
+    await Promise.all([ensurePipeline(db, ownerId), ensureOrderTable(db)]);
     const url = new URL(request.url);
     if (url.searchParams.get("summary") === "1") {
       // Strict: a sub-account only sees its own pipelines; the agency only sees agency pipelines.
@@ -166,15 +171,13 @@ export async function GET(request: Request) {
       : scope.clientId
         ? "SELECT * FROM crm_contacts WHERE owner_id = ?1 AND ((client_id = ?2 AND source <> 'client' AND id NOT IN (SELECT o.contact_id FROM crm_opportunities o JOIN crm_pipelines p ON p.id = o.pipeline_id WHERE o.owner_id = ?1 AND o.contact_id IS NOT NULL AND p.client_id IS NULL)) OR id IN (SELECT o.contact_id FROM crm_opportunities o JOIN crm_pipelines p ON p.id = o.pipeline_id WHERE o.owner_id = ?1 AND p.client_id = ?2)) ORDER BY updated_at DESC LIMIT 1000"
         : "SELECT * FROM crm_contacts WHERE owner_id = ?1 AND (client_id IS NULL OR id IN (SELECT o.contact_id FROM crm_opportunities o JOIN crm_pipelines p ON p.id = o.pipeline_id WHERE o.owner_id = ?1 AND p.client_id IS NULL)) ORDER BY updated_at DESC LIMIT 1000";
-    const [contacts, pipelineRows, opportunityRows, activityRows] = await Promise.all([
+    const [contacts, pipelineRows, opportunityRows, activityRows, flags, tags, smartLists] = await Promise.all([
       db.prepare(contactSql).bind(...scopeArgs).all<Record<string, unknown>>(),
       db.prepare(`SELECT p.*, s.id AS stage_id, s.name AS stage_name, s.position AS stage_position, s.category AS stage_category FROM crm_pipelines p LEFT JOIN crm_pipeline_stages s ON s.owner_id = p.owner_id AND s.pipeline_id = p.id WHERE p.owner_id = ?1 AND p.archived = 0${pipeWhere} ORDER BY p.created_at, s.position`).bind(...scopeArgs).all<PipelineRow & { client_id?: string | null }>(),
-      db.prepare(`SELECT o.*, c.first_name, c.last_name, c.email, c.phone, c.company, s.name AS stage_name FROM crm_opportunities o LEFT JOIN crm_contacts c ON c.id = o.contact_id AND c.owner_id = o.owner_id LEFT JOIN crm_pipeline_stages s ON s.id = o.stage_id AND s.owner_id = o.owner_id WHERE o.owner_id = ?1 AND o.pipeline_id IN (SELECT p.id FROM crm_pipelines p WHERE p.owner_id = ?1${pipeWhere}) ORDER BY o.updated_at DESC LIMIT 2000`).bind(...scopeArgs).all<Record<string, unknown>>(),
+      db.prepare(`SELECT o.*, oo.sort_order, c.first_name, c.last_name, c.email, c.phone, c.company, s.name AS stage_name FROM crm_opportunities o LEFT JOIN crm_contacts c ON c.id = o.contact_id AND c.owner_id = o.owner_id LEFT JOIN crm_pipeline_stages s ON s.id = o.stage_id AND s.owner_id = o.owner_id LEFT JOIN crm_opportunity_order oo ON oo.owner_id = o.owner_id AND oo.opportunity_id = o.id WHERE o.owner_id = ?1 AND o.pipeline_id IN (SELECT p.id FROM crm_pipelines p WHERE p.owner_id = ?1${pipeWhere}) ORDER BY o.updated_at DESC LIMIT 2000`).bind(...scopeArgs).all<Record<string, unknown>>(),
       db.prepare("SELECT * FROM crm_activities WHERE owner_id = ?1 ORDER BY created_at DESC LIMIT 1000").bind(ownerId).all<Record<string, unknown>>(),
+      readFlags(db, ownerId), readTags(db, ownerId), readSmartLists(db, ownerId, scope?.clientId || null),
     ]);
-    const [flags, tags, smartLists] = await Promise.all([readFlags(db, ownerId), readTags(db, ownerId), readSmartLists(db, ownerId, scope?.clientId || null)]);
-    const orderRows = await db.prepare("SELECT opportunity_id, sort_order FROM crm_opportunity_order WHERE owner_id = ?1").bind(ownerId).all<{ opportunity_id: string; sort_order: number }>();
-    const orderByOpportunity = new Map((orderRows.results || []).map((row) => [row.opportunity_id, row.sort_order] as const));
     const pipelines = new Map<string, PipelineView>();
     for (const r of pipelineRows.results || []) {
       if (!pipelines.has(r.id)) pipelines.set(r.id, { id: r.id, name: r.name, description: r.description, clientId: (r as { client_id?: string | null }).client_id ?? null, stages: [] } as PipelineView);
@@ -182,7 +185,7 @@ export async function GET(request: Request) {
     }
     const visibleOpps = new Set((opportunityRows.results || []).map((row) => String(row.id))), visibleContacts = new Set((contacts.results || []).map((row) => String(row.id)));
     const matches = (item: Record<string, unknown>) => !search || [item.title, item.first_name, item.last_name, item.email, item.company].some((value) => String(value || "").toLowerCase().includes(search));
-    return Response.json({ flags: flags.filter((row) => row.kind === "contact" ? visibleContacts.has(String(row.ref_id)) : visibleOpps.has(String(row.ref_id))), tags: tags.filter((row) => visibleContacts.has(String(row.contact_id))), smartLists, contacts: contacts.results || [], pipelines: [...pipelines.values()], opportunities: (opportunityRows.results || []).map((row) => ({ ...row, sort_order: orderByOpportunity.has(String(row.id)) ? orderByOpportunity.get(String(row.id)) : null })).filter(matches), activities: (activityRows.results || []).filter((a) => !scope || visibleOpps.has(String(a.opportunity_id)) || visibleContacts.has(String(a.contact_id))).map((a) => { const by = String(a.created_by || "").toLowerCase(); const person = by ? (workspace.staff || []).find((item: { email?: string; isBot?: boolean }) => !item.isBot && String(item.email || "").toLowerCase() === by) : undefined; return { ...a, created_by_name: person ? String((person as { name?: string }).name || "") : by ? (by === String(access.user?.email || "").toLowerCase() && access.user?.displayName ? String(access.user.displayName) : by.split("@")[0]) : "API" }; }), clients: (workspace.clients || []).filter((item) => !scope?.clientId || String(item.id) === scope.clientId).map((item) => ({ id: String(item.id), name: String(item.name), company: String(item.company || ""), logo: String(item.logo || ""), contact: String(item.contact || ""), email: String(item.email || ""), phone: String(item.phone || "") })), staff: (workspace.staff || []).filter((item) => !item.isBot).map((item) => ({ id: String(item.id), name: String(item.name), avatar: String(item.avatar || "") })) }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json({ flags: flags.filter((row) => row.kind === "contact" ? visibleContacts.has(String(row.ref_id)) : visibleOpps.has(String(row.ref_id))), tags: tags.filter((row) => visibleContacts.has(String(row.contact_id))), smartLists, contacts: contacts.results || [], pipelines: [...pipelines.values()], opportunities: (opportunityRows.results || []).map((row) => ({ ...row, sort_order: row.sort_order ?? null })).filter(matches), activities: (activityRows.results || []).filter((a) => !scope || visibleOpps.has(String(a.opportunity_id)) || visibleContacts.has(String(a.contact_id))).map((a) => { const by = String(a.created_by || "").toLowerCase(); const person = by ? (workspace.staff || []).find((item: { email?: string; isBot?: boolean }) => !item.isBot && String(item.email || "").toLowerCase() === by) : undefined; return { ...a, created_by_name: person ? String((person as { name?: string }).name || "") : by ? (by === String(access.user?.email || "").toLowerCase() && access.user?.displayName ? String(access.user.displayName) : by.split("@")[0]) : "API" }; }), clients: (workspace.clients || []).filter((item) => !scope?.clientId || String(item.id) === scope.clientId).map((item) => ({ id: String(item.id), name: String(item.name), company: String(item.company || ""), logo: String(item.logo || ""), contact: String(item.contact || ""), email: String(item.email || ""), phone: String(item.phone || "") })), staff: (workspace.staff || []).filter((item) => !item.isBot).map((item) => ({ id: String(item.id), name: String(item.name), avatar: String(item.avatar || "") })) }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) { return reply(error instanceof Error ? error.message : "Could not load CRM records.", 500); }
 }
 
@@ -498,7 +501,7 @@ export async function POST(request: Request) {
     if (action === "archivePipeline") {
       const pipelineId = clean(body.pipelineId, 80);
       if (await db.prepare("SELECT id FROM crm_opportunities WHERE owner_id=?1 AND pipeline_id=?2 LIMIT 1").bind(ownerId, pipelineId).first()) return reply("Move or close its opportunities before archiving this pipeline.", 409);
-      await db.prepare("UPDATE crm_pipelines SET archived=1, updated_at=?1 WHERE owner_id=?2 AND id=?3").bind(now, ownerId, pipelineId).run();
+      await db.prepare("UPDATE crm_pipelines SET archived=1, updated_at=?1 WHERE owner_id=?2 AND id=?3").bind(now, ownerId, pipelineId).run(); pipelineReady.delete(ownerId);
       return Response.json({ ok: true });
     }
     return reply("Choose a supported CRM action.");

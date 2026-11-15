@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { useFocusClient } from "@/lib/focus-client";
 import { createCardDragFx, showFxError, type CardDragFx } from "@/lib/card-drag-fx";
 import { ArrowUpDown, Ban, Factory, BellOff, Briefcase, Building2, Columns3, Filter, Footprints, Globe, Handshake, Mail, MapPin, Megaphone, MessageSquareText, MousePointerClick, NotebookPen, Pencil, Phone, Plus, Search, Share2, SquareKanban, Tag, Trash2, UserRound, Users, Zap, type LucideIcon } from "lucide-react";
@@ -57,8 +57,12 @@ function projectFacts(notes?: string | null): Array<[string, string]> {
   return out;
 }
 
+// Last CRM payload per sub-account, kept for this browser tab so reopening the CRM paints instantly while fresh data loads.
+const crmCache = new Map<string, Payload>();
+
 export function CrmView({ onOpenClient, scopeClientId = "", conversations, initialTab = "Pipeline", onOpenClients, onOpenLeadFactory }: { onOpenLeadFactory?: () => void; onOpenClient: (clientId: string) => void; scopeClientId?: string; conversations?: ReactNode; onOpenClients?: () => void; initialTab?: "Pipeline" | "Contacts" | "Conversations" }) {
-  const [data, setData] = useState<Payload>(empty);
+  const [data, setDataState] = useState<Payload>(() => crmCache.get(scopeClientId || "agency") || empty);
+  const setData = useCallback((next: Payload | ((current: Payload) => Payload)) => setDataState((current) => { const value = typeof next === "function" ? (next as (c: Payload) => Payload)(current) : next; crmCache.set(scopeClientId || "agency", value); return value; }), [scopeClientId]);
   const [tab, setTab] = useState<"Pipeline" | "Contacts" | "Conversations">(initialTab === "Conversations" && !conversations ? "Pipeline" : initialTab);
   const [pipelineId, setPipelineId] = useState("");
   const [search, setSearch] = useState("");
@@ -119,23 +123,33 @@ export function CrmView({ onOpenClient, scopeClientId = "", conversations, initi
   }, []);
 
   const load = useCallback(async () => {
-    const params = new URLSearchParams(); if (search.trim()) params.set("search", search.trim()); params.set("clientId", scopeClientId || "agency");
+    const params = new URLSearchParams(); params.set("clientId", scopeClientId || "agency");
     const response = await fetch(`/api/crm?${params}`, { cache: "no-store" });
     const result = await response.json() as Payload & { error?: string };
     if (!response.ok) throw new Error(result.error || "CRM could not be loaded.");
-    setData(result); setPipelineId((current) => result.pipelines.some((item) => item.id === current) ? current : result.pipelines[0]?.id || "");
-  }, [search, scopeClientId]);
+    setData(result); setPipelineId((current: string) => result.pipelines.some((item) => item.id === current) ? current : result.pipelines[0]?.id || "");
+  }, [scopeClientId, setData]);
   const syncedRef = useRef(false);
   useEffect(() => {
     let current = true;
-    const params = new URLSearchParams(); if (search.trim()) params.set("search", search.trim()); params.set("clientId", scopeClientId || "agency");
-    void (async () => { if (!syncedRef.current) { syncedRef.current = true; try { await fetch("/api/crm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "syncClients" }) }); } catch { /* sync is best-effort */ } } })().then(() => fetch(`/api/crm?${params}`, { cache: "no-store" })).then(async (response) => {
+    const params = new URLSearchParams(); params.set("clientId", scopeClientId || "agency");
+    const cached = crmCache.get(scopeClientId || "agency");
+    if (cached) setPipelineId((selected: string) => cached.pipelines.some((item) => item.id === selected) ? selected : cached.pipelines[0]?.id || "");
+    const apply = (result: Payload) => { if (current) { setData(result); setPipelineId((selected: string) => result.pipelines.some((item) => item.id === selected) ? selected : result.pipelines[0]?.id || ""); } };
+    // Load straight away; the one-off client sync runs alongside and only triggers a reload if it actually added cards.
+    fetch(`/api/crm?${params}`, { cache: "no-store" }).then(async (response) => {
       const result = await response.json() as Payload & { error?: string };
       if (!response.ok) throw new Error(result.error || "CRM could not be loaded.");
-      if (current) { setData(result); setPipelineId((selected) => result.pipelines.some((item) => item.id === selected) ? selected : result.pipelines[0]?.id || ""); }
+      apply(result);
     }).catch((reason) => { if (current) setError(reason instanceof Error ? reason.message : "CRM could not be loaded."); });
+    if (!syncedRef.current) {
+      syncedRef.current = true;
+      fetch("/api/crm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "syncClients" }) })
+        .then((response) => response.json()).then((sync: { created?: number }) => { if (current && Number(sync?.created) > 0) void load().catch(() => undefined); })
+        .catch(() => { /* sync is best-effort */ });
+    }
     return () => { current = false; };
-  }, [search, scopeClientId]);
+  }, [scopeClientId, setData, load]);
 
   // Suggestions for "Project type": the client's services plus types already used on cards.
   const projectTypeList = (clientId?: string | null) => {
@@ -150,17 +164,20 @@ export function CrmView({ onOpenClient, scopeClientId = "", conversations, initi
     finally { setBusy(false); }
   };
 
+  const flagSet = useMemo(() => new Set((data.flags || []).map((entry) => `${entry.kind}|${entry.ref_id}|${entry.flag}`)), [data.flags]);
+  const notesByOpportunity = useMemo(() => { const map = new Map<string, number>(); data.activities.forEach((note) => { if (note.opportunity_id) map.set(note.opportunity_id, (map.get(note.opportunity_id) || 0) + 1); }); return map; }, [data.activities]);
+  const searchText = useDeferredValue(search.trim().toLowerCase());
   const pipeline = data.pipelines.find((item) => item.id === pipelineId) || data.pipelines[0];
   const viewingClient = data.clients.find((client) => client.id === viewingContact?.client_id);
-  const opportunities = useMemo(() => data.opportunities.filter((item) => (!pipeline || item.pipeline_id === pipeline.id) && (!clientFilter || item.client_id === clientFilter) && !(data.flags || []).some((entry) => entry.kind === "opportunity" && entry.ref_id === item.id && entry.flag === "spam")), [data.opportunities, data.flags, pipeline, clientFilter]);
+  const opportunities = useMemo(() => data.opportunities.filter((item) => (!pipeline || item.pipeline_id === pipeline.id) && (!clientFilter || item.client_id === clientFilter) && !flagSet.has(`opportunity|${item.id}|spam`) && (!searchText || [item.title, item.first_name, item.last_name, item.email, item.company].some((value) => String(value || "").toLowerCase().includes(searchText)))), [data.opportunities, flagSet, pipeline, clientFilter, searchText]);
   const tagsByContact = useMemo(() => { const map = new Map<string, string[]>(); (data.tags || []).forEach((row) => map.set(row.contact_id, [...(map.get(row.contact_id) || []), row.tag])); return map; }, [data.tags]);
   const allTags = useMemo(() => [...new Set((data.tags || []).map((row) => row.tag))].sort(), [data.tags]);
   const allSources = useMemo(() => [...new Set(data.contacts.map((item) => item.source).filter(Boolean))].sort(), [data.contacts]);
   const visibleContacts = useMemo(() => {
-    const f = contactFilters, q = (f.search || "").trim().toLowerCase(), flagged = (id: string, flag: Flag["flag"]) => (data.flags || []).some((entry) => entry.kind === "contact" && entry.ref_id === id && entry.flag === flag);
+    const f = contactFilters, q = (f.search || "").trim().toLowerCase(), flagged = (id: string, flag: Flag["flag"]) => flagSet.has(`contact|${id}|${flag}`);
     return data.contacts.filter((item) => {
       if (clientFilter && item.client_id !== clientFilter) return false;
-      if (search.trim() && ![item.first_name, item.last_name, item.email, item.company, item.phone].some((value) => String(value || "").toLowerCase().includes(search.trim().toLowerCase()))) return false;
+      if (searchText && ![item.first_name, item.last_name, item.email, item.company, item.phone].some((value) => String(value || "").toLowerCase().includes(searchText))) return false;
       if (q && ![item.first_name, item.last_name, item.email, item.company, item.phone, item.notes].some((value) => String(value || "").toLowerCase().includes(q))) return false;
       const tags = tagsByContact.get(item.id) || [];
       if (f.tags?.length && !(f.tagMode === "all" ? f.tags.every((tag) => tags.includes(tag)) : f.tags.some((tag) => tags.includes(tag)))) return false;
@@ -173,11 +190,12 @@ export function CrmView({ onOpenClient, scopeClientId = "", conversations, initi
       if (f.hasPhone && !item.phone) return false;
       return true;
     });
-  }, [data.contacts, data.flags, clientFilter, search, contactFilters, tagsByContact]);
-  const lastActivityByContact = useMemo(() => { const map = new Map<string, string>(); const bump = (id: string | null | undefined, at: string | undefined) => { if (!id || !at) return; const prev = map.get(id); if (!prev || at > prev) map.set(id, at); }; data.activities.forEach((note) => bump(note.contact_id, note.created_at)); data.opportunities.forEach((item) => { bump(item.contact_id, item.updated_at); const oppNotes = data.activities.filter((note) => note.opportunity_id === item.id); oppNotes.forEach((note) => bump(item.contact_id, note.created_at)); }); return map; }, [data.activities, data.opportunities]);
+  }, [data.contacts, flagSet, clientFilter, searchText, contactFilters, tagsByContact]);
+  const lastActivityByContact = useMemo(() => { const map = new Map<string, string>(); const bump = (id: string | null | undefined, at: string | undefined) => { if (!id || !at) return; const prev = map.get(id); if (!prev || at > prev) map.set(id, at); }; const oppContact = new Map<string, string>(); data.opportunities.forEach((item) => { bump(item.contact_id, item.updated_at); if (item.contact_id) oppContact.set(item.id, item.contact_id); }); data.activities.forEach((note) => { bump(note.contact_id, note.created_at); if (note.opportunity_id) bump(oppContact.get(note.opportunity_id), note.created_at); }); return map; }, [data.activities, data.opportunities]);
   const sortedContacts = useMemo(() => { const name = (c: Contact) => ([c.first_name, c.last_name].filter(Boolean).join(" ") || c.company || c.email || "").toLowerCase(); const created = (c: Contact) => c.created_at || c.updated_at || ""; const list = [...visibleContacts]; list.sort((a, b) => contactSort === "name-asc" ? name(a).localeCompare(name(b)) : contactSort === "name-desc" ? name(b).localeCompare(name(a)) : contactSort === "created-asc" ? created(a).localeCompare(created(b)) : contactSort === "activity-desc" ? (lastActivityByContact.get(b.id) || "").localeCompare(lastActivityByContact.get(a.id) || "") : created(b).localeCompare(created(a))); return list; }, [visibleContacts, contactSort, lastActivityByContact]);
   const hasContactFilters = Boolean(contactFilters.search || contactFilters.tags?.length || contactFilters.source || contactFilters.dnd || contactFilters.spam || contactFilters.hasEmail || contactFilters.hasPhone);
-  const selectedVisible = selectedContactIds.filter((id) => visibleContacts.some((item) => item.id === id));
+  const visibleContactIds = useMemo(() => new Set(visibleContacts.map((item) => item.id)), [visibleContacts]);
+  const selectedVisible = selectedContactIds.filter((id) => visibleContactIds.has(id));
   const bulk = async (payload: Record<string, unknown>, message: string) => {
     setBusy(true); setError("");
     try {
@@ -209,7 +227,7 @@ export function CrmView({ onOpenClient, scopeClientId = "", conversations, initi
     await load(); applySmartList();
   };
   const personName = (item: Opportunity) => [item.first_name, item.last_name].filter(Boolean).join(" ") || item.email || "No contact linked";
-  const hasFlag = (kind: Flag["kind"], id: string | null | undefined, flag: Flag["flag"]) => Boolean(id) && (data.flags || []).some((entry) => entry.kind === kind && entry.ref_id === id && entry.flag === flag);
+  const hasFlag = (kind: Flag["kind"], id: string | null | undefined, flag: Flag["flag"]) => Boolean(id) && flagSet.has(`${kind}|${id}|${flag}`);
   const setFlag = async (kind: Flag["kind"], id: string, flag: Flag["flag"], on: boolean) => {
     setError("");
     const apply = (value: boolean) => setData((current) => ({ ...current, flags: [...(current.flags || []).filter((entry) => !(entry.kind === kind && entry.ref_id === id && entry.flag === flag)), ...(value ? [{ kind, ref_id: id, flag }] : [])] }));
@@ -562,7 +580,7 @@ export function CrmView({ onOpenClient, scopeClientId = "", conversations, initi
         
         <button type="button" className="crm-card-icon crm-card-delete" aria-label={`Delete ${item.title}`} title="Delete this card" onClick={() => void deleteOpportunity(item)}><Ico icon={Trash2} /></button>
       </div>
-      <button type="button" className="crm-card-notes-open" onClick={(event) => { event.stopPropagation(); setEditingOpp(item); setModal("opportunity-notes"); }} onPointerDown={(event) => event.stopPropagation()}><Ico icon={NotebookPen} size={13} /> Notes ({data.activities.filter((note) => note.opportunity_id === item.id).length})</button>
+      <button type="button" className="crm-card-notes-open" onClick={(event) => { event.stopPropagation(); setEditingOpp(item); setModal("opportunity-notes"); }} onPointerDown={(event) => event.stopPropagation()}><Ico icon={NotebookPen} size={13} /> Notes ({notesByOpportunity.get(item.id) || 0})</button>
     </article>; })}{!opportunities.some((item) => item.stage_id === stage.id) && <div className="crm-empty-stage">Drop an opportunity here</div>}</section>)}</div>}
     {tab === "Contacts" && <div className="crm-contacts-manager">
       <div className="cm-lists" role="tablist" aria-label="Smart lists"><button type="button" role="tab" aria-selected={!activeListId} className={!activeListId ? "active" : ""} onClick={() => applySmartList()}>All</button>{(data.smartLists || []).map((list) => <span className={`cm-list ${activeListId === list.id ? "active" : ""}`} key={list.id}><button type="button" role="tab" aria-selected={activeListId === list.id} title={list.name} onClick={() => applySmartList(list)}>{list.name}</button>{activeListId === list.id && <button type="button" className="cm-list-delete" aria-label={`Delete smart list ${list.name}`} title="Delete smart list" onClick={() => void deleteSmartList(list)}>×</button>}</span>)}<button type="button" className="cm-list-add" title={hasContactFilters ? (activeListId ? "Update this smart list with the current filters" : "Save the current filters as a smart list") : "Pick some filters, then click Add again to save them as a smart list"} onClick={() => { if (!hasContactFilters) { setShowContactFilters(true); setNotice({ text: "Choose the filters for your new smart list below (tags, source, DND…), then click + Add again to name and save it." }); return; } void saveSmartList(); }}><Ico icon={Plus} /> {activeListId ? "Update" : "Add"}</button></div>
