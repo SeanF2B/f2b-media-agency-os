@@ -966,3 +966,11 @@ html body .ai-tour-actions { display:flex; justify-content:flex-end; gap:8px; ma
 html body .ai-tour-actions .text-button { margin-right:auto; }
 html body .ai-tour-actions .primary-button { background:var(--brand-primary, #0b74b8) !important; border-color:var(--brand-primary, #0b74b8) !important; }
 @media (max-width: 860px) { html body .ai-chat-launcher { bottom:calc(96px + env(safe-area-inset-bottom, 0px)); right:16px; width:62px; height:62px; } html body .ai-chat-launcher .bot-live, html body .ai-chat-launcher .task-avatar { width:46px !important; height:46px !important; } html body .ai-chat-panel { right:8px; left:8px; width:auto; bottom:calc(170px + env(safe-area-inset-bottom, 0px)); height:min(520px, calc(100vh - 220px)); } html body .ai-chat-toast { right:16px; bottom:calc(170px + env(safe-area-inset-bottom, 0px)); } }
+
+/* Widget bot: centred and sized (the bot's inner body defaults to 36px) */
+html body .ai-chat-launcher .bot-live { width:54px !important; height:54px !important; margin:0 auto; }
+html body .ai-chat-launcher .bot-body, html body .ai-chat-launcher .bot-body .avatar, html body .ai-chat-launcher .bot-body .task-avatar { width:54px !important; height:54px !important; min-width:54px !important; }
+html body .ai-chat-launcher .bot-body .avatar { background-position:center !important; }
+html body .ai-chat-head-bot .bot-live, html body .ai-chat-head-bot .bot-body, html body .ai-chat-head-bot .bot-body .avatar { width:32px !important; height:32px !important; min-width:32px !important; }
+html body .ai-chat-launcher .bot-zzz, html body .ai-chat-launcher .bot-speed, html body .ai-chat-launcher .bot-bubble { display:none; }
+@media (max-width: 860px) { html body .ai-chat-launcher .bot-live, html body .ai-chat-launcher .bot-body, html body .ai-chat-launcher .bot-body .avatar { width:44px !important; height:44px !important; min-width:44px !important; } }
