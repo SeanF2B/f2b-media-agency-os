@@ -58,13 +58,13 @@ const ICON = {
   down: "M7 10l5 5 5-5",
 };
 
-export function FormSubmissionsView({ scopeClientId, clients, active }: { scopeClientId: string; clients: Client[]; active: boolean }) {
-  const [preset, setPreset] = useState<Preset>("30d");
+export function FormSubmissionsView({ scopeClientId, clients, active, formKey, defaultPreset = "30d" }: { scopeClientId: string; clients: Client[]; active: boolean; formKey?: string; defaultPreset?: Preset }) {
+  const [preset, setPreset] = useState<Preset>(defaultPreset);
   const today = useMemo(() => dayStart(new Date()), []);
   const [customFrom, setCustomFrom] = useState(inputDate(addDays(today, -29)));
   const [customTo, setCustomTo] = useState(inputDate(today));
   const [clientFilter, setClientFilter] = useState("all");
-  const [formFilter, setFormFilter] = useState("");
+  const [formFilter, setFormFilter] = useState(formKey || "");
   const [pageFilter, setPageFilter] = useState("");
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
@@ -79,7 +79,7 @@ export function FormSubmissionsView({ scopeClientId, clients, active }: { scopeC
   const range = useMemo(() => rangeFor(preset, customFrom, customTo), [preset, customFrom, customTo]);
   useEffect(() => { const timer = setTimeout(() => setDebounced(query.trim()), 300); return () => clearTimeout(timer); }, [query]);
   useEffect(() => { setOffset(0); }, [effectiveClient, formFilter, pageFilter, debounced, range.start.getTime(), range.end.getTime(), pageSize]);
-  useEffect(() => { setFormFilter(""); setPageFilter(""); }, [scopeClientId]);
+  useEffect(() => { setFormFilter(formKey || ""); setPageFilter(""); }, [scopeClientId, formKey]);
 
   const params = useMemo(() => {
     const search = new URLSearchParams({ start: range.start.toISOString(), end: range.end.toISOString(), clientId: effectiveClient || "all", limit: String(pageSize), offset: String(offset) });

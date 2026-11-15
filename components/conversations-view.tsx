@@ -23,7 +23,7 @@ export function ConversationsView({ scopeClientId, clients }: { scopeClientId: s
   const [configured, setConfigured] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [filter, setFilter] = useState<"all" | "unread" | "handoff">("all");
+  const [filter, setFilter] = useState<"all" | "unread" | "handoff" | "notifications">("all");
   const [activeId, setActiveId] = useState("");
   const [active, setActive] = useState<Thread | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -51,8 +51,10 @@ export function ConversationsView({ scopeClientId, clients }: { scopeClientId: s
   const send = async () => { const body = text.trim(); if (!body || !active) return; setText(""); if (active.channel === "email") { const last = [...messages].reverse().find((m) => /^Subject: /m.test(m.body)); const prev = last ? ((last.body.match(/^Subject: (.*)$/m) || [])[1] || "") : ""; await act({ action: "send", id: active.id, body, subject: subject.trim() || (prev ? (prev.startsWith("Re:") ? prev : `Re: ${prev}`) : "") }); setSubject(""); return; } await act({ action: "send", id: active.id, body }); };
   const draft = async () => { if (!active) return; setBusy(true); setError(""); try { const r = await call<{ draft: string }>("/api/conversations", { action: "draft", id: active.id }); setText(r.draft); } catch (e) { setError(e instanceof Error ? e.message : "No draft."); } finally { setBusy(false); } };
 
-  const shown = threads.filter((t) => filter === "all" ? t.status !== "closed" : filter === "unread" ? t.unread > 0 : t.status === "handoff");
-  const needs = threads.filter((t) => t.status === "handoff").length, unread = threads.reduce((n, t) => n + (t.unread > 0 ? 1 : 0), 0);
+  // Emails the system sends (lead alerts, invoices, task emails…) live under Notifications, not mixed into live chats.
+  const shown = threads.filter((t) => filter === "notifications" ? t.channel === "email" : filter === "all" ? t.status !== "closed" && t.channel !== "email" : filter === "unread" ? t.unread > 0 : t.status === "handoff");
+  const notes = threads.filter((t) => t.channel === "email").length;
+  const unread = threads.reduce((n, t) => n + (t.unread > 0 ? 1 : 0), 0);
 
   return <section className="cv" aria-label="Conversations">
     <header className="cv-head"><div><p className="eyebrow">💬 CONVERSATIONS{scopeClientId ? ` · ${clientName(scopeClientId).toUpperCase()}` : ""}</p><h1>Customer conversations</h1><p>SMS, WhatsApp and every email the system sends, in one inbox.</p></div>
@@ -61,8 +63,8 @@ export function ConversationsView({ scopeClientId, clients }: { scopeClientId: s
     {loading ? <div className="empty-state" role="status">Loading conversations…</div> : <>{!configured && <div className="cv-banner">💬 Emails the system sends show here already. To also text and WhatsApp customers, <button type="button" className="text-button" onClick={() => setSettingsOpen(true)}>connect Twilio</button>.</div>}
     <div className="cv-grid">
       <aside className="cv-list" aria-label="Conversation list">
-        <div className="cv-filters" role="tablist">{([["all", "Open"], ["unread", `Unread${unread ? ` (${unread})` : ""}`], ["handoff", `Needs you${needs ? ` (${needs})` : ""}`]] as const).map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={filter === k} className={filter === k ? "on" : ""} onClick={() => setFilter(k)}>{l}</button>)}</div>
-        <div className="cv-rows">{shown.length === 0 ? <p className="cv-none">{threads.length === 0 ? "Nothing yet. Emails the system sends, and customer texts, show up here." : "Nothing here."}</p> : shown.map((t) => <button type="button" key={t.id} className={`cv-row ${activeId === t.id ? "on" : ""} ${t.unread ? "unread" : ""}`} onClick={() => setActiveId(t.id)}>
+        <div className="cv-filters" role="tablist">{([["all", "Open"], ["unread", `Unread${unread ? ` (${unread})` : ""}`]] as const).map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={filter === k} className={filter === k ? "on" : ""} onClick={() => setFilter(k)}>{l}</button>)}<button type="button" role="tab" aria-selected={filter === "notifications"} className={`cv-bell ${filter === "notifications" ? "on" : ""}`} onClick={() => setFilter("notifications")} aria-label={`Notifications${notes ? ` (${notes})` : ""}`} title="Notifications"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>{notes ? <b>{notes > 99 ? "99+" : notes}</b> : null}</button></div>
+        <div className="cv-rows">{shown.length === 0 ? <p className="cv-none">{threads.length === 0 ? "Nothing yet. Emails the system sends, and customer texts, show up here." : filter === "notifications" ? "No notifications yet. Lead alerts and other emails the system sends will show here." : "Nothing here."}</p> : shown.map((t) => <button type="button" key={t.id} className={`cv-row ${activeId === t.id ? "on" : ""} ${t.unread ? "unread" : ""}`} onClick={() => setActiveId(t.id)}>
           <span className={`cv-avatar ${t.channel}`}>{t.channel === "whatsapp" ? "WA" : t.channel === "email" ? "✉" : "SMS"}</span>
           <span className="cv-row-main"><b>{title(t)}</b><small>{t.last_preview || "…"}</small>{!scopeClientId && t.client_id && <em>{clientName(t.client_id)}</em>}</span>
           <span className="cv-row-side"><small>{ago(t.last_at)}</small>{t.status === "handoff" ? <i className="cv-pill hand">Needs you</i> : t.unread ? <i className="cv-pill">{t.unread}</i> : t.bot_on ? <i className="cv-bot" title="AI bot is replying"><AiEyesIcon /></i> : null}</span></button>)}</div>

@@ -7,6 +7,7 @@
 // GET  /api/site-lead-photo?key=  team-only (Access identity required) photo viewer for CRM notes / emails
 import { logFormSubmission } from "../lib/form-submission-log";
 import { logSystemEmail } from "../lib/email-log";
+import { estimateFor, formSettingsFor } from "../lib/site-forms";
 
 type Env = Cloudflare.Env & { DB?: D1Database; BUCKET?: R2Bucket; RESEND_API_KEY?: string; TASK_NOTIFICATION_FROM?: string };
 
@@ -105,13 +106,18 @@ async function saveLead(request: Request, env: Env, site: SiteConfig) {
   const dup = await db.prepare("SELECT id, contact_id FROM crm_opportunities WHERE owner_id=?1 AND source_submission_id=?2").bind(owner, subKey).first<{ id: string; contact_id: string }>();
   if (dup) return json({ ok: true, duplicate: true, id: dup.id, delivered: true });
 
-  let stage = keyRow ? await db.prepare("SELECT s.id, s.pipeline_id FROM crm_pipeline_stages s JOIN crm_pipelines p ON p.id=s.pipeline_id AND p.owner_id=s.owner_id WHERE s.owner_id=?1 AND s.id=?2 AND p.archived=0").bind(owner, keyRow.stage_id).first<{ id: string; pipeline_id: string }>() : null;
+  // Settings saved in Operations → Forms (notify list, landing stage) override the built-in defaults.
+  const formCfg = await formSettingsFor(db, owner, `site:${site.clientId}:${kind === "contact" ? "contact" : "quote"}`);
+  const notifyTo = formCfg?.notify?.length ? formCfg.notify : site.notify;
+  const cfgStage = formCfg?.stageId ? await db.prepare("SELECT s.id, s.pipeline_id FROM crm_pipeline_stages s JOIN crm_pipelines p ON p.id=s.pipeline_id AND p.owner_id=s.owner_id WHERE s.owner_id=?1 AND s.id=?2 AND p.archived=0").bind(owner, formCfg.stageId).first<{ id: string; pipeline_id: string }>() : null;
+  let stage = cfgStage || (keyRow ? await db.prepare("SELECT s.id, s.pipeline_id FROM crm_pipeline_stages s JOIN crm_pipelines p ON p.id=s.pipeline_id AND p.owner_id=s.owner_id WHERE s.owner_id=?1 AND s.id=?2 AND p.archived=0").bind(owner, keyRow.stage_id).first<{ id: string; pipeline_id: string }>() : null);
   if (!stage) {
     const pipe = await db.prepare("SELECT id FROM crm_pipelines WHERE owner_id=?1 AND client_id=?2 AND archived=0 ORDER BY created_at LIMIT 1").bind(owner, site.clientId).first<{ id: string }>();
     const st = pipe ? await db.prepare("SELECT id FROM crm_pipeline_stages WHERE owner_id=?1 AND pipeline_id=?2 AND category='open' ORDER BY position LIMIT 1").bind(owner, pipe.id).first<{ id: string }>() : null;
     stage = pipe && st ? { id: st.id, pipeline_id: pipe.id } : null;
   }
 
+  const estimate = kind === "quote" ? estimateFor(formCfg, jobType) : 0;
   const now = new Date().toISOString();
   const existing = await db.prepare("SELECT id FROM crm_contacts WHERE owner_id=?1 AND client_id=?2 AND ((?3<>'' AND lower(email)=?3) OR phone=?4 OR phone=?5) ORDER BY updated_at DESC LIMIT 1").bind(owner, site.clientId, email, phone, phoneRaw).first<{ id: string }>();
   const contactId = existing?.id || crypto.randomUUID();
@@ -126,6 +132,7 @@ async function saveLead(request: Request, env: Env, site: SiteConfig) {
     `${kind === "contact" ? "📨 Contact form" : "🏠 Quote request"} · ${site.name} website`,
     "",
     `Job: ${job}`,
+    estimate ? `Rough estimate: €${estimate.toLocaleString("en-IE")}` : "",
     ...answers.map(([q, a]) => `${q}: ${a}`),
     urgency && `When: ${urgency}`,
     property && `Property: ${property}`,
@@ -149,8 +156,8 @@ async function saveLead(request: Request, env: Env, site: SiteConfig) {
       .bind(contactId, owner, site.clientId, first || name, rest.join(" "), email, phone, source, town ? `Location: ${town}` : "", now),
   ];
   if (stage) {
-    stmts.push(db.prepare("INSERT INTO crm_opportunities (id, owner_id, pipeline_id, stage_id, contact_id, client_id, title, value, currency, source, source_submission_id, notes, created_at, updated_at, project_type, project_location) VALUES (?1,?2,?3,?4,?5,?6,?7,0,'EUR',?8,?9,?10,?11,?11,?12,?13)")
-      .bind(oppId, owner, stage.pipeline_id, stage.id, contactId, site.clientId, title, source, subKey, notes, now, job, town));
+    stmts.push(db.prepare("INSERT INTO crm_opportunities (id, owner_id, pipeline_id, stage_id, contact_id, client_id, title, value, currency, source, source_submission_id, notes, created_at, updated_at, project_type, project_location) VALUES (?1,?2,?3,?4,?5,?6,?7,?14,'EUR',?8,?9,?10,?11,?11,?12,?13)")
+      .bind(oppId, owner, stage.pipeline_id, stage.id, contactId, site.clientId, title, source, subKey, notes, now, job, town, estimate));
     stmts.push(db.prepare("INSERT INTO crm_activities (id, owner_id, opportunity_id, contact_id, activity_type, body, created_by, created_at) VALUES (?1,?2,?3,?4,'note',?5,?6,?7)")
       .bind(crypto.randomUUID(), owner, oppId, contactId, notes, `${site.name} website`, now));
   }
@@ -173,7 +180,7 @@ async function saveLead(request: Request, env: Env, site: SiteConfig) {
       const mail = leadEmail(site, { kind, job, answers, urgency, property, town, details, name, phone, email, photos: attachments.length, channel, page, when: now });
       // Test leads (flag set only by the edge Worker for an authorised test) go to the agency, not the client.
       const isTest = b.test === true;
-      const to = isTest ? [TEST_INBOX] : site.notify;
+      const to = isTest ? [TEST_INBOX] : notifyTo;
       if (isTest) mail.subject = `TEST – ${mail.subject}`;
       const fromAddr = (env.TASK_NOTIFICATION_FROM.match(/<([^>]+)>/)?.[1] || env.TASK_NOTIFICATION_FROM).trim();
       const res = await fetch("https://api.resend.com/emails", {

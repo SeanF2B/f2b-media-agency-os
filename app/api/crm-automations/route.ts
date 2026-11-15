@@ -101,8 +101,27 @@ export async function GET(request: Request) {
       raw.prepare("SELECT paused, paused_by, paused_at FROM crm_automation_scope_settings WHERE owner_id=?1 AND scope_id=?2").bind(ownerId, scope).first<{ paused: number; paused_by: string | null; paused_at: string | null }>(),
       raw.prepare("SELECT id, automation_id, title, body, read_at, created_at FROM crm_automation_notifications WHERE owner_id=?1 AND scope_id=?2 ORDER BY created_at DESC LIMIT 20").bind(ownerId, scope).all(),
     ]);
+    // Agency view also lists every client's automations and the rules built into website forms, so nothing is hidden.
+    const clientName = (id: string) => String((workspace.clients || []).find((client) => String(client.id) === id)?.name || "Client");
+    let others: Array<ReturnType<typeof listItem> & { clientName: string }> = [];
+    let formRules: Array<{ formId: string; formName: string; clientId: string; clientName: string; status: string; notify: string[]; rules: Array<{ when: string; then: string[] }> }> = [];
+    if (!scope) {
+      const otherRows = await raw.prepare("SELECT * FROM crm_automations WHERE owner_id=?1 AND scope_id<>'' ORDER BY updated_at DESC LIMIT 300").bind(ownerId).all<AutomationRow>();
+      others = (otherRows.results || []).filter((row) => (workspace.clients || []).some((client) => String(client.id) === row.scope_id)).map((row) => ({ ...listItem(row), clientName: clientName(row.scope_id) }));
+      const forms = await raw.prepare("SELECT id, client_id, name, definition, settings FROM site_forms WHERE owner_id=?1 ORDER BY name LIMIT 100").bind(ownerId).all<{ id: string; client_id: string; name: string; definition: string; settings: string }>().catch(() => ({ results: [] as Array<{ id: string; client_id: string; name: string; definition: string; settings: string }> }));
+      const verb: Record<string, string> = { tag: "Add tag", urgent: "Mark urgent", stage: "Move to stage", notify: "Also email" };
+      formRules = (forms.results || []).map((form) => {
+        const def = (() => { try { return JSON.parse(form.definition || "{}"); } catch { return {}; } })() as { rules?: Array<{ when?: { field?: string; equals?: string }; then?: Array<{ action?: string; value?: string }> }>; fields?: Array<{ id: string; label: string }> };
+        const settings = (() => { try { return JSON.parse(form.settings || "{}"); } catch { return {}; } })() as { status?: string; notify?: string[] };
+        const label = (id?: string) => def.fields?.find((field) => field.id === id)?.label || id || "answer";
+        return { formId: form.id, formName: form.name, clientId: form.client_id, clientName: clientName(form.client_id), status: settings.status || "live", notify: Array.isArray(settings.notify) ? settings.notify : [],
+          rules: (def.rules || []).map((rule) => ({ when: `${label(rule.when?.field)} is “${rule.when?.equals || ""}”`, then: (rule.then || []).map((step) => `${verb[String(step.action)] || step.action}${step.value ? `: ${step.value}` : ""}`) })) };
+      });
+    }
     return ok({
       scope,
+      others,
+      formRules,
       clients: (workspace.clients || []).map((client) => ({ id: String(client.id), name: String(client.name || "Client") })),
       automations: (rows.results || []).map(listItem),
       killSwitch: { paused: Boolean(setting?.paused), pausedBy: setting?.paused_by || null, pausedAt: setting?.paused_at || null },

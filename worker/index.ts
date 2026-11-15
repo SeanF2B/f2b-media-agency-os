@@ -135,6 +135,24 @@ function decodeJwtPart<T>(part: string): T {
   return JSON.parse(new TextDecoder().decode(decodeJwtBytes(part))) as T;
 }
 
+// Baseline browser security headers. Framing is blocked only for the private app itself, because public forms,
+// funnels and media under /f, /media and /api/marketing-public are embedded on client websites.
+function withSecurityHeaders(response: Response, pathname: string): Response {
+  if (response.status === 101 || response.webSocket) return response;
+  let headers: Headers;
+  try { headers = new Headers(response.headers); } catch { return response; }
+  const setIfMissing = (name: string, value: string) => { if (!headers.has(name)) headers.set(name, value); };
+  setIfMissing("X-Content-Type-Options", "nosniff");
+  setIfMissing("Referrer-Policy", "strict-origin-when-cross-origin");
+  setIfMissing("Strict-Transport-Security", "max-age=15552000");
+  const privateApp = pathname === "/" || (pathname.startsWith("/api/") && !pathname.startsWith("/api/marketing-public"));
+  if (privateApp) {
+    setIfMissing("X-Frame-Options", "SAMEORIGIN");
+    setIfMissing("Permissions-Policy", "camera=(), geolocation=(), payment=(), usb=(), microphone=(self)");
+  }
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
 const worker = {
   async scheduled(controller: ScheduledController, env: Cloudflare.Env, ctx: ExecutionContext) {
     ctx.waitUntil(Promise.allSettled([
@@ -216,6 +234,14 @@ const worker = {
     // a fallback before passing the identity to the app.
     const authenticatedHeaders = new Headers(request.headers);
     authenticatedHeaders.delete("cf-access-authenticated-user-email");
+    // Legacy hosting headers (user id / email / name) are never set by Cloudflare Access, so in production any
+    // copy of them came from the caller and could be used to pose as another user (e.g. the owner's old user id).
+    // Local dev sets them itself, so only strip outside dev.
+    if (!import.meta.env.DEV) {
+      for (const name of [...authenticatedHeaders.keys()]) {
+        if (name.toLowerCase().startsWith("oai-authenticated-user-")) authenticatedHeaders.delete(name);
+      }
+    }
     const assertion = authenticatedHeaders.get("cf-access-jwt-assertion");
     const authorizationCookie = request.headers
       .get("cookie")
@@ -257,9 +283,10 @@ const worker = {
       }
     }
 
-    return runWithConnectorBinding(binding, () =>
+    const response = await runWithConnectorBinding(binding, () =>
       handler.fetch(appRequest, env, ctx),
     );
+    return withSecurityHeaders(response, appRequest === authenticatedRequest ? incomingUrl.pathname : "/f/");
   },
 };
 
