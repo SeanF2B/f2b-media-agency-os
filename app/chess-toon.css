@@ -173,3 +173,42 @@
 .app-shell .chess-games-layout { grid-template-columns:minmax(0,1fr) 300px; align-items:start; }
 .app-shell .chess-game[data-game-id] .chess-board { width:min(100%, 860px, max(320px, calc(100dvh - 210px))) !important; }
 @media (max-width:900px) { .app-shell .chess-games-layout { grid-template-columns:minmax(0,1fr); } .app-shell .chess-game[data-game-id] .chess-board { width:min(100%, 720px) !important; } }
+
+/* ===== Chess: resume cards on the page ===== */
+.app-shell .chess-resume-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:12px; }
+.app-shell .chess-resume-card { display:grid; grid-template-columns:96px minmax(0,1fr) auto; align-items:center; gap:14px; padding:12px; border-radius:14px; text-align:left; cursor:pointer; transition:transform .15s ease, box-shadow .15s ease; }
+.app-shell .chess-resume-card:hover { transform:translateY(-2px); box-shadow:0 10px 24px rgba(0,0,0,.12); }
+.app-shell .chess-resume-card .chess-game-thumbnail { width:96px; height:96px; }
+.app-shell .chess-resume-info { display:grid; gap:6px; min-width:0; }
+.app-shell .chess-resume-players { display:flex; align-items:center; gap:6px; min-width:0; flex-wrap:wrap; }
+.app-shell .chess-resume-players b { font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:150px; }
+.app-shell .chess-resume-players i { font-style:normal; font-weight:800; opacity:.55; }
+.app-shell .chess-resume-info small { opacity:.7; font-weight:600; }
+.app-shell .chess-resume-cta { padding:10px 16px; border-radius:10px; background:#7cb342; color:#fff !important; font-weight:800; box-shadow:0 3px 0 #4f7a26; }
+
+/* ===== Chess: full-screen play window ===== */
+.app-shell .chess-play-modal { position:fixed; inset:0; z-index:9000; overflow:auto; padding:18px 22px; background:var(--f2b-page,#f4f6f9); animation:chess-result-fade .2s ease-out both; }
+.app-shell.dark-mode .chess-play-modal { background:#14171c; }
+.app-shell .chess-play-exit { position:fixed; top:14px; right:16px; z-index:9001; width:42px; height:42px; display:grid; place-items:center; border-radius:50%; border:0; background:rgba(20,26,36,.85); cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,.25); }
+.app-shell .chess-play-exit svg { width:20px; height:20px; fill:none; stroke:#fff; stroke-width:2.6; stroke-linecap:round; }
+.app-shell .chess-play-modal .chess-games-layout { display:block; max-width:none; }
+.app-shell .chess-play-modal .chess-board-sidebar { display:none; }
+.app-shell .chess-play-modal .chess-game { display:grid; grid-template-columns:minmax(0,1fr) 340px; grid-auto-rows:min-content; column-gap:24px; row-gap:14px; align-items:start; margin:0; padding:0; border:0; background:transparent !important; box-shadow:none; min-height:calc(100dvh - 36px); }
+.app-shell .chess-play-modal .chess-game > * { grid-column:2; }
+.app-shell .chess-play-modal .chess-game > .chess-play-area { grid-column:1; grid-row:1 / span 8; display:flex; justify-content:center; align-items:center; min-height:calc(100dvh - 36px); }
+.app-shell .chess-play-modal .chess-game[data-game-id] .chess-board { width:min(100%, calc(100dvh - 48px), 1000px) !important; }
+.app-shell .chess-play-modal .chess-game-head { flex-direction:column; align-items:stretch; gap:12px; margin:46px 0 0; }
+.app-shell .chess-play-modal .chess-game-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.app-shell .chess-play-modal .chess-clock-row { display:flex; flex-direction:column; align-items:stretch; gap:8px; }
+.app-shell .chess-play-modal .chess-clock-row > * { width:auto; max-width:none; }
+.app-shell .chess-play-modal .chess-modal-leaderboard h2 { font-size:16px; margin:6px 0 8px; }
+.app-shell .chess-modal-leaderboard { display:none; }
+.app-shell .chess-play-modal .chess-modal-leaderboard { display:block; }
+.app-shell .chess-play-modal .chess-game-switcher { grid-column:2; }
+@media (max-width:900px) {
+  .app-shell .chess-play-modal { padding:12px; }
+  .app-shell .chess-play-modal .chess-game { grid-template-columns:minmax(0,1fr); min-height:0; }
+  .app-shell .chess-play-modal .chess-game > *, .app-shell .chess-play-modal .chess-game > .chess-play-area { grid-column:1; grid-row:auto; min-height:0; }
+  .app-shell .chess-play-modal .chess-game-head { margin-top:40px; }
+  .app-shell .chess-play-modal .chess-game[data-game-id] .chess-board { width:min(100%, 720px) !important; }
+}
