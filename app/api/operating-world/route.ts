@@ -4,7 +4,7 @@ import { aiConfigured, aiEndpoint, aiHeaders, aiModel, resolveAiProvider } from 
 import { OPERATING_WORLD_SCHEMA } from "@/lib/operating-world/schema-sql";
 import {
   achievementsFromSnapshot, briefing, canBuy, financialSummary, guessIndustry, INDUSTRIES, levelFromXp, operationalHealth, parseCommand,
-  PANELS, UPGRADES, nextUpgrade, stageForLevel, workingHoursBetween, taxRaids, raidAmount, type Industry, type OwSnapshot, type PanelKind,
+  PANELS, UPGRADES, nextUpgrade, stageForLevel, workingHoursBetween, taxRaids, raidAmount, departmentBoards, type Industry, type OwSnapshot, type PanelKind,
 } from "@/lib/operating-world/engine";
 
 // Operating World: the game layer over the CRM. This route never writes CRM records itself —
@@ -126,7 +126,7 @@ function businessProfile(ctx: Ctx, saved: Record<string, string>) {
   const branding = { ...(ctx.ws.settings?.branding || {}), ...(ctx.client?.branding || {}) } as Record<string, string>;
   const guessed = guessIndustry(`${name} ${source.wordpressSiteUrl || ""} ${(source.campaigns || []).map((c: any) => c?.landingPageUrl || "").join(" ")}`) as Industry;
   const industry = (saved.industry && saved.industry in INDUSTRIES ? saved.industry : ctx.scopeId ? guessed : "agency") as Industry;
-  return { name, logo: String(source.logo || branding.logo || ""), primary: String(saved.primary || branding.primary || "#3b82f6"), secondary: String(saved.secondary || branding.secondary || "#1e3a8a"), industry, industryGuessed: !saved.industry, industryLabel: INDUSTRIES[industry].label, outfit: INDUSTRIES[industry], characterName: String(saved.characterName || "Boss"), website: String(saved.website || source.wordpressSiteUrl || "") };
+  return { name, logo: String(source.logo || branding.logo || ""), primary: String(saved.primary || branding.primary || "#3b82f6"), secondary: String(saved.secondary || branding.secondary || "#1e3a8a"), industry, industryGuessed: !saved.industry, industryLabel: INDUSTRIES[industry].label, outfit: INDUSTRIES[industry], characterName: String(saved.characterName || "Boss"), website: String(saved.website || source.wordpressSiteUrl || ""), look: (() => { try { return JSON.parse(saved.look || "{}"); } catch { return {}; } })() };
 }
 
 export async function GET(request: Request) {
@@ -159,12 +159,8 @@ export async function GET(request: Request) {
     }
     const approaches = briefing(plain);
     const urgent = (plain.leads.filter((l) => l.category === "open" && l.stagePosition <= l.firstPosition)).sort((a, b) => a.createdAt.localeCompare(b.createdAt)).slice(0, 12).map((l) => ({ ...l, ...leadsExtra[l.id] }));
-    return respond({
-      scopeId: ctx.scopeId, state: { mode: state.mode, autopilotPaused: state.autopilotPaused, startedAt: state.startedAt }, profile: businessProfile(ctx, state.profile),
-      wallet: await wallet(ctx), freshRewards: fresh, raids, approaches, health: operationalHealth(plain), finance: financialSummary(plain), sources: plain.sources,
-      customers: urgent, counts: { leads: plain.leads.filter((l) => l.category === "open").length, unread: plain.threads.filter((t) => t.unread > 0).length, bookingsUpcoming: plain.bookings.filter((b) => b.status === "booked" && b.startAt >= now).length, openTasks: plain.tasks.filter((t) => !/^done$/i.test(t.status)).length },
-      // Who is busy right now: AI agents running/scheduled tasks and staff with work in progress (this account only).
-      ...(() => {
+    // Who is busy right now: AI agents running/scheduled tasks and staff with work in progress (this account only).
+    const activity = (() => {
         const tasks = (ctx.ws.tasks || []).filter((t: any) => String(t.clientId || "") === ctx.scopeId && !/^done$/i.test(String(t.status || "")));
         const staff = (ctx.ws.staff || []) as any[];
         const agents = staff.filter((m) => m.isBot && (ctx.scopeId ? m.botLevel !== "admin" : true)).map((m) => {
@@ -174,7 +170,14 @@ export async function GET(request: Request) {
         }).filter((a) => a.state !== "idle").slice(0, 5);
         const people = staff.filter((m) => !m.isBot).map((m) => { const t = tasks.find((x: any) => x.assigneeId === m.id && /in progress|doing/i.test(String(x.status || ""))); return t ? { id: String(m.id), name: String(m.name || "Team"), task: String(t.title || "").slice(0, 80) } : null; }).filter(Boolean).slice(0, 4);
         return { agents, staffAtWork: people };
-      })(),
+      })();
+    return respond({
+      scopeId: ctx.scopeId, state: { mode: state.mode, autopilotPaused: state.autopilotPaused, startedAt: state.startedAt }, profile: businessProfile(ctx, state.profile),
+      wallet: await wallet(ctx), freshRewards: fresh, raids, approaches, health: operationalHealth(plain), finance: financialSummary(plain), sources: plain.sources,
+      customers: urgent, counts: { leads: plain.leads.filter((l) => l.category === "open").length, unread: plain.threads.filter((t) => t.unread > 0).length, bookingsUpcoming: plain.bookings.filter((b) => b.status === "booked" && b.startAt >= now).length, openTasks: plain.tasks.filter((t) => !/^done$/i.test(t.status)).length },
+      ...activity,
+      departments: departmentBoards(plain, { agency: !ctx.scopeId, agents: activity.agents }),
+
       // Leads further down the pipeline walk around town (to sales, the calendar, etc.).
       visitors: plain.leads.filter((l) => l.category === "open" && l.stagePosition > l.firstPosition).slice(0, 6).map((l) => ({ id: l.id, name: l.name || l.title, stage: l.stage })),
       taxman: plain.expenses.some((e) => !e.hasReceipt && e.category !== "Advertising & marketing" && e.date.slice(0, 7) === now.slice(0, 7)),
@@ -216,6 +219,13 @@ export async function POST(request: Request) {
       for (const key of ["primary", "secondary"] as const) { const v = str(body[key], 7); if (/^#[0-9a-f]{6}$/i.test(v)) next[key] = v; else if (body[key] === "") delete next[key]; }
       const name = str(body.characterName, 30); if (name) next.characterName = name;
       const website = str(body.website, 200); if (website === "" || /^https?:\/\/[^\s]+\.[^\s]+$/i.test(website)) next.website = website;
+      if (body.look && typeof body.look === "object") {
+        const l = body.look as Record<string, unknown>;
+        const pick = (v: unknown, allowed: string[]) => (typeof v === "string" && allowed.includes(v) ? v : undefined);
+        const colour = typeof l.colour === "string" && (/^#[0-9a-f]{6}$/i.test(l.colour) || ["primary", "secondary"].includes(l.colour)) ? l.colour : undefined;
+        const extras = Array.isArray(l.extras) ? (l.extras as unknown[]).filter((e): e is string => typeof e === "string" && ["glasses", "tie", "shades", "crown"].includes(e)) : [];
+        next.look = JSON.stringify({ hair: pick(l.hair, ["short", "part", "bun", "bob", "wave", "none"]), top: pick(l.top, ["jacket", "polo", "hivis"]), colour, hat: pick(l.hat, ["auto", "none", "cap", "hardhat", "beanie"]), extras });
+      }
       await ctx.db.prepare("UPDATE ow_state SET profile=?3, updated_at=?4 WHERE owner_id=?1 AND scope_id=?2").bind(ctx.ownerId, ctx.scopeId, JSON.stringify(next), new Date().toISOString()).run();
       await logAction(ctx, "Owner", "Updated business character", "Manual correction of the game profile", []);
       return respond({ ok: true, profile: businessProfile(ctx, next) });

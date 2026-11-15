@@ -135,7 +135,7 @@ export function stageForLevel(level: number) {
 // Upgrade tracks. Coins buy visible upgrades only (never real-world assets); levels gate each tier.
 // Each tier changes the scene. Purchases are stored as "<track>:<tier>".
 export type UpgradeTier = { tier: number; name: string; price: number; minLevel: number; perk: string };
-export type UpgradeTrack = { id: string; name: string; group: "business" | "lifestyle"; tiers: UpgradeTier[] };
+export type UpgradeTrack = { id: string; name: string; group: "business" | "interior" | "lifestyle"; tiers: UpgradeTier[] };
 export const UPGRADES: UpgradeTrack[] = [
   { id: "hq", group: "business", name: "Headquarters", tiers: [
     { tier: 1, name: "Established office", price: 500, minLevel: 5, perk: "Second floor and a bigger footprint" },
@@ -170,10 +170,26 @@ export const UPGRADES: UpgradeTrack[] = [
     { tier: 1, name: "Fresh paint", price: 300, minLevel: 3, perk: "HQ walls in your brand colours" },
     { tier: 2, name: "Glass frontage", price: 1200, minLevel: 9, perk: "Floor-to-ceiling glass" },
     { tier: 3, name: "Luxury facade", price: 4000, minLevel: 17, perk: "Dark stone with gold trim" } ] },
-  { id: "interior", group: "business", name: "Interior", tiers: [
+  { id: "interior", group: "interior", name: "Decor", tiers: [
     { tier: 1, name: "Warm lighting", price: 150, minLevel: 2, perk: "Windows glow at all hours" },
     { tier: 2, name: "Plants & art", price: 500, minLevel: 5, perk: "Greenery in every window" },
     { tier: 3, name: "Designer interior", price: 1500, minLevel: 11, perk: "Chandeliers that sparkle" } ] },
+  { id: "furniture", group: "interior", name: "Office furniture", tiers: [
+    { tier: 1, name: "Proper desks", price: 120, minLevel: 1, perk: "Matching desks and chairs" },
+    { tier: 2, name: "Standing desks", price: 450, minLevel: 4, perk: "Sit-stand desks for the team" },
+    { tier: 3, name: "Designer furniture", price: 1600, minLevel: 10, perk: "Walnut desks and leather chairs" } ] },
+  { id: "tech", group: "interior", name: "Office tech", tiers: [
+    { tier: 1, name: "Laptops", price: 150, minLevel: 2, perk: "A laptop on every desk" },
+    { tier: 2, name: "Dual monitors", price: 600, minLevel: 6, perk: "Two screens each" },
+    { tier: 3, name: "Live wall screens", price: 2000, minLevel: 12, perk: "Big screens showing your live numbers" } ] },
+  { id: "breakroom", group: "interior", name: "Break room", tiers: [
+    { tier: 1, name: "Kettle corner", price: 80, minLevel: 1, perk: "Tea and biscuits" },
+    { tier: 2, name: "Espresso bar", price: 500, minLevel: 5, perk: "Proper coffee" },
+    { tier: 3, name: "Team kitchen", price: 1800, minLevel: 11, perk: "Kitchen island and a fridge full of snacks" } ] },
+  { id: "office", group: "interior", name: "Your office", tiers: [
+    { tier: 1, name: "Corner desk", price: 200, minLevel: 2, perk: "A desk of your own" },
+    { tier: 2, name: "Glass office", price: 900, minLevel: 7, perk: "Glass walls and a meeting table" },
+    { tier: 3, name: "Executive suite", price: 3500, minLevel: 15, perk: "Sofa, bar cart and a skyline view" } ] },
   { id: "home", group: "lifestyle", name: "Your home", tiers: [
     { tier: 1, name: "Cottage", price: 400, minLevel: 3, perk: "A cosy place to come home to" },
     { tier: 2, name: "Villa", price: 2500, minLevel: 12, perk: "Two storeys and a balcony" },
@@ -482,3 +498,43 @@ export function taxRaids(expenses: OwExpense[], since: string, now: string) {
 }
 /** How much a raid can take without pushing the balance below zero. */
 export const raidAmount = (balance: number) => Math.max(0, Math.min(TAX_RAID_COINS, Math.floor(balance)));
+
+// ───────────────────────────── Department live boards ─────────────────────────────
+export type DeptBoard = { headline: string; stats: Array<{ label: string; value: string }>; feed: Array<{ text: string; at: string }> };
+const fmtMoney = (by: Record<string, number>) => Object.keys(by).length ? Object.entries(by).map(([c, v]) => { try { return new Intl.NumberFormat("en-IE", { style: "currency", currency: c, maximumFractionDigits: 0 }).format(v); } catch { return `${c} ${Math.round(v)}`; } }).join(" + ") : "—";
+const sumBy = (rows: Array<{ currency: string; value: number }>) => { const o: Record<string, number> = {}; for (const r of rows) o[r.currency || "EUR"] = (o[r.currency || "EUR"] || 0) + r.value; return o; };
+/** Real numbers per department for the in-building boards. Nothing is estimated or invented. */
+export function departmentBoards(snap: OwSnapshot, opts: { agency: boolean; agents?: Array<{ name: string; state: string; task: string }> }): Record<EmployeeId, DeptBoard> {
+  const s = derived(snap); const month = snap.now.slice(0, 7); const fin = financialSummary(snap);
+  const openDeals = snap.leads.filter((l) => l.category === "open" && l.stagePosition > l.firstPosition);
+  const won30 = snap.leads.filter((l) => l.category === "won" && Date.parse(snap.now) - Date.parse(l.updatedAt) < 30 * 86_400_000);
+  const ads = snap.expenses.filter((e) => e.category === AD_SPEND_CATEGORY && e.date.slice(0, 7) === month);
+  const monthExp = snap.expenses.filter((e) => e.category !== AD_SPEND_CATEGORY && e.date.slice(0, 7) === month);
+  const upcoming = snap.bookings.filter((b) => b.status === "booked" && b.startAt >= snap.now).sort((a, b) => a.startAt.localeCompare(b.startAt));
+  const openTasks = snap.tasks.filter((t) => !/^done$/i.test(t.status));
+  const name = (l: OwLead) => l.name || l.title;
+  return {
+    receptionist: { headline: s.freshLeads.length ? `${plural(s.freshLeads.length, "new lead")} waiting` : "Front desk is clear",
+      stats: [{ label: "New leads", value: String(s.freshLeads.length) }, { label: "Waiting 24h+", value: String(s.waitingLeads.length) }, { label: "Unread messages", value: String(s.unreadThreads.length) }],
+      feed: [...s.freshLeads.slice(-4).reverse().map((l) => ({ text: `New enquiry: ${name(l)}`, at: l.createdAt })), ...s.unreadThreads.slice(0, 2).map((t) => ({ text: `${t.name || "Customer"}: “${t.preview.slice(0, 50)}”`, at: t.lastAt }))].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 5) },
+    sales: { headline: openDeals.length ? `${plural(openDeals.length, "deal")} in progress` : "No deals in progress",
+      stats: [{ label: "Open pipeline", value: fmtMoney(sumBy(openDeals)) }, { label: "Won (30 days)", value: `${won30.length} · ${fmtMoney(sumBy(won30))}` }, { label: "Gone quiet", value: String(s.staleDeals.length) }],
+      feed: [...openDeals, ...won30].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 5).map((l) => ({ text: l.category === "won" ? `Won: ${name(l)}` : `${name(l)} → ${l.stage}`, at: l.updatedAt })) },
+    accountant: opts.agency
+      ? { headline: fin.overdueCount ? `${plural(fin.overdueCount, "overdue invoice")}` : "Invoices on track",
+        stats: [{ label: "Paid this month", value: fmtMoney(fin.paidThisMonth) }, { label: "Outstanding", value: fmtMoney(fin.outstanding) }, { label: "Drafts to send", value: String(s.draftInvoices.length) }],
+        feed: snap.invoices.flatMap((i) => [i.paidAt ? { text: `Paid: ${i.number} · ${i.clientName}`, at: i.paidAt.length === 10 ? `${i.paidAt}T12:00:00Z` : i.paidAt } : null, i.sentAt ? { text: `Sent: ${i.number} · ${i.clientName}`, at: i.sentAt } : null]).filter((x): x is { text: string; at: string } => Boolean(x)).sort((a, b) => b.at.localeCompare(a.at)).slice(0, 5) }
+      : { headline: s.expensesNoReceipt.length ? `${plural(s.expensesNoReceipt.length, "receipt")} missing` : "Books up to date",
+        stats: [{ label: "Expenses this month", value: String(monthExp.length) }, { label: "Missing receipts", value: String(s.expensesNoReceipt.length) }, { label: "Total", value: `€${Math.round(monthExp.reduce((n, e) => n + e.amount, 0)).toLocaleString("en-IE")}` }],
+        feed: [...monthExp].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5).map((e) => ({ text: `${e.description}${e.hasReceipt ? "" : " · no receipt"}`, at: `${e.date}T12:00:00Z` })) },
+    calendar: { headline: s.bookingsToday.length ? `${plural(s.bookingsToday.length, "appointment")} today` : upcoming.length ? "Nothing today" : "Diary is empty",
+      stats: [{ label: "Today", value: String(s.bookingsToday.length) }, { label: "Tomorrow", value: String(s.bookingsTomorrow.length) }, { label: "To mark", value: String(s.pastUnmarked.length) }],
+      feed: upcoming.slice(0, 5).map((b) => ({ text: `${b.name || "Appointment"}`, at: b.startAt })) },
+    projects: { headline: s.overdueTasks.length ? `${plural(s.overdueTasks.length, "task")} overdue` : `${plural(openTasks.length, "open task")}`,
+      stats: [{ label: "Open", value: String(openTasks.length) }, { label: "Overdue", value: String(s.overdueTasks.length) }, { label: "AI agents busy", value: String((opts.agents || []).filter((a) => a.state === "working").length) }],
+      feed: [...(opts.agents || []).map((a) => ({ text: `${a.name} ${a.state === "working" ? "working on" : "scheduled:"} ${a.task}`, at: snap.now })), ...openTasks.filter((t) => t.due).sort((a, b) => a.due.localeCompare(b.due)).slice(0, 4).map((t) => ({ text: `${t.title}${t.due < s.today ? " · overdue" : ""}`, at: `${t.due}T09:00:00Z` }))].slice(0, 5) },
+    marketing: { headline: ads.length ? `Ad spend logged this month` : "No ad spend logged this month",
+      stats: [{ label: "Ad spend (month)", value: `€${Math.round(ads.reduce((n, e) => n + e.amount, 0)).toLocaleString("en-IE")}` }, { label: "Entries", value: String(ads.length) }, { label: "Reviews feed", value: "Not connected" }],
+      feed: [...ads].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5).map((e) => ({ text: `${e.description} · €${Math.round(e.amount).toLocaleString("en-IE")}`, at: `${e.date}T12:00:00Z` })) },
+  };
+}

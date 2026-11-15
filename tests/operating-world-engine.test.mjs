@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import {
   achievementsFromSnapshot, briefing, canBuy, financialSummary, guessIndustry, levelFromXp, operationalHealth,
-  parseCommand, rewardWalkthrough, taxRaids, raidAmount, UPGRADES, nextUpgrade, upgradeTier, stageForLevel, workingHoursBetween, xpForLevel, DAILY_REWARD_CAP, allClearLine,
+  parseCommand, rewardWalkthrough, taxRaids, raidAmount, departmentBoards, UPGRADES, nextUpgrade, upgradeTier, stageForLevel, workingHoursBetween, xpForLevel, DAILY_REWARD_CAP, allClearLine,
 } from "../lib/operating-world/engine.ts";
 import { OPERATING_WORLD_SCHEMA } from "../lib/operating-world/schema-sql.ts";
 
@@ -133,4 +133,12 @@ test("tax man raids only week-old expenses without receipts, never below zero", 
   ];
   assert.deepEqual(taxRaids(ex, START, NOW).map((r) => r.key), ["raid:a"]);
   assert.equal(raidAmount(100), 15); assert.equal(raidAmount(6), 6); assert.equal(raidAmount(-3), 0);
+});
+
+test("department boards use real numbers only", () => {
+  const b = departmentBoards(snap({ leads: [lead("1"), lead("2", { stagePosition: 2, stage: "Proposal sent", value: 500 })], expenses: [{ id: "x", description: "Google Ads", amount: 120, date: "2026-11-12", hasReceipt: false, category: "Advertising & marketing" }] }), { agency: true });
+  assert.equal(b.receptionist.stats[0].value, "1");
+  assert.match(b.sales.stats[0].value, /500/);
+  assert.match(b.marketing.stats[0].value, /120/);
+  assert.equal(departmentBoards(snap(), { agency: false }).receptionist.headline, "Front desk is clear");
 });

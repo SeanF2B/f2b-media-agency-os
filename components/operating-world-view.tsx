@@ -7,11 +7,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, Bot, Coins, Gauge, History, Mic, Pause, Play, Send, Settings2, Sparkles, Volume2, VolumeX, Wand2, X, Zap, CalendarDays, Copy, Check, Loader2, Eye, EyeOff, Hammer, Lock, ChevronRight } from "lucide-react";
-import { EMPLOYEES, EMPLOYEE_FOR_REWARD, REWARDS, UPGRADES, allClearLine, briefing, levelFromXp, nextUpgrade, reactionLine, rewardWalkthrough, stageForLevel, upgradeTier, workingHoursBetween, type Approach, type BriefingOption, type EmployeeId, type OwSnapshot, type PanelKind, type RewardKind, type UpgradeTrack, type WalkStep } from "@/lib/operating-world/engine";
+import { EMPLOYEES, EMPLOYEE_FOR_REWARD, REWARDS, UPGRADES, allClearLine, briefing, levelFromXp, nextUpgrade, reactionLine, rewardWalkthrough, stageForLevel, upgradeTier, workingHoursBetween, type Approach, type BriefingOption, type EmployeeId, type OwSnapshot, type PanelKind, type RewardKind, type UpgradeTrack, type WalkStep, type DeptBoard } from "@/lib/operating-world/engine";
 import "./operating-world.css";
 
 type Outfit = { hat: string; tool: string; outfit: string; label: string };
-type Profile = { name: string; logo: string; primary: string; secondary: string; industry: string; industryGuessed: boolean; industryLabel: string; outfit: Outfit; characterName: string; website: string };
+type Profile = { name: string; logo: string; primary: string; secondary: string; industry: string; industryGuessed: boolean; industryLabel: string; outfit: Outfit; characterName: string; website: string; look?: CharLook };
 type Pending = { key: string; kind: string; coins: number; xp: number; label: string };
 type Wallet = { coins: number; xp: number; level: number; xpIntoLevel: number; xpForNext: number; progress: number; stage: { name: string; floors: number; next: { level: number; name: string } | null }; owned: string[]; pending: Pending[]; recentRewards: Array<{ reward_key: string; kind: RewardKind; coins: number; label: string; created_at: string; collected_at?: string }>; actions: Array<{ id: string; actor: string; action: string; reason: string; records: string[]; status: string; created_at: string }> };
 type Customer = { id: string; title: string; name: string; createdAt: string; stage: string; email?: string; phone?: string; nextStageId?: string; nextStage?: string; value: number; currency: string };
@@ -20,7 +20,7 @@ type WorldData = {
   freshRewards: Array<{ key: string; kind: RewardKind; coins: number; xp: number; label: string }>; raids?: Array<{ key: string; coins: number; label: string }>; approaches: Approach[];
   health: { score: number; mood: string; issues: string[] }; finance: { paidThisMonth: Record<string, number>; outstanding: Record<string, number>; overdueCount: number };
   sources: Record<string, boolean>; customers: Customer[]; counts: { leads: number; unread: number; bookingsUpcoming: number; openTasks: number };
-  upcoming: Array<{ id: string; name: string; startAt: string }>; crops?: Crop[]; agents?: Array<{ id: string; name: string; state: string; task: string }>; staffAtWork?: Array<{ id: string; name: string; task: string }>; visitors?: Array<{ id: string; name: string; stage: string }>; taxman?: boolean; shop: UpgradeTrack[]; industries: Array<{ id: string; label: string }>; aiReady: boolean;
+  upcoming: Array<{ id: string; name: string; startAt: string }>; crops?: Crop[]; agents?: Array<{ id: string; name: string; state: string; task: string }>; staffAtWork?: Array<{ id: string; name: string; task: string }>; visitors?: Array<{ id: string; name: string; stage: string }>; taxman?: boolean; departments?: Record<EmployeeId, DeptBoard>; shop: UpgradeTrack[]; industries: Array<{ id: string; label: string }>; aiReady: boolean;
 };
 type Toast = { id: number; employee: EmployeeId; text: string; coins: number };
 export type OperatingWorldPanelRenderer = (kind: PanelKind, options: { focusId?: string; onDone: () => void }) => ReactNode;
@@ -39,15 +39,52 @@ const money = (by: Record<string, number>) => Object.keys(by).length ? Object.en
 const PANEL_TITLES: Record<PanelKind, string> = { leads: "Pipeline", contacts: "Contacts", conversations: "Conversations", scheduling: "Scheduling", invoicing: "Invoicing", books: "Books", expense: "Record a receipt", tasks: "Tasks", task: "New task", "lead-replies": "AI-prepared replies", "lead-detail": "Lead" };
 const sumCoins = (list: Pending[]) => list.reduce((n, p) => n + p.coins, 0);
 
-// ───────────── Sound (tiny synthesised chimes) ─────────────
-function chime(kind: "coin" | "level" | "pop" | "shower" | "steal") {
+// ───────────── Sound: modern synthesised UI audio (soft sines, filtered noise, short reverb) ─────────────
+let audioCtx: AudioContext | null = null;
+let reverb: ConvolverNode | null = null;
+function audio() {
+  const AC = (window as any).AudioContext || (window as any).webkitAudioContext; if (!AC) return null;
+  if (!audioCtx) {
+    audioCtx = new AC() as AudioContext;
+    // Tiny generated room impulse for a soft, modern tail.
+    const len = Math.floor(audioCtx.sampleRate * 0.9), buf = audioCtx.createBuffer(2, len, audioCtx.sampleRate);
+    for (let c = 0; c < 2; c++) { const d = buf.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2); }
+    reverb = audioCtx.createConvolver(); reverb.buffer = buf;
+    const wet = audioCtx.createGain(); wet.gain.value = 0.22; reverb.connect(wet).connect(audioCtx.destination);
+  }
+  if (audioCtx.state === "suspended") void audioCtx.resume();
+  return audioCtx;
+}
+function tone(ctx: AudioContext, { f, to, t = 0, dur = 0.25, type = "sine", gain = 0.12, q = 0 }: { f: number; to?: number; t?: number; dur?: number; type?: OscillatorType; gain?: number; q?: number }) {
+  const start = ctx.currentTime + t, o = ctx.createOscillator(), g = ctx.createGain(), filter = ctx.createBiquadFilter();
+  o.type = type; o.frequency.setValueAtTime(f, start); if (to) o.frequency.exponentialRampToValueAtTime(to, start + dur * 0.9);
+  filter.type = "lowpass"; filter.frequency.setValueAtTime(type === "sine" ? 9000 : 2600, start); if (q) filter.Q.value = q;
+  g.gain.setValueAtTime(0.0001, start); g.gain.exponentialRampToValueAtTime(gain, start + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+  o.connect(filter).connect(g); g.connect(ctx.destination); if (reverb) g.connect(reverb);
+  o.start(start); o.stop(start + dur + 0.05);
+}
+function noise(ctx: AudioContext, { t = 0, dur = 0.06, freq = 2400, gain = 0.06 }: { t?: number; dur?: number; freq?: number; gain?: number }) {
+  const start = ctx.currentTime + t, len = Math.floor(ctx.sampleRate * dur), buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  const src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(); src.buffer = buf; f.type = "bandpass"; f.frequency.value = freq; f.Q.value = 1.4;
+  g.gain.setValueAtTime(gain, start); g.gain.exponentialRampToValueAtTime(0.0001, start + dur); src.connect(f).connect(g).connect(ctx.destination); src.start(start);
+}
+function chime(kind: "coin" | "level" | "pop" | "shower" | "steal" | "door" | "select" | "menace") {
   try {
-    const AC = (window as any).AudioContext || (window as any).webkitAudioContext; if (!AC) return;
-    const ctx = new AC();
-    const notes = kind === "steal" ? [784, 622, 494, 392] : kind === "level" ? [523, 659, 784, 1046] : kind === "shower" ? [988, 1319, 1175, 1568, 1319, 1760] : kind === "coin" ? [988, 1319] : [660];
-    const gap = kind === "shower" ? 0.07 : 0.09;
-    notes.forEach((f, i) => { const o = ctx.createOscillator(), g = ctx.createGain(); o.type = "triangle"; o.frequency.value = f; const t = ctx.currentTime + i * gap; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.11, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.25); o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + 0.3); });
-    setTimeout(() => ctx.close(), 1600);
+    const ctx = audio(); if (!ctx) return;
+    if (kind === "pop" || kind === "select") { noise(ctx, { dur: 0.035, freq: 3200, gain: 0.05 }); tone(ctx, { f: kind === "select" ? 880 : 660, to: kind === "select" ? 1320 : 990, dur: 0.12, gain: 0.07 }); return; }
+    if (kind === "coin") { tone(ctx, { f: 1318, dur: 0.18, gain: 0.08 }); tone(ctx, { f: 1975, t: 0.07, dur: 0.42, gain: 0.07 }); noise(ctx, { t: 0.0, dur: 0.03, freq: 6000, gain: 0.03 }); return; }
+    if (kind === "shower") { [0, 0.06, 0.12, 0.2, 0.28, 0.36].forEach((t, i) => tone(ctx, { f: [1318, 1568, 1975, 1760, 2093, 2637][i], t, dur: 0.3, gain: 0.06 })); return; }
+    if (kind === "level") { [523.25, 659.25, 783.99].forEach((f, i) => tone(ctx, { f, t: i * 0.05, dur: 1.1, gain: 0.07 })); tone(ctx, { f: 1046.5, t: 0.22, dur: 1.2, gain: 0.06 }); tone(ctx, { f: 220, to: 440, dur: 0.6, type: "triangle", gain: 0.05 }); return; }
+    if (kind === "steal") { tone(ctx, { f: 520, to: 140, dur: 0.7, type: "sawtooth", gain: 0.06, q: 6 }); tone(ctx, { f: 390, to: 110, t: 0.08, dur: 0.7, type: "square", gain: 0.03 }); return; }
+    if (kind === "menace") {
+      // Creeping danger: low semitone pulses that speed up, then a dissonant sting. Original motif.
+      let t = 0, gap = 0.62; const low = [82.41, 87.31];
+      for (let i = 0; i < 18; i++) { tone(ctx, { f: low[i % 2], t, dur: Math.max(0.16, gap * 0.8), type: "sawtooth", gain: 0.09, q: 8 }); tone(ctx, { f: low[i % 2] * 2, t, dur: Math.max(0.12, gap * 0.6), type: "triangle", gain: 0.03 }); t += gap; gap = Math.max(0.13, gap * 0.86); }
+      [311.13, 329.63, 466.16].forEach((f) => tone(ctx, { f, t, dur: 1.4, type: "sawtooth", gain: 0.05, q: 3 }));
+      return;
+    }
+    if (kind === "door") { noise(ctx, { dur: 0.25, freq: 600, gain: 0.05 }); tone(ctx, { f: 330, to: 495, dur: 0.35, gain: 0.06 }); tone(ctx, { f: 660, t: 0.12, dur: 0.5, gain: 0.05 }); return; }
   } catch { /* audio blocked until the first tap */ }
 }
 
@@ -100,14 +137,14 @@ function Spot({ id, label, poked, onTap, children, labelAt, badge }: { id: strin
   </g>;
 }
 
-type BeanLook = { color: string; accessory?: "headset" | "tie" | "glasses" | "hardhat" | "beret" | "clock" | "crown"; hat?: string; tool?: string; trim?: string; tie?: boolean; shades?: boolean; crown?: boolean };
+type BeanLook = { hair?: string; top?: "jacket" | "polo" | "hivis"; glasses?: boolean; color: string; accessory?: "headset" | "tie" | "glasses" | "hardhat" | "beret" | "clock" | "crown"; hat?: string; tool?: string; trim?: string; tie?: boolean; shades?: boolean; crown?: boolean };
 /** Adult characters: realistic proportions, role-based clothing, one neutral stylised tone (no skin tones), understated faces. */
 function Bean({ at, look, mood = "calm", scale = 1, className = "", label, onTap, alert }: { at: [number, number]; look: BeanLook; mood?: string; scale?: number; className?: string; label: string; onTap?: () => void; alert?: boolean }) {
   const jacket = look.color, jacketDark = shade(jacket, -0.28), skin = "#d6d3d1", skinShade = "#bcb8b4", hair = "#3f3f46";
-  const hivis = look.accessory === "hardhat";
+  const hivis = look.accessory === "hardhat" || look.top === "hivis";
   const trousers = hivis ? "#44403c" : look.accessory === "headset" ? "#1f2937" : "#334155";
   const brows = mood === "panicked" || mood === "concerned";
-  const hairStyle = look.accessory === "headset" ? "bun" : look.accessory === "glasses" ? "bob" : look.accessory === "beret" ? "wave" : look.accessory === "tie" ? "part" : "short";
+  const hairStyle = look.hair ? look.hair : look.accessory === "headset" ? "bun" : look.accessory === "glasses" ? "bob" : look.accessory === "beret" ? "wave" : look.accessory === "tie" ? "part" : "short";
   return <g className={`ow-bean ow-person-adult ${className}`} transform={`translate(${at[0]} ${at[1]}) scale(${scale})`} role={onTap ? "button" : undefined} tabIndex={onTap ? 0 : undefined} aria-label={label} onClick={onTap} onKeyDown={onTap ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onTap(); } } : undefined}>
     <ellipse cx="0" cy="1" rx="10" ry="3.5" fill="rgba(0,0,0,.22)" />
     <g className="ow-bean-body">
@@ -118,7 +155,8 @@ function Bean({ at, look, mood = "calm", scale = 1, className = "", label, onTap
       <rect x="-10.5" y="-34" width="3.4" height="15" rx="1.7" fill={jacketDark} /><rect x="7.1" y="-34" width="3.4" height="15" rx="1.7" fill={jacketDark} />
       <circle cx="-8.8" cy="-18.5" r="1.8" fill={skin} /><circle cx="8.8" cy="-18.5" r="1.8" fill={skin} />
       <path d="M-8 -35 h16 a2 2 0 0 1 2 2 v15 h-20 v-15 a2 2 0 0 1 2 -2z" fill={jacket} />
-      {!hivis && <path d="M-3.2 -35 L0 -29 L3.2 -35 Z" fill="#f8fafc" />}
+      {!hivis && look.top !== "polo" && <path d="M-3.2 -35 L0 -29 L3.2 -35 Z" fill="#f8fafc" />}
+      {look.top === "polo" && <path d="M-3.4 -35 L0 -32 L3.4 -35 L2 -31 L-2 -31 Z" fill={shade(jacket, 0.25)} />}
       {hivis && <><rect x="-8" y="-29" width="16" height="2" fill="#fef08a" opacity=".9" /><rect x="-8" y="-23" width="16" height="2" fill="#fef08a" opacity=".9" /></>}
       {(look.accessory === "tie" || look.tie) && <path d="M-1.2 -33 L1.2 -33 L1.6 -24 L0 -22 L-1.6 -24 Z" fill={look.accessory === "tie" ? "#7f1d1d" : "#111827"} />}
       {look.accessory === "beret" && <path d="M-7 -35 q7 5 14 0 l-1 3 q-6 4 -12 0z" fill="#be185d" />}
@@ -135,7 +173,7 @@ function Bean({ at, look, mood = "calm", scale = 1, className = "", label, onTap
       {mood === "panicked" ? <ellipse cx="0" cy="-39.6" rx="1.1" ry="1.3" fill="#27272a" /> : mood === "concerned" ? <path d="M-1.6 -39.3 q1.6 -1 3.2 0" stroke="#27272a" strokeWidth=".8" fill="none" strokeLinecap="round" /> : <path d="M-1.6 -40 q1.6 1.2 3.2 0" stroke="#27272a" strokeWidth=".8" fill="none" strokeLinecap="round" />}
       {/* role details */}
       {look.accessory === "headset" && <><path d="M-5.6 -44 a5.6 5.6 0 0 1 11.2 0" stroke="#18181b" strokeWidth="1.1" fill="none" /><rect x="-6.6" y="-45" width="2" height="3.6" rx="1" fill="#18181b" /><path d="M-5.6 -41.6 q0.6 3 3.2 2.6" stroke="#18181b" strokeWidth=".8" fill="none" /></>}
-      {look.accessory === "glasses" && <><rect x="-4.2" y="-44.4" width="3.4" height="2.6" rx="1" fill="none" stroke="#18181b" strokeWidth=".7" /><rect x="0.8" y="-44.4" width="3.4" height="2.6" rx="1" fill="none" stroke="#18181b" strokeWidth=".7" /></>}
+      {(look.accessory === "glasses" || look.glasses) && <><rect x="-4.2" y="-44.4" width="3.4" height="2.6" rx="1" fill="none" stroke="#18181b" strokeWidth=".7" /><rect x="0.8" y="-44.4" width="3.4" height="2.6" rx="1" fill="none" stroke="#18181b" strokeWidth=".7" /></>}
       {(hivis || look.hat === "hardhat") && <><path d="M-6 -45.5 a6 5.4 0 0 1 12 0 z" fill="#facc15" /><rect x="-7" y="-46.2" width="14" height="1.8" rx=".9" fill="#ca8a04" /></>}
       {look.hat === "cap" && <><path d="M-5.6 -45.4 a5.6 4.8 0 0 1 11.2 0 z" fill={look.trim || jacketDark} /><rect x="1" y="-46" width="7" height="1.6" rx=".8" fill={look.trim || jacketDark} /></>}
       {look.hat === "beanie" && <path d="M-5.6 -44.5 a5.6 5.6 0 0 1 11.2 0 z" fill="#27272a" />}
@@ -296,63 +334,143 @@ function UpgradeArt({ id, tier, primary, secondary }: { id: string; tier: number
     case "car": return g(<><rect x="14" y="32" width="52" height={tier >= 3 ? 10 : 14} rx="6" fill={tier >= 4 ? "#111827" : tier >= 3 ? "#dc2626" : primary} /><path d={tier >= 3 ? "M28 32 L34 24 L50 24 L56 32 Z" : "M24 32 L30 20 L50 20 L58 32 Z"} fill="#bae6fd" /><circle cx="26" cy="46" r="6" fill="#111827" stroke={tier >= 4 ? "#fbbf24" : "#9ca3af"} strokeWidth="2" /><circle cx="54" cy="46" r="6" fill="#111827" stroke={tier >= 4 ? "#fbbf24" : "#9ca3af"} strokeWidth="2" /></>);
     case "air": return g(tier >= 3 ? <><path d="M10 30 L58 26 L72 30 L58 34 Z" fill="#fff" stroke="#94a3b8" /><path d="M34 28 L46 12 L52 28 Z" fill={primary} /><path d="M34 32 L46 48 L52 32 Z" fill={primary} /></> : tier >= 2 ? <><ellipse cx="40" cy="32" rx="16" ry="9" fill={primary} /><ellipse cx="45" cy="30" rx="7" ry="5" fill="#bae6fd" /><rect x="10" y="29" width="16" height="3" fill={primary} /><rect x="14" y="18" width="52" height="2.5" fill="#1f2937" /></> : <><ellipse cx="40" cy="42" rx="24" ry="9" fill="#475569" /><text x="40" y="46" textAnchor="middle" fontSize="12" fontWeight="900" fill="#fbbf24">H</text></>);
     case "wardrobe": return g(<><path d="M28 18 L36 14 L44 14 L52 18 L58 28 L52 30 L52 50 L28 50 L28 30 L22 28 Z" fill={primary} />{tier >= 2 && <path d="M38 16 L42 16 L41 34 L40 36 L39 34 Z" fill="#111827" />}{tier >= 4 && <path d="M30 12 L30 6 L35 9 L40 4 L45 9 L50 6 L50 12 Z" fill="#fbbf24" />}{tier >= 3 && <rect x="30" y="24" width="20" height="4" rx="2" fill="#111827" />}</>);
+    case "furniture": return g(<><polygon points="16,34 40,26 64,34 40,42" fill={tier >= 3 ? "#7c4a2d" : "#e7e5e4"} stroke="#a8a29e" /><rect x="20" y="34" width="3" height={tier >= 2 ? 14 : 10} fill="#57534e" /><rect x="57" y="34" width="3" height={tier >= 2 ? 14 : 10} fill="#57534e" /><rect x="30" y="16" width="14" height="12" rx="3" fill={tier >= 3 ? "#292524" : "#52525b"} /></>);
+    case "tech": return g(<>{tier >= 3 ? <><rect x="12" y="12" width="56" height="30" rx="3" fill="#0f172a" /><rect x="15" y="15" width="50" height="24" rx="2" fill={primary} opacity=".55" /><path d="M20 34 L30 26 L40 30 L52 20 L60 24" stroke="#fff" strokeWidth="2" fill="none" /></> : <><rect x={tier >= 2 ? 14 : 26} y="16" width="26" height="18" rx="2" fill="#18181b" /><rect x={tier >= 2 ? 16 : 28} y="18" width="22" height="13" rx="1" fill={primary} opacity=".6" />{tier >= 2 && <><rect x="42" y="16" width="26" height="18" rx="2" fill="#18181b" /><rect x="44" y="18" width="22" height="13" rx="1" fill="#38bdf8" opacity=".6" /></>}<rect x="34" y="34" width="12" height="4" fill="#52525b" /></>}</>);
+    case "breakroom": return g(<>{tier >= 2 ? <><rect x="26" y="20" width="22" height="26" rx="3" fill="#18181b" /><rect x="30" y="26" width="14" height="6" rx="1" fill="#71717a" /><path d="M54 30 h8 a3 3 0 0 1 0 8 h-2" stroke="#f5f5f4" strokeWidth="2" fill="none" /><rect x="50" y="30" width="10" height="12" rx="2" fill="#f5f5f4" /></> : <><rect x="30" y="26" width="18" height="18" rx="4" fill="#e5e7eb" /><path d="M48 30 q8 4 0 10" stroke="#e5e7eb" strokeWidth="3" fill="none" /><circle cx="56" cy="44" r="5" fill="#d4a017" /></>}{tier >= 3 && <rect x="12" y="44" width="56" height="6" rx="2" fill="#fafaf9" stroke="#d6d3d1" />}</>);
+    case "office": return g(<>{tier >= 2 && <rect x="10" y="12" width="60" height="38" rx="3" fill="#bae6fd" opacity=".6" stroke="#7dd3fc" />}<rect x="20" y="34" width="40" height="8" rx="2" fill={tier >= 3 ? "#3b2a1e" : "#a8a29e"} /><rect x="34" y="18" width="12" height="14" rx="3" fill="#292524" />{tier >= 3 && <><rect x="12" y="40" width="18" height="8" rx="3" fill="#57534e" /><path d="M56 22 l2 4 4 1 -3 3 1 4 -4 -2 -4 2 1 -4 -3 -3 4 -1z" fill="#d4a017" /></>}</>);
     default: return g(null);
   }
 }
 
 
-// ───────────── Inside HQ: every department is a room ─────────────
+
+// ───────────── Inside HQ: an open-plan office you walk into ─────────────
 type RoomId = EmployeeId | "boss";
-const ROOM_ORDER: RoomId[] = ["receptionist", "sales", "accountant", "calendar", "projects", "marketing", "boss"];
 const ROOM_NAME: Record<RoomId, string> = { receptionist: "Reception", sales: "Sales", accountant: "Accounts", calendar: "Scheduling", projects: "Projects", marketing: "Marketing", boss: "Your office" };
-function RoomArt({ id, primary, secondary, logo, look, mood }: { id: RoomId; primary: string; secondary: string; logo: string; look: BeanLook; mood: string }) {
-  const wall = id === "boss" ? shade(secondary, 0.55) : shade(EMPLOYEES[id].colour, 0.72);
-  return <svg viewBox="0 0 240 130" className="ow-room-art" aria-hidden="true">
-    <polygon points="0,30 120,0 240,30 240,130 0,130" fill={wall} />
-    <polygon points="0,88 120,62 240,88 120,130" fill="#d6cfc4" /><polygon points="0,88 120,130 120,131 0,131" fill="#c7bfb2" /><polygon points="240,88 120,130 120,131 240,131" fill="#bfb6a8" />
-    <line x1="0" y1="88" x2="120" y2="62" stroke="#00000014" strokeWidth="2" /><line x1="240" y1="88" x2="120" y2="62" stroke="#00000014" strokeWidth="2" />
-    {id === "receptionist" && <><rect x="70" y="78" width="100" height="22" rx="4" fill="#57534e" /><rect x="66" y="74" width="108" height="6" rx="3" fill={primary} /><circle cx="160" cy="70" r="4" fill="#d4a017" /><circle cx="200" cy="70" r="12" fill="#3f6212" /><rect x="196" y="80" width="8" height="12" fill="#78350f" /></>}
-    {id === "sales" && <><rect x="150" y="22" width="60" height="40" rx="3" fill="#fff" stroke="#cbd5e1" />{[0, 1, 2, 3].map((i) => <rect key={i} x={158 + i * 12} y={52 - i * 8} width="8" height={6 + i * 8} fill={i === 3 ? "#16a34a" : "#94a3b8"} />)}<rect x="60" y="84" width="80" height="12" rx="3" fill="#44403c" /></>}
-    {id === "accountant" && <><rect x="60" y="84" width="90" height="12" rx="3" fill="#44403c" />{[0, 1, 2].map((i) => <g key={i}>{[0, 1, 2, 3].map((j) => <ellipse key={j} cx={170 + i * 16} cy={92 - j * 3} rx="6" ry="2.2" fill="#d4a017" stroke="#92400e" strokeWidth=".6" />)}</g>)}<rect x="30" y="24" width="40" height="30" rx="2" fill="#fff" stroke="#cbd5e1" /><path d="M36 46 L46 36 L54 42 L64 30" stroke="#16a34a" strokeWidth="2" fill="none" /></>}
-    {id === "calendar" && <><rect x="140" y="18" width="70" height="50" rx="3" fill="#fff" stroke="#cbd5e1" /><rect x="140" y="18" width="70" height="10" fill={primary} />{Array.from({ length: 12 }).map((_, i) => <rect key={i} x={146 + (i % 4) * 16} y={32 + Math.floor(i / 4) * 11} width="11" height="8" fill={i === 5 ? "#fde68a" : "#f1f5f9"} />)}<rect x="60" y="84" width="80" height="12" rx="3" fill="#44403c" /></>}
-    {id === "projects" && <><rect x="140" y="80" width="80" height="14" rx="2" fill="#78350f" /><rect x="146" y="72" width="60" height="10" fill="#1d4ed8" opacity=".85" /><path d="M150 76 h50 M160 73 v8 M180 73 v8" stroke="#bfdbfe" strokeWidth="1" /><path d="M40 96 a10 8 0 0 1 20 0 z" fill="#facc15" /></>}
-    {id === "marketing" && <><rect x="150" y="24" width="56" height="46" rx="3" fill={primary} />{logo ? <image href={logo} x="160" y="30" width="36" height="34" preserveAspectRatio="xMidYMid meet" /> : <text x="178" y="52" textAnchor="middle" fontSize="11" fontWeight="900" fill="#fff">AD</text>}<path d="M156 70 L150 100 M200 70 L206 100" stroke="#57534e" strokeWidth="3" /></>}
-    {id === "boss" && <><rect x="150" y="16" width="70" height="44" rx="3" fill="#bfdbfe" stroke="#94a3b8" strokeWidth="3" /><path d="M150 50 L170 34 L186 46 L200 30 L220 44 V60 H150 Z" fill="#6f9a5a" /><rect x="50" y="82" width="120" height="16" rx="4" fill="#3b2a1e" /><path d="M40 70 h8 v-10 q4 -6 8 0 v10 h8" fill="#d4a017" /></>}
-    <g transform="translate(110 104)"><Bean at={[0, 0]} scale={1.55} look={look} mood={mood} label="" /></g>
+const isoIn = (x: number, y: number, z = 0): [number, number] => [500 + (x - y) * 38, 92 + (x + y) * 19 - z];
+const ptsIn = (list: Array<[number, number]>) => list.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+function BoxIn({ x, y, w, d, h, z = 0, color, top }: { x: number; y: number; w: number; d: number; h: number; z?: number; color: string; top?: string }) {
+  const A = isoIn(x, y, z + h), B = isoIn(x + w, y, z + h), C = isoIn(x + w, y + d, z + h), D = isoIn(x, y + d, z + h), Bb = isoIn(x + w, y, z), Cb = isoIn(x + w, y + d, z), Db = isoIn(x, y + d, z);
+  return <g><polygon points={ptsIn([D, C, Cb, Db])} fill={shade(color, -0.12)} /><polygon points={ptsIn([C, B, Bb, Cb])} fill={shade(color, -0.26)} /><polygon points={ptsIn([A, B, C, D])} fill={top || shade(color, 0.1)} /></g>;
+}
+const ZONES: Record<RoomId | "break", { x: number; y: number; w: number; d: number }> = {
+  accountant: { x: 6.6, y: 0.4, w: 3.0, d: 2.7 }, calendar: { x: 3.4, y: 0.4, w: 2.9, d: 2.7 }, projects: { x: 0.4, y: 0.4, w: 2.7, d: 2.7 },
+  sales: { x: 6.6, y: 3.5, w: 3.0, d: 2.8 }, break: { x: 3.4, y: 3.5, w: 2.9, d: 2.8 }, marketing: { x: 0.4, y: 3.5, w: 2.7, d: 2.8 },
+  receptionist: { x: 6.6, y: 6.7, w: 3.0, d: 2.9 }, boss: { x: 0.4, y: 6.7, w: 5.9, d: 2.9 },
+};
+function Desk({ x, y, furniture, tech, primary }: { x: number; y: number; furniture: number; tech: number; primary: string }) {
+  const h = furniture >= 2 ? 20 : 15, color = furniture >= 3 ? "#7c4a2d" : furniture >= 1 ? "#e7e5e4" : "#a8a29e";
+  const top = isoIn(x + 0.7, y + 0.4, h);
+  return <g><BoxIn x={x} y={y} w={1.4} d={0.8} h={h} color={color} />
+    {tech === 0 && <polygon points={ptsIn([isoIn(x + 0.4, y + 0.2, h + 0.5), isoIn(x + 0.9, y + 0.2, h + 0.5), isoIn(x + 0.9, y + 0.6, h + 0.5), isoIn(x + 0.4, y + 0.6, h + 0.5)])} fill="#fafaf9" />}
+    {tech >= 1 && <g><rect x={top[0] - (tech >= 2 ? 15 : 7)} y={top[1] - 14} width="13" height="10" rx="1.5" fill="#18181b" /><rect x={top[0] - (tech >= 2 ? 14 : 6)} y={top[1] - 13} width="11" height="7.5" rx="1" fill={primary} opacity=".55" className="ow-screen" />
+      {tech >= 2 && <><rect x={top[0] + 1} y={top[1] - 14} width="13" height="10" rx="1.5" fill="#18181b" /><rect x={top[0] + 2} y={top[1] - 13} width="11" height="7.5" rx="1" fill="#38bdf8" opacity=".6" className="ow-screen" /></>}</g>}
+    {furniture >= 1 && (() => { const c = isoIn(x + 0.7, y - 0.15); return <g><rect x={c[0] - 5} y={c[1] - 12} width="10" height="9" rx="2" fill={furniture >= 3 ? "#292524" : "#52525b"} /><rect x={c[0] - 1} y={c[1] - 3} width="2" height="4" fill="#3f3f46" /></g>; })()}
+  </g>;
+}
+function HQInterior({ data, wallet, approaches, selected, onSelect, reduced, customers, ownerLook }: { data: WorldData; wallet: Wallet; approaches: Approach[]; selected: RoomId; onSelect: (r: RoomId) => void; reduced: boolean; customers: Customer[]; ownerLook: BeanLook }) {
+  const p = data.profile; const owned = wallet.owned; const tier = (id: string) => upgradeTier(owned, id);
+  const furniture = tier("furniture"), tech = tier("tech"), decor = tier("interior"), brk = tier("breakroom"), office = tier("office");
+  const H = 120, floorA = furniture >= 3 ? "#c8a27a" : "#d9c4a3", floorB = shade(floorA, -0.05);
+  const boards = data.departments;
+  const zoneTap = (id: RoomId) => () => onSelect(id);
+  const roomOrder: RoomId[] = ["projects", "calendar", "accountant", "marketing", "sales", "boss", "receptionist"];
+  return <svg viewBox="0 0 1000 560" role="img" aria-label={`Inside ${p.name} headquarters`} className="ow-interior">
+    <defs><linearGradient id="ow-wall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={shade(p.secondary, 0.82)} /><stop offset="1" stopColor={shade(p.secondary, 0.7)} /></linearGradient></defs>
+    <rect width="1000" height="560" fill="#1f2328" />
+    {/* walls */}
+    <polygon points={ptsIn([isoIn(0, 0), isoIn(0, 10), isoIn(0, 10, H), isoIn(0, 0, H)])} fill="url(#ow-wall)" />
+    <polygon points={ptsIn([isoIn(0, 0), isoIn(10, 0), isoIn(10, 0, H), isoIn(0, 0, H)])} fill={shade(p.secondary, 0.76)} />
+    {[1.5, 4.5, 7.5].map((t) => <polygon key={`wl${t}`} points={ptsIn([isoIn(0, t, 40), isoIn(0, t + 1.6, 40), isoIn(0, t + 1.6, 96), isoIn(0, t, 96)])} fill="#bfdbfe" opacity=".85" />)}
+    {[6.2, 8.2].map((t) => <polygon key={`wr${t}`} points={ptsIn([isoIn(t, 0, 40), isoIn(t + 1.4, 0, 40), isoIn(t + 1.4, 0, 96), isoIn(t, 0, 96)])} fill="#bfdbfe" opacity=".85" />)}
+    {p.logo ? (() => { const c = isoIn(3.4, 0, 82); return <image href={p.logo} x={c[0] - 34} y={c[1] - 26} width="68" height="44" preserveAspectRatio="xMidYMid meet" transform={`skewY(-26.6) translate(0 ${c[0] * Math.tan(26.6 * Math.PI / 180)})`} />; })() : null}
+    {tech >= 3 && (() => { const a = isoIn(4.4, 0, 30), b = isoIn(5.9, 0, 30); return <g><polygon points={ptsIn([a, b, [b[0], b[1] - 40], [a[0], a[1] - 40]])} fill="#0f172a" stroke="#334155" strokeWidth="2" /><polygon points={ptsIn([[a[0] + 4, a[1] - 4], [b[0] - 4, b[1] - 2], [b[0] - 4, b[1] - 36], [a[0] + 4, a[1] - 38]])} fill={p.primary} opacity=".35" className="ow-screen" /></g>; })()}
+    {/* floor */}
+    <polygon points={ptsIn([isoIn(0, 0), isoIn(10, 0), isoIn(10, 10), isoIn(0, 10)])} fill={floorA} />
+    {Array.from({ length: 10 }).map((_, i) => <polygon key={i} points={ptsIn([isoIn(i, 0), isoIn(i + 0.5, 0), isoIn(i + 0.5, 10), isoIn(i, 10)])} fill={floorB} opacity=".6" />)}
+    {/* zone rugs (tap a department) */}
+    {(Object.keys(ZONES) as Array<RoomId | "break">).map((id) => { const z = ZONES[id]; const col = id === "break" ? "#a8a29e" : id === "boss" ? p.primary : EMPLOYEES[id].colour; const on = id === selected; return <polygon key={id} className={`ow-zone${on ? " on" : ""}`} points={ptsIn([isoIn(z.x + 0.15, z.y + 0.15), isoIn(z.x + z.w - 0.15, z.y + 0.15), isoIn(z.x + z.w - 0.15, z.y + z.d - 0.15), isoIn(z.x + 0.15, z.y + z.d - 0.15)])} fill={shade(col, 0.55)} opacity={on ? 0.95 : 0.7} stroke={on ? col : "none"} strokeWidth="3" onClick={id === "break" ? undefined : zoneTap(id)} role={id === "break" ? undefined : "button"} aria-label={id === "break" ? "Break room" : ROOM_NAME[id]} />; })}
+    {/* boss office glass */}
+    {office >= 2 && <g opacity=".55"><polygon points={ptsIn([isoIn(0.3, 6.6), isoIn(6.4, 6.6), isoIn(6.4, 6.6, 70), isoIn(0.3, 6.6, 70)])} fill="#bae6fd" /><polygon points={ptsIn([isoIn(6.4, 6.6), isoIn(6.4, 9.7), isoIn(6.4, 9.7, 70), isoIn(6.4, 6.6, 70)])} fill="#bae6fd" /></g>}
+    {/* break room */}
+    {(() => { const z = ZONES.break; return <g><BoxIn x={z.x + 0.4} y={z.y + 0.4} w={brk >= 3 ? 2.0 : 1.0} d={0.7} h={18} color={brk >= 3 ? "#f5f5f4" : "#d6d3d1"} />{brk >= 1 && (() => { const c = isoIn(z.x + 0.8, z.y + 0.7, 18); return <rect x={c[0] - 4} y={c[1] - 10} width="8" height="10" rx="2" fill={brk >= 2 ? "#18181b" : "#e5e7eb"} />; })()}{brk >= 2 && (() => { const c = isoIn(z.x + 0.8, z.y + 0.7, 40); return <g className="ow-steam"><circle cx={c[0]} cy={c[1]} r="3" fill="#e5e7eb" /></g>; })()}{brk >= 3 && <BoxIn x={z.x + 1.0} y={z.y + 1.7} w={1.2} d={0.8} h={16} color="#e7e5e4" top="#fafaf9" />}</g>; })()}
+    {/* departments: person behind desk */}
+    {roomOrder.map((id) => { const z = ZONES[id]; const cx = z.x + z.w / 2 - 0.7, cy = z.y + z.d / 2 - 0.2; const look = id === "boss" ? ownerLook : EMP_LOOK[id]; const appr = id === "boss" ? undefined : approaches.find((a) => a.employee === id); const at = isoIn(cx + 0.7, cy - 0.35);
+      return <g key={id} className="ow-dept" onClick={zoneTap(id)} role="button" tabIndex={0} aria-label={`${ROOM_NAME[id]}${appr ? `: ${appr.line}` : ""}`} onKeyDown={(e) => { if (e.key === "Enter") onSelect(id); }}>
+        <Bean at={at} scale={1.55} look={look} mood={appr?.mood || "calm"} className={`staff ${appr ? "talking" : ""}`} label="" alert={Boolean(appr && appr.urgency >= 75)} />
+        {!(id === "boss" && office === 0) && <Desk x={cx} y={cy} furniture={id === "boss" ? Math.max(furniture, office >= 3 ? 3 : 0) : furniture} tech={tech} primary={p.primary} />}
+        {id === "boss" && office >= 3 && <g><BoxIn x={z.x + 0.5} y={z.y + 1.9} w={1.6} d={0.6} h={10} color="#57534e" /><BoxIn x={z.x + 0.5} y={z.y + 1.9} w={0.3} d={0.6} h={16} color="#44403c" /></g>}
+      </g>; })}
+    {/* department name plates */}
+    {(Object.keys(ROOM_NAME) as RoomId[]).map((id) => { const z = ZONES[id]; const c = isoIn(z.x + z.w / 2, z.y + z.d - 0.25); const label = ROOM_NAME[id]; const n = id === "boss" ? 0 : (boards?.[id as EmployeeId]?.stats?.[0]?.value || ""); return <g key={`pl-${id}`} className="ow-plate-in" onClick={zoneTap(id)} transform={`translate(${c[0]} ${c[1] + 6})`}><rect x={-label.length * 3.4 - 9} y="-10" width={label.length * 6.8 + 18} height="18" rx="9" fill={id === selected ? "#111827" : "rgba(17,24,39,.72)"} /><text y="3" textAnchor="middle" fontSize="10" fontWeight="800" fill="#fff">{label}</text>{n && n !== "0" && /^\d+$/.test(String(n)) ? <g transform={`translate(${label.length * 3.4 + 10} -9)`}><circle r="8" fill="#dc2626" stroke="#fff" strokeWidth="1.5" /><text y="3.5" textAnchor="middle" fontSize="9" fontWeight="900" fill="#fff">{n}</text></g> : null}</g>; })}
+    {/* decor */}
+    {decor >= 2 && [[0.3, 3.2], [3.2, 0.3], [9.6, 3.2], [0.3, 9.4], [6.4, 0.3]].map(([px, py], i) => { const c = isoIn(px, py); return <g key={i}><rect x={c[0] - 5} y={c[1] - 10} width="10" height="10" rx="2" fill="#78716c" /><circle cx={c[0]} cy={c[1] - 18} r="9" fill="#3f6212" /><circle cx={c[0] - 5} cy={c[1] - 13} r="6" fill="#4d7c0f" /></g>; })}
+    {decor >= 1 && [[2, 2], [5, 2], [8, 2], [2, 5], [5, 5], [8, 5], [8, 8]].map(([lx, ly], i) => { const c = isoIn(lx, ly, H - 18); return <g key={i}><line x1={c[0]} y1={c[1] - 14} x2={c[0]} y2={c[1]} stroke="#52525b" /><circle cx={c[0]} cy={c[1] + 3} r="5" fill="#fde68a" className={decor >= 3 ? "ow-sparkle" : ""} /><circle cx={c[0]} cy={c[1] + 3} r="14" fill="#fde68a" opacity=".15" /></g>; })}
+    {/* AI agents at work (or snoozing in the break room) and team members on jobs */}
+    {(data.agents || []).map((a, i) => { const at = a.state === "working" ? isoIn(1.2 + (i % 3) * 0.8, 2.9 + Math.floor(i / 3) * 0.6) : isoIn(4.2 + i * 0.6, 5.9); return <g key={a.id} transform={`translate(${at[0]} ${at[1]}) scale(1.3)`}><Robot sleeping={a.state !== "working"} label={`${a.name}: ${a.state === "working" ? "working on" : "scheduled —"} ${a.task}`} /></g>; })}
+    {(data.staffAtWork || []).map((m, i) => <Bean key={m.id} at={isoIn(7.2 + i * 0.6, 6.1)} scale={1.4} look={{ color: "#3f5f6f", tie: true }} className="staff" label={`${m.name}: ${m.task}`} />)}
+    {/* lobby: customers waiting by reception */}
+    {[...customers].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).slice(0, 5).map((c, i) => <Bean key={c.id} at={isoIn(9.1 - i * 0.55, 9.9)} scale={1.25} look={{ color: ["#5f7a99", "#7a6a8c", "#8c6a5f", "#5f8c76", "#8c7d5f"][i % 5] }} mood={i === 0 ? "concerned" : "calm"} className="impatient" label={c.name || c.title} />)}
   </svg>;
 }
 
-function InsideHQ({ focus, data, approaches, wallet, onOpen, onAct, onClose, onFocus }: { focus: RoomId; data: WorldData; approaches: Approach[]; wallet: Wallet; onOpen: (k: PanelKind) => void; onAct: (a: "upgrades" | "history" | "settings") => void; onClose: () => void; onFocus: (r: RoomId) => void }) {
-  const p = data.profile;
-  const refs = useRef<Record<string, HTMLElement | null>>({});
-  useEffect(() => { refs.current[focus]?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, [focus]);
-  const actions: Record<RoomId, Array<{ label: string; panel?: PanelKind; act?: "upgrades" | "history" | "settings" }>> = {
+/** Live board for a department: real stats, latest activity and buttons into the CRM. */
+function DeptPanel({ id, data, wallet, approach, onOpen, onAct, onCharacter }: { id: RoomId; data: WorldData; wallet: Wallet; approach?: Approach; onOpen: (k: PanelKind) => void; onAct: (a: "upgrades" | "history" | "settings") => void; onCharacter: () => void }) {
+  const person = id === "boss" ? { name: data.profile.characterName, title: "Owner" } : EMPLOYEES[id];
+  const board = id === "boss" ? null : data.departments?.[id];
+  const actions: Record<RoomId, Array<{ label: string; panel?: PanelKind; act?: "upgrades" | "history" | "settings" | "character" }>> = {
     receptionist: [{ label: "Reply to new leads", panel: "lead-replies" }, { label: "Conversations", panel: "conversations" }, { label: "Contacts", panel: "contacts" }],
     sales: [{ label: "Open the pipeline", panel: "leads" }, { label: "Contacts", panel: "contacts" }],
     accountant: [{ label: "Record a receipt", panel: "expense" }, { label: "Books", panel: "books" }, ...(data.scopeId ? [] : [{ label: "Invoices", panel: "invoicing" as PanelKind }])],
     calendar: [{ label: "Book & manage appointments", panel: "scheduling" }],
     projects: [{ label: "Task list", panel: "tasks" }, { label: "New task", panel: "task" }],
     marketing: [{ label: "Contacts", panel: "contacts" }],
-    boss: [{ label: "Upgrades", act: "upgrades" }, { label: "Rewards & history", act: "history" }, { label: "Settings", act: "settings" }],
+    boss: [{ label: "Customise character", act: "character" }, { label: "Upgrades", act: "upgrades" }, { label: "Rewards & history", act: "history" }, { label: "Settings", act: "settings" }],
   };
-  const counts: Partial<Record<RoomId, number>> = { receptionist: data.counts.leads + data.counts.unread, calendar: data.counts.bookingsUpcoming, projects: data.counts.openTasks };
-  return <div className="ow-modal-scrim" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}><div className="ow-inside" role="dialog" aria-label={`Inside ${p.name} headquarters`}>
-    <header>{p.logo ? <img src={p.logo} alt="" /> : null}<div><b>Inside {p.name} HQ</b><small>Level {wallet.level} · {wallet.stage.name} · tap a department</small></div><button type="button" className="ghost" onClick={onClose} aria-label="Close"><X size={18} /></button></header>
-    <div className="ow-rooms">{ROOM_ORDER.map((id) => {
-      const approach = id === "boss" ? undefined : approaches.find((a) => a.employee === id);
-      const person = id === "boss" ? { name: p.characterName, title: "Owner" } : EMPLOYEES[id];
-      const look: BeanLook = id === "boss" ? { color: p.primary, trim: p.secondary, hat: p.outfit.hat === "hardhat" ? undefined : p.outfit.hat, tool: undefined, tie: true } : EMP_LOOK[id];
-      const n = counts[id];
-      return <article key={id} ref={(el) => { refs.current[id] = el; }} className={`ow-room${focus === id ? " focus" : ""}${approach && approach.urgency >= 75 ? " hot" : ""}`} onClick={() => onFocus(id)}>
-        <RoomArt id={id} primary={p.primary} secondary={p.secondary} logo={p.logo} look={look} mood={approach?.mood || "calm"} />
-        <div className="ow-room-body">
-          <div className="ow-room-head"><b>{ROOM_NAME[id]}</b><span>{person.name} · {person.title}</span>{n ? <em>{n}</em> : null}</div>
-          <p className={approach && approach.urgency >= 75 ? "hot" : ""}>{approach ? approach.line : id === "boss" ? `${wallet.coins.toLocaleString("en-IE")} coins · ${wallet.pending.length ? `${sumCoins(wallet.pending)} waiting to collect` : "all collected"}` : id === "marketing" ? "Reviews and social aren't connected yet — I'll speak up when they are." : "All calm in here."}</p>
-          {approach?.detail && <small>{approach.detail}</small>}
-          <div className="ow-options">{actions[id].map((a, i) => <button type="button" key={a.label} className={i === 0 ? "" : "ghost"} onClick={(e) => { e.stopPropagation(); if (a.panel) onOpen(a.panel); else if (a.act) onAct(a.act); }}>{a.label}</button>)}</div>
-        </div>
-      </article>;
-    })}</div>
+  return <div className="ow-dept-panel" key={id}>
+    <div className="ow-dept-head"><span className="ow-speaker" style={{ background: id === "boss" ? data.profile.primary : EMPLOYEES[id].colour }}>{person.name.charAt(0)}</span><div><small>{ROOM_NAME[id]} · {person.name}, {person.title}</small><p className={approach && approach.urgency >= 75 ? "shout" : ""}>{approach ? approach.line : board ? board.headline : `${wallet.coins.toLocaleString("en-IE")} coins · Level ${wallet.level}`}</p></div><span className="ow-live"><i /> Live</span></div>
+    {board && <div className="ow-dept-stats">{board.stats.map((s) => <div key={s.label}><b>{s.value}</b><small>{s.label}</small></div>)}</div>}
+    {board && board.feed.length > 0 && <ul className="ow-dept-feed">{board.feed.map((f, i) => <li key={i}><span>{f.text}</span><time>{new Date(f.at).toLocaleString("en-IE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</time></li>)}</ul>}
+    {board && !board.feed.length && <p className="ow-muted">Nothing new yet — updates appear here as they happen.</p>}
+    <div className="ow-options">{actions[id].map((a, i) => <button type="button" key={a.label} className={i === 0 ? "" : "ghost"} onClick={() => { if (a.panel) onOpen(a.panel); else if (a.act === "character") onCharacter(); else if (a.act) onAct(a.act); }}>{a.label}</button>)}</div>
+  </div>;
+}
+
+// ───────────── Character editor ─────────────
+const CHAR_OPTIONS = {
+  hair: [{ v: "short", label: "Short" }, { v: "part", label: "Side part" }, { v: "bun", label: "Bun" }, { v: "bob", label: "Bob" }, { v: "wave", label: "Wavy" }, { v: "none", label: "Shaved" }],
+  top: [{ v: "jacket", label: "Blazer" }, { v: "polo", label: "Polo" }, { v: "hivis", label: "Hi-vis" }],
+  colour: [{ v: "primary", label: "Brand" }, { v: "secondary", label: "Brand dark" }, { v: "#1f2937", label: "Charcoal" }, { v: "#1e3a5f", label: "Navy" }, { v: "#f5f5f4", label: "White" }, { v: "#3f6212", label: "Olive" }],
+  hat: [{ v: "auto", label: "Trade hat" }, { v: "none", label: "None" }, { v: "cap", label: "Cap" }, { v: "hardhat", label: "Hard hat" }, { v: "beanie", label: "Beanie" }],
+  extra: [{ v: "glasses", label: "Glasses", min: 0 }, { v: "tie", label: "Tie", min: 2 }, { v: "shades", label: "Designer shades", min: 3 }, { v: "crown", label: "Golden crown", min: 4 }],
+};
+export type CharLook = { hair?: string; top?: string; colour?: string; hat?: string; extras?: string[] };
+function ownerLookFrom(p: Profile, look: CharLook, wardrobe: number): BeanLook {
+  const colour = look.colour === "secondary" ? p.secondary : look.colour && look.colour !== "primary" ? look.colour : p.primary;
+  const ex = new Set((look.extras || []).filter((e) => (CHAR_OPTIONS.extra.find((o) => o.v === e)?.min || 0) <= wardrobe));
+  const hat = look.hat === "none" ? undefined : look.hat && look.hat !== "auto" ? look.hat : p.outfit.hat === "none" ? undefined : p.outfit.hat;
+  return { color: colour, trim: p.secondary, hat: ex.has("crown") ? undefined : hat, tool: p.outfit.tool, hair: look.hair || "short", top: (look.top as BeanLook["top"]) || (p.outfit.outfit === "hivis" ? "hivis" : "jacket"), glasses: ex.has("glasses"), tie: ex.has("tie"), shades: ex.has("shades"), crown: ex.has("crown") };
+}
+function CharacterEditor({ data, wardrobe, onSave, onClose }: { data: WorldData; wardrobe: number; onSave: (look: CharLook) => Promise<void>; onClose: () => void }) {
+  const [look, setLook] = useState<CharLook>(() => ({ ...(data.profile.look || {}) }));
+  const [busy, setBusy] = useState(false); const [msg, setMsg] = useState("");
+  const set = (k: keyof CharLook, v: string) => setLook((l) => ({ ...l, [k]: v }));
+  const toggle = (v: string) => setLook((l) => { const ex = new Set(l.extras || []); if (ex.has(v)) ex.delete(v); else ex.add(v); return { ...l, extras: [...ex] }; });
+  const preview = ownerLookFrom(data.profile, look, wardrobe);
+  const Chips = ({ k, list }: { k: "hair" | "top" | "colour" | "hat"; list: Array<{ v: string; label: string }> }) => <div className="ow-chips">{list.map((o) => <button type="button" key={o.v} className={(look[k] || (k === "hat" ? "auto" : k === "colour" ? "primary" : k === "top" ? "" : "short")) === o.v ? "" : "ghost"} onClick={() => set(k, o.v)}>{k === "colour" && <i className="ow-swatch" style={{ background: o.v === "primary" ? data.profile.primary : o.v === "secondary" ? data.profile.secondary : o.v }} />}{o.label}</button>)}</div>;
+  return <div className="ow-modal-scrim" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}><div className="ow-card-modal ow-char" role="dialog" aria-label="Customise your character">
+    <header><b>Customise {data.profile.characterName}</b><button type="button" className="ghost" onClick={onClose} aria-label="Close"><X size={18} /></button></header>
+    <div className="ow-char-grid">
+      <div className="ow-char-preview"><svg viewBox="-50 -110 100 120" aria-hidden="true"><ellipse cx="0" cy="2" rx="34" ry="8" fill="#e7e5e4" /><Bean at={[0, 0]} scale={2.1} look={preview} label="" className="staff" /></svg><small>Wardrobe tier {wardrobe} · unlock more in Upgrades</small></div>
+      <div className="ow-char-options">
+        <h4>Hair</h4><Chips k="hair" list={CHAR_OPTIONS.hair} />
+        <h4>Outfit</h4><Chips k="top" list={CHAR_OPTIONS.top} />
+        <h4>Colour</h4><Chips k="colour" list={CHAR_OPTIONS.colour} />
+        <h4>Hat</h4><Chips k="hat" list={CHAR_OPTIONS.hat} />
+        <h4>Extras</h4><div className="ow-chips">{CHAR_OPTIONS.extra.map((o) => { const locked = wardrobe < o.min; const on = (look.extras || []).includes(o.v); return <button type="button" key={o.v} disabled={locked} className={on && !locked ? "" : "ghost"} onClick={() => toggle(o.v)} title={locked ? `Unlock with Wardrobe tier ${o.min}` : ""}>{locked && <Lock size={12} />}{o.label}</button>; })}</div>
+      </div>
+    </div>
+    <div className="ow-options"><button type="button" disabled={busy} onClick={async () => { setBusy(true); setMsg(""); try { await onSave(look); setMsg("Looking sharp!"); } catch (e) { setMsg(e instanceof Error ? e.message : "Couldn't save."); } finally { setBusy(false); } }}>{busy ? <Loader2 size={14} className="ow-spin" /> : <Check size={14} />} Save look</button><button type="button" className="ghost" onClick={onClose}>Done</button>{msg && <span className="ow-ok">{msg}</span>}</div>
   </div></div>;
 }
 
@@ -398,7 +516,10 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
   const [walk, setWalk] = useState<{ steps: WalkStep[]; at: number } | null>(null);
   const [collecting, setCollecting] = useState(false);
   const [poked, setPoked] = useState("");
-  const [inside, setInside] = useState<RoomId | null>(null);
+  const [view, setView] = useState<"town" | "hq">("town");
+  const [room, setRoom] = useState<RoomId>("receptionist");
+  const [zooming, setZooming] = useState(false);
+  const [charOpen, setCharOpen] = useState(false);
   const [raid, setRaid] = useState<{ coins: number; count: number; n: number } | null>(null);
   const [bubble, setBubble] = useState<{ text: string; at: [number, number]; n: number } | null>(null);
   const bubbleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -437,7 +558,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
         const coins = next.raids.reduce((n, r) => n + r.coins, 0);
         setTimeout(() => {
           setRaid({ coins, count: next.raids!.length, n: Date.now() });
-          if (prefs.current.sound) setTimeout(() => chime("steal"), 2200);
+          if (prefs.current.sound) { chime("menace"); setTimeout(() => chime("steal"), 4200); }
           setTimeout(() => toast([{ employee: "accountant", text: coins ? `The Tax Man just stole ${coins} coins! ${next.raids!.length} expense${next.raids!.length === 1 ? " has" : "s have"} gone a week without a receipt — add receipts to keep him away.` : `The Tax Man came for coins but your wallet was empty. Add receipts to keep him away.`, coins: 0 }]), 2400);
           setTimeout(() => setRaid(null), 6200);
         }, lastLevel.current ? 200 : 1200);
@@ -453,6 +574,9 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
   // When the app finishes saving (e.g. an expense or task added from its own pop-up), re-read so rewards and the briefing update.
   const wasSaving = useRef(saving);
   useEffect(() => { if (wasSaving.current && !saving && !panel && !demo) void load(true); wasSaving.current = saving; }, [saving, panel, demo, load]);
+
+  // Live department boards: while inside HQ, refresh every 90s (only when the tab is visible — light on the database).
+  useEffect(() => { if (view !== "hq" || demo) return; const t = setInterval(() => { if (document.visibilityState === "visible" && !panel) void load(true); }, 90_000); return () => clearInterval(t); }, [view, demo, panel, load]);
 
   const today = new Date().toISOString().slice(0, 10);
   const approaches = useMemo(() => {
@@ -554,6 +678,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
 
   const p = data.profile; const w = wallet;
   const tier = (id: string) => upgradeTier(w.owned, id);
+  const ownerLook = ownerLookFrom(p, p.look || {}, tier("wardrobe"));
   const say = (id: string, text: string, at: [number, number]) => {
     setPoked(id); setTimeout(() => setPoked((cur) => (cur === id ? "" : cur)), 450);
     setBubble({ text, at, n: Date.now() });
@@ -561,21 +686,28 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
     bubbleTimer.current = setTimeout(() => setBubble(null), 3800);
     if (prefs.current.sound) chime("pop");
   };
+  const enterHQ = (r: RoomId) => {
+    setRoom(r); if (view === "hq") { if (prefs.current.sound) chime("select"); return; }
+    if (prefs.current.sound) chime("door");
+    if (reduced) { setView("hq"); return; }
+    setZooming(true); setTimeout(() => { setView("hq"); setZooming(false); }, 560);
+  };
+  const exitHQ = () => { if (prefs.current.sound) chime("door"); setView("town"); };
   const openLead = (id: string) => setPanel({ kind: "lead-detail", focusId: id });
   const tapEmployee = (id: EmployeeId) => {
     const own = approaches.findIndex((a) => a.employee === id);
     if (own >= 0) setIndex(own);
     const lines = IDLE_LINES[id];
     say(id, own >= 0 ? approaches[own].line : lines[Math.floor(Math.random() * lines.length)], ((at) => [at[0], at[1] - 62] as [number, number])(iso(...EMP_SPOTS[id])));
-    setTimeout(() => setInside(id), 650);
+    setTimeout(() => enterHQ(id), 450);
   };
-  const tapOwner = () => { const at = iso(7.0, 11.5); setTimeout(() => setInside("boss"), 650); say("owner", approaches.length ? `${approaches.length} thing${approaches.length === 1 ? "" : "s"} need${approaches.length === 1 ? "s" : ""} me. Let's go!` : "Business is booming. Coffee time!", [at[0], at[1] - 58]); };
+  const tapOwner = () => { const at = iso(7.0, 11.5); setTimeout(() => enterHQ("boss"), 450); say("owner", approaches.length ? `${approaches.length} thing${approaches.length === 1 ? "" : "s"} need${approaches.length === 1 ? "s" : ""} me. Let's go!` : "Business is booming. Coffee time!", [at[0], at[1] - 58]); };
   const tapBuilding = (which: EmployeeId | "hq" | "farm") => {
     if (demo && which !== "hq" && which !== "marketing") { say(`b-${which}`, "Demo: buildings open your real screens outside the demo.", [500, 200]); return; }
     setPoked(`b-${which === "receptionist" ? "reception" : which === "accountant" ? "accounts" : which}`); setTimeout(() => setPoked(""), 450);
     if (prefs.current.sound) chime("pop");
-    if (which === "hq") { setInside("boss"); return; }
-    if (which === "marketing") { setInside("marketing"); return; }
+    if (which === "hq") { enterHQ("receptionist"); return; }
+    if (which === "marketing") { enterHQ("marketing"); return; }
     const target: Record<string, PanelKind> = { receptionist: customers.length ? "lead-replies" : "conversations", accountant: data.scopeId ? "books" : "invoicing", calendar: "scheduling", projects: "tasks", sales: "leads", farm: "leads" };
     setPanel({ kind: target[which] });
   };
@@ -618,7 +750,11 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
 
     <div className="ow-layout">
       <section className="ow-stage" aria-label="Your business">
-        <div className="ow-stage-wrap">
+        {view === "hq" ? <div className="ow-stage-wrap ow-interior-wrap">
+          <HQInterior data={data} wallet={w} approaches={approaches} selected={room} onSelect={(r) => { setRoom(r); if (prefs.current.sound) chime("select"); }} reduced={reduced} customers={customers} ownerLook={ownerLook} />
+          <button type="button" className="ow-exit" onClick={exitHQ}><ArrowLeft size={16} /> Back outside</button>
+          <div className="ow-room-tag">Inside {p.name} HQ · tap a department</div>
+        </div> : <div className={`ow-stage-wrap${zooming ? " zooming" : ""}`}>
         <svg viewBox="0 0 1000 560" role="img" aria-label={`${p.name} headquarters with ${customers.length} customers waiting`}>
           <defs>
             <linearGradient id="ow-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#a5c8dc" /><stop offset="1" stopColor="#e8f0f4" /></linearGradient>
@@ -713,7 +849,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
             <text x={at[0]} y={at[1] + 14} textAnchor="middle" fontSize="10" fontWeight="800" fill="#1c1917" className="ow-name">{EMPLOYEES[id].name}</text>
           </g>; })}
           {/* The owner */}
-          {(() => { const at = iso(7.0, 11.5); return <g><Bean at={at} scale={1.45} look={{ color: tier("wardrobe") >= 1 ? shade(p.primary, -0.08) : p.primary, trim: p.secondary, hat: tier("wardrobe") >= 4 ? undefined : p.outfit.hat, tool: p.outfit.tool, tie: tier("wardrobe") >= 2, shades: tier("wardrobe") >= 3, crown: tier("wardrobe") >= 4 }} className={`owner ${poked === "owner" ? "poked" : ""}`} label={`${p.characterName} (you)`} onTap={() => tapOwner()} /><text x={at[0]} y={at[1] + 18} textAnchor="middle" fontSize="11" fontWeight="900" fill="#14532d">{p.characterName}</text></g>; })()}
+          {(() => { const at = iso(7.0, 11.5); return <g><Bean at={at} scale={1.45} look={ownerLook} className={`owner ${poked === "owner" ? "poked" : ""}`} label={`${p.characterName} (you)`} onTap={() => tapOwner()} /><text x={at[0]} y={at[1] + 18} textAnchor="middle" fontSize="11" fontWeight="900" fill="#14532d">{p.characterName}</text></g>; })()}
           {/* Collectable coins */}
           {[...pendingByEmployee.entries()].map(([id, items]) => { const at = iso(...EMP_SPOTS[id]); return <CoinBubble key={id} x={at[0]} y={at[1] - 84} amount={sumCoins(items)} label={`Collect ${sumCoins(items)} coins from ${EMPLOYEES[id].name}`} onCollect={() => void collect(items.map((x) => x.key))} />; })}
           {raid && (() => { const door = iso(6.2, 8.4), shore = iso(6.0, 12.8); return <g key={raid.n} className="ow-raid">
@@ -723,8 +859,9 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
           {coinBurst > 0 && !reduced && <g key={coinBurst} className="ow-coin-fly">{[0, 1, 2, 3, 4, 5].map((k) => <circle key={k} cx={480 + k * 10} cy={380} r="8" fill="#fbbf24" stroke="#b45309" strokeWidth="2" style={{ animationDelay: `${k * 0.06}s` }} />)}</g>}
         </svg>
         {bubble && <div className="ow-bubble" style={{ left: `${bubble.at[0] / 10}%`, top: `${bubble.at[1] / 5.6}%` }} key={bubble.n}>{bubble.text}</div>}
-        </div>
+        </div>}
 
+        {view === "hq" ? <DeptPanel id={room} data={data} wallet={w} approach={room === "boss" ? undefined : approaches.find((a) => a.employee === room)} onOpen={(k) => { if (!demo) setPanel({ kind: k }); }} onAct={(a) => setDrawer(a)} onCharacter={() => setCharOpen(true)} /> :
         <div className={`ow-dialogue${current ? "" : " clear"}`} aria-live="polite">
           {current ? <>
             <div className="ow-speaker" style={{ background: EMPLOYEES[current.employee].colour }}>{EMPLOYEES[current.employee].name.charAt(0)}</div>
@@ -736,7 +873,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
             </div>
             {approaches.length > 1 && <button type="button" className="ow-next ghost" onClick={() => setIndex((index + 1) % approaches.length)} aria-label="Next update"><ChevronRight size={20} /></button>}
           </> : <><div className="ow-speaker ok"><Check size={20} /></div><div className="ow-speech"><p>{allClearLine(today)}</p><span className="ow-detail">Nothing needs you right now. New enquiries, invoices and appointments will appear here as they happen.</span></div></>}
-        </div>
+        </div>}
       </section>
 
       <aside className="ow-side">
@@ -774,7 +911,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
         {last ? <button type="button" onClick={() => { setWalk(null); void collect(); }}><Sparkles size={16} /> Collect {total} coins</button> : <button type="button" onClick={() => { if (prefs.current.sound) chime("coin"); setWalk({ ...walk, at: walk.at + 1 }); }}>Next <ChevronRight size={16} /></button>}
       </div></div></div>; })()}
 
-    {inside && <InsideHQ focus={inside} data={data} approaches={approaches} wallet={w} onFocus={setInside} onClose={() => setInside(null)} onOpen={(k) => { if (demo) return; setInside(null); setPanel({ kind: k }); }} onAct={(a) => { setInside(null); setDrawer(a); }} />}
+    {charOpen && <CharacterEditor data={data} wardrobe={tier("wardrobe")} onClose={() => setCharOpen(false)} onSave={async (look) => { if (demo) throw new Error("Demo mode: saving is off."); const r = await post({ action: "saveProfile", look }); setData((d) => d ? { ...d, profile: r.profile } : d); if (prefs.current.sound) chime("level"); }} />}
     {drawer && <Drawer kind={drawer} data={data} wallet={w} demo={demo} onClose={() => setDrawer("")} post={post} buy={buy} onChanged={() => void load(true)} />}
 
     {panel && (panel.kind === "lead-replies" || panel.kind === "lead-detail") && <div className="ow-modal-scrim" onClick={(e) => { if (e.target === e.currentTarget) closePanel(); }}><div className="ow-card-modal" role="dialog" aria-label={PANEL_TITLES[panel.kind]}>
@@ -899,7 +1036,7 @@ function Drawer({ kind, data, wallet: w, demo, onClose, post, buy, onChanged }: 
     {kind === "upgrades" && <>
       <div className="ow-balance"><Coins size={18} /> <b>{w.coins.toLocaleString("en-IE")}</b> coins · Level {w.level}</div>
       <p className="ow-muted">Earn coins from real work, collect them from your team, then spend them here. Levels unlock higher tiers.</p>
-      {(["business", "lifestyle"] as const).map((group) => <div key={group}><h4 className="ow-group-title">{group === "business" ? "Your business" : "Your lifestyle"}</h4><ul className="ow-tracks">{UPGRADES.filter((t) => t.group === group).map((t) => { const have = upgradeTier(w.owned, t.id); const next = nextUpgrade(t.id, w.owned); const locked = next ? w.level < next.minLevel : false; const short = next ? w.coins < next.price : false; return <li key={t.id}>
+      {(["business", "interior", "lifestyle"] as const).map((group) => <div key={group}><h4 className="ow-group-title">{group === "business" ? "Your business" : group === "interior" ? "Inside HQ" : "Your lifestyle"}</h4><ul className="ow-tracks">{UPGRADES.filter((t) => t.group === group).map((t) => { const have = upgradeTier(w.owned, t.id); const next = nextUpgrade(t.id, w.owned); const locked = next ? w.level < next.minLevel : false; const short = next ? w.coins < next.price : false; return <li key={t.id}>
         <div className="ow-track-row"><UpgradeArt id={t.id} tier={Math.max(1, Math.min(t.tiers.length, have + 1))} primary={data.profile.primary} secondary={data.profile.secondary} /><div className="ow-track-info"><div className="ow-track-top"><b>{t.name}</b><span className="ow-pips" aria-label={`Tier ${have} of ${t.tiers.length}`}>{t.tiers.map((x) => <i key={x.tier} className={x.tier <= have ? "on" : ""} />)}</span></div>
         <small>{have ? `Now: ${t.tiers[have - 1].name}` : "Not built yet"}</small>
         {next ? <div className="ow-track-next"><div><b>{next.name}</b><small>{next.perk}</small></div>
