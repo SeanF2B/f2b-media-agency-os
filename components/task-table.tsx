@@ -1,6 +1,22 @@
 "use client";
 
 import { Fragment, useMemo, useState, type ReactNode } from "react";
+import { BarChart3, CircleCheck, FileText, Globe, Mail, Megaphone, MapPin, PenLine, Phone, Search, Settings, Share2, Users, Wrench, type LucideIcon } from "lucide-react";
+
+// A small icon per task, picked from its service (or the title when no service is set).
+const TASK_ICON_RULES: Array<[RegExp, LucideIcon, string]> = [
+  [/google ads|ppc|meta ads|facebook ads|\bads?\b|campaign/i, Megaphone, "#e8590c"], [/seo|keyword|rank|backlink|search console/i, Search, "#2f9e44"],
+  [/crm|lead|pipeline|contact/i, Users, "#7048e8"], [/web|site|domain|wordpress|dns|landing/i, Globe, "#1c7ed6"],
+  [/email|newsletter|mail/i, Mail, "#0c8599"], [/social|instagram|tiktok|linkedin|post/i, Share2, "#d6336c"],
+  [/content|copy|blog|article|write/i, PenLine, "#5f3dc4"], [/report|analytics|ga4|audit/i, BarChart3, "#1971c2"],
+  [/business profile|gbp|review|local|maps/i, MapPin, "#c92a2a"], [/call|phone|whatsapp/i, Phone, "#2b8a3e"],
+  [/setup|onboard|connect|integrat|config/i, Settings, "#495057"], [/fix|repair|bug|maint/i, Wrench, "#868e96"], [/invoice|document|contract/i, FileText, "#495057"],
+];
+function TaskIcon({ service, title }: { service?: string; title: string }) {
+  const hit = TASK_ICON_RULES.find(([pattern]) => pattern.test(service || "")) || TASK_ICON_RULES.find(([pattern]) => pattern.test(title));
+  const [, Icon, colour] = hit || [null, CircleCheck, "#868e96"];
+  return <span className="tt-task-icon" style={{ color: colour, background: `${colour}14` }} aria-hidden="true"><Icon size={14} strokeWidth={2} /></span>;
+}
 
 // Monday-style table view of tasks: grouped by client, coloured labels, inline edits, multi-select and bulk actions.
 // Every change goes through the same handlers as the board, so the board updates live.
@@ -73,7 +89,7 @@ export function TaskTable({ tasks, clients, staff, statuses, onStatus, onEdit, o
         </tr>
         {open && group.list.map((task) => { const owner = staffById.get(task.assigneeId); const overdue = Boolean(task.due && task.due < today && isOpen(task)); return <tr key={task.id} className={`tt-row ${picked.has(task.id) ? "picked" : ""}`} style={{ ["--tt-group" as string]: group.colour }}>
           <td className="tt-check"><input type="checkbox" aria-label={`Select ${task.title}`} checked={picked.has(task.id)} onChange={(event) => togglePick([task.id], event.target.checked)} /></td>
-          <td><button type="button" className="tt-title" onClick={() => onEdit(task.id)} title={task.title}>{task.title}</button></td>
+          <td><span className="tt-title-wrap"><TaskIcon service={task.service} title={task.title} /><button type="button" className="tt-title" onClick={() => onEdit(task.id)} title={task.title}>{task.title}</button></span></td>
           <td><span className="tt-owner">{renderAvatar(task.assigneeId)}<span>{owner?.name?.split("|")[0].trim() || "Unassigned"}</span></span></td>
           <td><select className="tt-pill" aria-label={`Status of ${task.title}`} value={task.status} style={{ background: STATUS_COLOURS[task.status] || "#8a94a6" }} onChange={(event) => onStatus(task.id, event.target.value)}>{statuses.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}{!statuses.some((item) => item.value === task.status) && <option value={task.status}>{task.status}</option>}</select></td>
           <td>{onBulkUpdate ? <select className="tt-pill" aria-label={`Priority of ${task.title}`} value={task.priority || "Normal"} style={{ background: PRIORITY_COLOURS[task.priority] || "#9aa5b1" }} onChange={(event) => onBulkUpdate([task.id], { priority: event.target.value })}>{PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}</select> : <span className="tt-pill" style={{ background: PRIORITY_COLOURS[task.priority] || "#9aa5b1" }}>{task.priority || "Normal"}</span>}</td>

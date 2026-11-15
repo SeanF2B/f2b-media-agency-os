@@ -689,3 +689,14 @@ html body .app-shell.dark-mode .ml-project-form { background: rgba(255,255,255,.
 /* Leads card: edit button top right */
 html body .app-shell .crm-card .crm-card-edit-top, html body .app-shell .crm-card-edit-top { position:absolute; top:10px; right:10px; z-index:3; width:30px; height:30px; display:inline-grid; place-items:center; padding:0; border-radius:9px; border:1px solid #e3e8ef; background:#fff; color:#475467; cursor:pointer; }
 html body .app-shell.dark-mode .crm-card-edit-top { background:rgba(255,255,255,.06); border-color:rgba(255,255,255,.14); color:#d0d5dd; }
+
+/* Task table: icon beside each task */
+html body .tt-title-wrap { display:inline-flex; align-items:center; gap:9px; min-width:0; max-width:100%; }
+html body .tt-title-wrap .tt-title { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+html body .tt-task-icon { flex:0 0 26px; width:26px; height:26px; display:inline-grid; place-items:center; border-radius:8px; }
+
+/* AI generate pop-up: no sideways scroll */
+html body .ml-ai-panel { min-width:0 !important; width:100%; box-sizing:border-box; }
+html body .ml-ai-panel textarea, html body .ml-ai-panel select { width:100%; box-sizing:border-box; }
+html body .ml-modal:not(.is-wide) { width:min(560px, 94vw); }
+html body .ml-modal .ml-modal-body, html body .ml-modal > div:last-child { overflow-x:hidden; }
