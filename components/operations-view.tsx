@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { readFocusClient, setFocusClient, useFocusClient } from "@/lib/focus-client";
 import { BrandIcon } from "./brand-icon";
-import { BarChart3, ClipboardList, Factory, FileText, Globe, LayoutDashboard, MapPin, Megaphone, MessageCircle, Search, Zap, type LucideIcon } from "lucide-react";
+import { BarChart3, ClipboardList, Factory, FileText, Globe, LayoutDashboard, MapPin, Megaphone, MessageCircle, Star, Search, Zap, type LucideIcon } from "lucide-react";
 import { AiVisibilityPanel } from "./ai-visibility-panel";
 import { RankTrackingPanel } from "./rank-tracking-panel";
 import { SiteFormsPanel } from "./site-forms-panel";
@@ -69,7 +69,8 @@ function wpAdminUrl(siteUrl: string) {
   try { const url = new URL(/^https?:\/\//i.test(siteUrl) ? siteUrl : `https://${siteUrl}`); return `${url.origin}${url.pathname.replace(/\/+$/, "").replace(/\/wp-admin$/, "")}/wp-admin/`; } catch { return siteUrl; }
 }
 
-export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenWebsite, onOpenDns, onStartOnboarding, onboarding, onCreateGbpTask, onCreateCommunityTask, renderTool, automations, hasLeadFactory = false }: {
+export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenWebsite, onOpenDns, onStartOnboarding, onboarding, onCreateGbpTask, onCreateCommunityTask, renderTool, automations, hasLeadFactory = false, onStartReviews, onEditClient }: {
+  onStartReviews?: (clientId: string) => string; onEditClient?: (clientId: string) => void;
   clients: OpsClient[]; tasks: OpsTask[]; tab: OperationsTab; onTab: (tab: OperationsTab) => void;
   onOpenPage: (page: string, clientId?: string) => void; onOpenWebsite: (client: OpsClient) => void; onOpenDns: () => void;
   onStartOnboarding?: (clientId: string) => void; onboarding?: React.ReactNode; automations?: React.ReactNode; hasLeadFactory?: boolean;
@@ -208,6 +209,10 @@ export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenW
           <header><MapPin size={18} aria-hidden="true" /><div><h3>Google Business Profile</h3><p>{gbp ? "Connected. AI drafts posts and replies to new reviews; nothing is posted until you approve it." : `Link ${client.name}’s Business Profile to draft posts and review replies.`}</p></div><span className={`ops-local-status ${gbp ? "ok" : "off"}`}>{gbp ? "Connected" : "Not linked"}</span></header>
           <div className="ops-local-actions">{gbp ? onCreateGbpTask && <button type="button" className="primary-button" onClick={() => setNotice(onCreateGbpTask(client.id))}>Draft posts &amp; review replies</button> : <button type="button" className="primary-button" onClick={() => onOpenPage("Integrations", client.id)}>Link Business Profile</button>}</div>
         </section>
+        {(() => { const reviewsOn = (client.services || []).some((service) => /ai reviews?/i.test(service.name)); const running = tasks.some((task) => (task as { localKey?: string }).localKey === `${client.id}:reviews` && task.status !== "Done" && !(task as { paused?: boolean }).paused); return <section className="ops-local-card">
+          <header><Star size={18} aria-hidden="true" /><div><h3>AI Reviews</h3><p>{reviewsOn ? "Every week the AI drafts replies to new Google reviews, plus a review-request message for happy customers. Nothing is posted until you approve it." : `Add the “AI Reviews” service to ${client.name} to switch this on.`}</p></div><span className={`ops-local-status ${reviewsOn && running ? "ok" : "off"}`}>{reviewsOn ? (running ? "Running weekly" : "Service on") : "Off"}</span></header>
+          <div className="ops-local-actions">{!reviewsOn ? onEditClient && <button type="button" className="primary-button" onClick={() => onEditClient(client.id)}>Add AI Reviews service</button> : !running ? onStartReviews && <button type="button" className="primary-button" disabled={!gbp} title={gbp ? "" : "Link the Business Profile first"} onClick={() => setNotice(onStartReviews(client.id))}>Start weekly review replies</button> : <span className="muted">Drafts appear in Tasks each week for approval.</span>}{reviewsOn && !gbp && <span className="muted">Link the Business Profile first.</span>}</div>
+        </section>; })()}
         <section className="ops-local-card">
           <header><MessageCircle size={18} aria-hidden="true" /><div><h3>Community questions</h3><p>Find recent questions on Reddit, Boards.ie and forums where {client.name} could genuinely help, then have AI draft answers for your approval.</p></div></header>
           <div className="ops-local-actions"><button type="button" className="secondary-button" disabled={c.busy} onClick={() => void findQuestions(client)}>{c.busy ? "Searching…" : "Find questions"}</button>{c.results && c.results.length > 0 && onCreateCommunityTask && <button type="button" className="primary-button" onClick={() => { setNotice(onCreateCommunityTask(client.id, c.results || [])); setCommunity((current) => ({ ...current, [client.id]: { ...current[client.id], results: [] } })); }}>Draft answers for {c.results.length}</button>}<span className="muted">{c.error ? <span className="ops-error">{c.error}</span> : c.results ? `${c.results.length} found${c.cost != null ? ` · $${c.cost.toFixed(3)}` : ""}${c.note ? ` · ${c.note}` : ""}` : c.usage?.lastRun ? `Last search ${new Date(c.usage.lastRun).toLocaleDateString("en-IE")}` : ""}</span></div>
