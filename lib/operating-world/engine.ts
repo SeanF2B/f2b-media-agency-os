@@ -190,6 +190,18 @@ export const UPGRADES: UpgradeTrack[] = [
     { tier: 1, name: "Corner desk", price: 200, minLevel: 2, perk: "A desk of your own" },
     { tier: 2, name: "Glass office", price: 900, minLevel: 7, perk: "Glass walls and a meeting table" },
     { tier: 3, name: "Executive suite", price: 3500, minLevel: 15, perk: "Sofa, bar cart and a skyline view" } ] },
+  { id: "flooring", group: "interior", name: "Flooring", tiers: [
+    { tier: 1, name: "Oak boards", price: 200, minLevel: 2, perk: "Warm wooden floors" },
+    { tier: 2, name: "Polished marble", price: 900, minLevel: 8, perk: "Gleaming marble tiles" },
+    { tier: 3, name: "Black & gold", price: 3000, minLevel: 16, perk: "Dark stone with gold inlay" } ] },
+  { id: "artwork", group: "interior", name: "Artwork", tiers: [
+    { tier: 1, name: "Framed prints", price: 120, minLevel: 2, perk: "Prints on the walls" },
+    { tier: 2, name: "Gallery canvases", price: 700, minLevel: 7, perk: "Bold canvases with gold frames" },
+    { tier: 3, name: "Gold sculpture", price: 2500, minLevel: 14, perk: "A statement sculpture in the lobby" } ] },
+  { id: "meeting", group: "interior", name: "Meeting room", tiers: [
+    { tier: 1, name: "Meeting table", price: 250, minLevel: 3, perk: "A table for client meetings" },
+    { tier: 2, name: "Boardroom", price: 1200, minLevel: 9, perk: "Long walnut table, six chairs" },
+    { tier: 3, name: "Presentation suite", price: 3200, minLevel: 15, perk: "Big screen for pitches" } ] },
   { id: "home", group: "lifestyle", name: "Your home", tiers: [
     { tier: 1, name: "Cottage", price: 400, minLevel: 3, perk: "A cosy place to come home to" },
     { tier: 2, name: "Villa", price: 2500, minLevel: 12, perk: "Two storeys and a balcony" },

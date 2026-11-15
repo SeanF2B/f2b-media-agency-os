@@ -6,7 +6,7 @@
 // completed records (idempotent). The owner taps the coins over each employee to collect them.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, Bot, Coins, Gauge, History, Mic, Pause, Play, Send, Settings2, Sparkles, Volume2, VolumeX, Wand2, X, Zap, CalendarDays, Copy, Check, Loader2, Eye, EyeOff, Hammer, Lock, ChevronRight } from "lucide-react";
+import { PanelRight, ArrowLeft, Bot, Coins, Gauge, History, Mic, Pause, Play, Send, Settings2, Sparkles, Volume2, VolumeX, Wand2, X, Zap, CalendarDays, Copy, Check, Loader2, Eye, EyeOff, Hammer, Lock, ChevronRight } from "lucide-react";
 import { EMPLOYEES, EMPLOYEE_FOR_REWARD, REWARDS, UPGRADES, allClearLine, briefing, levelFromXp, nextUpgrade, reactionLine, rewardWalkthrough, stageForLevel, upgradeTier, workingHoursBetween, type Approach, type BriefingOption, type EmployeeId, type OwSnapshot, type PanelKind, type RewardKind, type UpgradeTrack, type WalkStep, type DeptBoard } from "@/lib/operating-world/engine";
 import "./operating-world.css";
 
@@ -129,11 +129,11 @@ function IsoTile({ x, y, w = 1, d = 1, fill, opacity = 1 }: { x: number; y: numb
 }
 
 /** A tappable building: lifts on hover, squashes on tap, shows its name plate. */
-function Spot({ id, label, poked, onTap, children, labelAt, badge }: { id: string; label: string; poked: string; onTap: () => void; children: ReactNode; labelAt: [number, number]; badge?: number }) {
+function Spot({ id, label, poked, onTap, children, labelAt, badge, badgeAt, badgeText }: { id: string; label: string; poked: string; onTap: () => void; children: ReactNode; labelAt: [number, number]; badge?: number; badgeAt?: [number, number]; badgeText?: string }) {
   return <g className={`ow-spot${poked === id ? " poked" : ""}`} role="button" tabIndex={0} aria-label={label} onClick={onTap} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onTap(); } }}>
     <g className="ow-spot-body">{children}</g>
     <g className="ow-plate" transform={`translate(${labelAt[0]} ${labelAt[1]})`}><rect x={-label.length * 3.6 - 10} y="-12" width={label.length * 7.2 + 20} height="22" rx="11" fill="#111827" opacity=".85" /><text y="3.5" textAnchor="middle" fontSize="11" fontWeight="800" fill="#fff">{label}</text></g>
-    {badge ? <g transform={`translate(${labelAt[0] + 34} ${labelAt[1] - 16})`} className="ow-badge"><circle r="10" fill="#ef4444" stroke="#fff" strokeWidth="2" /><text y="4" textAnchor="middle" fontSize="11" fontWeight="900" fill="#fff">{badge > 9 ? "9+" : badge}</text></g> : null}
+    {badge ? (() => { const at = badgeAt || [labelAt[0] + 34, labelAt[1] - 16]; const text = badgeText ? `${badge > 9 ? "9+" : badge} ${badgeText}` : String(badge > 9 ? "9+" : badge); const w = Math.max(20, text.length * 6.6 + 12); return <g transform={`translate(${at[0]} ${at[1]})`} className="ow-badge"><rect x={-w / 2} y="-10" width={w} height="20" rx="10" fill="#dc2626" stroke="#fff" strokeWidth="2" /><text y="4" textAnchor="middle" fontSize="11" fontWeight="900" fill="#fff">{text}</text></g>; })() : null}
   </g>;
 }
 
@@ -214,25 +214,23 @@ const IDLE_LINES: Record<EmployeeId, string[]> = {
   calendar: ["Diary's under control.", "Want me to fill tomorrow?", "Tick-tock, I've got the times."],
 };
 
-/** A crop = a real open lead. Grows with its pipeline stage, wilts when neglected, ripens when the job is won. */
+/** A deal plot = a real open lead. The building goes up as the deal moves through the pipeline; finished when the job is won. */
 type Crop = { id: string; name: string; growth: number; ripe: boolean; wilting: boolean };
-function CropPlant({ at, crop, onTap }: { at: [number, number]; crop: Crop; onTap?: () => void }) {
-  const leaf = crop.wilting ? "#a3a35a" : "#22c55e", leafDark = crop.wilting ? "#8a7f3d" : "#15803d";
+function CropPlant({ at, crop, onTap, primary }: { at: [number, number]; crop: Crop; onTap?: () => void; primary: string }) {
   const g = crop.ripe ? 4 : Math.min(3, crop.growth);
-  return <g className={`ow-crop${crop.ripe ? " ripe" : ""}${crop.wilting ? " wilting" : ""}`} transform={`translate(${at[0]} ${at[1]})`} role={onTap ? "button" : undefined} tabIndex={onTap ? 0 : undefined} aria-label={`${crop.name}: ${crop.ripe ? "job won — ready to harvest" : crop.wilting ? "wilting, needs attention" : ["just planted", "sprouting", "growing", "nearly there"][g]}`} onClick={onTap} onKeyDown={onTap ? (e) => { if (e.key === "Enter") onTap(); } : undefined}>
-    <ellipse cx="0" cy="0" rx="9" ry="4" fill="#7c2d12" opacity=".55" />
-    <g className="ow-crop-body">
-      {g === 0 && <ellipse cx="0" cy="-2" rx="5" ry="3" fill="#92400e" />}
-      {g >= 1 && <path d="M0 0 V-8" stroke={leafDark} strokeWidth="2" />}
-      {g >= 1 && <><ellipse cx="-4" cy="-9" rx="4" ry="2.2" fill={leaf} transform="rotate(-30 -4 -9)" /><ellipse cx="4" cy="-9" rx="4" ry="2.2" fill={leaf} transform="rotate(30 4 -9)" /></>}
-      {g >= 2 && <><path d="M0 -8 V-18" stroke={leafDark} strokeWidth="2" /><ellipse cx="-5" cy="-16" rx="5" ry="2.6" fill={leaf} transform="rotate(-35 -5 -16)" /><ellipse cx="5" cy="-17" rx="5" ry="2.6" fill={leaf} transform="rotate(35 5 -17)" /></>}
-      {g >= 3 && !crop.ripe && <circle cx="0" cy="-21" r="3.5" fill={crop.wilting ? "#a16207" : "#fde047"} />}
-      {crop.ripe && <><circle cx="0" cy="-23" r="7" fill="#f97316" stroke="#c2410c" strokeWidth="1.5" /><path d="M0 -30 V-27" stroke="#15803d" strokeWidth="2" /><path className="ow-sparkle" d="M10 -30 l1.5 3 3 1.5 -3 1.5 -1.5 3 -1.5 -3 -3 -1.5 3 -1.5z" fill="#fde047" /></>}
+  const wall = crop.wilting ? "#a8a29e" : "#f5f5f4", roof = crop.wilting ? "#78716c" : primary;
+  return <g className={`ow-plot${crop.ripe ? " ripe" : ""}${crop.wilting ? " stalled" : ""}`} transform={`translate(${at[0]} ${at[1]})`} role={onTap ? "button" : undefined} tabIndex={onTap ? 0 : undefined} aria-label={`${crop.name}: ${crop.ripe ? "job won — finished" : crop.wilting ? "stalled — needs attention" : ["new lead — plot marked out", "contacted — foundations in", "qualified — scaffolding up", "proposal stage — nearly built"][g]}`} onClick={onTap} onKeyDown={onTap ? (e) => { if (e.key === "Enter") onTap(); } : undefined}>
+    <polygon points="-15,0 0,-7.5 15,0 0,7.5" fill="#d6d3d1" stroke="#a8a29e" strokeWidth=".8" />
+    <g className="ow-plot-body">
+      {g === 0 && <>{[[-9, 0], [9, 0], [0, -5], [0, 5]].map(([x, y], i) => <g key={i}><rect x={x - 0.8} y={y - 9} width="1.6" height="9" fill="#92400e" /><rect x={x - 0.8} y={y - 9} width="4" height="2" fill="#f97316" /></g>)}</>}
+      {g >= 1 && <polygon points="-12,-1 0,-7 12,-1 0,5" fill="#a8a29e" />}
+      {g === 2 && <>{[[-10, -2], [10, -2], [0, -7], [0, 4]].map(([x, y], i) => <rect key={i} x={x - 0.7} y={y - 18} width="1.4" height="18" fill="#71717a" />)}<path d="M-10 -12 L0 -17 L10 -12" stroke="#71717a" strokeWidth="1.2" fill="none" /><path d="M-10 -6 L0 -11 L10 -6" stroke="#71717a" strokeWidth="1.2" fill="none" /></>}
+      {g >= 3 && <><polygon points="-11,-2 0,4 0,-12 -11,-18" fill={shade(wall, -0.06)} /><polygon points="0,4 11,-2 11,-18 0,-12" fill={shade(wall, -0.18)} />{g >= 4 ? <><polygon points="-12,-18 0,-12 12,-18 0,-27" fill={roof} /><rect x="-3" y="-4" width="4" height="6" fill={shade(roof, -0.3)} transform="skewY(26)" /></> : <path d="M-11 -18 L0 -26 L11 -18" stroke="#a16207" strokeWidth="1.5" fill="none" />}</>}
+      {crop.ripe && <path className="ow-sparkle" d="M13 -28 l1.6 3.2 3.4 1.4 -3.4 1.4 -1.6 3.2 -1.6 -3.2 -3.4 -1.4 3.4 -1.4z" fill="#facc15" />}
+      {crop.wilting && <g transform="translate(12 -2)"><path d="M-3 0 L0 -9 L3 0 Z" fill="#f97316" /><rect x="-3.5" y="0" width="7" height="1.5" fill="#f97316" /><rect x="-1.6" y="-5.5" width="3.2" height="1.4" fill="#fff" /></g>}
     </g>
   </g>;
 }
-
-
 // ───────────── Lifestyle upgrades ─────────────
 function Home({ tier, primary, secondary }: { tier: number; primary: string; secondary: string }) {
   if (!tier) return <IsoTile x={8.8} y={0.8} w={2.2} d={1.8} fill="#ffffff" opacity={0.12} />;
@@ -338,6 +336,9 @@ function UpgradeArt({ id, tier, primary, secondary }: { id: string; tier: number
     case "tech": return g(<>{tier >= 3 ? <><rect x="12" y="12" width="56" height="30" rx="3" fill="#0f172a" /><rect x="15" y="15" width="50" height="24" rx="2" fill={primary} opacity=".55" /><path d="M20 34 L30 26 L40 30 L52 20 L60 24" stroke="#fff" strokeWidth="2" fill="none" /></> : <><rect x={tier >= 2 ? 14 : 26} y="16" width="26" height="18" rx="2" fill="#18181b" /><rect x={tier >= 2 ? 16 : 28} y="18" width="22" height="13" rx="1" fill={primary} opacity=".6" />{tier >= 2 && <><rect x="42" y="16" width="26" height="18" rx="2" fill="#18181b" /><rect x="44" y="18" width="22" height="13" rx="1" fill="#38bdf8" opacity=".6" /></>}<rect x="34" y="34" width="12" height="4" fill="#52525b" /></>}</>);
     case "breakroom": return g(<>{tier >= 2 ? <><rect x="26" y="20" width="22" height="26" rx="3" fill="#18181b" /><rect x="30" y="26" width="14" height="6" rx="1" fill="#71717a" /><path d="M54 30 h8 a3 3 0 0 1 0 8 h-2" stroke="#f5f5f4" strokeWidth="2" fill="none" /><rect x="50" y="30" width="10" height="12" rx="2" fill="#f5f5f4" /></> : <><rect x="30" y="26" width="18" height="18" rx="4" fill="#e5e7eb" /><path d="M48 30 q8 4 0 10" stroke="#e5e7eb" strokeWidth="3" fill="none" /><circle cx="56" cy="44" r="5" fill="#d4a017" /></>}{tier >= 3 && <rect x="12" y="44" width="56" height="6" rx="2" fill="#fafaf9" stroke="#d6d3d1" />}</>);
     case "office": return g(<>{tier >= 2 && <rect x="10" y="12" width="60" height="38" rx="3" fill="#bae6fd" opacity=".6" stroke="#7dd3fc" />}<rect x="20" y="34" width="40" height="8" rx="2" fill={tier >= 3 ? "#3b2a1e" : "#a8a29e"} /><rect x="34" y="18" width="12" height="14" rx="3" fill="#292524" />{tier >= 3 && <><rect x="12" y="40" width="18" height="8" rx="3" fill="#57534e" /><path d="M56 22 l2 4 4 1 -3 3 1 4 -4 -2 -4 2 1 -4 -3 -3 4 -1z" fill="#d4a017" /></>}</>);
+    case "flooring": return g(<><polygon points="10,40 40,26 70,40 40,54" fill={tier >= 3 ? "#1f2937" : tier >= 2 ? "#e7e5e4" : "#b08158"} stroke="#a8a29e" />{[0, 1, 2].map((i) => <line key={i} x1={18 + i * 10} y1={36 + i * 5} x2={48 + i * 10} y2={22 + i * 5} stroke={tier >= 3 ? "#d4a017" : "#00000022"} />)}</>);
+    case "artwork": return g(<><rect x="18" y="12" width="20" height="26" fill={tier >= 2 ? "#0f766e" : "#f5f5f4"} stroke={tier >= 2 ? "#d4a017" : "#a8a29e"} strokeWidth="2" /><rect x="44" y="16" width="18" height="18" fill={tier >= 2 ? "#7c3aed" : "#fde68a"} stroke={tier >= 2 ? "#d4a017" : "#a8a29e"} strokeWidth="2" />{tier >= 3 && <path d="M52 50 q6 -18 12 0 z" fill="#d4a017" />}</>);
+    case "meeting": return g(<><ellipse cx="40" cy="38" rx="24" ry="9" fill={tier >= 2 ? "#3b2a1e" : "#a8a29e"} />{[16, 28, 52, 64].map((x) => <rect key={x} x={x - 4} y="44" width="8" height="7" rx="2" fill="#27272a" />)}{tier >= 3 && <rect x="22" y="10" width="36" height="18" rx="2" fill="#0f172a" stroke={primary} strokeWidth="2" />}</>);
     default: return g(null);
   }
 }
@@ -356,7 +357,7 @@ function BoxIn({ x, y, w, d, h, z = 0, color, top }: { x: number; y: number; w: 
 const ZONES: Record<RoomId | "break", { x: number; y: number; w: number; d: number }> = {
   accountant: { x: 6.6, y: 0.4, w: 3.0, d: 2.7 }, calendar: { x: 3.4, y: 0.4, w: 2.9, d: 2.7 }, projects: { x: 0.4, y: 0.4, w: 2.7, d: 2.7 },
   sales: { x: 6.6, y: 3.5, w: 3.0, d: 2.8 }, break: { x: 3.4, y: 3.5, w: 2.9, d: 2.8 }, marketing: { x: 0.4, y: 3.5, w: 2.7, d: 2.8 },
-  receptionist: { x: 6.6, y: 6.7, w: 3.0, d: 2.9 }, boss: { x: 0.4, y: 6.7, w: 5.9, d: 2.9 },
+  receptionist: { x: 6.6, y: 6.7, w: 3.0, d: 2.1 }, boss: { x: 0.4, y: 6.7, w: 5.9, d: 2.9 },
 };
 function Desk({ x, y, furniture, tech, primary }: { x: number; y: number; furniture: number; tech: number; primary: string }) {
   const h = furniture >= 2 ? 20 : 15, color = furniture >= 3 ? "#7c4a2d" : furniture >= 1 ? "#e7e5e4" : "#a8a29e";
@@ -371,13 +372,14 @@ function Desk({ x, y, furniture, tech, primary }: { x: number; y: number; furnit
 function HQInterior({ data, wallet, approaches, selected, onSelect, reduced, customers, ownerLook }: { data: WorldData; wallet: Wallet; approaches: Approach[]; selected: RoomId; onSelect: (r: RoomId) => void; reduced: boolean; customers: Customer[]; ownerLook: BeanLook }) {
   const p = data.profile; const owned = wallet.owned; const tier = (id: string) => upgradeTier(owned, id);
   const furniture = tier("furniture"), tech = tier("tech"), decor = tier("interior"), brk = tier("breakroom"), office = tier("office");
-  const H = 120, floorA = furniture >= 3 ? "#c8a27a" : "#d9c4a3", floorB = shade(floorA, -0.05);
+  const flooring = tier("flooring"), art = tier("artwork"), meeting = tier("meeting");
+  const H = 120, floorA = flooring >= 3 ? "#1f2937" : flooring >= 2 ? "#e7e5e4" : flooring >= 1 ? "#b08158" : "#d9c4a3", floorB = shade(floorA, flooring >= 3 ? 0.08 : -0.05);
   const boards = data.departments;
   const zoneTap = (id: RoomId) => () => onSelect(id);
   const roomOrder: RoomId[] = ["projects", "calendar", "accountant", "marketing", "sales", "boss", "receptionist"];
-  return <svg viewBox="0 0 1000 560" role="img" aria-label={`Inside ${p.name} headquarters`} className="ow-interior">
+  return <svg viewBox="96 -46 808 532" role="img" aria-label={`Inside ${p.name} headquarters`} className="ow-interior">
     <defs><linearGradient id="ow-wall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={shade(p.secondary, 0.82)} /><stop offset="1" stopColor={shade(p.secondary, 0.7)} /></linearGradient></defs>
-    <rect width="1000" height="560" fill="#1f2328" />
+    <rect x="0" y="-60" width="1000" height="620" fill="#1f2328" />
     {/* walls */}
     <polygon points={ptsIn([isoIn(0, 0), isoIn(0, 10), isoIn(0, 10, H), isoIn(0, 0, H)])} fill="url(#ow-wall)" />
     <polygon points={ptsIn([isoIn(0, 0), isoIn(10, 0), isoIn(10, 0, H), isoIn(0, 0, H)])} fill={shade(p.secondary, 0.76)} />
@@ -388,6 +390,10 @@ function HQInterior({ data, wallet, approaches, selected, onSelect, reduced, cus
     {/* floor */}
     <polygon points={ptsIn([isoIn(0, 0), isoIn(10, 0), isoIn(10, 10), isoIn(0, 10)])} fill={floorA} />
     {Array.from({ length: 10 }).map((_, i) => <polygon key={i} points={ptsIn([isoIn(i, 0), isoIn(i + 0.5, 0), isoIn(i + 0.5, 10), isoIn(i, 10)])} fill={floorB} opacity=".6" />)}
+    {flooring >= 2 && Array.from({ length: 10 }).map((_, i) => <line key={`fl${i}`} x1={isoIn(0, i)[0]} y1={isoIn(0, i)[1]} x2={isoIn(10, i)[0]} y2={isoIn(10, i)[1]} stroke={flooring >= 3 ? "#d4a017" : "#d6d3d1"} strokeWidth={flooring >= 3 ? 0.8 : 1} opacity=".6" />)}
+    {/* artwork on the walls */}
+    {art >= 1 && [[0, 3.3], [0, 6.4]].map(([, t], i) => { const a = isoIn(0, t, 50), b = isoIn(0, t + 1.0, 50); return <polygon key={`art${i}`} points={ptsIn([a, b, [b[0], b[1] - 34], [a[0], a[1] - 34]])} fill={art >= 2 ? (i ? "#7c3aed" : "#0f766e") : "#f5f5f4"} stroke={art >= 2 ? "#d4a017" : "#a8a29e"} strokeWidth="2.5" />; })}
+    {art >= 3 && (() => { const c = isoIn(5.0, 6.2); return <g><rect x={c[0] - 7} y={c[1] - 14} width="14" height="14" fill="#e7e5e4" /><path d={`M${c[0] - 8} ${c[1] - 14} q8 -30 16 0 z`} fill="#d4a017" /></g>; })()}
     {/* zone rugs (tap a department) */}
     {(Object.keys(ZONES) as Array<RoomId | "break">).map((id) => { const z = ZONES[id]; const col = id === "break" ? "#a8a29e" : id === "boss" ? p.primary : EMPLOYEES[id].colour; const on = id === selected; return <polygon key={id} className={`ow-zone${on ? " on" : ""}`} points={ptsIn([isoIn(z.x + 0.15, z.y + 0.15), isoIn(z.x + z.w - 0.15, z.y + 0.15), isoIn(z.x + z.w - 0.15, z.y + z.d - 0.15), isoIn(z.x + 0.15, z.y + z.d - 0.15)])} fill={shade(col, 0.55)} opacity={on ? 0.95 : 0.7} stroke={on ? col : "none"} strokeWidth="3" onClick={id === "break" ? undefined : zoneTap(id)} role={id === "break" ? undefined : "button"} aria-label={id === "break" ? "Break room" : ROOM_NAME[id]} />; })}
     {/* boss office glass */}
@@ -401,6 +407,8 @@ function HQInterior({ data, wallet, approaches, selected, onSelect, reduced, cus
         {!(id === "boss" && office === 0) && <Desk x={cx} y={cy} furniture={id === "boss" ? Math.max(furniture, office >= 3 ? 3 : 0) : furniture} tech={tech} primary={p.primary} />}
         {id === "boss" && office >= 3 && <g><BoxIn x={z.x + 0.5} y={z.y + 1.9} w={1.6} d={0.6} h={10} color="#57534e" /><BoxIn x={z.x + 0.5} y={z.y + 1.9} w={0.3} d={0.6} h={16} color="#44403c" /></g>}
       </g>; })}
+    {/* meeting room in your office */}
+    {meeting >= 1 && <g><BoxIn x={3.6} y={7.3} w={meeting >= 2 ? 2.2 : 1.4} d={1.2} h={14} color={meeting >= 2 ? "#3b2a1e" : "#a8a29e"} />{Array.from({ length: meeting >= 2 ? 6 : 4 }).map((_, i) => { const c = isoIn(3.5 + (i % (meeting >= 2 ? 3 : 2)) * 0.8, i < (meeting >= 2 ? 3 : 2) ? 7.1 : 8.7); return <rect key={i} x={c[0] - 4} y={c[1] - 9} width="8" height="8" rx="2" fill="#27272a" />; })}{meeting >= 3 && (() => { const a = isoIn(0, 8.6, 40), b = isoIn(0, 9.8, 40); return <polygon points={ptsIn([a, b, [b[0], b[1] - 36], [a[0], a[1] - 36]])} fill="#0f172a" stroke={p.primary} strokeWidth="2" className="ow-screen" />; })()}</g>}
     {/* department name plates */}
     {(Object.keys(ROOM_NAME) as RoomId[]).map((id) => { const z = ZONES[id]; const c = isoIn(z.x + z.w / 2, z.y + z.d - 0.25); const label = ROOM_NAME[id]; const n = id === "boss" ? 0 : (boards?.[id as EmployeeId]?.stats?.[0]?.value || ""); return <g key={`pl-${id}`} className="ow-plate-in" onClick={zoneTap(id)} transform={`translate(${c[0]} ${c[1] + 6})`}><rect x={-label.length * 3.4 - 9} y="-10" width={label.length * 6.8 + 18} height="18" rx="9" fill={id === selected ? "#111827" : "rgba(17,24,39,.72)"} /><text y="3" textAnchor="middle" fontSize="10" fontWeight="800" fill="#fff">{label}</text>{n && n !== "0" && /^\d+$/.test(String(n)) ? <g transform={`translate(${label.length * 3.4 + 10} -9)`}><circle r="8" fill="#dc2626" stroke="#fff" strokeWidth="1.5" /><text y="3.5" textAnchor="middle" fontSize="9" fontWeight="900" fill="#fff">{n}</text></g> : null}</g>; })}
     {/* decor */}
@@ -410,7 +418,9 @@ function HQInterior({ data, wallet, approaches, selected, onSelect, reduced, cus
     {(data.agents || []).map((a, i) => { const at = a.state === "working" ? isoIn(1.2 + (i % 3) * 0.8, 2.9 + Math.floor(i / 3) * 0.6) : isoIn(4.2 + i * 0.6, 5.9); return <g key={a.id} transform={`translate(${at[0]} ${at[1]}) scale(1.3)`}><Robot sleeping={a.state !== "working"} label={`${a.name}: ${a.state === "working" ? "working on" : "scheduled —"} ${a.task}`} /></g>; })}
     {(data.staffAtWork || []).map((m, i) => <Bean key={m.id} at={isoIn(7.2 + i * 0.6, 6.1)} scale={1.4} look={{ color: "#3f5f6f", tie: true }} className="staff" label={`${m.name}: ${m.task}`} />)}
     {/* lobby: customers waiting by reception */}
-    {[...customers].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).slice(0, 5).map((c, i) => <Bean key={c.id} at={isoIn(9.1 - i * 0.55, 9.9)} scale={1.25} look={{ color: ["#5f7a99", "#7a6a8c", "#8c6a5f", "#5f8c76", "#8c7d5f"][i % 5] }} mood={i === 0 ? "concerned" : "calm"} className="impatient" label={c.name || c.title} />)}
+    <polygon points={ptsIn([isoIn(6.6, 9.0), isoIn(9.9, 9.0), isoIn(9.9, 9.95), isoIn(6.6, 9.95)])} fill="#57534e" opacity=".35" />
+    {(() => { const c = isoIn(8.3, 9.5); return <text x={c[0]} y={c[1] + 26} textAnchor="middle" fontSize="9" fontWeight="800" fill="#e7e5e4" letterSpacing="1">LOBBY</text>; })()}
+    {[...customers].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).slice(0, 5).map((c, i) => <Bean key={c.id} at={isoIn(9.5 - i * 0.62, 9.5)} scale={1.25} look={{ color: ["#5f7a99", "#7a6a8c", "#8c6a5f", "#5f8c76", "#8c7d5f"][i % 5] }} mood={i === 0 ? "concerned" : "calm"} className="impatient" label={c.name || c.title} />)}
   </svg>;
 }
 
@@ -520,6 +530,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
   const [room, setRoom] = useState<RoomId>("receptionist");
   const [zooming, setZooming] = useState(false);
   const [charOpen, setCharOpen] = useState(false);
+  const [sideOpen, setSideOpen] = useState(false);
   const [raid, setRaid] = useState<{ coins: number; count: number; n: number } | null>(null);
   const [bubble, setBubble] = useState<{ text: string; at: [number, number]; n: number } | null>(null);
   const bubbleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -723,7 +734,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
   const pendingTotal = sumCoins(w.pending);
   const upgradesReady = UPGRADES.filter((t) => { const n = nextUpgrade(t.id, w.owned); return n && w.level >= n.minLevel && w.coins >= n.price; }).length;
 
-  return <div className={`ow-root mood-${healthMood}${reduced ? " ow-reduced" : ""}`} style={{ ["--ow-primary" as string]: p.primary, ["--ow-secondary" as string]: p.secondary }}>
+  return <div className={`ow-root ow-full${sideOpen ? " side-open" : ""} mood-${healthMood}${reduced ? " ow-reduced" : ""}`} style={{ ["--ow-primary" as string]: p.primary, ["--ow-secondary" as string]: p.secondary }}>
     {demo && <div className="ow-demo-banner" role="note"><Eye size={16} /> Demo — sample customers and figures. Nothing here is real, saved or sent. <button type="button" onClick={exitDemo}>Exit demo</button></div>}
 
     <header className="ow-hud">
@@ -733,6 +744,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
       {pendingTotal > 0 && <button type="button" className="ow-collect-all" onClick={() => void collect()} disabled={collecting}><Sparkles size={16} /> Collect {pendingTotal}</button>}
       <div className="ow-hud-actions">
         <button type="button" className={upgradesReady ? "has-dot" : ""} onClick={() => setDrawer(drawer === "upgrades" ? "" : "upgrades")} aria-label={`Upgrades${upgradesReady ? `, ${upgradesReady} ready` : ""}`} title="Upgrades"><Hammer size={18} />{upgradesReady > 0 && <i>{upgradesReady}</i>}</button>
+        <button type="button" className={sideOpen ? "on" : ""} onClick={() => setSideOpen(!sideOpen)} aria-label={sideOpen ? "Hide side panel" : "Show task queue, health and quick actions"} title="Panel"><PanelRight size={18} />{approaches.length > 0 && !sideOpen && <i>{approaches.length}</i>}</button>
         <button type="button" onClick={() => setDrawer(drawer === "history" ? "" : "history")} aria-label="Rewards and action history" title="History"><History size={18} /></button>
         <button type="button" onClick={() => setDrawer(drawer === "settings" ? "" : "settings")} aria-label="Game settings" title="Settings"><Settings2 size={18} /></button>
         <button type="button" onClick={() => { const n = !sound; setSound(n); writePref("ow-sound", n ? "on" : "off"); if (n) chime("coin"); }} aria-label={sound ? "Mute sounds" : "Turn sounds on"} title="Sound">{sound ? <Volume2 size={18} /> : <VolumeX size={18} />}</button>
@@ -795,7 +807,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
           <Pool tier={tier("pool")} primary={p.primary} />
           <Air tier={tier("air")} primary={p.primary} reduced={reduced} />
           {/* Headquarters — grows with each Headquarters tier */}
-          {(() => { const t = tier("hq"), w = t >= 2 ? 4.0 : 3.6, h = 58 + t * 22, x0 = 4.2, y0 = 4.1; const L = iso(x0, y0 + w), R = iso(x0 + w, y0 + w); const b1 = lerp(L, R, 0.18), b2 = lerp(L, R, 0.82); const apex = iso(x0 + w / 2, y0 + w / 2, h + 40); return <Spot id="b-hq" label="Enter headquarters" poked={poked} labelAt={[apex[0], apex[1] - 34]} badge={customers.length || undefined} onTap={() => tapBuilding("hq")}>
+          {(() => { const t = tier("hq"), w = t >= 2 ? 4.0 : 3.6, h = 58 + t * 22, x0 = 4.2, y0 = 4.1; const L = iso(x0, y0 + w), R = iso(x0 + w, y0 + w); const b1 = lerp(L, R, 0.18), b2 = lerp(L, R, 0.82); const apex = iso(x0 + w / 2, y0 + w / 2, h + 40); return <Spot id="b-hq" label="Enter headquarters" poked={poked} labelAt={[apex[0], apex[1] - 34]} badge={customers.length || undefined} badgeText="waiting" badgeAt={((d) => [d[0], d[1] - 44] as [number, number])(iso(x0 + w / 2, y0 + w, 0))} onTap={() => tapBuilding("hq")}>
             <IsoBox x={x0 - 0.15} y={y0 - 0.15} w={w + 0.3} d={w + 0.3} h={8} color="#a8a29e" />
             <IsoBox x={x0} y={y0} w={w} d={w} h={h} z={8} color={tier("renovation") >= 3 ? "#292524" : tier("renovation") >= 2 ? "#7dd3fc" : tier("renovation") >= 1 ? shade(p.primary, 0.75) : "#f5efe3"} />
             {tier("renovation") >= 3 && <polyline points={pts([iso(x0, y0 + w, h + 8), iso(x0 + w, y0 + w, h + 8), iso(x0 + w, y0, h + 8)])} fill="none" stroke="#fbbf24" strokeWidth="3" />}
@@ -820,13 +832,13 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
           {tier("fleet") >= 1 && <g className="ow-van-iso"><IsoBox x={9.7} y={10.3} w={tier("fleet") >= 2 ? 1.6 : 1.2} d={0.7} h={20} z={4} color={p.primary} /><IsoBox x={9.4} y={10.3} w={0.35} d={0.7} h={14} z={4} color={shade(p.primary, -0.15)} />{[[9.8, 11.0], [10.7, 11.0]].map(([wx, wy]) => { const [sx, sy] = iso(wx, wy); return <ellipse key={wx} cx={sx} cy={sy} rx="5" ry="3.5" fill="#111827" />; })}</g>}
           {tier("fleet") >= 3 && <g><IsoBox x={10.6} y={8.9} w={1.0} d={0.6} h={18} z={4} color={p.secondary} /></g>}
 
-          {/* Farm: every crop is a real open lead */}
-          <Spot id="b-farm" label={`Lead farm · ${crops.length}`} poked={poked} labelAt={iso(10.8, 8.6, 46)} onTap={() => tapBuilding("farm")}>
-            <IsoTile x={9.9} y={7.3} w={1.9} d={2.7} fill="#92400e" />
-            {Array.from({ length: 6 }).map((_, r) => <IsoTile key={r} x={9.95} y={7.4 + r * 0.44} w={1.8} d={0.2} fill="#7c2d12" opacity={0.6} />)}
-            <polyline points={pts([iso(9.85, 10.05, 6), iso(11.85, 10.05, 6), iso(11.85, 7.25, 6)])} fill="none" stroke="#a16207" strokeWidth="2.5" strokeDasharray="5 4" />
+          {/* Deal yard: every open lead is a building going up */}
+          <Spot id="b-farm" label={`Deal yard · ${crops.length}`} poked={poked} labelAt={iso(10.8, 8.6, 46)} onTap={() => tapBuilding("farm")}>
+            <IsoTile x={9.9} y={7.3} w={1.9} d={2.7} fill="#b8b2a7" />
+            <IsoTile x={9.95} y={7.35} w={1.8} d={2.6} fill="#c9c3b8" />
+            <polyline points={pts([iso(9.85, 10.05, 8), iso(11.85, 10.05, 8), iso(11.85, 7.25, 8)])} fill="none" stroke="#f59e0b" strokeWidth="2" strokeDasharray="6 4" />
           </Spot>
-          {crops.slice(0, 12).map((c, i) => <CropPlant key={c.id} at={iso(10.25 + (i % 3) * 0.6, 7.6 + Math.floor(i / 3) * 0.62)} crop={c} onTap={demo ? undefined : () => openLead(c.id)} />)}
+          {crops.slice(0, 12).map((c, i) => <CropPlant key={c.id} at={iso(10.25 + (i % 3) * 0.6, 7.6 + Math.floor(i / 3) * 0.62)} crop={c} primary={p.primary} onTap={demo ? undefined : () => openLead(c.id)} />)}
           {/* Long grass grows while work piles up */}
           {grassTufts.map(([gx, gy], i) => { const [sx, sy] = iso(gx, gy); return <g key={i} className="ow-grass-tuft"><path d={`M${sx - 6} ${sy} q2 -14 4 0 M${sx - 1} ${sy} q1 -18 3 0 M${sx + 3} ${sy} q3 -13 5 0`} fill="#3f8f2f" stroke="#2f6f22" strokeWidth="1" /></g>; })}
           {/* Customers = real new leads queuing outside. Longest wait at the front; the longer they wait, the more fed up they get. */}
@@ -857,8 +869,8 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
             <g className="ow-raid-coins" transform={`translate(${door[0]} ${door[1] - 70})`}>{[0, 1, 2, 3].map((k) => <circle key={k} cx={(k - 1.5) * 9} cy="0" r="6" fill="#fbbf24" stroke="#b45309" strokeWidth="1.5" style={{ animationDelay: `${2.1 + k * 0.08}s` }} />)}<text className="ow-raid-text" y="-14" textAnchor="middle" fontSize="16" fontWeight="900" fill="#b91c1c" stroke="#fff" strokeWidth="3" paintOrder="stroke">−{raid.coins}</text></g>
           </g>; })()}
           {coinBurst > 0 && !reduced && <g key={coinBurst} className="ow-coin-fly">{[0, 1, 2, 3, 4, 5].map((k) => <circle key={k} cx={480 + k * 10} cy={380} r="8" fill="#fbbf24" stroke="#b45309" strokeWidth="2" style={{ animationDelay: `${k * 0.06}s` }} />)}</g>}
+          {bubble && <foreignObject x={bubble.at[0] - 130} y={bubble.at[1] - 110} width="260" height="110" key={bubble.n} className="ow-bubble-fo"><div className="ow-bubble-box"><div className="ow-bubble">{bubble.text}</div></div></foreignObject>}
         </svg>
-        {bubble && <div className="ow-bubble" style={{ left: `${bubble.at[0] / 10}%`, top: `${bubble.at[1] / 5.6}%` }} key={bubble.n}>{bubble.text}</div>}
         </div>}
 
         {view === "hq" ? <DeptPanel id={room} data={data} wallet={w} approach={room === "boss" ? undefined : approaches.find((a) => a.employee === room)} onOpen={(k) => { if (!demo) setPanel({ kind: k }); }} onAct={(a) => setDrawer(a)} onCharacter={() => setCharOpen(true)} /> :
