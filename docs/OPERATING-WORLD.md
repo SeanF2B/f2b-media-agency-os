@@ -1,8 +1,8 @@
 # Operating World — integration registry & build notes
 
-Operating World is a new top-bar page (**World**) that turns the existing CRM into a living miniature business. It is an interface layer only: every real action happens in the **existing** CRM screens and pop-ups, opened as full-screen in-game panels. The CRM stays the single source of truth.
+Operating World is a top-bar page (**World**, game-controller icon, always in the middle of the bar) that turns the existing CRM into a living miniature business. It is an interface layer only: every real action happens in the **existing** CRM screens and pop-ups, opened as full-screen in-game panels. The CRM stays the single source of truth.
 
-Status: **Phase 1 vertical slice** — agency owner/admin only, per account (agency + each sub-account), on a branch for review. Nothing is deployed.
+Status: **live on main** — agency owner/admin only, per account (agency + each sub-account).
 
 ## Architecture
 
@@ -50,15 +50,18 @@ Legend: ✅ in the game · 🔗 opens the existing screen inside the game · ⏳
 
 - **Employees** (one AI, six personalities): Rosie (reception), Sam (sales), Ada (accounts), Pete (projects), Mia (marketing), Cal (calendar). The most urgent one walks over with a line built from real counts and 2–4 options (open a screen, show the most urgent item, let AI prepare, remind me later).
 - **Character** reflects the industry (hard hat + hammer for roofing/construction, cap + drill for electricians, scrubs for dentists, apron + scissors for hairdressers…), in the account's brand colours. Industry is guessed from the business name and can be corrected.
-- **Progression:** XP → levels (L2 = 100 XP, L5 = 1,000, L10 = 4,500). Stages: Startup → Established (L5) → Expanding (L10) → Growing (L15) → Market leader (L20) → Empire (L30) → Legend (L50). Each stage adds a floor to HQ. Coins buy cosmetics (flowers, tree, bench, signage, van, fountain, gold-trim outfit, truck). Upgrades are never removed.
+- **Collecting coins:** rewards appear as coin stacks over the employee who handled the work. Tap a stack (or *Collect all*) to bank coins and XP, with coin sounds and a fly-to-wallet animation. On each visit a *Welcome back* walkthrough explains, employee by employee, exactly which real work earned the coins, then collects them.
+- **Rewards:** lead responded 20 · follow-up/task done 20 · appointment booked 30 · appointment completed 20 · receipt recorded 50 · expense recorded 10 · ad spend logged in Books 10 · invoice drafted 10 · invoice sent 50 · payment confirmed 40 · job won 100 · contact added 5 · note logged 5.
+- **Upgrades (coins):** Headquarters (6 tiers, each adds a floor, gated at levels 5/10/15/20/30/50), Reception (desk → lounge → concierge), Grounds (flowers → trees → fountain), Workshop (shed → workshop → warehouse), Fleet (van → truck → second van), Signage (premium → rooftop neon), Staff café, Outfit. Each tier visibly changes the scene.
+- **In-game booking:** on a lead card, *Book an appointment* shows real free slots from Scheduling; confirming uses the existing `book` action (availability re-checked, optional customer confirmation).
+- **Progression:** XP → levels (L2 = 100 XP, L5 = 1,000, L10 = 4,500). Stages: Startup → Established (L5) → Expanding (L10) → Growing (L15) → Market leader (L20) → Empire (L30) → Legend (L50). Levels unlock Headquarters tiers, which you then build with coins. Upgrades are never removed.
 - **Health:** working-day aware (weekends don't count as waiting). Neglect desaturates the scene and piles up paperwork; finishing work brings it back.
 - **Modes:** Manual (recommend), Copilot (prepare for approval — default), Autopilot (paused by default; only rules switched on in Automations). Every in-game action and AI draft is in the action history.
-- **Accessibility:** everything is clickable without walking, keyboard focus on customers, reduced-motion toggle (and respects the OS setting), sounds off by default, solid-white pop-ups.
+- **Accessibility:** everything is clickable without walking, keyboard focus on customers, reduced-motion toggle (and respects the OS setting), sounds on by default with a mute button (browsers may hold the first sound until the first tap), solid-white pop-ups.
 - **Demo scenario:** a clearly labelled demo (five driveway leads, a draft invoice, a receipt, a project task) runs entirely in the browser, touches no data, and walks through to a level-5 HQ upgrade.
 
 ## Phase 2 (proposed order)
 1. AI receipt extraction + duplicate detection on the existing expense pop-up.
-2. In-dialogue appointment picker (three real slots from `/api/scheduling?view=slots`, confirm via `book`).
 3. Sub-account staff access (CRM roles) and sub-account invoicing to their own customers.
 4. Project photo uploads + AI project description.
 5. Marketing assistant once a review/GBP feed is connected.

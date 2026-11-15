@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import {
   achievementsFromSnapshot, briefing, canBuy, financialSummary, guessIndustry, levelFromXp, operationalHealth,
-  parseCommand, SHOP, stageForLevel, workingHoursBetween, xpForLevel, DAILY_REWARD_CAP, allClearLine,
+  parseCommand, rewardWalkthrough, UPGRADES, nextUpgrade, upgradeTier, stageForLevel, workingHoursBetween, xpForLevel, DAILY_REWARD_CAP, allClearLine,
 } from "../lib/operating-world/engine.ts";
 import { OPERATING_WORLD_SCHEMA } from "../lib/operating-world/schema-sql.ts";
 
@@ -40,21 +40,29 @@ test("rewards only for real completed work after start, each record once", () =>
     ],
     bookings: [{ id: "b1", name: "Sarah", startAt: "2026-11-20T10:00:00Z", status: "booked", createdAt: "2026-11-16T10:00:00Z" }, { id: "b2", name: "Old", startAt: "2026-11-20T10:00:00Z", status: "cancelled", createdAt: "2026-11-16T10:00:00Z" }],
     tasks: [{ id: "t1", title: "Follow up", status: "Done", priority: "Normal", due: "", completedAt: "2026-11-16T10:00:00Z", createdAt: "" }],
-    expenses: [{ id: "e1", description: "Fuel", amount: 40, date: "2026-11-12", hasReceipt: true }, { id: "e2", description: "Lunch", amount: 10, date: "2026-11-12", hasReceipt: false }],
+    expenses: [{ id: "e1", description: "Fuel", amount: 40, date: "2026-11-12", hasReceipt: true }, { id: "e2", description: "Lunch", amount: 10, date: "2026-11-12", hasReceipt: false }, { id: "e3", description: "Google Ads", amount: 300, date: "2026-11-12", hasReceipt: false, category: "Advertising & marketing" }],
   });
   const keys = achievementsFromSnapshot(s, START).map((a) => a.key).sort();
-  assert.deepEqual(keys, ["booking:b1", "inv-paid:i1", "inv-sent:i1", "lead:a", "lead:d", "receipt:e1", "task:t1", "won:d"].sort());
+  assert.deepEqual(keys, ["adspend:e3", "booking:b1", "expense:e2", "inv-new:i1", "inv-new:i2", "inv-paid:i1", "inv-sent:i1", "lead:a", "lead:d", "receipt:e1", "task:t1", "won:d"].sort());
+  const walk = rewardWalkthrough(achievementsFromSnapshot(s, START), "x");
+  assert.equal(walk.reduce((n, w) => n + w.keys.length, 0), 12);
+  assert.ok(walk.find((w) => w.employee === "marketing").items[0].includes("Ad spend"));
   // Idempotency through the real ledger primary key.
   const db = new DatabaseSync(":memory:"); for (const sql of OPERATING_WORLD_SCHEMA) db.exec(sql);
   const ins = db.prepare("INSERT OR IGNORE INTO ow_ledger (owner_id, scope_id, reward_key, kind, coins, xp, label, earned_at, created_at) VALUES ('o','',?,?,?,?,?,?,?)");
+  const collect = db.prepare("UPDATE ow_ledger SET collected_at=? WHERE owner_id='o' AND scope_id='' AND collected_at=''");
   for (let round = 0; round < 3; round++) for (const a of achievementsFromSnapshot(s, START)) ins.run(a.key, a.kind, a.coins, a.xp, a.label, a.at, NOW);
   const row = db.prepare("SELECT COUNT(*) n, SUM(coins) c FROM ow_ledger").get();
-  assert.equal(row.n, 8); assert.equal(row.c, 20 + 20 + 100 + 40 + 50 + 30 + 20 + 50);
+  assert.equal(row.n, 12); assert.equal(row.c, 20 + 20 + 100 + 40 + 50 + 30 + 20 + 50 + 10 + 10 + 10 + 10);
+  // Collecting twice only collects once.
+  assert.equal(collect.run(NOW).changes, 12); assert.equal(collect.run(NOW).changes, 0);
 });
 
 test("daily cap stops reward farming", () => {
   const tasks = Array.from({ length: 60 }, (_, i) => ({ id: `t${i}`, title: "x", status: "Done", priority: "", due: "", completedAt: "2026-11-16T10:00:00Z", createdAt: "" }));
   assert.equal(achievementsFromSnapshot(snap({ tasks }), START).length, DAILY_REWARD_CAP);
+  const contacts = Array.from({ length: 60 }, (_, i) => ({ id: `c${i}`, name: "x", createdAt: "2026-11-16T10:00:00Z" }));
+  assert.equal(achievementsFromSnapshot(snap({ contacts }), START).length, DAILY_REWARD_CAP);
 });
 
 test("briefing reflects real data and never invents activity", () => {
@@ -86,12 +94,17 @@ test("finance summary counts only confirmed payments as money received", () => {
   assert.deepEqual(f.paidThisMonth, { EUR: 120.5 }); assert.deepEqual(f.outstanding, { EUR: 80 });
 });
 
-test("shop rules", () => {
-  const flowers = SHOP.find((i) => i.id === "flowers"), van = SHOP.find((i) => i.id === "van");
-  assert.equal(canBuy(flowers, [], 100, 1), null);
-  assert.match(canBuy(flowers, ["flowers"], 100, 1), /already/);
-  assert.match(canBuy(van, [], 1000, 1), /level/);
-  assert.match(canBuy(flowers, [], 10, 1), /more coins/);
+test("upgrade tracks: tiers in order, level-gated, coin-gated", () => {
+  assert.ok(UPGRADES.length >= 6);
+  assert.equal(upgradeTier([], "garden"), 0);
+  assert.equal(nextUpgrade("garden", []).name, "Flower beds");
+  assert.equal(canBuy("garden", [], 100, 1), null);
+  assert.equal(upgradeTier(["garden:1", "garden:2"], "garden"), 2);
+  assert.equal(nextUpgrade("garden", ["garden:1", "garden:2"]).name, "Fountain");
+  assert.match(canBuy("garden", ["garden:1", "garden:2"], 1000, 1), /level 5/);
+  assert.match(canBuy("garden", ["garden:1", "garden:2", "garden:3"], 9999, 50), /Fully/);
+  assert.match(canBuy("garden", [], 10, 1), /more coins/);
+  assert.match(canBuy("nope", [], 10, 1), /exist/);
 });
 
 test("industry guess and commands", () => {
