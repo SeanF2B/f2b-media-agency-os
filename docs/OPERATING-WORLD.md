@@ -48,7 +48,8 @@ Legend: ✅ in the game · 🔗 opens the existing screen inside the game · ⏳
 
 ## Gameplay
 
-- **Art:** Clash-of-Clans-style isometric island in the account's brand colours and logo. Each department is a tappable building (Headquarters → upgrades, Reception → leads, Accounts → invoices/books, Calendar tower → scheduling, Workshop → tasks, Sales → pipeline, Billboard → marketing). Characters are original bean-style mascots with their own accessories and idle animations (no skin tones); tap them for a speech bubble.
+- **Art:** Clash-of-Clans-style isometric island in the account's brand colours and logo. Each department is a tappable building (Headquarters → upgrades, Reception → leads, Accounts → invoices/books, Calendar tower → scheduling, Workshop → tasks, Sales → pipeline, Billboard → marketing). Characters are adult, human figures in role-based clothing with one neutral stylised tone (no skin tones). Departments live inside Headquarters: tap HQ or any staff member to open *Inside HQ*, a room per department with its status and buttons into the real CRM screens.
+- **The Tax Man (villain):** any expense left 7 days without a receipt triggers a raid — he marches in and steals up to 15 coins per expense (once each, never below zero). Attaching the receipt still earns +50.
 - **Lead farm:** every open lead is a crop that grows with its pipeline stage, wilts when neglected and ripens when the job is won. New leads queue outside reception, longest wait first, getting impatient → bored → fed up.
 - **Town life:** AI agents walk around while running tasks and snooze (z z z) while scheduled; staff with work in progress walk between buildings; leads further down the pipeline visit Sales or the Calendar tower. The Tax Man knocks when this month's expenses are missing receipts. Long grass grows while work piles up.
 

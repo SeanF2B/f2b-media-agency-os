@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import {
   achievementsFromSnapshot, briefing, canBuy, financialSummary, guessIndustry, levelFromXp, operationalHealth,
-  parseCommand, rewardWalkthrough, UPGRADES, nextUpgrade, upgradeTier, stageForLevel, workingHoursBetween, xpForLevel, DAILY_REWARD_CAP, allClearLine,
+  parseCommand, rewardWalkthrough, taxRaids, raidAmount, UPGRADES, nextUpgrade, upgradeTier, stageForLevel, workingHoursBetween, xpForLevel, DAILY_REWARD_CAP, allClearLine,
 } from "../lib/operating-world/engine.ts";
 import { OPERATING_WORLD_SCHEMA } from "../lib/operating-world/schema-sql.ts";
 
@@ -121,4 +121,16 @@ test("industry guess and commands", () => {
   assert.equal(parseCommand("Prepare replies for all five new leads", s).panel, "lead-replies");
   assert.equal(parseCommand("Show me everyone we haven't replied to", s).panel, "leads");
   assert.ok(parseCommand("Sing me a song", s).needsAi);
+});
+
+test("tax man raids only week-old expenses without receipts, never below zero", () => {
+  const ex = [
+    { id: "a", description: "Fuel", amount: 1, date: "2026-11-10", hasReceipt: false },
+    { id: "b", description: "Lunch", amount: 1, date: "2026-11-16", hasReceipt: false },
+    { id: "c", description: "Tools", amount: 1, date: "2026-11-10", hasReceipt: true },
+    { id: "d", description: "Ads", amount: 1, date: "2026-11-10", hasReceipt: false, category: "Advertising & marketing" },
+    { id: "e", description: "Old", amount: 1, date: "2026-11-01", hasReceipt: false },
+  ];
+  assert.deepEqual(taxRaids(ex, START, NOW).map((r) => r.key), ["raid:a"]);
+  assert.equal(raidAmount(100), 15); assert.equal(raidAmount(6), 6); assert.equal(raidAmount(-3), 0);
 });

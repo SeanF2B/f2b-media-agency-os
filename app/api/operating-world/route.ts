@@ -4,7 +4,7 @@ import { aiConfigured, aiEndpoint, aiHeaders, aiModel, resolveAiProvider } from 
 import { OPERATING_WORLD_SCHEMA } from "@/lib/operating-world/schema-sql";
 import {
   achievementsFromSnapshot, briefing, canBuy, financialSummary, guessIndustry, INDUSTRIES, levelFromXp, operationalHealth, parseCommand,
-  PANELS, UPGRADES, nextUpgrade, stageForLevel, workingHoursBetween, type Industry, type OwSnapshot, type PanelKind,
+  PANELS, UPGRADES, nextUpgrade, stageForLevel, workingHoursBetween, taxRaids, raidAmount, type Industry, type OwSnapshot, type PanelKind,
 } from "@/lib/operating-world/engine";
 
 // Operating World: the game layer over the CRM. This route never writes CRM records itself —
@@ -143,11 +143,25 @@ export async function GET(request: Request) {
       fresh = earned.filter((_, i) => (results[i]?.meta?.changes || 0) > 0);
     }
     const { leadsExtra, ...plain } = snap;
+    // The Tax Man: each expense left a week without a receipt costs coins once (virtual only, never below zero).
+    const raids: Array<{ key: string; coins: number; label: string }> = [];
+    const due = taxRaids(plain.expenses, state.startedAt, now);
+    if (due.length) {
+      const known = new Set(((await ctx.db.prepare(`SELECT reward_key FROM ow_ledger WHERE owner_id=?1 AND scope_id=?2 AND reward_key IN (${due.map((_, i) => `?${i + 3}`).join(",")})`).bind(ctx.ownerId, ctx.scopeId, ...due.map((d) => d.key)).all<{ reward_key: string }>()).results || []).map((r) => r.reward_key));
+      let balance = (await wallet(ctx)).coins;
+      for (const d of due) {
+        if (known.has(d.key)) continue;
+        const take = raidAmount(balance);
+        const r = await ctx.db.prepare("INSERT OR IGNORE INTO ow_ledger (owner_id, scope_id, reward_key, kind, coins, xp, label, earned_at, created_at, collected_at) VALUES (?1,?2,?3,'taxman_raid',?4,0,?5,?6,?6,?6)").bind(ctx.ownerId, ctx.scopeId, d.key, -take, d.label.slice(0, 200), now).run();
+        if (r.meta.changes) { balance -= take; raids.push({ key: d.key, coins: take, label: d.label }); }
+      }
+      if (raids.length) await logAction(ctx, "The Tax Man", `Raided ${raids.reduce((n, r) => n + r.coins, 0)} coins`, `${raids.length} expense${raids.length === 1 ? "" : "s"} still without a receipt after 7 days`, raids.map((r) => r.key.replace("raid:", "expense:")));
+    }
     const approaches = briefing(plain);
     const urgent = (plain.leads.filter((l) => l.category === "open" && l.stagePosition <= l.firstPosition)).sort((a, b) => a.createdAt.localeCompare(b.createdAt)).slice(0, 12).map((l) => ({ ...l, ...leadsExtra[l.id] }));
     return respond({
       scopeId: ctx.scopeId, state: { mode: state.mode, autopilotPaused: state.autopilotPaused, startedAt: state.startedAt }, profile: businessProfile(ctx, state.profile),
-      wallet: await wallet(ctx), freshRewards: fresh, approaches, health: operationalHealth(plain), finance: financialSummary(plain), sources: plain.sources,
+      wallet: await wallet(ctx), freshRewards: fresh, raids, approaches, health: operationalHealth(plain), finance: financialSummary(plain), sources: plain.sources,
       customers: urgent, counts: { leads: plain.leads.filter((l) => l.category === "open").length, unread: plain.threads.filter((t) => t.unread > 0).length, bookingsUpcoming: plain.bookings.filter((b) => b.status === "booked" && b.startAt >= now).length, openTasks: plain.tasks.filter((t) => !/^done$/i.test(t.status)).length },
       // Who is busy right now: AI agents running/scheduled tasks and staff with work in progress (this account only).
       ...(() => {

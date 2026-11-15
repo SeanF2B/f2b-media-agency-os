@@ -331,3 +331,30 @@ html:has(.ow-panel) .toast { z-index: 95; }
 .ow-track-row { display: flex; gap: 12px; align-items: flex-start; }
 .ow-track-info { flex: 1; display: grid; gap: 6px; min-width: 0; }
 .ow-up-art { flex: 0 0 auto; border-radius: 12px; box-shadow: inset 0 -3px 0 rgba(0,0,0,.06); }
+
+/* Inside HQ */
+.ow-inside { width: min(1100px, 100%); max-height: 90vh; overflow: auto; padding: 18px; border-radius: 22px; background: #f8f7f4; color: #111827; box-shadow: 0 30px 80px rgba(15,23,42,.45); animation: ow-bubble .3s cubic-bezier(.3,1.4,.5,1); }
+.ow-inside > header { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.ow-inside > header img { width: 40px; height: 40px; object-fit: contain; }
+.ow-inside > header div { flex: 1; } .ow-inside > header b { display: block; font-size: 18px; color: #111827; } .ow-inside > header small { color: #57534e; }
+.ow-rooms { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.ow-room { border-radius: 18px; overflow: hidden; background: #fff; border: 2px solid #e7e5e4; cursor: pointer; transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+.ow-room:hover { transform: translateY(-3px); box-shadow: 0 10px 26px rgba(15,23,42,.14); border-color: color-mix(in srgb, var(--ow-secondary) 50%, #fff); }
+.ow-room.focus { border-color: var(--ow-primary); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ow-primary) 22%, transparent); }
+.ow-room.hot { border-color: #dc2626; }
+.ow-room-art { display: block; width: 100%; height: auto; }
+.ow-room-body { padding: 12px 14px 14px; display: grid; gap: 6px; }
+.ow-room-head { display: flex; align-items: baseline; gap: 8px; }
+.ow-room-head b { font-size: 15px; color: #111827; } .ow-room-head span { color: #57534e; font-size: 12px; flex: 1; }
+.ow-room-head em { font-style: normal; min-width: 22px; text-align: center; padding: 1px 7px; border-radius: 999px; background: #111827; color: #fff; font-size: 12px; font-weight: 800; }
+.ow-room-body p { margin: 0; font-weight: 700; color: #1f2937; font-size: 14px; } .ow-room-body p.hot { color: #b91c1c; }
+.ow-room-body small { color: #57534e; font-size: 12px; }
+.ow-person-adult .ow-bean-body { animation-duration: 3.6s; }
+
+/* Tax Man raid */
+.ow-raid-coins circle { opacity: 0; animation: ow-raid-coin 1.2s ease-in forwards; }
+@keyframes ow-raid-coin { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(58px) scale(.6); } }
+.ow-raid-text { opacity: 0; animation: ow-raid-text 2.4s ease-out 2.1s forwards; }
+@keyframes ow-raid-text { 0% { opacity: 0; transform: translateY(6px); } 20% { opacity: 1; } 100% { opacity: 0; transform: translateY(-26px); } }
+.ow-coins.robbed { animation: ow-robbed .5s ease 2.2s 3; background: #fee2e2; border-color: #dc2626; color: #7f1d1d; }
+@keyframes ow-robbed { 25% { transform: translateX(-4px) rotate(-3deg); } 75% { transform: translateX(4px) rotate(3deg); } }

@@ -282,12 +282,12 @@ function derived(snap: OwSnapshot) {
 // ───────────────────────────── Employees & briefing ─────────────────────────────
 export type EmployeeId = "receptionist" | "sales" | "accountant" | "projects" | "marketing" | "calendar";
 export const EMPLOYEES: Record<EmployeeId, { name: string; title: string; colour: string }> = {
-  receptionist: { name: "Rosie", title: "Receptionist", colour: "#f472b6" },
-  sales: { name: "Sam", title: "Salesperson", colour: "#f59e0b" },
-  accountant: { name: "Ada", title: "Accountant", colour: "#10b981" },
-  projects: { name: "Pete", title: "Project manager", colour: "#6366f1" },
-  marketing: { name: "Mia", title: "Marketing assistant", colour: "#ec4899" },
-  calendar: { name: "Cal", title: "Calendar assistant", colour: "#0ea5e9" },
+  receptionist: { name: "Rosie", title: "Receptionist", colour: "#9d4b6e" },
+  sales: { name: "Sam", title: "Salesperson", colour: "#1e3a5f" },
+  accountant: { name: "Ada", title: "Accountant", colour: "#2f5d50" },
+  projects: { name: "Pete", title: "Project manager", colour: "#c2410c" },
+  marketing: { name: "Mia", title: "Marketing assistant", colour: "#5b4a8a" },
+  calendar: { name: "Cal", title: "Calendar assistant", colour: "#2a6f97" },
 };
 /** Where an option takes the owner. Every panel opens an EXISTING CRM screen inside the game. */
 export type PanelKind = "leads" | "contacts" | "conversations" | "scheduling" | "invoicing" | "books" | "expense" | "tasks" | "task" | "lead-replies" | "lead-detail";
@@ -469,3 +469,16 @@ export function parseCommand(text: string, snap: OwSnapshot): CommandIntent {
   return { label: "Ask AI", needsAi: true };
 }
 export const PANELS: PanelKind[] = ["leads", "contacts", "conversations", "scheduling", "invoicing", "books", "expense", "tasks", "task", "lead-replies", "lead-detail"];
+
+// ───────────────────────────── The Tax Man (the villain) ─────────────────────────────
+/** Coins the Tax Man steals per expense left without a receipt for a week. Virtual only. */
+export const TAX_RAID_COINS = 15;
+export const TAX_RAID_GRACE_DAYS = 7;
+/** Expenses that have gone a week without a receipt since the game started: each one is raided once. */
+export function taxRaids(expenses: OwExpense[], since: string, now: string) {
+  const cutoff = new Date(Date.parse(now) - TAX_RAID_GRACE_DAYS * 86_400_000).toISOString().slice(0, 10);
+  return expenses.filter((e) => !e.hasReceipt && e.category !== AD_SPEND_CATEGORY && e.date >= since.slice(0, 10) && e.date <= cutoff)
+    .map((e) => ({ key: `raid:${e.id}`, label: `Tax Man raid · no receipt for ${e.description || "an expense"}` }));
+}
+/** How much a raid can take without pushing the balance below zero. */
+export const raidAmount = (balance: number) => Math.max(0, Math.min(TAX_RAID_COINS, Math.floor(balance)));
