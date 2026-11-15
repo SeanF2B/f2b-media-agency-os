@@ -892,3 +892,6 @@ html body .app-shell .tn-item .tn-gamepad { transform-origin: 50% 60%; }
 html body .app-shell .tn-item:hover .tn-gamepad, html body .app-shell .tn-item.active .tn-gamepad { animation: tn-gamepad-wiggle .5s ease; }
 @keyframes tn-gamepad-wiggle { 25% { transform: rotate(-10deg); } 75% { transform: rotate(10deg); } }
 @media (prefers-reduced-motion: reduce) { html body .app-shell .tn-item .tn-gamepad { animation: none !important; } }
+html body .tt-logo { width:auto !important; min-width:34px; max-width:96px; height:34px !important; flex:0 0 auto !important; padding:2px 4px; border-radius:9px !important; }
+html body .tt-logo img { width:auto !important; max-width:88px; height:30px !important; object-fit:contain; }
+html body .tt-group .tt-group-toggle { gap:10px; }
