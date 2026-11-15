@@ -58,8 +58,10 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
   const [uploadProject, setUploadProject] = useState<Project>({});
   const [projectOpen, setProjectOpen] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [uploadOpen, setUploadOpen] = useState(false);
   const [picks, setPicks] = useState<Set<string>>(new Set());
-  const queueUpload = (files: FileList | File[]) => { const list = Array.from(files); if (list.length) setPendingFiles(list); };
+  const queueUpload = (files: FileList | File[]) => { const list = Array.from(files); if (list.length) { setPendingFiles((current) => [...current, ...list]); setUploadOpen(true); } };
+  const closeUpload = () => { setUploadOpen(false); setPendingFiles([]); };
   const [uploads, setUploads] = useState<Upload[]>([]);
   const [selected, setSelected] = useState<MediaItem | null>(null);
   const [panel, setPanel] = useState<"" | "stock" | "drive" | "link" | "mobile" | "ai">("");
@@ -136,7 +138,8 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
       try {
         const size = await imageSize(file);
         const query = new URLSearchParams({ scope: uploadScope, name: file.name || "Photo" });
-        if (uploadFolder.trim()) query.set("folder", uploadFolder.trim());
+        const folderName = uploadFolder.trim() || String(baseProject.service || "").trim();
+        if (folderName) query.set("folder", folderName.slice(0, 60));
         if (size) { query.set("w", String(size.w)); query.set("h", String(size.h)); }
         // Project details for local SEO: what was typed above, plus GPS and date from the photo itself when present.
         const geo = await readPhotoGeo(file);
@@ -209,7 +212,7 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
       </header>
 
       <div className="ml-actions">
-        <button type="button" className="primary-button" onClick={() => fileInput.current?.click()} disabled={!uploadScope}>⬆ Upload</button>
+        <button type="button" className="primary-button" onClick={() => setUploadOpen(true)} disabled={!uploadScope}>⬆ Upload</button>
         <button type="button" className="secondary-button ml-camera" onClick={() => cameraInput.current?.click()} disabled={!uploadScope}>📷 Take photo</button>
         <button type="button" className="secondary-button" onClick={() => setPanel("drive")}>🟢 Google Drive</button>
         <button type="button" className="secondary-button" onClick={() => setPanel("ai")} disabled={!uploadScope}>✨ AI generate</button>
@@ -271,15 +274,18 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
       {selected && <DetailPanel item={selected} canMove={!inSubAccount} scopes={[...(status?.canUseAgency !== false ? [{ id: "agency", name: "Agency library" }] : []), ...allowedClients.map((client) => ({ id: client.id, name: client.name }))]} scopeName={scopeName} onClose={() => setSelected(null)} onSave={saveItem} onDelete={deleteItem} onCopy={(text, label) => void copy(text, label)} absolute={absolute} />}
       {panel === "stock" && status && <StockPanel providers={status.providers} isAdmin={status.isAdmin} target={uploadScope} targetName={uploadScopeName} folder={uploadFolder} onClose={() => setPanel("")} onAdded={(item) => { addItem(item); flash(`Added to ${uploadScopeName}`); }} onKeysChanged={() => setStatus(null)} />}
       {panel === "drive" && status && <DrivePanel drive={status.drive} isAdmin={status.isAdmin} target={uploadScope} targetName={uploadScopeName} folder={uploadFolder} onClose={() => setPanel("")} onAdded={(item) => { addItem(item); flash(`Added to ${uploadScopeName}`); }} />}
-      {pendingFiles.length > 0 && <Modal title={`Upload ${pendingFiles.length} file${pendingFiles.length === 1 ? "" : "s"} to ${uploadScopeName}`} onClose={() => setPendingFiles([])}>
+      {uploadOpen && <Modal title={`Upload to ${uploadScopeName}`} onClose={closeUpload}>
         <div className="ml-upload-details">
           <p className="ml-hint">📍 Project details for local SEO. Saved with every file in this upload. Phone photos add their GPS location and date automatically.</p>
           <label className="field"><span>Location</span><input autoFocus value={uploadProject.location || ""} onChange={(event) => setUploadProject({ ...uploadProject, location: event.target.value })} placeholder="e.g. Salthill, Galway" maxLength={160} /></label>
           <label className="field"><span>Service / job</span><input value={uploadProject.service || ""} onChange={(event) => setUploadProject({ ...uploadProject, service: event.target.value })} placeholder="e.g. Slate roof replacement" maxLength={120} /></label>
-          <div className="ml-upload-row"><label className="field"><span>Date of job</span><input type="date" value={uploadProject.date || ""} onChange={(event) => setUploadProject({ ...uploadProject, date: event.target.value })} /></label><label className="field"><span>Folder</span><input value={uploadFolder} onChange={(event) => setUploadFolder(event.target.value)} placeholder="e.g. Job photos" maxLength={60} list="ml-folders" /></label></div>
+          <div className="ml-upload-row"><label className="field"><span>Date of job</span><input type="date" value={uploadProject.date || ""} onChange={(event) => setUploadProject({ ...uploadProject, date: event.target.value })} /></label><label className="field"><span>Folder</span><input value={uploadFolder} onChange={(event) => setUploadFolder(event.target.value)} placeholder={uploadProject.service ? `${uploadProject.service} (from service)` : "Uses the service name"} maxLength={60} list="ml-folders" /></label></div>
           <label className="field"><span>Notes</span><input value={uploadProject.notes || ""} onChange={(event) => setUploadProject({ ...uploadProject, notes: event.target.value })} placeholder="Before / after, materials used, customer quote" maxLength={600} /></label>
-          <ul className="ml-upload-files">{pendingFiles.slice(0, 6).map((file) => <li key={`${file.name}-${file.size}`}>{file.name}</li>)}{pendingFiles.length > 6 && <li>+ {pendingFiles.length - 6} more</li>}</ul>
-          <div className="ml-detail-actions"><button type="button" className="secondary-button" onClick={() => { const files = pendingFiles; setPendingFiles([]); void uploadFiles(files, {}); }}>Skip details</button><button type="button" className="primary-button" onClick={() => { const files = pendingFiles; setPendingFiles([]); void uploadFiles(files); }}>Upload {pendingFiles.length}</button></div>
+          <div className="ml-upload-drop" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); if (event.dataTransfer.files?.length) setPendingFiles((current) => [...current, ...Array.from(event.dataTransfer.files)]); }}>
+            {pendingFiles.length ? <ul className="ml-upload-files">{pendingFiles.slice(0, 8).map((file, index) => <li key={`${file.name}-${file.size}-${index}`}>{file.name}<button type="button" className="text-button" aria-label={`Remove ${file.name}`} onClick={() => setPendingFiles((current) => current.filter((_, i) => i !== index))}>✕</button></li>)}{pendingFiles.length > 8 && <li>+ {pendingFiles.length - 8} more</li>}</ul> : <p>Drop photos, videos or PDFs here</p>}
+            <div className="ml-upload-pick"><button type="button" className="secondary-button" onClick={() => fileInput.current?.click()}>{pendingFiles.length ? "＋ Add more files" : "Choose files"}</button><button type="button" className="secondary-button ml-camera" onClick={() => cameraInput.current?.click()}>📷 Take photo</button></div>
+          </div>
+          <div className="ml-detail-actions"><button type="button" className="secondary-button" onClick={closeUpload}>Cancel</button><button type="button" className="primary-button" disabled={!pendingFiles.length} onClick={() => { const files = pendingFiles; closeUpload(); void uploadFiles(files); }}>{pendingFiles.length ? `Upload ${pendingFiles.length} file${pendingFiles.length === 1 ? "" : "s"}` : "Upload"}</button></div>
         </div>
       </Modal>}
       {panel === "ai" && <AiPanel target={uploadScope} targetName={uploadScopeName} folder={uploadFolder} project={uploadProject} onClose={() => setPanel("")} onAdded={(item) => { addItem(item); flash(`Added to ${uploadScopeName}`); setPanel(""); setSelected(item); }} />}
@@ -317,7 +323,7 @@ function DetailPanel({ item, canMove, scopes, scopeName, onClose, onSave, onDele
             <label className="field"><span>Notes</span><input value={project.notes || ""} onChange={(event) => setProject({ ...project, notes: event.target.value })} placeholder="Before / after, materials, details" maxLength={600} /></label>
             {project.lat != null && project.lng != null ? <p className="ml-hint">GPS from photo: <a href={`https://www.google.com/maps?q=${project.lat},${project.lng}`} target="_blank" rel="noreferrer">{project.lat}, {project.lng}</a> <button type="button" className="text-button" onClick={() => { const next = { ...project }; delete next.lat; delete next.lng; setProject(next); }}>Remove</button></p> : <p className="ml-hint">No GPS in this file. Phone photos usually include it.</p>}
           </fieldset>
-          {dirty && <button type="button" className="primary-button" onClick={() => onSave({ name, folder, alt, project })}>Save changes</button>}
+          {dirty && <button type="button" className="primary-button" onClick={() => onSave({ name, folder: folder.trim() || String(project.service || "").trim().slice(0, 60), alt, project })}>Save changes</button>}
           {canMove && <label className="field"><span>Client library</span><select value={item.scopeId || "agency"} onChange={(event) => onSave({ scope: event.target.value })}>{scopes.map((scope) => <option key={scope.id} value={scope.id}>{scope.name}</option>)}</select></label>}
           <dl className="ml-facts">
             <div><dt>Library</dt><dd>{scopeName(item.scopeId)}</dd></div>
