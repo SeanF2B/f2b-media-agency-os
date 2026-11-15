@@ -48,6 +48,10 @@ Legend: ✅ in the game · 🔗 opens the existing screen inside the game · ⏳
 
 ## Gameplay
 
+- **Progression:** Headquarters starts as a run-down shopfront (boarded window, cracks, weeds) and the office inside starts on cardboard boxes with cobwebs, stains and a flickering bulb; upgrades turn it into offices and finally a glass skyscraper. Each trade gets its own props outside HQ (roofing ladders and tiles, cable drums, barber pole, tooth sign, etc.).
+- **Lead generation (agency only):** Leo (Lead Factory) and Olive (Outreach) sit in their own department inside HQ.
+- **Receipt Rush:** after a Tax Man raid, tap the receipts in 9 seconds to win back up to what he took (once per raid). A demo raid is in Quick actions.
+- **Guided tour:** voiced walkthrough (UK English voice where available) on first visit, or any time from the ? button.
 - **Art:** Clash-of-Clans-style isometric island in the account's brand colours and logo. Each department is a tappable building (Headquarters → upgrades, Reception → leads, Accounts → invoices/books, Calendar tower → scheduling, Workshop → tasks, Sales → pipeline, Billboard → marketing). Characters are adult, human figures in role-based clothing with one neutral stylised tone (no skin tones). Departments live inside Headquarters: tap HQ or any staff member to open *Inside HQ*, a room per department with its status and buttons into the real CRM screens.
 - **The Tax Man (villain):** any expense left 7 days without a receipt triggers a raid — he marches in and steals up to 15 coins per expense (once each, never below zero). Attaching the receipt still earns +50.
 - **Deal yard:** every open lead is a building plot that goes up stage by stage (stakes → foundations → scaffolding → walls → finished office when won); stalled deals get a warning cone. New leads queue outside reception, longest wait first, getting impatient → bored → fed up.

@@ -177,6 +177,12 @@ export async function GET(request: Request) {
       customers: urgent, counts: { leads: plain.leads.filter((l) => l.category === "open").length, unread: plain.threads.filter((t) => t.unread > 0).length, bookingsUpcoming: plain.bookings.filter((b) => b.status === "booked" && b.startAt >= now).length, openTasks: plain.tasks.filter((t) => !/^done$/i.test(t.status)).length },
       ...activity,
       departments: departmentBoards(plain, { agency: !ctx.scopeId, agents: activity.agents }),
+      leadgen: ctx.scopeId ? null : (() => {
+        const lists = ((ctx.ws as any).leadLists || []) as Array<{ name?: string; createdAt?: string; rows?: unknown[] }>;
+        const profiles = ((ctx.ws as any).leadProfiles || []) as unknown[];
+        const rows = lists.reduce((n, l) => n + (Array.isArray(l.rows) ? l.rows.length : 0), 0);
+        return { factory: { stats: [{ label: "ICP profiles", value: String(profiles.length) }, { label: "Saved lists", value: String(lists.length) }, { label: "Prospects found", value: String(rows) }], feed: [...lists].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || ""))).slice(0, 4).map((l) => ({ text: `List: ${l.name || "Untitled"} · ${Array.isArray(l.rows) ? l.rows.length : 0} prospects`, at: String(l.createdAt || now) })) }, outreach: { live: false } };
+      })(),
 
       // Leads further down the pipeline walk around town (to sales, the calendar, etc.).
       visitors: plain.leads.filter((l) => l.category === "open" && l.stagePosition > l.firstPosition).slice(0, 6).map((l) => ({ id: l.id, name: l.name || l.title, stage: l.stage })),
@@ -245,6 +251,21 @@ export async function POST(request: Request) {
         ? await ctx.db.prepare(`UPDATE ow_ledger SET collected_at=?3 WHERE owner_id=?1 AND scope_id=?2 AND collected_at='' AND reward_key IN (${keys.map((_, i) => `?${i + 4}`).join(",")})`).bind(ctx.ownerId, ctx.scopeId, now, ...keys).run()
         : await ctx.db.prepare("UPDATE ow_ledger SET collected_at=?3 WHERE owner_id=?1 AND scope_id=?2 AND collected_at=''").bind(ctx.ownerId, ctx.scopeId, now).run();
       return respond({ ok: true, collected: result.meta.changes || 0, wallet: await wallet(ctx) });
+    }
+    if (action === "defend") {
+      // Receipt Rush result: win back up to what each raid took, once per raid. Virtual coins only.
+      const keys = Array.isArray(body.keys) ? (body.keys as unknown[]).map((k) => str(k, 160)).filter((k) => k.startsWith("raid:")).slice(0, 20) : [];
+      const score = Math.max(0, Math.min(1, Number(body.score) || 0));
+      const now = new Date().toISOString(); let won = 0;
+      for (const key of keys) {
+        const raid = await ctx.db.prepare("SELECT coins, label FROM ow_ledger WHERE owner_id=?1 AND scope_id=?2 AND reward_key=?3 AND kind='taxman_raid'").bind(ctx.ownerId, ctx.scopeId, key).first<{ coins: number; label: string }>();
+        if (!raid) continue;
+        const back = Math.round(Math.abs(Number(raid.coins) || 0) * score);
+        if (!back) continue;
+        const r = await ctx.db.prepare("INSERT OR IGNORE INTO ow_ledger (owner_id, scope_id, reward_key, kind, coins, xp, label, earned_at, created_at, collected_at) VALUES (?1,?2,?3,'taxman_defence',?4,0,?5,?6,?6,?6)").bind(ctx.ownerId, ctx.scopeId, `defend:${key}`, back, "Won back from the Tax Man (Receipt Rush)", now).run();
+        if (r.meta.changes) won += back;
+      }
+      return respond({ ok: true, won, wallet: await wallet(ctx) });
     }
     if (action === "buy") {
       const trackId = str(body.itemId, 40);

@@ -447,7 +447,7 @@ html.f2b-world .page-content { max-width: none !important; padding: 0 !important
 .ow-full .ow-layout { position: absolute; inset: 0; display: block; }
 .ow-full .ow-stage { position: absolute; inset: 0; border-radius: 0; box-shadow: none; background: linear-gradient(#a5c8dc, #e8f0f4); }
 .ow-full .ow-stage-wrap { width: 100%; height: 100%; max-width: none; aspect-ratio: auto; margin: 0; }
-.ow-full .ow-stage-wrap > svg { padding: 118px 0 min(30vh, 250px); box-sizing: border-box; }
+.ow-full .ow-stage-wrap > svg { padding: 104px 0 min(22vh, 190px); box-sizing: border-box; }
 .ow-full .ow-interior-wrap { background: #1f2328; }
 .ow-full .ow-dialogue, .ow-full .ow-dept-panel { position: absolute; left: 0; right: 0; bottom: 14px; margin: 0 auto; width: min(980px, calc(100% - 28px)); max-height: min(34vh, 300px); overflow: auto; z-index: 15; background: rgba(255,255,255,.95); backdrop-filter: blur(14px); }
 .ow-full .ow-dept-feed li:nth-child(n+4) { display: none; }
@@ -465,3 +465,27 @@ html.f2b-world .page-content { max-width: none !important; padding: 0 !important
 .ow-plot:hover .ow-plot-body { transform: translateY(-3px) scale(1.08); }
 .ow-plot.ripe .ow-plot-body { animation: ow-float-soft 2.6s ease-in-out infinite; }
 .ow-plot.stalled .ow-plot-body { filter: saturate(.4); }
+.ow-flicker { animation: ow-flicker 3.2s steps(1) infinite; }
+@keyframes ow-flicker { 0%, 18%, 22%, 60%, 64%, 100% { opacity: 1; } 20%, 62% { opacity: .25; } }
+.ow-bean.slouch .ow-bean-body { transform: rotate(4deg) translateY(1px); animation: none !important; transform-box: fill-box; transform-origin: 50% 100%; }
+.ow-hint { margin: 0; padding: 8px 12px; border-radius: 10px; background: #fef3c7; color: #78350f; font-size: 13px; }
+.ow-hint b { color: #78350f; }
+
+/* Receipt Rush */
+.ow-game { position: fixed; inset: 0; z-index: 3700; background: rgba(15,23,42,.55); backdrop-filter: blur(2px); }
+.ow-game-card { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(420px, 92vw); padding: 22px; border-radius: 20px; background: #fff; color: #111827; display: grid; gap: 10px; text-align: center; box-shadow: 0 30px 80px rgba(0,0,0,.4); animation: ow-rise .4s var(--ow-spring, ease) both; }
+.ow-game-card b { font-size: 22px; color: #111827; } .ow-game-card p { margin: 0; color: #374151; }
+.ow-game-hud { position: absolute; top: 100px; left: 50%; transform: translateX(-50%); display: flex; gap: 14px; padding: 8px 16px; border-radius: 999px; background: #111827; color: #fff; font-weight: 800; }
+.ow-receipt { position: absolute; transform: translate(-50%, -50%); background: transparent !important; box-shadow: none !important; padding: 0 !important; border: 0 !important; animation: ow-receipt-in .25s var(--ow-spring, ease) both; filter: drop-shadow(0 6px 10px rgba(0,0,0,.35)); }
+.ow-receipt.got { animation: ow-receipt-got .35s ease forwards; }
+@keyframes ow-receipt-in { from { transform: translate(-50%, -50%) scale(.3) rotate(-20deg); opacity: 0; } }
+@keyframes ow-receipt-got { to { transform: translate(-50%, -120%) scale(1.4); opacity: 0; } }
+
+/* Guided tour */
+.ow-tour { position: fixed; inset: 0; z-index: 3800; }
+.ow-tour-dim { position: absolute; inset: 0; background: rgba(15,23,42,.55); }
+.ow-tour-spot { position: absolute; border-radius: 14px; box-shadow: 0 0 0 9999px rgba(15,23,42,.58); outline: 3px solid #fff; transition: all .45s cubic-bezier(.34,1.36,.64,1); pointer-events: none; }
+.ow-tour-card { position: absolute; width: min(380px, 92vw); padding: 16px; border-radius: 18px; background: #fff; color: #111827; display: grid; gap: 6px; box-shadow: 0 24px 60px rgba(0,0,0,.35); transition: left .45s ease, top .45s ease; }
+.ow-tour-card small { color: #6b7280; font-weight: 700; } .ow-tour-card b { font-size: 17px; color: #111827; } .ow-tour-card p { margin: 0 0 6px; color: #374151; }
+.ow-full .ow-interior-wrap > svg { padding: 100px 0 min(33vh, 300px); }
+.ow-full .ow-dept-panel { max-height: min(31vh, 290px); }

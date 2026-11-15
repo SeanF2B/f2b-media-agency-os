@@ -138,12 +138,12 @@ export type UpgradeTier = { tier: number; name: string; price: number; minLevel:
 export type UpgradeTrack = { id: string; name: string; group: "business" | "interior" | "lifestyle"; tiers: UpgradeTier[] };
 export const UPGRADES: UpgradeTrack[] = [
   { id: "hq", group: "business", name: "Headquarters", tiers: [
-    { tier: 1, name: "Established office", price: 500, minLevel: 5, perk: "Second floor and a bigger footprint" },
+    { tier: 1, name: "Refurbished shopfront", price: 300, minLevel: 3, perk: "No more boarded windows — a proper office" },
     { tier: 2, name: "Expanding business", price: 1500, minLevel: 10, perk: "Third floor" },
     { tier: 3, name: "Growing company", price: 3000, minLevel: 15, perk: "Fourth floor" },
-    { tier: 4, name: "Market leader tower", price: 6000, minLevel: 20, perk: "Fifth floor" },
-    { tier: 5, name: "Business empire", price: 12000, minLevel: 30, perk: "Sixth floor" },
-    { tier: 6, name: "Industry legend", price: 25000, minLevel: 50, perk: "Seventh floor — the skyline is yours" } ] },
+    { tier: 4, name: "Glass office tower", price: 6000, minLevel: 20, perk: "Your first skyscraper" },
+    { tier: 5, name: "Skyscraper", price: 12000, minLevel: 30, perk: "Taller tower with a rooftop helipad view" },
+    { tier: 6, name: "Landmark tower", price: 25000, minLevel: 50, perk: "The tallest building on the skyline" } ] },
   { id: "reception", group: "business", name: "Reception", tiers: [
     { tier: 1, name: "Polished desk", price: 80, minLevel: 1, perk: "A proper front desk for Rosie" },
     { tier: 2, name: "Waiting lounge", price: 250, minLevel: 3, perk: "Sofas and plants for waiting customers" },
@@ -318,7 +318,7 @@ export const EMPLOYEES: Record<EmployeeId, { name: string; title: string; colour
   calendar: { name: "Cal", title: "Calendar assistant", colour: "#2a6f97" },
 };
 /** Where an option takes the owner. Every panel opens an EXISTING CRM screen inside the game. */
-export type PanelKind = "leads" | "contacts" | "conversations" | "scheduling" | "invoicing" | "books" | "expense" | "tasks" | "task" | "lead-replies" | "lead-detail";
+export type PanelKind = "leads" | "contacts" | "conversations" | "scheduling" | "invoicing" | "books" | "expense" | "tasks" | "task" | "lead-replies" | "lead-detail" | "lead-factory" | "outreach";
 export type BriefingOption = { label: string; panel?: PanelKind; focusId?: string; snooze?: boolean };
 export type Approach = { id: string; employee: EmployeeId; urgency: number; mood: "panicked" | "concerned" | "cheerful" | "calm"; line: string; detail: string; count: number; options: BriefingOption[] };
 

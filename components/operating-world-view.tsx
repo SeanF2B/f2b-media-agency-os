@@ -5,8 +5,8 @@
 // cards, which open here as in-game panels. Coins come from the server, which credits them from real
 // completed records (idempotent). The owner taps the coins over each employee to collect them.
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { PanelRight, ArrowLeft, Bot, Coins, Gauge, History, Mic, Pause, Play, Send, Settings2, Sparkles, Volume2, VolumeX, Wand2, X, Zap, CalendarDays, Copy, Check, Loader2, Eye, EyeOff, Hammer, Lock, ChevronRight } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { HelpCircle, PanelRight, ArrowLeft, Bot, Coins, Gauge, History, Mic, Pause, Play, Send, Settings2, Sparkles, Volume2, VolumeX, Wand2, X, Zap, CalendarDays, Copy, Check, Loader2, Eye, EyeOff, Hammer, Lock, ChevronRight } from "lucide-react";
 import { EMPLOYEES, EMPLOYEE_FOR_REWARD, REWARDS, UPGRADES, allClearLine, briefing, levelFromXp, nextUpgrade, reactionLine, rewardWalkthrough, stageForLevel, upgradeTier, workingHoursBetween, type Approach, type BriefingOption, type EmployeeId, type OwSnapshot, type PanelKind, type RewardKind, type UpgradeTrack, type WalkStep, type DeptBoard } from "@/lib/operating-world/engine";
 import "./operating-world.css";
 
@@ -20,7 +20,7 @@ type WorldData = {
   freshRewards: Array<{ key: string; kind: RewardKind; coins: number; xp: number; label: string }>; raids?: Array<{ key: string; coins: number; label: string }>; approaches: Approach[];
   health: { score: number; mood: string; issues: string[] }; finance: { paidThisMonth: Record<string, number>; outstanding: Record<string, number>; overdueCount: number };
   sources: Record<string, boolean>; customers: Customer[]; counts: { leads: number; unread: number; bookingsUpcoming: number; openTasks: number };
-  upcoming: Array<{ id: string; name: string; startAt: string }>; crops?: Crop[]; agents?: Array<{ id: string; name: string; state: string; task: string }>; staffAtWork?: Array<{ id: string; name: string; task: string }>; visitors?: Array<{ id: string; name: string; stage: string }>; taxman?: boolean; departments?: Record<EmployeeId, DeptBoard>; shop: UpgradeTrack[]; industries: Array<{ id: string; label: string }>; aiReady: boolean;
+  upcoming: Array<{ id: string; name: string; startAt: string }>; crops?: Crop[]; agents?: Array<{ id: string; name: string; state: string; task: string }>; staffAtWork?: Array<{ id: string; name: string; task: string }>; visitors?: Array<{ id: string; name: string; stage: string }>; taxman?: boolean; departments?: Record<EmployeeId, DeptBoard>; leadgen?: { factory: { stats: Array<{ label: string; value: string }>; feed: Array<{ text: string; at: string }> }; outreach: { live: boolean } } | null; shop: UpgradeTrack[]; industries: Array<{ id: string; label: string }>; aiReady: boolean;
 };
 type Toast = { id: number; employee: EmployeeId; text: string; coins: number };
 export type OperatingWorldPanelRenderer = (kind: PanelKind, options: { focusId?: string; onDone: () => void }) => ReactNode;
@@ -36,7 +36,7 @@ const writePref = (key: string, value: string) => { try { localStorage.setItem(k
 const readSession = (key: string) => { try { return sessionStorage.getItem(key); } catch { return null; } };
 const writeSession = (key: string, value: string) => { try { sessionStorage.setItem(key, value); } catch { /* private mode */ } };
 const money = (by: Record<string, number>) => Object.keys(by).length ? Object.entries(by).map(([c, v]) => new Intl.NumberFormat("en-IE", { style: "currency", currency: c }).format(v)).join(" + ") : "—";
-const PANEL_TITLES: Record<PanelKind, string> = { leads: "Pipeline", contacts: "Contacts", conversations: "Conversations", scheduling: "Scheduling", invoicing: "Invoicing", books: "Books", expense: "Record a receipt", tasks: "Tasks", task: "New task", "lead-replies": "AI-prepared replies", "lead-detail": "Lead" };
+const PANEL_TITLES: Record<PanelKind, string> = { leads: "Pipeline", contacts: "Contacts", conversations: "Conversations", scheduling: "Scheduling", invoicing: "Invoicing", books: "Books", expense: "Record a receipt", tasks: "Tasks", task: "New task", "lead-replies": "AI-prepared replies", "lead-detail": "Lead", "lead-factory": "Lead Factory", outreach: "Outreach" };
 const sumCoins = (list: Pending[]) => list.reduce((n, p) => n + p.coins, 0);
 
 // ───────────── Sound: modern synthesised UI audio (soft sines, filtered noise, short reverb) ─────────────
@@ -168,7 +168,7 @@ function Bean({ at, look, mood = "calm", scale = 1, className = "", label, onTap
       {hairStyle === "bob" && <path d="M-6 -40 q-1 -10 6 -10 q7 0 6 10 l-1.6 0 q0 -5 -4.4 -6 q-4 1 -4.4 6z" fill={hair} />}
       {hairStyle === "wave" && <path d="M-5.8 -44 q1 -7 6 -6.6 q5 0 5.6 6.4 q-1.8 -2 -3 -1 q-1.5 -2 -3 -0.6 q-1.6 -1.6 -3 0 q-1.4 -1.4 -2.6 1.8z" fill={hair} />}
       {hairStyle === "short" && !look.hat && !hivis && <path d="M-5.4 -44 a5.4 5.4 0 0 1 10.8 0 q-5.4 -2.4 -10.8 0z" fill={hair} />}
-      <circle cx="-2" cy="-43" r="0.9" fill="#27272a" /><circle cx="2" cy="-43" r="0.9" fill="#27272a" />
+      {mood === "tired" ? <><path d="M-3 -43 h2" stroke="#27272a" strokeWidth=".8" /><path d="M1 -43 h2" stroke="#27272a" strokeWidth=".8" /></> : <><circle cx="-2" cy="-43" r="0.9" fill="#27272a" /><circle cx="2" cy="-43" r="0.9" fill="#27272a" /></>}
       {brows && <><path d="M-3.4 -45.6 L-0.8 -45" stroke="#27272a" strokeWidth=".8" strokeLinecap="round" /><path d="M3.4 -45.6 L0.8 -45" stroke="#27272a" strokeWidth=".8" strokeLinecap="round" /></>}
       {mood === "panicked" ? <ellipse cx="0" cy="-39.6" rx="1.1" ry="1.3" fill="#27272a" /> : mood === "concerned" ? <path d="M-1.6 -39.3 q1.6 -1 3.2 0" stroke="#27272a" strokeWidth=".8" fill="none" strokeLinecap="round" /> : <path d="M-1.6 -40 q1.6 1.2 3.2 0" stroke="#27272a" strokeWidth=".8" fill="none" strokeLinecap="round" />}
       {/* role details */}
@@ -231,6 +231,29 @@ function CropPlant({ at, crop, onTap, primary }: { at: [number, number]; crop: C
     </g>
   </g>;
 }
+
+// ───────────── Their business, their props ─────────────
+function IndustryProps({ industry, primary, secondary }: { industry: string; primary: string; secondary: string }) {
+  const [x, y] = iso(1.9, 5.3);
+  const sign = (label: string) => <g transform={`translate(${x + 44} ${y - 50})`}><rect x="-2" y="0" width="4" height="34" fill="#57534e" /><rect x="-34" y="-20" width="68" height="22" rx="5" fill={secondary} stroke={primary} strokeWidth="2" /><text y="-5" textAnchor="middle" fontSize="9.5" fontWeight="900" fill="#fff">{label}</text></g>;
+  switch (industry) {
+    case "roofing": case "construction": return <g>
+      <IsoBox x={1.2} y={4.6} w={1.4} d={0.9} h={6} color="#b45309" />{[0, 1, 2].map((i) => <IsoBox key={i} x={1.25} y={4.65} w={1.3} d={0.8} h={4} z={6 + i * 4} color={i % 2 ? "#7f1d1d" : "#991b1b"} />)}
+      <g transform={`translate(${x - 30} ${y - 4}) rotate(-62)`}><rect x="0" y="-3" width="62" height="2.5" fill="#a16207" /><rect x="0" y="5" width="62" height="2.5" fill="#a16207" />{Array.from({ length: 7 }).map((_, i) => <rect key={i} x={4 + i * 8.5} y="-2" width="2" height="9" fill="#a16207" />)}</g>
+      {industry === "construction" && <g><rect x={x + 10} y={y - 120} width="5" height="120" fill="#eab308" /><rect x={x - 10} y={y - 120} width="80" height="5" fill="#eab308" /><line x1={x + 60} y1={y - 115} x2={x + 60} y2={y - 70} stroke="#57534e" /><rect x={x + 54} y={y - 70} width="12" height="8" fill="#92400e" /></g>}
+      {sign(industry === "roofing" ? "ROOFING" : "BUILD")}</g>;
+    case "electrician": return <g>{[0, 1].map((i) => { const [cx, cy] = iso(1.4 + i * 0.8, 5.2); return <g key={i}><ellipse cx={cx} cy={cy - 9} rx="10" ry="10" fill="#f59e0b" stroke="#92400e" strokeWidth="2" /><ellipse cx={cx} cy={cy - 9} rx="3.5" ry="3.5" fill="#92400e" /></g>; })}{sign("ELECTRICAL")}</g>;
+    case "plumber": return <g>{[0, 1, 2].map((i) => { const [cx, cy] = iso(1.3, 4.9 + i * 0.25); return <rect key={i} x={cx - 4} y={cy - 6 - i * 5} width="54" height="5" rx="2.5" fill="#94a3b8" stroke="#64748b" />; })}{sign("PLUMBING")}</g>;
+    case "mechanic": return <g>{[0, 1, 2].map((i) => { const [cx, cy] = iso(1.6, 5.2); return <ellipse key={i} cx={cx} cy={cy - 4 - i * 7} rx="13" ry="6" fill="#18181b" stroke="#3f3f46" strokeWidth="3" />; })}{sign("GARAGE")}</g>;
+    case "hairdresser": return <g><g transform={`translate(${x + 10} ${y - 44})`}><rect x="-5" y="0" width="10" height="40" rx="5" fill="#fff" stroke="#94a3b8" />{[0, 1, 2, 3].map((i) => <path key={i} d={`M-5 ${i * 10 + 2} L5 ${i * 10 + 8}`} stroke="#dc2626" strokeWidth="3" />)}<circle cx="0" cy="-2" r="5" fill="#1e3a8a" /></g>{sign("SALON")}</g>;
+    case "dentist": return <g><g transform={`translate(${x + 4} ${y - 40})`}><path d="M-12 -10 q12 -8 24 0 q4 12 -4 26 q-3 6 -5 -6 q-3 -6 -6 6 q-2 6 -5 -6 q-8 -12 -4 -20z" fill="#fff" stroke="#38bdf8" strokeWidth="2" /></g>{sign("DENTAL")}</g>;
+    case "tattoo": return <g><g transform={`translate(${x + 8} ${y - 46})`} className="ow-neon"><rect x="-28" y="-14" width="56" height="26" rx="6" fill="#111827" stroke="#f472b6" strokeWidth="2.5" /><text y="4" textAnchor="middle" fontSize="11" fontWeight="900" fill="#f472b6">INK</text></g>{sign("TATTOO")}</g>;
+    case "interiors": return <g><IsoBox x={1.2} y={4.8} w={1.3} d={0.6} h={10} color="#78716c" /><IsoBox x={1.2} y={4.8} w={0.3} d={0.6} h={16} color="#57534e" />{["#f87171", "#60a5fa", "#34d399"].map((c, i) => { const [cx, cy] = iso(2.8, 5.0 + i * 0.3); return <rect key={c} x={cx} y={cy - 22} width="10" height="18" rx="2" fill={c} />; })}{sign("INTERIORS")}</g>;
+    case "agency": return <g><g transform={`translate(${x} ${y - 10})`}><ellipse cx="0" cy="-16" rx="16" ry="9" fill="#e5e7eb" stroke="#94a3b8" strokeWidth="2" transform="rotate(-25 0 -16)" /><rect x="-2" y="-14" width="4" height="14" fill="#64748b" /></g>{sign("MEDIA")}</g>;
+    default: return sign("OPEN");
+  }
+}
+
 // ───────────── Lifestyle upgrades ─────────────
 function Home({ tier, primary, secondary }: { tier: number; primary: string; secondary: string }) {
   if (!tier) return <IsoTile x={8.8} y={0.8} w={2.2} d={1.8} fill="#ffffff" opacity={0.12} />;
@@ -346,8 +369,9 @@ function UpgradeArt({ id, tier, primary, secondary }: { id: string; tier: number
 
 
 // ───────────── Inside HQ: an open-plan office you walk into ─────────────
-type RoomId = EmployeeId | "boss";
-const ROOM_NAME: Record<RoomId, string> = { receptionist: "Reception", sales: "Sales", accountant: "Accounts", calendar: "Scheduling", projects: "Projects", marketing: "Marketing", boss: "Your office" };
+type RoomId = EmployeeId | "boss" | "leadgen";
+const ROOM_NAME: Record<RoomId, string> = { receptionist: "Reception", sales: "Sales", accountant: "Accounts", calendar: "Scheduling", projects: "Projects", marketing: "Marketing", boss: "Your office", leadgen: "Lead generation" };
+const LEADGEN_TEAM = [{ name: "Leo", title: "Lead Factory", look: { color: "#155e75", accessory: "glasses" as const, hair: "part" } }, { name: "Olive", title: "Outreach", look: { color: "#9a3412", accessory: "headset" as const, hair: "bob" } }];
 const isoIn = (x: number, y: number, z = 0): [number, number] => [500 + (x - y) * 38, 92 + (x + y) * 19 - z];
 const ptsIn = (list: Array<[number, number]>) => list.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
 function BoxIn({ x, y, w, d, h, z = 0, color, top }: { x: number; y: number; w: number; d: number; h: number; z?: number; color: string; top?: string }) {
@@ -355,14 +379,16 @@ function BoxIn({ x, y, w, d, h, z = 0, color, top }: { x: number; y: number; w: 
   return <g><polygon points={ptsIn([D, C, Cb, Db])} fill={shade(color, -0.12)} /><polygon points={ptsIn([C, B, Bb, Cb])} fill={shade(color, -0.26)} /><polygon points={ptsIn([A, B, C, D])} fill={top || shade(color, 0.1)} /></g>;
 }
 const ZONES: Record<RoomId | "break", { x: number; y: number; w: number; d: number }> = {
+  leadgen: { x: 3.4, y: 3.5, w: 2.9, d: 2.8 },
   accountant: { x: 6.6, y: 0.4, w: 3.0, d: 2.7 }, calendar: { x: 3.4, y: 0.4, w: 2.9, d: 2.7 }, projects: { x: 0.4, y: 0.4, w: 2.7, d: 2.7 },
   sales: { x: 6.6, y: 3.5, w: 3.0, d: 2.8 }, break: { x: 3.4, y: 3.5, w: 2.9, d: 2.8 }, marketing: { x: 0.4, y: 3.5, w: 2.7, d: 2.8 },
   receptionist: { x: 6.6, y: 6.7, w: 3.0, d: 2.1 }, boss: { x: 0.4, y: 6.7, w: 5.9, d: 2.9 },
 };
 function Desk({ x, y, furniture, tech, primary }: { x: number; y: number; furniture: number; tech: number; primary: string }) {
-  const h = furniture >= 2 ? 20 : 15, color = furniture >= 3 ? "#7c4a2d" : furniture >= 1 ? "#e7e5e4" : "#a8a29e";
+  const h = furniture >= 2 ? 20 : furniture >= 1 ? 15 : 12, color = furniture >= 3 ? "#7c4a2d" : furniture >= 1 ? "#e7e5e4" : "#b07c4a";
   const top = isoIn(x + 0.7, y + 0.4, h);
-  return <g><BoxIn x={x} y={y} w={1.4} d={0.8} h={h} color={color} />
+  return <g><BoxIn x={x} y={y} w={furniture ? 1.4 : 1.1} d={0.8} h={h} color={color} />
+    {furniture === 0 && <line x1={isoIn(x, y + 0.4, h)[0]} y1={isoIn(x, y + 0.4, h)[1]} x2={isoIn(x + 1.1, y + 0.4, h)[0]} y2={isoIn(x + 1.1, y + 0.4, h)[1]} stroke="#d6b88a" strokeWidth="2.5" />}
     {tech === 0 && <polygon points={ptsIn([isoIn(x + 0.4, y + 0.2, h + 0.5), isoIn(x + 0.9, y + 0.2, h + 0.5), isoIn(x + 0.9, y + 0.6, h + 0.5), isoIn(x + 0.4, y + 0.6, h + 0.5)])} fill="#fafaf9" />}
     {tech >= 1 && <g><rect x={top[0] - (tech >= 2 ? 15 : 7)} y={top[1] - 14} width="13" height="10" rx="1.5" fill="#18181b" /><rect x={top[0] - (tech >= 2 ? 14 : 6)} y={top[1] - 13} width="11" height="7.5" rx="1" fill={primary} opacity=".55" className="ow-screen" />
       {tech >= 2 && <><rect x={top[0] + 1} y={top[1] - 14} width="13" height="10" rx="1.5" fill="#18181b" /><rect x={top[0] + 2} y={top[1] - 13} width="11" height="7.5" rx="1" fill="#38bdf8" opacity=".6" className="ow-screen" /></>}</g>}
@@ -375,45 +401,60 @@ function HQInterior({ data, wallet, approaches, selected, onSelect, reduced, cus
   const flooring = tier("flooring"), art = tier("artwork"), meeting = tier("meeting");
   const H = 120, floorA = flooring >= 3 ? "#1f2937" : flooring >= 2 ? "#e7e5e4" : flooring >= 1 ? "#b08158" : "#d9c4a3", floorB = shade(floorA, flooring >= 3 ? 0.08 : -0.05);
   const boards = data.departments;
+  const shabby = decor === 0, bare = furniture === 0 && tech === 0;
   const zoneTap = (id: RoomId) => () => onSelect(id);
+  const agency = !data.scopeId;
+  const breakZone = agency ? { x: 0.5, y: 6.8, w: 1.6, d: 1.0 } : ZONES.break;
   const roomOrder: RoomId[] = ["projects", "calendar", "accountant", "marketing", "sales", "boss", "receptionist"];
   return <svg viewBox="96 -46 808 532" role="img" aria-label={`Inside ${p.name} headquarters`} className="ow-interior">
-    <defs><linearGradient id="ow-wall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={shade(p.secondary, 0.82)} /><stop offset="1" stopColor={shade(p.secondary, 0.7)} /></linearGradient></defs>
+    <defs><linearGradient id="ow-wall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={shabby ? "#b9b3a6" : shade(p.secondary, 0.82)} /><stop offset="1" stopColor={shabby ? "#a39d90" : shade(p.secondary, 0.7)} /></linearGradient></defs>
     <rect x="0" y="-60" width="1000" height="620" fill="#1f2328" />
     {/* walls */}
     <polygon points={ptsIn([isoIn(0, 0), isoIn(0, 10), isoIn(0, 10, H), isoIn(0, 0, H)])} fill="url(#ow-wall)" />
-    <polygon points={ptsIn([isoIn(0, 0), isoIn(10, 0), isoIn(10, 0, H), isoIn(0, 0, H)])} fill={shade(p.secondary, 0.76)} />
-    {[1.5, 4.5, 7.5].map((t) => <polygon key={`wl${t}`} points={ptsIn([isoIn(0, t, 40), isoIn(0, t + 1.6, 40), isoIn(0, t + 1.6, 96), isoIn(0, t, 96)])} fill="#bfdbfe" opacity=".85" />)}
+    <polygon points={ptsIn([isoIn(0, 0), isoIn(10, 0), isoIn(10, 0, H), isoIn(0, 0, H)])} fill={shabby ? "#aea89b" : shade(p.secondary, 0.76)} />
+    {[1.5, 4.5, 7.5].map((t) => <polygon key={`wl${t}`} points={ptsIn([isoIn(0, t, 40), isoIn(0, t + 1.6, 40), isoIn(0, t + 1.6, 96), isoIn(0, t, 96)])} fill={shabby ? "#c9c2a8" : "#bfdbfe"} opacity={shabby ? 0.55 : 0.85} />)}
     {[6.2, 8.2].map((t) => <polygon key={`wr${t}`} points={ptsIn([isoIn(t, 0, 40), isoIn(t + 1.4, 0, 40), isoIn(t + 1.4, 0, 96), isoIn(t, 0, 96)])} fill="#bfdbfe" opacity=".85" />)}
     {p.logo ? (() => { const c = isoIn(3.4, 0, 82); return <image href={p.logo} x={c[0] - 34} y={c[1] - 26} width="68" height="44" preserveAspectRatio="xMidYMid meet" transform={`skewY(-26.6) translate(0 ${c[0] * Math.tan(26.6 * Math.PI / 180)})`} />; })() : null}
     {tech >= 3 && (() => { const a = isoIn(4.4, 0, 30), b = isoIn(5.9, 0, 30); return <g><polygon points={ptsIn([a, b, [b[0], b[1] - 40], [a[0], a[1] - 40]])} fill="#0f172a" stroke="#334155" strokeWidth="2" /><polygon points={ptsIn([[a[0] + 4, a[1] - 4], [b[0] - 4, b[1] - 2], [b[0] - 4, b[1] - 36], [a[0] + 4, a[1] - 38]])} fill={p.primary} opacity=".35" className="ow-screen" /></g>; })()}
+    {shabby && <g className="ow-grime">
+      {/* cracks and cobwebs */}
+      <path d={`M${isoIn(0, 2.4, 110)[0]} ${isoIn(0, 2.4, 110)[1]} l8 14 -5 10 9 16`} stroke="#6b6458" strokeWidth="1.5" fill="none" />
+      <path d={`M${isoIn(7.4, 0, 112)[0]} ${isoIn(7.4, 0, 112)[1]} l-6 12 7 8 -4 14`} stroke="#6b6458" strokeWidth="1.5" fill="none" />
+      {[isoIn(0, 0, H), isoIn(0, 10, H), isoIn(10, 0, H)].map((c, i) => <g key={i} transform={`translate(${c[0]} ${c[1] + 2})`} opacity=".75"><path d="M0 0 L-22 22 M0 0 L0 28 M0 0 L22 22 M-11 11 Q0 16 11 11 M-17 17 Q0 24 17 17 M-6 6 Q0 9 6 6" stroke="#f5f5f4" strokeWidth=".9" fill="none" /></g>)}
+    </g>}
     {/* floor */}
     <polygon points={ptsIn([isoIn(0, 0), isoIn(10, 0), isoIn(10, 10), isoIn(0, 10)])} fill={floorA} />
     {Array.from({ length: 10 }).map((_, i) => <polygon key={i} points={ptsIn([isoIn(i, 0), isoIn(i + 0.5, 0), isoIn(i + 0.5, 10), isoIn(i, 10)])} fill={floorB} opacity=".6" />)}
     {flooring >= 2 && Array.from({ length: 10 }).map((_, i) => <line key={`fl${i}`} x1={isoIn(0, i)[0]} y1={isoIn(0, i)[1]} x2={isoIn(10, i)[0]} y2={isoIn(10, i)[1]} stroke={flooring >= 3 ? "#d4a017" : "#d6d3d1"} strokeWidth={flooring >= 3 ? 0.8 : 1} opacity=".6" />)}
+    {flooring === 0 && [[2.2, 5.0, 26], [7.6, 2.0, 20], [5.2, 7.8, 30], [4.6, 3.1, 16]].map(([sx, sy, r], i) => { const c = isoIn(sx, sy); return <ellipse key={`st${i}`} cx={c[0]} cy={c[1]} rx={r} ry={r / 2} fill="#7a5c3a" opacity=".22" />; })}
+    {shabby && <g>{(() => { const c = isoIn(5, 5, H - 10); return <g><line x1={c[0]} y1={c[1] - 30} x2={c[0]} y2={c[1]} stroke="#3f3f46" /><circle cx={c[0]} cy={c[1] + 4} r="5" fill="#fef9c3" className="ow-flicker" /><circle cx={c[0]} cy={c[1] + 4} r="22" fill="#fef9c3" opacity=".12" className="ow-flicker" /></g>; })()}
+      {(() => { const c = isoIn(9.4, 3.2); return <g><rect x={c[0] - 7} y={c[1] - 16} width="14" height="16" rx="2" fill="#57534e" /><circle cx={c[0] - 3} cy={c[1] - 18} r="4" fill="#e7e5e4" /><circle cx={c[0] + 4} cy={c[1] - 19} r="3.5" fill="#d6d3d1" /></g>; })()}
+      <BoxIn x={3.6} y={6.9} w={0.6} d={0.5} h={14} color="#b07c4a" /><BoxIn x={3.75} y={6.95} w={0.4} d={0.35} h={10} z={14} color="#a16f40" /></g>}
     {/* artwork on the walls */}
     {art >= 1 && [[0, 3.3], [0, 6.4]].map(([, t], i) => { const a = isoIn(0, t, 50), b = isoIn(0, t + 1.0, 50); return <polygon key={`art${i}`} points={ptsIn([a, b, [b[0], b[1] - 34], [a[0], a[1] - 34]])} fill={art >= 2 ? (i ? "#7c3aed" : "#0f766e") : "#f5f5f4"} stroke={art >= 2 ? "#d4a017" : "#a8a29e"} strokeWidth="2.5" />; })}
     {art >= 3 && (() => { const c = isoIn(5.0, 6.2); return <g><rect x={c[0] - 7} y={c[1] - 14} width="14" height="14" fill="#e7e5e4" /><path d={`M${c[0] - 8} ${c[1] - 14} q8 -30 16 0 z`} fill="#d4a017" /></g>; })()}
     {/* zone rugs (tap a department) */}
-    {(Object.keys(ZONES) as Array<RoomId | "break">).map((id) => { const z = ZONES[id]; const col = id === "break" ? "#a8a29e" : id === "boss" ? p.primary : EMPLOYEES[id].colour; const on = id === selected; return <polygon key={id} className={`ow-zone${on ? " on" : ""}`} points={ptsIn([isoIn(z.x + 0.15, z.y + 0.15), isoIn(z.x + z.w - 0.15, z.y + 0.15), isoIn(z.x + z.w - 0.15, z.y + z.d - 0.15), isoIn(z.x + 0.15, z.y + z.d - 0.15)])} fill={shade(col, 0.55)} opacity={on ? 0.95 : 0.7} stroke={on ? col : "none"} strokeWidth="3" onClick={id === "break" ? undefined : zoneTap(id)} role={id === "break" ? undefined : "button"} aria-label={id === "break" ? "Break room" : ROOM_NAME[id]} />; })}
+    {(Object.keys(ZONES) as Array<RoomId | "break">).filter((id) => agency ? id !== "break" : id !== "leadgen").map((id) => { const z = ZONES[id]; const col = id === "break" ? "#a8a29e" : id === "boss" ? p.primary : id === "leadgen" ? "#0e7490" : EMPLOYEES[id].colour; const on = id === selected; return <polygon key={id} className={`ow-zone${on ? " on" : ""}`} points={ptsIn([isoIn(z.x + 0.15, z.y + 0.15), isoIn(z.x + z.w - 0.15, z.y + 0.15), isoIn(z.x + z.w - 0.15, z.y + z.d - 0.15), isoIn(z.x + 0.15, z.y + z.d - 0.15)])} fill={shade(col, 0.55)} opacity={on ? 0.95 : 0.7} stroke={on ? col : "none"} strokeWidth="3" onClick={id === "break" ? undefined : zoneTap(id)} role={id === "break" ? undefined : "button"} aria-label={id === "break" ? "Break room" : ROOM_NAME[id]} />; })}
     {/* boss office glass */}
     {office >= 2 && <g opacity=".55"><polygon points={ptsIn([isoIn(0.3, 6.6), isoIn(6.4, 6.6), isoIn(6.4, 6.6, 70), isoIn(0.3, 6.6, 70)])} fill="#bae6fd" /><polygon points={ptsIn([isoIn(6.4, 6.6), isoIn(6.4, 9.7), isoIn(6.4, 9.7, 70), isoIn(6.4, 6.6, 70)])} fill="#bae6fd" /></g>}
     {/* break room */}
-    {(() => { const z = ZONES.break; return <g><BoxIn x={z.x + 0.4} y={z.y + 0.4} w={brk >= 3 ? 2.0 : 1.0} d={0.7} h={18} color={brk >= 3 ? "#f5f5f4" : "#d6d3d1"} />{brk >= 1 && (() => { const c = isoIn(z.x + 0.8, z.y + 0.7, 18); return <rect x={c[0] - 4} y={c[1] - 10} width="8" height="10" rx="2" fill={brk >= 2 ? "#18181b" : "#e5e7eb"} />; })()}{brk >= 2 && (() => { const c = isoIn(z.x + 0.8, z.y + 0.7, 40); return <g className="ow-steam"><circle cx={c[0]} cy={c[1]} r="3" fill="#e5e7eb" /></g>; })()}{brk >= 3 && <BoxIn x={z.x + 1.0} y={z.y + 1.7} w={1.2} d={0.8} h={16} color="#e7e5e4" top="#fafaf9" />}</g>; })()}
+    {(() => { const z = breakZone; return <g><BoxIn x={z.x + 0.4} y={z.y + 0.4} w={brk >= 3 ? 2.0 : 1.0} d={0.7} h={18} color={brk >= 3 ? "#f5f5f4" : "#d6d3d1"} />{brk >= 1 && (() => { const c = isoIn(z.x + 0.8, z.y + 0.7, 18); return <rect x={c[0] - 4} y={c[1] - 10} width="8" height="10" rx="2" fill={brk >= 2 ? "#18181b" : "#e5e7eb"} />; })()}{brk >= 2 && (() => { const c = isoIn(z.x + 0.8, z.y + 0.7, 40); return <g className="ow-steam"><circle cx={c[0]} cy={c[1]} r="3" fill="#e5e7eb" /></g>; })()}{brk >= 3 && <BoxIn x={z.x + 1.0} y={z.y + 1.7} w={1.2} d={0.8} h={16} color="#e7e5e4" top="#fafaf9" />}</g>; })()}
     {/* departments: person behind desk */}
-    {roomOrder.map((id) => { const z = ZONES[id]; const cx = z.x + z.w / 2 - 0.7, cy = z.y + z.d / 2 - 0.2; const look = id === "boss" ? ownerLook : EMP_LOOK[id]; const appr = id === "boss" ? undefined : approaches.find((a) => a.employee === id); const at = isoIn(cx + 0.7, cy - 0.35);
+    {roomOrder.map((id) => { const z = ZONES[id]; const cx = z.x + z.w / 2 - 0.7, cy = z.y + z.d / 2 - 0.2; const look = id === "boss" ? ownerLook : EMP_LOOK[id as EmployeeId]; const appr = id === "boss" ? undefined : approaches.find((a) => a.employee === id); const at = isoIn(cx + 0.7, cy - 0.35);
       return <g key={id} className="ow-dept" onClick={zoneTap(id)} role="button" tabIndex={0} aria-label={`${ROOM_NAME[id]}${appr ? `: ${appr.line}` : ""}`} onKeyDown={(e) => { if (e.key === "Enter") onSelect(id); }}>
-        <Bean at={at} scale={1.55} look={look} mood={appr?.mood || "calm"} className={`staff ${appr ? "talking" : ""}`} label="" alert={Boolean(appr && appr.urgency >= 75)} />
+        <Bean at={at} scale={1.55} look={bare && id !== "boss" ? { ...look, color: shade(look.color, -0.1) } : look} mood={appr?.mood || (bare && id !== "boss" ? "tired" : "calm")} className={`staff ${appr ? "talking" : ""} ${bare && id !== "boss" ? "slouch" : ""}`} label="" alert={Boolean(appr && appr.urgency >= 75)} />
         {!(id === "boss" && office === 0) && <Desk x={cx} y={cy} furniture={id === "boss" ? Math.max(furniture, office >= 3 ? 3 : 0) : furniture} tech={tech} primary={p.primary} />}
         {id === "boss" && office >= 3 && <g><BoxIn x={z.x + 0.5} y={z.y + 1.9} w={1.6} d={0.6} h={10} color="#57534e" /><BoxIn x={z.x + 0.5} y={z.y + 1.9} w={0.3} d={0.6} h={16} color="#44403c" /></g>}
       </g>; })}
     {/* meeting room in your office */}
     {meeting >= 1 && <g><BoxIn x={3.6} y={7.3} w={meeting >= 2 ? 2.2 : 1.4} d={1.2} h={14} color={meeting >= 2 ? "#3b2a1e" : "#a8a29e"} />{Array.from({ length: meeting >= 2 ? 6 : 4 }).map((_, i) => { const c = isoIn(3.5 + (i % (meeting >= 2 ? 3 : 2)) * 0.8, i < (meeting >= 2 ? 3 : 2) ? 7.1 : 8.7); return <rect key={i} x={c[0] - 4} y={c[1] - 9} width="8" height="8" rx="2" fill="#27272a" />; })}{meeting >= 3 && (() => { const a = isoIn(0, 8.6, 40), b = isoIn(0, 9.8, 40); return <polygon points={ptsIn([a, b, [b[0], b[1] - 36], [a[0], a[1] - 36]])} fill="#0f172a" stroke={p.primary} strokeWidth="2" className="ow-screen" />; })()}</g>}
     {/* department name plates */}
-    {(Object.keys(ROOM_NAME) as RoomId[]).map((id) => { const z = ZONES[id]; const c = isoIn(z.x + z.w / 2, z.y + z.d - 0.25); const label = ROOM_NAME[id]; const n = id === "boss" ? 0 : (boards?.[id as EmployeeId]?.stats?.[0]?.value || ""); return <g key={`pl-${id}`} className="ow-plate-in" onClick={zoneTap(id)} transform={`translate(${c[0]} ${c[1] + 6})`}><rect x={-label.length * 3.4 - 9} y="-10" width={label.length * 6.8 + 18} height="18" rx="9" fill={id === selected ? "#111827" : "rgba(17,24,39,.72)"} /><text y="3" textAnchor="middle" fontSize="10" fontWeight="800" fill="#fff">{label}</text>{n && n !== "0" && /^\d+$/.test(String(n)) ? <g transform={`translate(${label.length * 3.4 + 10} -9)`}><circle r="8" fill="#dc2626" stroke="#fff" strokeWidth="1.5" /><text y="3.5" textAnchor="middle" fontSize="9" fontWeight="900" fill="#fff">{n}</text></g> : null}</g>; })}
+    {(Object.keys(ROOM_NAME) as RoomId[]).filter((id) => agency || id !== "leadgen").map((id) => { const z = ZONES[id]; const c = isoIn(z.x + 0.35, z.y + 0.35, 2); const label = ROOM_NAME[id].toUpperCase(); const n = id === "boss" || id === "leadgen" ? 0 : (boards?.[id as EmployeeId]?.stats?.[0]?.value || ""); return <g key={`pl-${id}`} className="ow-plate-in" onClick={zoneTap(id)} transform={`translate(${c[0]} ${c[1] - 6})`}><rect x={-label.length * 4.1 - 12} y="-12" width={label.length * 8.2 + 24} height="23" rx="11.5" fill={id === selected ? (id === "boss" ? p.primary : id === "leadgen" ? "#0e7490" : EMPLOYEES[id as EmployeeId].colour) : "rgba(17,24,39,.82)"} stroke="#fff" strokeWidth="1.5" /><text y="4" textAnchor="middle" fontSize="11.5" fontWeight="900" letterSpacing=".6" fill="#fff">{label}</text>{n && n !== "0" && /^\d+$/.test(String(n)) ? <g transform={`translate(${label.length * 4.1 + 13} -11)`}><circle r="8" fill="#dc2626" stroke="#fff" strokeWidth="1.5" /><text y="3.5" textAnchor="middle" fontSize="9" fontWeight="900" fill="#fff">{n}</text></g> : null}</g>; })}
     {/* decor */}
     {decor >= 2 && [[0.3, 3.2], [3.2, 0.3], [9.6, 3.2], [0.3, 9.4], [6.4, 0.3]].map(([px, py], i) => { const c = isoIn(px, py); return <g key={i}><rect x={c[0] - 5} y={c[1] - 10} width="10" height="10" rx="2" fill="#78716c" /><circle cx={c[0]} cy={c[1] - 18} r="9" fill="#3f6212" /><circle cx={c[0] - 5} cy={c[1] - 13} r="6" fill="#4d7c0f" /></g>; })}
     {decor >= 1 && [[2, 2], [5, 2], [8, 2], [2, 5], [5, 5], [8, 5], [8, 8]].map(([lx, ly], i) => { const c = isoIn(lx, ly, H - 18); return <g key={i}><line x1={c[0]} y1={c[1] - 14} x2={c[0]} y2={c[1]} stroke="#52525b" /><circle cx={c[0]} cy={c[1] + 3} r="5" fill="#fde68a" className={decor >= 3 ? "ow-sparkle" : ""} /><circle cx={c[0]} cy={c[1] + 3} r="14" fill="#fde68a" opacity=".15" /></g>; })}
+    {/* Lead generation team (agency): Leo runs Lead Factory, Olive runs Outreach */}
+    {agency && LEADGEN_TEAM.map((m, i) => { const z = ZONES.leadgen; const cx = z.x + 0.15 + i * 1.45, cy = z.y + z.d / 2 - 0.2; const at = isoIn(cx + 0.55, cy - 0.35); return <g key={m.name} className="ow-dept" onClick={zoneTap("leadgen")} role="button" tabIndex={0} aria-label={`Lead generation: ${m.name}, ${m.title}`} onKeyDown={(e) => { if (e.key === "Enter") onSelect("leadgen"); }}><Bean at={at} scale={1.5} look={m.look} mood={bare ? "tired" : "calm"} className={`staff ${bare ? "slouch" : ""}`} label="" /><Desk x={cx} y={cy} furniture={furniture} tech={tech} primary={p.primary} /></g>; })}
     {/* AI agents at work (or snoozing in the break room) and team members on jobs */}
     {(data.agents || []).map((a, i) => { const at = a.state === "working" ? isoIn(1.2 + (i % 3) * 0.8, 2.9 + Math.floor(i / 3) * 0.6) : isoIn(4.2 + i * 0.6, 5.9); return <g key={a.id} transform={`translate(${at[0]} ${at[1]}) scale(1.3)`}><Robot sleeping={a.state !== "working"} label={`${a.name}: ${a.state === "working" ? "working on" : "scheduled —"} ${a.task}`} /></g>; })}
     {(data.staffAtWork || []).map((m, i) => <Bean key={m.id} at={isoIn(7.2 + i * 0.6, 6.1)} scale={1.4} look={{ color: "#3f5f6f", tie: true }} className="staff" label={`${m.name}: ${m.task}`} />)}
@@ -426,8 +467,8 @@ function HQInterior({ data, wallet, approaches, selected, onSelect, reduced, cus
 
 /** Live board for a department: real stats, latest activity and buttons into the CRM. */
 function DeptPanel({ id, data, wallet, approach, onOpen, onAct, onCharacter }: { id: RoomId; data: WorldData; wallet: Wallet; approach?: Approach; onOpen: (k: PanelKind) => void; onAct: (a: "upgrades" | "history" | "settings") => void; onCharacter: () => void }) {
-  const person = id === "boss" ? { name: data.profile.characterName, title: "Owner" } : EMPLOYEES[id];
-  const board = id === "boss" ? null : data.departments?.[id];
+  const person = id === "boss" ? { name: data.profile.characterName, title: "Owner" } : id === "leadgen" ? { name: "Leo & Olive", title: "Lead generation" } : EMPLOYEES[id];
+  const board = id === "boss" ? null : id === "leadgen" ? (data.leadgen ? { headline: "Finding and contacting new clients", stats: [...data.leadgen.factory.stats, { label: "Outreach", value: data.leadgen.outreach.live ? "Live" : "Not live yet" }], feed: data.leadgen.factory.feed } : null) : data.departments?.[id];
   const actions: Record<RoomId, Array<{ label: string; panel?: PanelKind; act?: "upgrades" | "history" | "settings" | "character" }>> = {
     receptionist: [{ label: "Reply to new leads", panel: "lead-replies" }, { label: "Conversations", panel: "conversations" }, { label: "Contacts", panel: "contacts" }],
     sales: [{ label: "Open the pipeline", panel: "leads" }, { label: "Contacts", panel: "contacts" }],
@@ -435,11 +476,13 @@ function DeptPanel({ id, data, wallet, approach, onOpen, onAct, onCharacter }: {
     calendar: [{ label: "Book & manage appointments", panel: "scheduling" }],
     projects: [{ label: "Task list", panel: "tasks" }, { label: "New task", panel: "task" }],
     marketing: [{ label: "Contacts", panel: "contacts" }],
+    leadgen: [{ label: "Leo · Open Lead Factory", panel: "lead-factory" }, { label: "Olive · Outreach", panel: "outreach" }],
     boss: [{ label: "Customise character", act: "character" }, { label: "Upgrades", act: "upgrades" }, { label: "Rewards & history", act: "history" }, { label: "Settings", act: "settings" }],
   };
   return <div className="ow-dept-panel" key={id}>
-    <div className="ow-dept-head"><span className="ow-speaker" style={{ background: id === "boss" ? data.profile.primary : EMPLOYEES[id].colour }}>{person.name.charAt(0)}</span><div><small>{ROOM_NAME[id]} · {person.name}, {person.title}</small><p className={approach && approach.urgency >= 75 ? "shout" : ""}>{approach ? approach.line : board ? board.headline : `${wallet.coins.toLocaleString("en-IE")} coins · Level ${wallet.level}`}</p></div><span className="ow-live"><i /> Live</span></div>
+    <div className="ow-dept-head"><span className="ow-speaker" style={{ background: id === "boss" ? data.profile.primary : id === "leadgen" ? "#0e7490" : EMPLOYEES[id].colour }}>{person.name.charAt(0)}</span><div><small>{ROOM_NAME[id]} · {person.name}, {person.title}</small><p className={approach && approach.urgency >= 75 ? "shout" : ""}>{approach ? approach.line : board ? board.headline : `${wallet.coins.toLocaleString("en-IE")} coins · Level ${wallet.level}`}</p></div><span className="ow-live"><i /> Live</span></div>
     {board && <div className="ow-dept-stats">{board.stats.map((s) => <div key={s.label}><b>{s.value}</b><small>{s.label}</small></div>)}</div>}
+    {upgradeTier(wallet.owned, "furniture") === 0 && id !== "boss" && id !== "leadgen" && <p className="ow-hint">Working off cardboard boxes… Upgrade <b>Office furniture</b> and <b>Office tech</b> to give {person.name} a proper desk.</p>}
     {board && board.feed.length > 0 && <ul className="ow-dept-feed">{board.feed.map((f, i) => <li key={i}><span>{f.text}</span><time>{new Date(f.at).toLocaleString("en-IE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</time></li>)}</ul>}
     {board && !board.feed.length && <p className="ow-muted">Nothing new yet — updates appear here as they happen.</p>}
     <div className="ow-options">{actions[id].map((a, i) => <button type="button" key={a.label} className={i === 0 ? "" : "ghost"} onClick={() => { if (a.panel) onOpen(a.panel); else if (a.act === "character") onCharacter(); else if (a.act) onAct(a.act); }}>{a.label}</button>)}</div>
@@ -482,6 +525,73 @@ function CharacterEditor({ data, wardrobe, onSave, onClose }: { data: WorldData;
     </div>
     <div className="ow-options"><button type="button" disabled={busy} onClick={async () => { setBusy(true); setMsg(""); try { await onSave(look); setMsg("Looking sharp!"); } catch (e) { setMsg(e instanceof Error ? e.message : "Couldn't save."); } finally { setBusy(false); } }}>{busy ? <Loader2 size={14} className="ow-spin" /> : <Check size={14} />} Save look</button><button type="button" className="ghost" onClick={onClose}>Done</button>{msg && <span className="ow-ok">{msg}</span>}</div>
   </div></div>;
+}
+
+
+// ───────────── Mini-game: Receipt Rush (defend against the Tax Man) ─────────────
+function ReceiptRush({ stolen, demo, onDone, sound }: { stolen: number; demo: boolean; onDone: (score: number) => void; sound: boolean }) {
+  type R = { id: number; x: number; y: number; born: number; caught?: boolean };
+  const TOTAL = 10, LIFE = 1300, GAME = 9000;
+  const [items, setItems] = useState<R[]>([]);
+  const [caught, setCaught] = useState(0);
+  const [phase, setPhase] = useState<"ready" | "play" | "done">("ready");
+  const [left, setLeft] = useState(GAME / 1000);
+  const spawned = useRef(0);
+  useEffect(() => {
+    if (phase !== "play") return;
+    const start = Date.now();
+    const spawn = setInterval(() => {
+      if (spawned.current >= TOTAL) return;
+      spawned.current += 1; const id = spawned.current;
+      setItems((all) => [...all, { id, x: 8 + Math.random() * 84, y: 18 + Math.random() * 60, born: Date.now() }]);
+      setTimeout(() => setItems((all) => all.filter((r) => r.id !== id || r.caught)), LIFE);
+    }, (GAME - LIFE) / TOTAL);
+    const tick = setInterval(() => { const t = Math.max(0, GAME - (Date.now() - start)); setLeft(Math.ceil(t / 1000)); if (t <= 0) { clearInterval(tick); clearInterval(spawn); setPhase("done"); } }, 200);
+    return () => { clearInterval(spawn); clearInterval(tick); };
+  }, [phase]);
+  const score = Math.min(1, caught / TOTAL), saved = Math.round(stolen * score);
+  return <div className="ow-game" role="dialog" aria-label="Receipt Rush mini-game">
+    {phase === "ready" && <div className="ow-game-card"><b>Receipt Rush!</b><p>The Tax Man is grabbing {stolen} coins{demo ? " (demo)" : ""}. Tap the receipts as they appear to prove your expenses and win coins back.</p><button type="button" onClick={() => { setPhase("play"); if (sound) chime("select"); }}>Defend!</button><button type="button" className="ghost" onClick={() => onDone(0)}>Let him have them</button></div>}
+    {phase === "play" && <><div className="ow-game-hud"><span>Caught {caught}/{TOTAL}</span><span>{left}s</span></div>
+      {items.map((r) => <button type="button" key={r.id} className={`ow-receipt${r.caught ? " got" : ""}`} style={{ left: `${r.x}%`, top: `${r.y}%` }} aria-label="Receipt" onClick={() => { if (r.caught) return; setItems((all) => all.map((x) => x.id === r.id ? { ...x, caught: true } : x)); setCaught((n) => n + 1); if (sound) chime("coin"); setTimeout(() => setItems((all) => all.filter((x) => x.id !== r.id)), 350); }}><svg viewBox="0 0 30 38" width="44" height="56" aria-hidden="true"><path d="M2 2 h26 v34 l-4 -3 -4 3 -4 -3 -4 3 -4 -3 -4 3 -2 -1.5z" fill="#fff" stroke="#94a3b8" strokeWidth="1.5" /><path d="M7 10 h16 M7 15 h16 M7 20 h10" stroke="#94a3b8" strokeWidth="1.5" /><text x="20" y="29" fontSize="7" fontWeight="900" fill="#16a34a">€✓</text></svg></button>)}</>}
+    {phase === "done" && <div className="ow-game-card"><b>{score >= 0.7 ? "Great defence!" : score >= 0.3 ? "Not bad!" : "Ouch."}</b><p>You caught {caught} of {TOTAL} receipts and saved <strong>{saved}</strong> of {stolen} coins.{demo ? " (Demo — nothing saved.)" : ""}</p><p className="ow-muted">Add the missing receipts in Books to stop him coming back.</p><button type="button" onClick={() => onDone(score)}>Collect {saved} coins</button></div>}
+  </div>;
+}
+
+// ───────────── Guided tour with voice-over ─────────────
+type TourStep = { sel?: string; title: string; text: string };
+function GuidedTour({ steps, onClose }: { steps: TourStep[]; onClose: () => void }) {
+  const [i, setI] = useState(0);
+  const [voice, setVoice] = useState(() => readPref("ow-voice", "on") === "on");
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const step = steps[i];
+  useEffect(() => {
+    const el = step.sel ? document.querySelector(step.sel) as HTMLElement | SVGElement | null : null;
+    const update = () => setRect(el ? el.getBoundingClientRect() : null);
+    update(); const t = setInterval(update, 400); return () => clearInterval(t);
+  }, [step]);
+  useEffect(() => {
+    if (!voice || typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const synth = window.speechSynthesis; synth.cancel();
+    const u = new SpeechSynthesisUtterance(`${step.title}. ${step.text}`);
+    const v = synth.getVoices().find((x) => /en-(GB|IE)/i.test(x.lang) && /natural|neural|google|daniel|serena|libby|sonia/i.test(x.name)) || synth.getVoices().find((x) => /en-(GB|IE)/i.test(x.lang));
+    if (v) u.voice = v; u.rate = 1.02; u.pitch = 1; synth.speak(u);
+    return () => synth.cancel();
+  }, [i, voice, step]);
+  useEffect(() => () => { try { window.speechSynthesis?.cancel(); } catch { /* ignore */ } }, []);
+  const pad = 8;
+  const below = rect ? rect.bottom + 200 < window.innerHeight : false;
+  const cardStyle = rect ? { left: Math.min(Math.max(12, rect.left), window.innerWidth - 392), top: below ? rect.bottom + 14 : Math.max(12, rect.top - 190) } : { left: "50%", top: "50%", transform: "translate(-50%, -50%)" };
+  return <div className="ow-tour" role="dialog" aria-label="Guided tour">
+    {rect ? <div className="ow-tour-spot" style={{ left: rect.left - pad, top: rect.top - pad, width: rect.width + pad * 2, height: rect.height + pad * 2 }} /> : <div className="ow-tour-dim" />}
+    <div className="ow-tour-card" style={cardStyle as CSSProperties}>
+      <small>Step {i + 1} of {steps.length}</small><b>{step.title}</b><p>{step.text}</p>
+      <div className="ow-options"><button type="button" className="ghost" onClick={() => { const n = !voice; setVoice(n); writePref("ow-voice", n ? "on" : "off"); if (!n) window.speechSynthesis?.cancel(); }} aria-label={voice ? "Mute voice-over" : "Turn voice-over on"}>{voice ? <Volume2 size={14} /> : <VolumeX size={14} />} Voice</button>
+        {i > 0 && <button type="button" className="ghost" onClick={() => setI(i - 1)}>Back</button>}
+        {i < steps.length - 1 ? <button type="button" onClick={() => setI(i + 1)}>Next <ChevronRight size={14} /></button> : <button type="button" onClick={onClose}>Let's play</button>}
+        <button type="button" className="ghost" onClick={onClose}>Skip</button></div>
+    </div>
+  </div>;
 }
 
 // ───────────── Demo scenario (clearly labelled; never touches real data) ─────────────
@@ -531,6 +641,8 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
   const [zooming, setZooming] = useState(false);
   const [charOpen, setCharOpen] = useState(false);
   const [sideOpen, setSideOpen] = useState(false);
+  const [defence, setDefence] = useState<{ keys: string[]; stolen: number; demo: boolean } | null>(null);
+  const [tour, setTour] = useState(false);
   const [raid, setRaid] = useState<{ coins: number; count: number; n: number } | null>(null);
   const [bubble, setBubble] = useState<{ text: string; at: [number, number]; n: number } | null>(null);
   const bubbleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -558,8 +670,9 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
         toast(next.freshRewards.map((r) => ({ employee: EMPLOYEE_FOR_REWARD[r.kind] || "receptionist", text: `${reactionLine(r.kind, seed + r.key)} Tap the coins to collect.`, coins: r.coins })));
         if (prefs.current.sound) chime("pop");
       }
+      if (!lastLevel.current && readPref("ow-tour-done", "") !== "1") setTimeout(() => setTour(true), 900);
       // Logging on: a walkthrough of what the team earned and why (once per session per account).
-      if (!lastLevel.current && next.wallet.pending.length && !readSession(`ow-walk:${scope}`)) {
+      else if (!lastLevel.current && next.wallet.pending.length && !readSession(`ow-walk:${scope}`)) {
         setWalk({ steps: rewardWalkthrough(next.wallet.pending, seed), at: 0 });
         writeSession(`ow-walk:${scope}`, "1");
         if (prefs.current.sound) chime("coin"); // browsers may hold this until the first tap
@@ -572,6 +685,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
           if (prefs.current.sound) { chime("menace"); setTimeout(() => chime("steal"), 4200); }
           setTimeout(() => toast([{ employee: "accountant", text: coins ? `The Tax Man just stole ${coins} coins! ${next.raids!.length} expense${next.raids!.length === 1 ? " has" : "s have"} gone a week without a receipt — add receipts to keep him away.` : `The Tax Man came for coins but your wallet was empty. Add receipts to keep him away.`, coins: 0 }]), 2400);
           setTimeout(() => setRaid(null), 6200);
+          if (coins > 0) setTimeout(() => setDefence({ keys: next.raids!.map((r) => r.key), stolen: coins, demo: false }), 3000);
         }, lastLevel.current ? 200 : 1200);
       }
       lastLevel.current = next.wallet.level;
@@ -703,6 +817,14 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
     if (reduced) { setView("hq"); return; }
     setZooming(true); setTimeout(() => { setView("hq"); setZooming(false); }, 560);
   };
+  const demoRaid = () => {
+    if (view === "hq") setView("town");
+    const stolen = Math.max(15, Math.min(45, w.coins || 30));
+    setRaid({ coins: stolen, count: 2, n: Date.now() });
+    if (prefs.current.sound) { chime("menace"); setTimeout(() => chime("steal"), 4200); }
+    setTimeout(() => setRaid(null), 6200);
+    setTimeout(() => setDefence({ keys: [], stolen, demo: true }), 3000);
+  };
   const exitHQ = () => { if (prefs.current.sound) chime("door"); setView("town"); };
   const openLead = (id: string) => setPanel({ kind: "lead-detail", focusId: id });
   const tapEmployee = (id: EmployeeId) => {
@@ -744,6 +866,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
       {pendingTotal > 0 && <button type="button" className="ow-collect-all" onClick={() => void collect()} disabled={collecting}><Sparkles size={16} /> Collect {pendingTotal}</button>}
       <div className="ow-hud-actions">
         <button type="button" className={upgradesReady ? "has-dot" : ""} onClick={() => setDrawer(drawer === "upgrades" ? "" : "upgrades")} aria-label={`Upgrades${upgradesReady ? `, ${upgradesReady} ready` : ""}`} title="Upgrades"><Hammer size={18} />{upgradesReady > 0 && <i>{upgradesReady}</i>}</button>
+        <button type="button" onClick={() => setTour(true)} aria-label="Guided tour" title="Guided tour"><HelpCircle size={18} /></button>
         <button type="button" className={sideOpen ? "on" : ""} onClick={() => setSideOpen(!sideOpen)} aria-label={sideOpen ? "Hide side panel" : "Show task queue, health and quick actions"} title="Panel"><PanelRight size={18} />{approaches.length > 0 && !sideOpen && <i>{approaches.length}</i>}</button>
         <button type="button" onClick={() => setDrawer(drawer === "history" ? "" : "history")} aria-label="Rewards and action history" title="History"><History size={18} /></button>
         <button type="button" onClick={() => setDrawer(drawer === "settings" ? "" : "settings")} aria-label="Game settings" title="Settings"><Settings2 size={18} /></button>
@@ -772,7 +895,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
             <linearGradient id="ow-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#a5c8dc" /><stop offset="1" stopColor="#e8f0f4" /></linearGradient>
             <linearGradient id="ow-grass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#93b878" /><stop offset="1" stopColor="#6f9a5a" /></linearGradient>
           </defs>
-          <rect width="1000" height="560" fill="url(#ow-sky)" className="ow-sky" />
+          
           <g className="ow-clouds"><ellipse cx="140" cy="70" rx="58" ry="16" fill="#fff" opacity=".9" /><ellipse cx="180" cy="60" rx="36" ry="15" fill="#fff" opacity=".9" /><ellipse cx="820" cy="54" rx="50" ry="13" fill="#fff" opacity=".85" /><ellipse cx="860" cy="46" rx="30" ry="12" fill="#fff" opacity=".85" /></g>
           <ellipse cx="500" cy="318" rx="430" ry="214" fill="#7fa9c0" opacity=".35" className="ow-water" />
           {/* Island */}
@@ -807,19 +930,29 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
           <Pool tier={tier("pool")} primary={p.primary} />
           <Air tier={tier("air")} primary={p.primary} reduced={reduced} />
           {/* Headquarters — grows with each Headquarters tier */}
-          {(() => { const t = tier("hq"), w = t >= 2 ? 4.0 : 3.6, h = 58 + t * 22, x0 = 4.2, y0 = 4.1; const L = iso(x0, y0 + w), R = iso(x0 + w, y0 + w); const b1 = lerp(L, R, 0.18), b2 = lerp(L, R, 0.82); const apex = iso(x0 + w / 2, y0 + w / 2, h + 40); return <Spot id="b-hq" label="Enter headquarters" poked={poked} labelAt={[apex[0], apex[1] - 34]} badge={customers.length || undefined} badgeText="waiting" badgeAt={((d) => [d[0], d[1] - 44] as [number, number])(iso(x0 + w / 2, y0 + w, 0))} onTap={() => tapBuilding("hq")}>
-            <IsoBox x={x0 - 0.15} y={y0 - 0.15} w={w + 0.3} d={w + 0.3} h={8} color="#a8a29e" />
-            <IsoBox x={x0} y={y0} w={w} d={w} h={h} z={8} color={tier("renovation") >= 3 ? "#292524" : tier("renovation") >= 2 ? "#7dd3fc" : tier("renovation") >= 1 ? shade(p.primary, 0.75) : "#f5efe3"} />
-            {tier("renovation") >= 3 && <polyline points={pts([iso(x0, y0 + w, h + 8), iso(x0 + w, y0 + w, h + 8), iso(x0 + w, y0, h + 8)])} fill="none" stroke="#fbbf24" strokeWidth="3" />}
-            <IsoWindows x={x0} y={y0} w={w} d={w} floors={1 + t} floorH={22} base={22} glow={tier("interior") >= 1 || healthMood === "thriving"} />
-            {tier("interior") >= 2 && Array.from({ length: 1 + t }).map((_, f) => [0.3, 0.67].map((u) => { const a = lerp(iso(x0 + w, y0 + w), iso(x0 + w, y0), u); return <circle key={`${f}-${u}`} cx={a[0]} cy={a[1] - 22 - f * 22 - 4} r="3" fill="#16a34a" />; }))}
-            {tier("interior") >= 3 && (() => { const a = lerp(iso(x0 + w, y0 + w), iso(x0 + w, y0), 0.5); return <path className="ow-sparkle" d={`M${a[0]} ${a[1] - 40} l2 4 4 2 -4 2 -2 4 -2 -4 -4 -2 4 -2z`} fill="#fde047" />; })()}
-            {(Object.keys(EMPLOYEES) as EmployeeId[]).map((id, i) => { const a = lerp(iso(x0 + w, y0 + w), iso(x0 + w, y0), 0.06 + i * 0.155), b2x = lerp(iso(x0 + w, y0 + w), iso(x0 + w, y0), 0.06 + i * 0.155 + 0.12); return <polygon key={id} points={pts([[a[0], a[1] - 14], [b2x[0], b2x[1] - 14], [b2x[0], b2x[1] - 18], [a[0], a[1] - 18]])} fill={EMPLOYEES[id].colour} opacity=".9" />; })}
-            <IsoRoof x={x0} y={y0} w={w} d={w} z={h + 8} rise={40} color={p.secondary} />
-            <IsoDoor x={x0} y={y0} w={w} d={w} h={26} color={p.primary} />
-            <polygon points={pts([[b1[0], b1[1] - h + 2], [b2[0], b2[1] - h + 2], [b2[0], b2[1] - h + 20], [b1[0], b1[1] - h + 20]])} fill={tier("signage") >= 1 ? "#111827" : shade(p.secondary, -0.1)} stroke={tier("signage") >= 1 ? p.primary : "none"} strokeWidth="2" />
+          <IndustryProps industry={p.industry} primary={p.primary} secondary={p.secondary} />
+          {/* Headquarters: run-down shop → offices → glass skyscraper (each Headquarters tier) */}
+          {(() => { const t = tier("hq"); const tower = t >= 4; const w = tower ? 3.0 : t >= 2 ? 4.0 : 3.6, h = tower ? 150 + (t - 4) * 46 : 58 + t * 22, x0 = tower ? 4.5 : 4.2, y0 = tower ? 4.4 : 4.1; const shabbyHq = t === 0; const L = iso(x0, y0 + w), R = iso(x0 + w, y0 + w); const b1 = lerp(L, R, 0.18), b2 = lerp(L, R, 0.82); const apex = iso(x0 + w / 2, y0 + w / 2, h + (tower ? 18 : 40)); const wall = tower ? "#7dd3fc" : tier("renovation") >= 3 ? "#292524" : tier("renovation") >= 2 ? "#7dd3fc" : tier("renovation") >= 1 ? shade(p.primary, 0.75) : shabbyHq ? "#d6cfbf" : "#f5efe3"; return <Spot id="b-hq" label="Enter headquarters" poked={poked} labelAt={[apex[0], apex[1] - 34]} badge={customers.length || undefined} badgeText="waiting" badgeAt={((d) => [d[0], d[1] - 44] as [number, number])(iso(x0 + w / 2, y0 + w, 0))} onTap={() => tapBuilding("hq")}>
+            <IsoBox x={x0 - 0.15} y={y0 - 0.15} w={w + 0.3} d={w + 0.3} h={8} color={tower ? "#e2e8f0" : "#a8a29e"} />
+            <IsoBox x={x0} y={y0} w={w} d={w} h={h} z={8} color={wall} />
+            {tower ? <>
+              {Array.from({ length: Math.floor(h / 14) }).map((_, f) => <g key={f}><polyline points={pts([iso(x0, y0 + w, 8 + f * 14), iso(x0 + w, y0 + w, 8 + f * 14), iso(x0 + w, y0, 8 + f * 14)])} fill="none" stroke="#e0f2fe" strokeWidth="1.2" opacity=".9" /></g>)}
+              {[0.25, 0.5, 0.75].map((u) => { const a = lerp(iso(x0, y0 + w), iso(x0 + w, y0 + w), u), b = lerp(iso(x0 + w, y0 + w), iso(x0 + w, y0), u); return <g key={u}><line x1={a[0]} y1={a[1] - 8} x2={a[0]} y2={a[1] - 8 - h} stroke="#bae6fd" strokeWidth="1" /><line x1={b[0]} y1={b[1] - 8} x2={b[0]} y2={b[1] - 8 - h} stroke="#93c5fd" strokeWidth="1" /></g>; })}
+              <IsoBox x={x0 + 0.3} y={y0 + 0.3} w={w - 0.6} d={w - 0.6} h={14} z={h + 8} color="#e2e8f0" />
+              {(() => { const c = iso(x0 + w / 2, y0 + w / 2, h + 22); return <g><rect x={c[0] - 1.5} y={c[1] - 44} width="3" height="44" fill="#94a3b8" /><circle cx={c[0]} cy={c[1] - 46} r="3" fill="#ef4444" className="ow-led" /></g>; })()}
+              {p.logo && (() => { const c = lerp(iso(x0 + w, y0 + w), iso(x0 + w, y0), 0.5); return <image href={p.logo} x={c[0] - 24} y={c[1] - h + 10} width="48" height="40" preserveAspectRatio="xMidYMid meet" />; })()}
+            </> : <>
+              <IsoWindows x={x0} y={y0} w={w} d={w} floors={1 + t} floorH={22} base={22} glow={tier("interior") >= 1 || healthMood === "thriving"} />
+              {(Object.keys(EMPLOYEES) as EmployeeId[]).map((id, i) => { const a = lerp(iso(x0 + w, y0 + w), iso(x0 + w, y0), 0.06 + i * 0.155), b2x = lerp(iso(x0 + w, y0 + w), iso(x0 + w, y0), 0.06 + i * 0.155 + 0.12); return <polygon key={id} points={pts([[a[0], a[1] - 14], [b2x[0], b2x[1] - 14], [b2x[0], b2x[1] - 18], [a[0], a[1] - 18]])} fill={EMPLOYEES[id].colour} opacity=".9" />; })}
+              <IsoRoof x={x0} y={y0} w={w} d={w} z={h + 8} rise={40} color={shabbyHq ? "#57534e" : p.secondary} />
+            </>}
+            {shabbyHq && <g className="ow-shabby">{(() => { const a = lerp(iso(x0 + w, y0 + w), iso(x0 + w, y0), 0.62); return <g><rect x={a[0] - 2} y={a[1] - 44} width="26" height="16" fill="#a16207" transform={`rotate(-8 ${a[0]} ${a[1] - 36})`} /><rect x={a[0] - 2} y={a[1] - 38} width="26" height="4" fill="#78350f" transform={`rotate(10 ${a[0]} ${a[1] - 36})`} /></g>; })()}
+              {[0.3, 0.7].map((u) => { const a = lerp(L, R, u); return <path key={u} d={`M${a[0]} ${a[1] - 50} l4 8 -3 6 5 9`} stroke="#78716c" strokeWidth="1.3" fill="none" />; })}
+              {[[x0 - 0.3, y0 + w + 0.1], [x0 + w + 0.1, y0 + 1]].map(([gx, gy], i) => { const [sx, sy] = iso(gx, gy); return <path key={i} d={`M${sx - 6} ${sy} q2 -12 4 0 M${sx} ${sy} q1 -15 3 0 M${sx + 4} ${sy} q3 -11 5 0`} fill="#4d7c0f" />; })}</g>}
+            <IsoDoor x={x0} y={y0} w={w} d={w} h={26} color={tower ? "#0f172a" : p.primary} />
+            {!tower && <><polygon points={pts([[b1[0], b1[1] - h + 2], [b2[0], b2[1] - h + 2], [b2[0], b2[1] - h + 20], [b1[0], b1[1] - h + 20]])} fill={tier("signage") >= 1 ? "#111827" : shade(p.secondary, -0.1)} stroke={tier("signage") >= 1 ? p.primary : "none"} strokeWidth="2" />
             {p.logo && (() => { const m = lerp(b1, b2, 0.08); return <image href={p.logo} x={m[0] - 2} y={m[1] - h + 2} width="16" height="16" preserveAspectRatio="xMidYMid meet" transform={`rotate(26.6 ${m[0] + 6} ${m[1] - h + 10})`} />; })()}
-            {(() => { const m = lerp(b1, b2, 0.5); return <text x={m[0]} y={m[1] - h + 15} textAnchor="middle" fontSize="9.5" fontWeight="900" fill="#fff" transform={`rotate(26.6 ${m[0]} ${m[1] - h + 11})`}>{p.name.length > 16 ? `${p.name.slice(0, 15)}…` : p.name}</text>; })()}
+            {(() => { const m = lerp(b1, b2, 0.5); return <text x={m[0]} y={m[1] - h + 15} textAnchor="middle" fontSize="9.5" fontWeight="900" fill="#fff" transform={`rotate(26.6 ${m[0]} ${m[1] - h + 11})`}>{p.name.length > 16 ? `${p.name.slice(0, 15)}…` : p.name}</text>; })()}</>}
             <g className="ow-flag" transform={`translate(${apex[0]} ${apex[1]})`}><rect x="-1.2" y="-30" width="2.4" height="30" fill="#57534e" /><path d="M1 -30 L22 -24 L1 -18 Z" fill={p.primary} /></g>
             {tier("signage") >= 2 && <g className="ow-neon" transform={`translate(${apex[0]} ${apex[1] + 22})`}><rect x="-62" y="-12" width="124" height="20" rx="6" fill="#111827" stroke={p.primary} strokeWidth="2" /><text y="3" textAnchor="middle" fontSize="10" fontWeight="900" fill="#fff">{p.name.slice(0, 18).toUpperCase()}</text></g>}
             {healthMood === "struggling" && <g className="ow-storm" transform={`translate(${apex[0]} ${apex[1] - 60})`}><ellipse cx="0" cy="0" rx="36" ry="13" fill="#64748b" /><ellipse cx="-20" cy="4" rx="20" ry="10" fill="#475569" /></g>}
@@ -873,7 +1006,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
         </svg>
         </div>}
 
-        {view === "hq" ? <DeptPanel id={room} data={data} wallet={w} approach={room === "boss" ? undefined : approaches.find((a) => a.employee === room)} onOpen={(k) => { if (!demo) setPanel({ kind: k }); }} onAct={(a) => setDrawer(a)} onCharacter={() => setCharOpen(true)} /> :
+        {view === "hq" ? <DeptPanel id={room} data={data} wallet={w} approach={room === "boss" || room === "leadgen" ? undefined : approaches.find((a) => a.employee === room)} onOpen={(k) => { if (!demo) setPanel({ kind: k }); }} onAct={(a) => setDrawer(a)} onCharacter={() => setCharOpen(true)} /> :
         <div className={`ow-dialogue${current ? "" : " clear"}`} aria-live="polite">
           {current ? <>
             <div className="ow-speaker" style={{ background: EMPLOYEES[current.employee].colour }}>{EMPLOYEES[current.employee].name.charAt(0)}</div>
@@ -908,6 +1041,8 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
         <section className="ow-card"><h3><Wand2 size={16} /> Quick actions</h3><div className="ow-quick">
           {(["leads", "conversations", "scheduling", "tasks", "expense", "books", "contacts", ...(data.scopeId ? [] : ["invoicing"])] as PanelKind[]).map((k) => <button type="button" key={k} className="ghost" disabled={demo} onClick={() => setPanel({ kind: k })}>{PANEL_TITLES[k]}</button>)}
           {!demo && <button type="button" className="ghost" onClick={() => { setDemo(true); setSnoozed({}); setDemoState(DEMO_START); }}><Eye size={14} /> Try the demo</button>}
+          <button type="button" className="ghost" onClick={() => { setSideOpen(false); demoRaid(); }}>Tax Man raid (demo)</button>
+          <button type="button" className="ghost" onClick={() => { setSideOpen(false); setTour(true); }}><HelpCircle size={14} /> Guided tour</button>
         </div></section>
       </aside>
     </div>
@@ -923,6 +1058,19 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
         {last ? <button type="button" onClick={() => { setWalk(null); void collect(); }}><Sparkles size={16} /> Collect {total} coins</button> : <button type="button" onClick={() => { if (prefs.current.sound) chime("coin"); setWalk({ ...walk, at: walk.at + 1 }); }}>Next <ChevronRight size={16} /></button>}
       </div></div></div>; })()}
 
+    {defence && <ReceiptRush stolen={defence.stolen} demo={defence.demo} sound={sound} onDone={async (score) => { const d = defence; setDefence(null); const saved = Math.round(d.stolen * score); if (!d.demo && d.keys.length && score > 0) { try { const r = await post({ action: "defend", keys: d.keys, score }); setData((x) => x ? { ...x, wallet: r.wallet } : x); } catch { /* keep the loss */ } } if (saved > 0) { setCoinBurst((n) => n + 1); if (prefs.current.sound) chime("shower"); } toast([{ employee: "accountant", text: saved > 0 ? `You won back ${saved} coins from the Tax Man!${d.demo ? " (demo)" : ""}` : "The Tax Man got away with it this time.", coins: d.demo ? 0 : saved }]); }} />}
+    {tour && <GuidedTour steps={[
+      { title: `Welcome to ${p.name}`, text: "This is your business as a living world. Everything you see is your real CRM: leads, deals, invoices, appointments and tasks." },
+      { sel: ".ow-coins", title: "Coins", text: "Every real piece of work earns coins: replying to leads, booking appointments, sending invoices, recording receipts. Coins are virtual — never real money." },
+      { sel: ".ow-xp", title: "Levels", text: "Coins come with experience. Level up to unlock bigger headquarters and new upgrades." },
+      { sel: '[aria-label="Enter headquarters"]', title: "Headquarters", text: "Tap headquarters to walk inside. Each department has its own desk, its own person and a live board of real numbers." },
+      { sel: ".ow-bean.staff", title: "Your team", text: "Tap anyone to hear what they're working on. They walk over when something needs you." },
+      { sel: '[aria-label^="Deal yard"]', title: "Deal yard", text: "Every open lead is a building going up. It grows as the deal moves through your pipeline and finishes when you win the job." },
+      { sel: ".ow-dialogue", title: "Briefings", text: "Your team brings you what matters most, with one-tap options that open the right screen." },
+      { sel: ".ow-command", title: "Just ask", text: "Type or speak a request, like who haven't we replied to, or record this receipt." },
+      { sel: '[aria-label^="Upgrades"]', title: "Upgrades", text: "Spend coins on upgrades: a better office, furniture and tech, your home, cars, even a helicopter. You start from the bottom — build it up." },
+      { title: "Watch out for the Tax Man", text: "Leave expenses without receipts for a week and he raids your town and steals coins. Win them back in Receipt Rush — and add those receipts!" },
+    ]} onClose={() => { setTour(false); writePref("ow-tour-done", "1"); }} />}
     {charOpen && <CharacterEditor data={data} wardrobe={tier("wardrobe")} onClose={() => setCharOpen(false)} onSave={async (look) => { if (demo) throw new Error("Demo mode: saving is off."); const r = await post({ action: "saveProfile", look }); setData((d) => d ? { ...d, profile: r.profile } : d); if (prefs.current.sound) chime("level"); }} />}
     {drawer && <Drawer kind={drawer} data={data} wallet={w} demo={demo} onClose={() => setDrawer("")} post={post} buy={buy} onChanged={() => void load(true)} />}
 
