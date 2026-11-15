@@ -668,3 +668,7 @@ html body .ca-form-status.on { background:#ecfdf3; color:#067647; }
 html body .ca-agency-none { margin:8px 0 0; }
 html body .app-shell.dark-mode .ca-form-rule-card { background:rgba(255,255,255,.04); border-color:rgba(255,255,255,.1); }
 html body .app-shell.dark-mode .ca-form-rule-card li { background:rgba(255,255,255,.04); }
+
+/* Dropdowns (Radix select/popover menus) always open above pop-ups like the AI Assistant */
+html body [data-radix-popper-content-wrapper] { z-index: 3000 !important; }
+html body [data-slot="select-content"], html body [data-slot="popover-content"], html body [data-slot="dropdown-menu-content"] { z-index: 3000 !important; }
