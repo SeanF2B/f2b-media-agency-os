@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type
 import "./media-library.css";
 import { readPhotoGeo } from "@/lib/media-library/exif";
 
-type Client = { id: string; name: string; logo?: string; color?: string };
+type Client = { id: string; name: string; logo?: string; color?: string ; seoServices?: string[]; services?: Array<{ name?: string; campaignName?: string }> };
 type MediaItem = { id: string; scopeId: string; name: string; folder: string; kind: "image" | "video" | "document"; mime: string; size: number; width: number | null; height: number | null; url: string; source: string; sourceUrl: string; credit: string; alt: string; project?: Project; createdBy: string; createdAt: string };
 type Project = { location?: string; service?: string; date?: string; notes?: string; lat?: number; lng?: number };
 type Provider = { id: "unsplash" | "pexels" | "pixabay" | "openverse"; label: string; ready: boolean; signup: string };
@@ -75,6 +75,13 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
   }, [clients, status]);
   const listScope = inSubAccount ? scopeClientId : picker;
   const uploadScope = inSubAccount ? scopeClientId : picker !== "all" ? picker : status?.canUseAgency === false ? allowedClients[0]?.id || "" : "agency";
+  // The client's own services, offered as one-tap choices for "Service / job" (also become the folder).
+  const scopeServices = useMemo(() => {
+    const client = clients.find((item) => item.id === uploadScope);
+    if (!client) return [] as string[];
+    const billed = (client.services || []).map((service) => String(service.campaignName || "").replace(/^.*?\|\s*/, "").trim()).filter(Boolean);
+    return [...new Set([...(client.seoServices || []), ...billed].map((item) => item.trim()).filter((item) => item.length > 1))].slice(0, 24);
+  }, [clients, uploadScope]);
   const scopeName = (id: string) => id === "agency" || id === "" ? "Agency library" : clients.find((client) => client.id === id)?.name || "Client";
   const uploadScopeName = scopeName(uploadScope);
 
@@ -278,7 +285,9 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
         <div className="ml-upload-details">
           <p className="ml-hint">📍 Project details for local SEO. Saved with every file in this upload. Phone photos add their GPS location and date automatically.</p>
           <label className="field"><span>Location</span><input autoFocus value={uploadProject.location || ""} onChange={(event) => setUploadProject({ ...uploadProject, location: event.target.value })} placeholder="e.g. Salthill, Galway" maxLength={160} /></label>
-          <label className="field"><span>Service / job</span><input value={uploadProject.service || ""} onChange={(event) => setUploadProject({ ...uploadProject, service: event.target.value })} placeholder="e.g. Slate roof replacement" maxLength={120} /></label>
+          <label className="field"><span>Service / job</span><input value={uploadProject.service || ""} onChange={(event) => setUploadProject({ ...uploadProject, service: event.target.value })} placeholder="e.g. Slate roof replacement" maxLength={120} list="ml-services" /></label>
+          {scopeServices.length > 0 && <div className="ml-service-chips" role="group" aria-label="Choose a service">{scopeServices.map((service) => <button type="button" key={service} className={uploadProject.service === service ? "active" : ""} onClick={() => setUploadProject({ ...uploadProject, service: uploadProject.service === service ? "" : service })}>{service}</button>)}</div>}
+          <datalist id="ml-services">{scopeServices.map((service) => <option key={service} value={service} />)}</datalist>
           <div className="ml-upload-row"><label className="field"><span>Date of job</span><input type="date" value={uploadProject.date || ""} onChange={(event) => setUploadProject({ ...uploadProject, date: event.target.value })} /></label><label className="field"><span>Folder</span><input value={uploadFolder} onChange={(event) => setUploadFolder(event.target.value)} placeholder={uploadProject.service ? `${uploadProject.service} (from service)` : "Uses the service name"} maxLength={60} list="ml-folders" /></label></div>
           <label className="field"><span>Notes</span><input value={uploadProject.notes || ""} onChange={(event) => setUploadProject({ ...uploadProject, notes: event.target.value })} placeholder="Before / after, materials used, customer quote" maxLength={600} /></label>
           <div className="ml-upload-drop" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); if (event.dataTransfer.files?.length) setPendingFiles((current) => [...current, ...Array.from(event.dataTransfer.files)]); }}>
