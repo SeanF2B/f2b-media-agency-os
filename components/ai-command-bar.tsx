@@ -9,11 +9,11 @@ export type AiCommand = { action: string; reply: string; fields: Record<string, 
 type Chip = { label: string; prompt?: string; run?: () => void; hint?: string };
 
 const EXAMPLES: Record<string, string[]> = {
-  Overview: ["What needs my attention today?", "Add a task to call Red Island tomorrow", "Show me the leads board"],
+  Overview: ["What needs my attention today?", "Add a task to call a client tomorrow", "Show me the leads board"],
   CRM: ["Add a lead: Mary Walsh 087 555 1234, kitchen quote, €8,000", "Create a task to follow up new website leads", "Open Conversations"],
   Tasks: ["Task for Pat: update the Google Ads budget by Friday, high priority", "Remind me to send the monthly report on the 1st"],
-  Operations: ["Create an SEO audit task for Pro Roofers Galway", "Add a Google Business post task for Heatwise", "Open the Launchpad"],
-  Bookkeeping: ["Add expense: Canva €12.99 today, software", "Add income €450 from Aldo Handy Man, website project", "Open invoicing"],
+  Operations: ["Create an SEO audit task for this client", "Draft this month’s Google Business posts", "Open the Launchpad"],
+  Bookkeeping: ["Add expense: Canva €12.99 today, software", "Add income €450 from a client, website project", "Open invoicing"],
   "Media Library": ["Task to photograph the new kitchen job next Tuesday", "Open the Leads board"],
 };
 

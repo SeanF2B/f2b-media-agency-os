@@ -913,3 +913,4 @@ html body .app-shell.dark-mode .ai-cmd-bar, html body .app-shell.dark-mode .ai-c
 html body .app-shell.dark-mode .ai-cmd-bar input { color:#fff; }
 html body .app-shell.dark-mode .ai-cmd-chips button.is-suggestion { background:color-mix(in srgb, var(--brand-primary, #0b74b8) 18%, transparent); }
 html body .app-shell.dark-mode .ai-cmd-note { color:#c7ccd4; }
+html body .app-shell .ai-cmd { margin:4px 0 22px; }
