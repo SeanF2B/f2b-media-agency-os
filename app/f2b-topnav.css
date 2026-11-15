@@ -1021,3 +1021,20 @@ html body .ai-chat-toast, html body .ai-chat-toast p { color:#1f2a33 !important;
 html body .ai-chat-toast .primary-button { color:#fff !important; }
 html body .ai-tour-card { color:#1f2a33 !important; } html body .ai-tour-card b { color:#1f2a33 !important; } html body .ai-tour-card p { color:#475467 !important; }
 html body .ai-tour-card .primary-button { color:#fff !important; }
+
+/* AI widget in dark mode: beat the global dark-mode text rules (id-level specificity) */
+html body .ai-chat-panel > header :is(b, small, span, div, #f2b-ai-hdr), html body.f2b-dark .ai-chat-panel > header :is(b, small, span, div, #f2b-ai-hdr) { color:#fff !important; -webkit-text-fill-color:#fff !important; }
+html body.f2b-dark .ai-chat-panel :is(.ai-chat-list, .ai-chat-chips, .ai-chat-input, #f2b-ai-x) { background:#1b1f25 !important; }
+html body.f2b-dark .ai-chat-panel { background:#1b1f25 !important; border-color:rgba(255,255,255,.12) !important; }
+html body.f2b-dark .ai-chat-panel .ai-chat-msg.bot :is(p, #f2b-ai-x) { background:#262b33 !important; border-color:rgba(255,255,255,.08) !important; color:#e9ecf1 !important; -webkit-text-fill-color:#e9ecf1 !important; }
+html body.f2b-dark .ai-chat-panel .ai-chat-msg.me :is(p, #f2b-ai-x) { color:#fff !important; -webkit-text-fill-color:#fff !important; }
+html body.f2b-dark .ai-chat-panel :is(.ai-chat-chips button, .ai-chat-actions button, #f2b-ai-x) { background:rgba(255,255,255,.06) !important; border-color:rgba(255,255,255,.16) !important; color:#e9ecf1 !important; -webkit-text-fill-color:#e9ecf1 !important; }
+html body.f2b-dark .ai-chat-panel :is(.ai-chat-input input, #f2b-ai-x) { background:#12151a !important; border-color:rgba(255,255,255,.16) !important; color:#fff !important; -webkit-text-fill-color:#fff !important; }
+html body.f2b-dark .ai-chat-panel .ai-chat-input :is(input, #f2b-ai-x)::placeholder { color:#8a93a3 !important; -webkit-text-fill-color:#8a93a3 !important; }
+html body.f2b-dark .ai-chat-panel .ai-chat-input :is(.ai-chat-icon, #f2b-ai-x) { background:rgba(255,255,255,.08) !important; color:#e9ecf1 !important; }
+html body .ai-chat-msg.bot :is(p, #f2b-ai-x), html body .ai-chat-chips :is(button, #f2b-ai-x), html body .ai-chat-actions :is(button, #f2b-ai-x), html body .ai-chat-input :is(input, #f2b-ai-x) { -webkit-text-fill-color:currentColor; }
+html body.f2b-dark :is(.ai-chat-toast, #f2b-ai-x) { background:#1f2329 !important; border-color:rgba(255,255,255,.12) !important; }
+html body.f2b-dark .ai-chat-toast :is(p, #f2b-ai-x) { color:#e9ecf1 !important; -webkit-text-fill-color:#e9ecf1 !important; background:transparent !important; }
+html body.f2b-dark :is(.ai-tour-card, #f2b-ai-x) { background:#1f2329 !important; }
+html body.f2b-dark .ai-tour-card :is(b, #f2b-ai-x) { color:#fff !important; -webkit-text-fill-color:#fff !important; }
+html body.f2b-dark .ai-tour-card :is(p, #f2b-ai-x) { color:#c9cfd8 !important; -webkit-text-fill-color:#c9cfd8 !important; }
