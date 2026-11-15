@@ -131,9 +131,26 @@ export function IntegrationsView({ onNavigate }: { onNavigate: (page: string) =>
         <section className="lp-grid" aria-label="Tools">{shown.map((item, index) => <article className={`lp-card status-${item.status}`} style={{ "--lp-delay": `${index * 55}ms` } as CSSProperties} key={item.id}>
           <div className="lp-icon" aria-hidden="true"><BrandIcon id={item.id} size={24} fallback={integrationIcons[item.id] || "🔗"} /></div>
           <div className="lp-body"><h3>{item.name}</h3><p>{plainHelp[item.id] || firstSentence(item.detail)}</p>{item.mappingUnit && <small className="lp-chip">{mappingSummary(item)}</small>}</div>
-          <div className="lp-action">{item.status === "ready" ? <span className="lp-done" role="img" aria-label="Connected">✓ Connected</span> : item.connectHref ? <a className="lp-button" href={item.connectHref}>Connect</a> : <button className="lp-button" type="button" onClick={() => onNavigate(item.actionPage)}>Set up</button>}</div>
+          <div className="lp-action">{item.status === "ready" ? <span className="lp-done" role="img" aria-label="Connected">✓ Connected</span> : item.connectHref ? <a className="lp-button" href={item.connectHref}>Connect</a> : <button className="lp-button" type="button" onClick={() => onNavigate(item.actionPage)}>Set up</button>}
+            {item.status !== "ready" && <ShareLink name={item.name} href={item.connectHref ? new URL(item.connectHref, window.location.origin).toString() : `${window.location.origin}/?page=${encodeURIComponent(item.actionPage || "Integrations")}`} />}</div>
         </article>)}</section>
       </>;
     })()}
   </main>;
+}
+
+/** Copy or email a link so someone (e.g. on their phone) can finish this connection. They sign in to the OS first. */
+function ShareLink({ name, href }: { name: string; href: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(href); }
+    catch { const t = document.createElement("textarea"); t.value = href; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove(); }
+    setCopied(true); window.setTimeout(() => setCopied(false), 1800);
+  };
+  const subject = `Connect ${name} to F2B Agency OS`;
+  const body = `Hi,\n\nCould you connect ${name} for us? Open this link (sign in to the F2B Agency OS if asked) and follow the steps:\n\n${href}\n\nThanks!`;
+  return <span className="lp-share">
+    <button type="button" className="lp-share-btn" onClick={() => void copy()} title="Copy a link you can send to anyone (works on mobile)">{copied ? "✓ Copied" : "Copy link"}</button>
+    <a className="lp-share-btn" href={`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`} title="Email this link">Email</a>
+  </span>;
 }
