@@ -1,10 +1,11 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 import "./media-library.css";
 import { readPhotoGeo } from "@/lib/media-library/exif";
 
-type Client = { id: string; name: string; logo?: string; color?: string ; seoServices?: string[]; services?: Array<{ name?: string; campaignName?: string }> };
+type Client = { id: string; name: string; logo?: string; color?: string ; seoServices?: string[]; seoLocations?: string[]; services?: Array<{ name?: string; campaignName?: string }> };
 type MediaItem = { id: string; scopeId: string; name: string; folder: string; kind: "image" | "video" | "document"; mime: string; size: number; width: number | null; height: number | null; url: string; source: string; sourceUrl: string; credit: string; alt: string; project?: Project; createdBy: string; createdAt: string };
 type Project = { location?: string; service?: string; date?: string; notes?: string; lat?: number; lng?: number };
 type Provider = { id: "unsplash" | "pexels" | "pixabay" | "openverse"; label: string; ready: boolean; signup: string };
@@ -82,6 +83,12 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
     const billed = (client.services || []).map((service) => String(service.campaignName || "").replace(/^.*?\|\s*/, "").trim()).filter(Boolean);
     return [...new Set([...(client.seoServices || []), ...billed].map((item) => item.trim()).filter((item) => item.length > 1))].slice(0, 24);
   }, [clients, uploadScope]);
+  // Placeholders use this client's own area and services, so examples fit the account.
+  const scopeHints = useMemo(() => {
+    const client = clients.find((item) => item.id === uploadScope);
+    const area = (client?.seoLocations || [])[0] || "";
+    return { location: area ? `e.g. ${area}` : "e.g. town or area of the job", service: scopeServices[0] ? `e.g. ${scopeServices[0]}` : "e.g. the job or service shown", notes: "e.g. before / after, what was done, customer feedback" };
+  }, [clients, uploadScope, scopeServices]);
   const scopeName = (id: string) => id === "agency" || id === "" ? "Agency library" : clients.find((client) => client.id === id)?.name || "Client";
   const uploadScopeName = scopeName(uploadScope);
 
@@ -145,7 +152,7 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
       try {
         const size = await imageSize(file);
         const query = new URLSearchParams({ scope: uploadScope, name: file.name || "Photo" });
-        const folderName = uploadFolder.trim() || String(baseProject.service || "").trim();
+        const folderName = (uploadFolder === "__new__" ? "" : uploadFolder.trim()) || String(baseProject.service || "").trim();
         if (folderName) query.set("folder", folderName.slice(0, 60));
         if (size) { query.set("w", String(size.w)); query.set("h", String(size.h)); }
         // Project details for local SEO: what was typed above, plus GPS and date from the photo itself when present.
@@ -164,7 +171,7 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
 
   const onDrop = (event: DragEvent) => { event.preventDefault(); setDragOver(false); if (event.dataTransfer.files?.length) queueUpload(event.dataTransfer.files); };
 
-  const copy = async (text: string, label = "Link copied") => { try { await navigator.clipboard.writeText(text); flash(label); } catch { window.prompt("Copy this link:", text); } };
+  const copy = async (text: string, label = "Link copied") => { try { await navigator.clipboard.writeText(text); flash(label); } catch { (await appPrompt("Copy this link:", text)); } };
   const absolute = (path: string) => `${window.location.origin}${path}`;
 
   const saveItem = async (patch: Partial<Pick<MediaItem, "name" | "folder" | "alt" | "project">> & { scope?: string }) => {
@@ -180,7 +187,7 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
   };
 
   const deleteItem = async (item: MediaItem) => {
-    if (!window.confirm(`Delete “${item.name}”? Its public link will stop working on any website or ad that uses it.`)) return;
+    if (!(await appConfirm(`Delete “${item.name}”? Its public link will stop working on any website or ad that uses it.`))) return;
     try {
       await api("/api/media-library", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "delete", ids: [item.id] }) });
       setItems((current) => current.filter((entry) => entry.id !== item.id)); setSelected(null); flash("Deleted");
@@ -189,7 +196,7 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
 
   const deletePicked = async () => {
     const ids = [...picks];
-    if (!ids.length || !window.confirm(`Delete ${ids.length} file${ids.length === 1 ? "" : "s"}? Their public links will stop working on any website or ad that uses them.`)) return;
+    if (!ids.length || !(await appConfirm(`Delete ${ids.length} file${ids.length === 1 ? "" : "s"}? Their public links will stop working on any website or ad that uses them.`))) return;
     try {
       for (let i = 0; i < ids.length; i += 100) await api("/api/media-library", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "delete", ids: ids.slice(i, i + 100) }) });
       setItems((current) => current.filter((entry) => !picks.has(entry.id))); setPicks(new Set()); flash(`Deleted ${ids.length}`);
@@ -230,14 +237,14 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
       </div>
       <p className="ml-target">New files go to <b>{uploadScopeName}</b>{" "}
         <label className="ml-folder-input">· folder <input value={uploadFolder} onChange={(event) => setUploadFolder(event.target.value)} placeholder="optional, e.g. Job photos" maxLength={60} list="ml-folders" /></label>
-        <datalist id="ml-folders">{folders.map((name) => <option key={name} value={name} />)}</datalist>
+        <datalist id="ml-folders">{[...new Set([...folders, ...scopeServices])].map((name) => <option key={name} value={name} />)}</datalist>
         <button type="button" className="text-button ml-project-toggle" onClick={() => setProjectOpen(!projectOpen)}>{projectOpen ? "Hide project details" : `📍 Project details${uploadProject.location || uploadProject.service ? ` · ${[uploadProject.service, uploadProject.location].filter(Boolean).join(", ")}` : ""}`}</button>
       </p>
       {projectOpen && <div className="ml-project-form"><p className="ml-hint">Added to every file you upload now. Used for local SEO: where the job was, what it was, and when. Phone photos also add their GPS location automatically.</p>
-        <label className="field"><span>Location</span><input value={uploadProject.location || ""} onChange={(event) => setUploadProject({ ...uploadProject, location: event.target.value })} placeholder="e.g. Salthill, Galway" maxLength={160} /></label>
-        <label className="field"><span>Service / job</span><input value={uploadProject.service || ""} onChange={(event) => setUploadProject({ ...uploadProject, service: event.target.value })} placeholder="e.g. Slate roof replacement" maxLength={120} /></label>
+        <label className="field"><span>Location</span><input value={uploadProject.location || ""} onChange={(event) => setUploadProject({ ...uploadProject, location: event.target.value })} placeholder={scopeHints.location} maxLength={160} /></label>
+        <label className="field"><span>Service / job</span><input value={uploadProject.service || ""} onChange={(event) => setUploadProject({ ...uploadProject, service: event.target.value })} placeholder={scopeHints.service} maxLength={120} /></label>
         <label className="field"><span>Date of job</span><input type="date" value={uploadProject.date || ""} onChange={(event) => setUploadProject({ ...uploadProject, date: event.target.value })} /></label>
-        <label className="field ml-project-notes"><span>Notes</span><input value={uploadProject.notes || ""} onChange={(event) => setUploadProject({ ...uploadProject, notes: event.target.value })} placeholder="e.g. Before / after, materials used, customer quote" maxLength={600} /></label>
+        <label className="field ml-project-notes"><span>Notes</span><input value={uploadProject.notes || ""} onChange={(event) => setUploadProject({ ...uploadProject, notes: event.target.value })} placeholder={scopeHints.notes} maxLength={600} /></label>
         {(uploadProject.location || uploadProject.service || uploadProject.date || uploadProject.notes) && <button type="button" className="text-button" onClick={() => setUploadProject({})}>Clear</button>}
       </div>}
 
@@ -284,12 +291,12 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
       {uploadOpen && <Modal title={`Upload to ${uploadScopeName}`} onClose={closeUpload}>
         <div className="ml-upload-details">
           <p className="ml-hint">📍 Project details for local SEO. Saved with every file in this upload. Phone photos add their GPS location and date automatically.</p>
-          <label className="field"><span>Location</span><input autoFocus value={uploadProject.location || ""} onChange={(event) => setUploadProject({ ...uploadProject, location: event.target.value })} placeholder="e.g. Salthill, Galway" maxLength={160} /></label>
-          <label className="field"><span>Service / job</span><input value={uploadProject.service || ""} onChange={(event) => setUploadProject({ ...uploadProject, service: event.target.value })} placeholder="e.g. Slate roof replacement" maxLength={120} list="ml-services" /></label>
+          <label className="field"><span>Location</span><input autoFocus value={uploadProject.location || ""} onChange={(event) => setUploadProject({ ...uploadProject, location: event.target.value })} placeholder={scopeHints.location} maxLength={160} /></label>
+          <label className="field"><span>Service / job</span><input value={uploadProject.service || ""} onChange={(event) => setUploadProject({ ...uploadProject, service: event.target.value })} placeholder={scopeHints.service} maxLength={120} list="ml-services" /></label>
           {scopeServices.length > 0 && <div className="ml-service-chips" role="group" aria-label="Choose a service">{scopeServices.map((service) => <button type="button" key={service} className={uploadProject.service === service ? "active" : ""} onClick={() => setUploadProject({ ...uploadProject, service: uploadProject.service === service ? "" : service })}>{service}</button>)}</div>}
           <datalist id="ml-services">{scopeServices.map((service) => <option key={service} value={service} />)}</datalist>
-          <div className="ml-upload-row"><label className="field"><span>Date of job</span><input type="date" value={uploadProject.date || ""} onChange={(event) => setUploadProject({ ...uploadProject, date: event.target.value })} /></label><label className="field"><span>Folder</span><input value={uploadFolder} onChange={(event) => setUploadFolder(event.target.value)} placeholder={uploadProject.service ? `${uploadProject.service} (from service)` : "Uses the service name"} maxLength={60} list="ml-folders" /></label></div>
-          <label className="field"><span>Notes</span><input value={uploadProject.notes || ""} onChange={(event) => setUploadProject({ ...uploadProject, notes: event.target.value })} placeholder="Before / after, materials used, customer quote" maxLength={600} /></label>
+          <div className="ml-upload-row"><label className="field"><span>Date of job</span><input type="date" value={uploadProject.date || ""} onChange={(event) => setUploadProject({ ...uploadProject, date: event.target.value })} /></label><label className="field"><span>Folder</span>{(() => { const options = [...new Set([...folders, ...scopeServices])].sort((x, y) => x.localeCompare(y)); const custom = uploadFolder !== "" && !options.includes(uploadFolder); return custom || uploadFolder === "__new__" ? <span className="ml-folder-new"><input autoFocus value={uploadFolder === "__new__" ? "" : uploadFolder} onChange={(event) => setUploadFolder(event.target.value)} placeholder="New folder name" maxLength={60} /><button type="button" className="text-button" onClick={() => setUploadFolder("")}>✕</button></span> : <select value={uploadFolder} onChange={(event) => setUploadFolder(event.target.value)}><option value="">{uploadProject.service ? `${uploadProject.service} (same as service)` : "Same as service"}</option>{options.map((name) => <option key={name} value={name}>{folders.includes(name) ? `📁 ${name}` : name}</option>)}<option value="__new__">＋ New folder…</option></select>; })()}</label></div>
+          <label className="field"><span>Notes</span><input value={uploadProject.notes || ""} onChange={(event) => setUploadProject({ ...uploadProject, notes: event.target.value })} placeholder={scopeHints.notes} maxLength={600} /></label>
           <div className="ml-upload-drop" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); if (event.dataTransfer.files?.length) setPendingFiles((current) => [...current, ...Array.from(event.dataTransfer.files)]); }}>
             {pendingFiles.length ? <ul className="ml-upload-files">{pendingFiles.slice(0, 8).map((file, index) => <li key={`${file.name}-${file.size}-${index}`}>{file.name}<button type="button" className="text-button" aria-label={`Remove ${file.name}`} onClick={() => setPendingFiles((current) => current.filter((_, i) => i !== index))}>✕</button></li>)}{pendingFiles.length > 8 && <li>+ {pendingFiles.length - 8} more</li>}</ul> : <p>Drop photos, videos or PDFs here</p>}
             <div className="ml-upload-pick"><button type="button" className="secondary-button" onClick={() => fileInput.current?.click()}>{pendingFiles.length ? "＋ Add more files" : "Choose files"}</button><button type="button" className="secondary-button ml-camera" onClick={() => cameraInput.current?.click()}>📷 Take photo</button></div>
@@ -326,8 +333,8 @@ function DetailPanel({ item, canMove, scopes, scopeName, onClose, onSave, onDele
           <label className="field"><span>Folder</span><input value={folder} onChange={(event) => setFolder(event.target.value)} maxLength={60} placeholder="e.g. Job photos" /></label>
           {item.kind === "image" && <label className="field"><span>Alt text (for SEO)</span><input value={alt} onChange={(event) => setAlt(event.target.value)} maxLength={300} placeholder="Describe the image" /></label>}
           <fieldset className="ml-project-fields"><legend>📍 Project details (local SEO)</legend>
-            <label className="field"><span>Location</span><input value={project.location || ""} onChange={(event) => setProject({ ...project, location: event.target.value })} placeholder="e.g. Salthill, Galway" maxLength={160} /></label>
-            <label className="field"><span>Service / job</span><input value={project.service || ""} onChange={(event) => setProject({ ...project, service: event.target.value })} placeholder="e.g. Slate roof replacement" maxLength={120} /></label>
+            <label className="field"><span>Location</span><input value={project.location || ""} onChange={(event) => setProject({ ...project, location: event.target.value })} placeholder="Town or area of the job" maxLength={160} /></label>
+            <label className="field"><span>Service / job</span><input value={project.service || ""} onChange={(event) => setProject({ ...project, service: event.target.value })} placeholder="The job or service shown" maxLength={120} /></label>
             <label className="field"><span>Date of job</span><input type="date" value={project.date || ""} onChange={(event) => setProject({ ...project, date: event.target.value })} /></label>
             <label className="field"><span>Notes</span><input value={project.notes || ""} onChange={(event) => setProject({ ...project, notes: event.target.value })} placeholder="Before / after, materials, details" maxLength={600} /></label>
             {project.lat != null && project.lng != null ? <p className="ml-hint">GPS from photo: <a href={`https://www.google.com/maps?q=${project.lat},${project.lng}`} target="_blank" rel="noreferrer">{project.lat}, {project.lng}</a> <button type="button" className="text-button" onClick={() => { const next = { ...project }; delete next.lat; delete next.lng; setProject(next); }}>Remove</button></p> : <p className="ml-hint">No GPS in this file. Phone photos usually include it.</p>}

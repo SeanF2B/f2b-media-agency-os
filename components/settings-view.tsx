@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { useEffect, useState, type FormEvent } from "react";
 
 type ApiKeyState = { connected: boolean; fingerprint: string; updatedAt: string | null; secureStorageReady: boolean };
@@ -42,7 +43,7 @@ export function SettingsView() {
   }
 
   async function remove() {
-    if (!window.confirm("Remove the OpenRouter key from Agency OS? New AI work will stop until another provider is connected.")) return;
+    if (!(await appConfirm("Remove the OpenRouter key from Agency OS? New AI work will stop until another provider is connected."))) return;
     setRemoving(true); setMessage(""); setIsError(false);
     try {
       const response = await fetch("/api/settings/api-keys", { method: "DELETE" });

@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { Fragment, useEffect, useMemo, useState, type FormEvent } from "react";
 import { clientWebsite, clientWebsiteHost } from "@/lib/client-website";
 import { MarketingAuditPanel } from "@/components/marketing-audit-panel";
@@ -504,7 +505,7 @@ ${sorted.map((group, index) => `<section class="page"><div class="running">${esc
   };
   const newSaveGroup = async () => {
     if (!client) return;
-    const name = window.prompt("New group name (e.g. an ad group or service)")?.trim();
+    const name = (await appPrompt("New group name (e.g. an ad group or service)"))?.trim();
     if (!name) return;
     const ok = await callSaved({ action: "createGroup", name: name.slice(0, 60) });
     if (ok) {
@@ -741,7 +742,7 @@ ${sorted.map((group, index) => `<section class="page"><div class="running">${esc
               <label className="kw-group-mode"><span>Group by</span><select value={kwGroupMode} onChange={(event) => { const next = event.target.value as typeof kwGroupMode; if (next === "ai" && !aiGroups) void runAiGroups(); else setKwGroupMode(next); }}><option value="theme">Seed theme</option><option value="services" disabled={!clientServiceList.length}>Client services{clientServiceList.length ? "" : " (none set)"}</option><option value="ai">AI ad groups</option><option value="none">No grouping</option></select></label>
               <button type="button" className="secondary-button kw-ai-groups" disabled={aiGroupBusy || !kwRows.length} onClick={() => void runAiGroups()}>{aiGroupBusy ? "Grouping…" : aiGroups ? "✨ Re-run AI ad groups" : "✨ AI ad groups"}</button>
               <span className="kw-count">{rows.length} of {kwRows.length} ideas{keywordIdeas?.providerCostUsd != null ? ` · last run $${keywordIdeas.providerCostUsd.toFixed(4)}` : ""}</span>
-              <button type="button" className="text-button" onClick={() => { if (window.confirm("Clear all research results? Saved keywords are not affected.")) { setKwRows([]); setPickedKeywords(new Set()); setKeywordIdeas(null); } }}>Clear results</button>
+              <button type="button" className="text-button" onClick={async () => { if ((await appConfirm("Clear all research results? Saved keywords are not affected."))) { setKwRows([]); setPickedKeywords(new Set()); setKeywordIdeas(null); } }}>Clear results</button>
             </div>
             <div className="kw-bulk" role="toolbar" aria-label="Bulk actions">
               <b>{pickedKeywords.size ? `${pickedKeywords.size} selected` : "Tick keywords to save or report"}</b>

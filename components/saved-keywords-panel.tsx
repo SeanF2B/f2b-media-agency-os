@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { useMemo, useState } from "react";
 
 export type SavedKeyword = { id: string; keyword: string; location: string; geo: string; language: string; groupId: string; tags: string[]; avgMonthlySearches: number | null; competition: string; competitionIndex: number | null; lowTopOfPageBid: number | null; highTopOfPageBid: number | null; difficulty: number | null; source: string; metricsSource: string; lastCheckedAt: string | null; createdAt: string };
@@ -85,7 +86,7 @@ export function SavedKeywordsPanel({ clientId, clientName, data, busy, message, 
             <button type="button" onClick={() => { setRenaming(group.id); setRenameValue(group.name); }}>Rename</button>
             <button type="button" disabled={index === 0} onClick={() => { const order = groups.map((item) => item.id); [order[index - 1], order[index]] = [order[index], order[index - 1]]; void act({ action: "reorderGroups", order }); }}>Move up</button>
             <button type="button" disabled={index === groups.length - 1} onClick={() => { const order = groups.map((item) => item.id); [order[index + 1], order[index]] = [order[index], order[index + 1]]; void act({ action: "reorderGroups", order }); }}>Move down</button>
-            <button type="button" className="danger" onClick={() => { if (window.confirm(`Delete the group “${group.name}”? Its keywords move to Ungrouped.`)) void act({ action: "deleteGroup", groupId: group.id }).then(() => { if (groupView === group.id) setGroupView("all"); }); }}>Delete group</button>
+            <button type="button" className="danger" onClick={async () => { if ((await appConfirm(`Delete the group “${group.name}”? Its keywords move to Ungrouped.`))) void act({ action: "deleteGroup", groupId: group.id }).then(() => { if (groupView === group.id) setGroupView("all"); }); }}>Delete group</button>
           </div></details>
         </div>)}
       <form className="saved-kw-new" onSubmit={(event) => { event.preventDefault(); if (!newGroup.trim()) return; void act({ action: "createGroup", name: newGroup }).then((ok) => { if (ok) setNewGroup(""); }); }}><input value={newGroup} onChange={(event) => setNewGroup(event.target.value)} placeholder="New group, e.g. Extensions" aria-label="New group name" /><button type="submit" className="secondary-button" disabled={!newGroup.trim() || busy}>Add</button></form>
@@ -108,7 +109,7 @@ export function SavedKeywordsPanel({ clientId, clientName, data, busy, message, 
         <button type="button" className="secondary-button" disabled={busy} onClick={() => void act({ action: "refresh", ids })} title="Re-check search volume, CPC and competition in Google Keyword Planner">↻ Refresh metrics</button>
         <button type="button" className="secondary-button" disabled={busy} onClick={() => void sendToRankTracking()}>Send to rank tracking</button>
         <button type="button" className="primary-button" onClick={batchTask}>Create review task</button>
-        <button type="button" className="text-button danger" disabled={busy} onClick={() => { if (window.confirm(`Remove ${picked.size} keyword(s) from saved keywords?`)) void act({ action: "remove", ids }, true); }}>Remove</button>
+        <button type="button" className="text-button danger" disabled={busy} onClick={async () => { if ((await appConfirm(`Remove ${picked.size} keyword(s) from saved keywords?`))) void act({ action: "remove", ids }, true); }}>Remove</button>
         <button type="button" className="text-button" onClick={() => setPicked(new Set())}>Clear</button>
       </div>}
       {(message || rankNote) && <p className="kw-note" role="status">{[message, rankNote].filter(Boolean).join(" ")}</p>}

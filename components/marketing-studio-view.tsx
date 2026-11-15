@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { type CSSProperties, type DragEvent as ReactDragEvent, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_MARKETING_DESIGN, marketingBlockImageProperties, marketingBlockStyleForDevice, marketingBlockStyleProperties, marketingFontStack, normalizeMarketingDesign, type MarketingBlockStyle, type MarketingBlockStyleValues, type MarketingDesign } from "../lib/marketing-design";
 import { marketingEmbedSnippet } from "../lib/marketing-embed";
@@ -554,7 +555,7 @@ export function MarketingStudioView({ kind, clients, staff = [], active, scopeCl
     finally { setBusy(false); }
   }
   async function deleteReusableBlock(id: string) {
-    if (!window.confirm("Remove this section from the reusable library? Existing funnels will not change.")) return;
+    if (!(await appConfirm("Remove this section from the reusable library? Existing funnels will not change."))) return;
     setBusy(true); setError("");
     try {
       const response = await fetch("/api/marketing-studio", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "deleteReusableBlock", kind: "funnel", id }) });
@@ -591,8 +592,8 @@ export function MarketingStudioView({ kind, clients, staff = [], active, scopeCl
     } catch (reason) { if (quiet) failedAutosaveRevisionRef.current = savedRevision; setError(reason instanceof Error ? reason.message : "Could not save this project."); }
     finally { savingRef.current = false; setBusy(false); }
   }, [name, kind, draft, assetId, clientId, folderId, loadVersions, load]);
-  function unpublishCurrent() {
-    if (!assetId || !current?.hasPublishedVersion || !window.confirm("Unpublish this page now? Visitors will no longer be able to open it. Your saved draft and version history will remain.")) return;
+  async function unpublishCurrent() {
+    if (!assetId || !current?.hasPublishedVersion || !(await appConfirm("Unpublish this page now? Visitors will no longer be able to open it. Your saved draft and version history will remain."))) return;
     void save("draft", false, true);
   }
   useEffect(() => { saveRef.current = save; }, [save]);
@@ -602,7 +603,7 @@ export function MarketingStudioView({ kind, clients, staff = [], active, scopeCl
     return () => window.clearTimeout(timer);
   }, [active, assetId, current, draftDirty, busy, draft, name, clientId, folderId]);
   async function remove() {
-    if (!assetId || !window.confirm("Delete this project and its saved submissions? This cannot be undone.")) return;
+    if (!assetId || !(await appConfirm("Delete this project and its saved submissions? This cannot be undone."))) return;
     setBusy(true); setError("");
     try { const response = await fetch(`/api/marketing-studio?id=${encodeURIComponent(assetId)}`, { method: "DELETE" }); const payload = await response.json() as ApiPayload; if (!response.ok) throw new Error(payload.error || "Could not delete this project."); setAssets((items) => items.filter((item) => item.id !== assetId)); create(); if (kind === "automation") setAutomationView("list"); setMessage("Project deleted."); void load(false); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Could not delete this project."); }
@@ -658,7 +659,7 @@ export function MarketingStudioView({ kind, clients, staff = [], active, scopeCl
   }
   async function saveSubmissionRetention() {
     const days = retentionSelection === "never" ? null : Number(retentionSelection);
-    if (days !== null && !window.confirm(`Enable automatic deletion after ${days} days? The next background cleanup will permanently remove older form submissions, their uploaded files, linked workflow run records and their saved daily submission count. CRM contacts already created from those submissions will remain.`)) return;
+    if (days !== null && !(await appConfirm(`Enable automatic deletion after ${days} days? The next background cleanup will permanently remove older form submissions, their uploaded files, linked workflow run records and their saved daily submission count. CRM contacts already created from those submissions will remain.`))) return;
     setRetentionSaving(true); setError(""); setMessage("");
     try {
       const response = await fetch("/api/marketing-studio", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind, action: "saveSubmissionRetention", retentionDays: days }) });
@@ -672,7 +673,7 @@ export function MarketingStudioView({ kind, clients, staff = [], active, scopeCl
     finally { setRetentionSaving(false); }
   }
   async function deleteSubmission(submission: Submission) {
-    if (!window.confirm("Delete this CRM submission, its uploaded files, and linked workflow run records? A native CRM contact already created from this submission will remain. This cannot be undone.")) return;
+    if (!(await appConfirm("Delete this CRM submission, its uploaded files, and linked workflow run records? A native CRM contact already created from this submission will remain. This cannot be undone."))) return;
     setBusy(true); setError("");
     try {
       const response = await fetch(`/api/marketing-studio?submissionId=${encodeURIComponent(submission.id)}`, { method: "DELETE" });
@@ -711,7 +712,7 @@ export function MarketingStudioView({ kind, clients, staff = [], active, scopeCl
     finally { setBusy(false); }
   }
 async function restoreVersion(version: number) {
-    if (!assetId || !window.confirm(`Restore version ${version} as a new draft? The current published version will remain saved.`)) return;
+    if (!assetId || !(await appConfirm(`Restore version ${version} as a new draft? The current published version will remain saved.`))) return;
     setBusy(true); setError(""); setMessage("");
     try {
       const response = await fetch("/api/marketing-studio", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: assetId, kind, name, clientId: clientId || null, folderId: folderId || null, restoreVersion: version, data: draft }) });

@@ -838,3 +838,79 @@ html body .app-shell .finance-row .finance-icon-btn + .finance-delete, html body
 .lp-share { display: inline-flex; gap: 6px; }
 .lp-share-btn { display: inline-flex; align-items: center; border: 1px solid rgba(127,127,127,.35); background: transparent; color: inherit; border-radius: 9px; padding: 7px 11px; font: inherit; font-size: 12.5px; font-weight: 700; text-decoration: none; cursor: pointer; transition: transform .14s ease, border-color .14s ease, box-shadow .14s ease; }
 .lp-share-btn:hover { transform: translateY(-1px); border-color: var(--brand-secondary, var(--brand-primary, #3b82f6)); box-shadow: 0 4px 12px color-mix(in srgb, var(--brand-secondary, var(--brand-primary, #3b82f6)) 18%, transparent); }
+
+/* Operations connections: quick connect link */
+html body .ops-quick-link { display:inline-flex; gap:4px; margin-left:8px; padding-left:8px; border-left:1px solid #e4e7ec; }
+html body .ops-quick-link > button, html body .ops-quick-link > a { width:28px; height:28px; display:inline-grid; place-items:center; border-radius:8px; border:1px solid #e3e8ef; background:#fff; color:var(--brand-secondary, #0b74b8); cursor:pointer; text-decoration:none; }
+html body .app-shell.dark-mode .ops-quick-link { border-left-color:rgba(255,255,255,.14); }
+html body .app-shell.dark-mode .ops-quick-link > button, html body .app-shell.dark-mode .ops-quick-link > a { background:rgba(255,255,255,.06); border-color:rgba(255,255,255,.14); color:#9fc5ff; }
+html body .tt-logo { width:22px; height:22px; flex:0 0 22px; display:inline-grid; place-items:center; border-radius:6px; overflow:hidden; background:#fff; border:1px solid rgba(0,0,0,.08); }
+html body .tt-logo img { width:100%; height:100%; object-fit:contain; }
+html body .overview-finance-toolbar .books-export { position:relative; margin-left:auto; }
+html body .books-export-menu { position:absolute; right:0; top:calc(100% + 6px); z-index:30; display:grid; min-width:150px; padding:6px; border-radius:12px; background:#fff; border:1px solid #e4e7ec; box-shadow:0 12px 32px rgba(16,24,40,.14); }
+html body .books-export-menu button { padding:8px 10px; border:0; background:transparent; border-radius:8px; text-align:left; cursor:pointer; font-weight:600; color:#1f2a33; }
+html body .books-export-menu button:hover { background:#f2f6fb; }
+html body .app-shell.dark-mode .books-export-menu { background:#1f2329; border-color:rgba(255,255,255,.14); }
+html body .app-shell.dark-mode .books-export-menu button { color:#e4e7ec; }
+
+/* Client books records use the same row layout as the agency Books */
+html body .app-shell .client-tax-list > div { grid-template-columns: 30px 92px minmax(0,1fr) auto auto !important; gap: 12px !important; padding-top: 9px !important; padding-bottom: 9px !important; border-top: 0 !important; }
+html body .app-shell .client-tax-list > div > .finance-kind { width: 26px; height: 26px; display: inline-grid; place-items: center; border-radius: 8px; font-size: 13px; }
+html body .app-shell .client-tax-list > div > .finance-kind.income { background: #e3f6ea; color: #067647; }
+html body .app-shell .client-tax-list > div > .finance-kind.expense { background: #fbe4e2; color: #b42318; }
+html body .app-shell .client-tax-list .client-tax-date { font-size: 12.5px; color: #667085; font-variant-numeric: tabular-nums; }
+html body .app-shell .client-tax-list > div > b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html body .app-shell .client-tax-list > div > strong { justify-self: end; font-size: 14px; font-variant-numeric: tabular-nums; }
+html body .app-shell .client-tax-list > div > .client-tax-auto { justify-self: end; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #f2f4f7; color: #667085; }
+html body .app-shell.dark-mode .client-tax-list > div > .finance-kind.income { background: rgba(18,183,106,.15); color: #6ce9a6; }
+html body .app-shell.dark-mode .client-tax-list > div > .finance-kind.expense { background: rgba(240,68,56,.15); color: #fda29b; }
+html body .app-shell.dark-mode .client-tax-list .client-tax-date { color: #98a2b3; }
+html body .app-shell.dark-mode .client-tax-list > div > .client-tax-auto { background: rgba(255,255,255,.08); color: #d0d5dd; }
+html body .ml-folder-new { display:flex; align-items:center; gap:6px; }
+html body .ml-folder-new input { flex:1; }
+html body .finance-actions .books-export { position:relative; margin-left:0; }
+html body .finance-actions { display:flex; align-items:center; gap:8px; }
+
+/* In-app confirm / alert / prompt: brand colours of the current account */
+html body .app-dialog-backdrop { position:fixed; inset:0; z-index:4000; display:grid; place-items:center; padding:16px; background:rgba(15,20,30,.42); backdrop-filter:blur(3px); animation:app-dialog-fade .14s ease; }
+html body .app-dialog { width:min(440px, 94vw); padding:22px 22px 18px; border-radius:18px; background:#fff; color:#1f2a33; box-shadow:0 24px 60px rgba(16,24,40,.28); border-top:4px solid var(--brand-primary, #0b74b8); animation:app-dialog-pop .16s ease; }
+html body .app-dialog-body p { margin:0 0 6px; font-size:14px; line-height:1.5; color:#475467; white-space:pre-wrap; }
+html body .app-dialog-body p.lead { font-size:15.5px; font-weight:700; color:#1f2a33; }
+html body .app-dialog-input { width:100%; box-sizing:border-box; margin-top:10px; padding:10px 12px; border:1px solid #d0d5dd; border-radius:10px; font-size:14px; }
+html body .app-dialog-input:focus { outline:none; border-color:var(--brand-secondary, #0b74b8); box-shadow:0 0 0 3px color-mix(in srgb, var(--brand-secondary, #0b74b8) 20%, transparent); }
+html body .app-dialog-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+html body .app-dialog-actions .primary-button { background:var(--brand-primary, #0b74b8) !important; border-color:var(--brand-primary, #0b74b8) !important; color:#fff !important; }
+html body .app-dialog-actions .primary-button.app-dialog-danger { background:#d92d20 !important; border-color:#d92d20 !important; }
+html body .app-shell.dark-mode .app-dialog { background:#1f2329; color:#e4e7ec; }
+html body .app-shell.dark-mode .app-dialog-body p { color:#c7ccd4; } html body .app-shell.dark-mode .app-dialog-body p.lead { color:#fff; }
+html body .app-shell.dark-mode .app-dialog-input { background:#14171c; border-color:rgba(255,255,255,.16); color:#fff; }
+@keyframes app-dialog-fade { from { opacity:0; } }
+@keyframes app-dialog-pop { from { opacity:0; transform:translateY(6px) scale(.98); } }
+
+/* Operating World — game controller in the middle of the bar */
+html body .app-shell .tn-item .tn-gamepad { transform-origin: 50% 60%; }
+html body .app-shell .tn-item:hover .tn-gamepad, html body .app-shell .tn-item.active .tn-gamepad { animation: tn-gamepad-wiggle .5s ease; }
+@keyframes tn-gamepad-wiggle { 25% { transform: rotate(-10deg); } 75% { transform: rotate(10deg); } }
+@media (prefers-reduced-motion: reduce) { html body .app-shell .tn-item .tn-gamepad { animation: none !important; } }
+html body .tt-logo { width:auto !important; min-width:34px; max-width:96px; height:34px !important; flex:0 0 auto !important; padding:2px 4px; border-radius:9px !important; }
+html body .tt-logo img { width:auto !important; max-width:88px; height:30px !important; object-fit:contain; }
+html body .tt-group .tt-group-toggle { gap:10px; }
+
+/* "Ask AI" bar at the top of each tab */
+html body .app-shell .ai-cmd { margin:0 0 18px; display:grid; gap:8px; }
+html body .app-shell .ai-cmd-bar { display:flex; align-items:center; gap:10px; padding:7px 7px 7px 10px; border-radius:16px; background:#fff; border:1px solid #e4e7ec; box-shadow:0 2px 10px rgba(16,24,40,.05); }
+html body .app-shell .ai-cmd-icon { flex:0 0 34px; width:34px; height:34px; display:grid; place-items:center; border-radius:10px; background:color-mix(in srgb, var(--brand-primary, #0b74b8) 14%, #fff); color:var(--brand-primary, #0b74b8); }
+html body .app-shell .ai-cmd-bar input { flex:1; min-width:0; border:0 !important; background:transparent !important; box-shadow:none !important; outline:none; font-size:14.5px; padding:8px 4px; transform:none !important; }
+html body .app-shell .ai-cmd-mic { flex:0 0 38px; width:38px; height:38px; display:grid; place-items:center; border-radius:11px; border:1px solid #e4e7ec; background:#fff; color:#475467; cursor:pointer; }
+html body .app-shell .ai-cmd-mic.on { background:#fef3f2; border-color:#fda29b; color:#d92d20; animation:ai-cmd-pulse 1.2s ease-in-out infinite; }
+@keyframes ai-cmd-pulse { 50% { box-shadow:0 0 0 6px rgba(217,45,32,.12); } }
+html body .app-shell .ai-cmd-go { height:38px; padding:0 18px !important; border-radius:11px !important; background:var(--brand-primary, #0b74b8) !important; border-color:var(--brand-primary, #0b74b8) !important; color:#fff !important; white-space:nowrap; }
+html body .app-shell .ai-cmd-note { margin:0 4px; font-size:13px; color:#475467; }
+html body .app-shell .ai-cmd-chips { display:flex; flex-wrap:wrap; gap:8px; }
+html body .app-shell .ai-cmd-chips button { display:inline-flex; align-items:center; gap:6px; padding:7px 13px; border-radius:999px; border:1px solid #e4e7ec; background:#fff; color:#344054; font-size:12.5px; font-weight:500; cursor:pointer; max-width:420px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+html body .app-shell .ai-cmd-chips button.is-suggestion { border-color:color-mix(in srgb, var(--brand-primary, #0b74b8) 35%, #fff); background:color-mix(in srgb, var(--brand-primary, #0b74b8) 7%, #fff); color:#1f2a33; font-weight:600; }
+html body .app-shell.dark-mode .ai-cmd-bar, html body .app-shell.dark-mode .ai-cmd-chips button, html body .app-shell.dark-mode .ai-cmd-mic { background:rgba(255,255,255,.04); border-color:rgba(255,255,255,.12); color:#e4e7ec; }
+html body .app-shell.dark-mode .ai-cmd-bar input { color:#fff; }
+html body .app-shell.dark-mode .ai-cmd-chips button.is-suggestion { background:color-mix(in srgb, var(--brand-primary, #0b74b8) 18%, transparent); }
+html body .app-shell.dark-mode .ai-cmd-note { color:#c7ccd4; }
+html body .app-shell .ai-cmd { margin:4px 0 22px; }

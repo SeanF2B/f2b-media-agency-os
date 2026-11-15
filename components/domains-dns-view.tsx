@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 type ConnectionState = { connected: boolean; source: "secret" | "stored" | null; fingerprint: string; secureStorageReady: boolean; canStoreToken?: boolean };
@@ -89,7 +90,7 @@ export function DomainsDnsView({ clientHosts }: { clientHosts?: string[] } = {})
   }
 
   async function removeToken() {
-    if (!window.confirm("Disconnect Cloudflare from Agency OS? Your domains and DNS records in Cloudflare are not changed.")) return;
+    if (!(await appConfirm("Disconnect Cloudflare from Agency OS? Your domains and DNS records in Cloudflare are not changed."))) return;
     setBusy("token");
     try {
       const state = await api<ConnectionState>("/api/settings/cloudflare-dns", { method: "POST", body: { action: "remove-token" } });
@@ -127,7 +128,7 @@ export function DomainsDnsView({ clientHosts }: { clientHosts?: string[] } = {})
   }
 
   async function removeRecord(record: DnsRecord) {
-    if (!window.confirm(`Delete this ${record.type} record for ${record.name}? This takes effect immediately and cannot be undone.`)) return;
+    if (!(await appConfirm(`Delete this ${record.type} record for ${record.name}? This takes effect immediately and cannot be undone.`))) return;
     setBusy("record"); say("");
     try {
       await api("/api/settings/cloudflare-dns", { method: "POST", body: { action: "delete-record", zone: zoneId, recordId: record.id } });

@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ArrowLeft, Bell, Euro, CalendarCheck, CalendarClock, CalendarX, UserX, CircleCheck, Columns3, Copy, FileInput, FlaskConical, GitBranch, History, Hourglass, ListTodo,
@@ -180,7 +181,7 @@ export function AutomationBuilder({ id, scope, onBack, onToggle, onChanged }: { 
     } finally { setSaving(false); }
   };
 
-  const back = () => { if (dirty && !window.confirm("You have unsaved changes. Leave without saving?")) return; onBack(); };
+  const back = async () => { if (dirty && !(await appConfirm("You have unsaved changes. Leave without saving?"))) return; onBack(); };
 
   if (error) return <div className="ca-empty"><p>{error}</p><button type="button" className="secondary-button" onClick={onBack}>Back to automations</button></div>;
   if (!loaded || !definition || !graph) return <div className="ca-empty"><p>Loading automation…</p></div>;
@@ -253,8 +254,8 @@ export function AutomationBuilder({ id, scope, onBack, onToggle, onChanged }: { 
       {selectedNode && <StepPanel key={selectedNode.id} node={selectedNode} options={loaded.options} definition={definition}
         onCancel={() => setSelected("")}
         onSave={(config) => { change({ ...definition, nodes: definition.nodes.map((node) => node.id === selectedNode.id ? { ...node, config } : node) }); setSelected(""); }}
-        onDelete={() => {
-          if (selectedNode.type === "if_else" && !window.confirm("Delete this If / Else and every step on both of its paths?")) return;
+        onDelete={async () => {
+          if (selectedNode.type === "if_else" && !(await appConfirm("Delete this If / Else and every step on both of its paths?"))) return;
           change(removeNode(definition, selectedNode.id)); setSelected("");
         }}
         onDuplicate={() => { change(duplicateNode(definition, selectedNode.id)); setSelected(""); setToast("Step duplicated below the original."); }} />}

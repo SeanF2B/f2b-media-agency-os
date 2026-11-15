@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 type Item = { description: string; qty: number; unit: number };
@@ -74,7 +75,7 @@ export function InvoicingView({ scopeClientId }: { scopeClientId: string }) {
           {(i.rawStatus === "draft" || i.rawStatus === "sent") && <button type="button" className="iv-btn" disabled={busy} onClick={() => void act({ action: "send", id: i.id }, `${i.number} sent to ${i.clientEmail || "the client"}.`)}>{i.rawStatus === "draft" ? "Send" : "Resend"}</button>}
           {(i.rawStatus === "sent" || i.rawStatus === "draft") && <button type="button" className="iv-btn ok" disabled={busy} onClick={() => void act({ action: "mark-paid", id: i.id }, `${i.number} marked as paid.`)}>✓ Paid</button>}
           {i.rawStatus === "paid" && <button type="button" className="iv-btn" disabled={busy} onClick={() => void act({ action: "mark-unpaid", id: i.id })}>Undo paid</button>}
-          {i.rawStatus === "draft" ? <button type="button" className="iv-btn danger" disabled={busy} onClick={() => { if (confirm(`Delete draft ${i.number}?`)) void act({ action: "delete", id: i.id }); }}>Delete</button> : i.rawStatus !== "void" && i.rawStatus !== "paid" ? <button type="button" className="iv-btn danger" disabled={busy} onClick={() => { if (confirm(`Void ${i.number}? It will stay in your records.`)) void act({ action: "void", id: i.id }); }}>Void</button> : null}
+          {i.rawStatus === "draft" ? <button type="button" className="iv-btn danger" disabled={busy} onClick={async () => { if ((await appConfirm(`Delete draft ${i.number}?`))) void act({ action: "delete", id: i.id }); }}>Delete</button> : i.rawStatus !== "void" && i.rawStatus !== "paid" ? <button type="button" className="iv-btn danger" disabled={busy} onClick={async () => { if ((await appConfirm(`Void ${i.number}? It will stay in your records.`))) void act({ action: "void", id: i.id }); }}>Void</button> : null}
         </div></div>)}</div>}
     </div>}
 
@@ -86,7 +87,7 @@ export function InvoicingView({ scopeClientId }: { scopeClientId: string }) {
         <span className={`iv-pill ${r.active ? "sent" : "void"}`}>{r.active ? (r.autoSend ? "Auto-sends" : "Creates drafts") : "Paused"}</span>
         <div className="iv-actions"><button type="button" className="iv-btn" onClick={() => setRecEditor({ id: r.id, clientId: r.clientId, title: r.title, items: r.items, vatRate: r.vatRate, interval: r.interval, nextDate: r.nextDate, autoSend: r.autoSend, notes: r.notes, currency: r.currency })}>Edit</button>
           <button type="button" className="iv-btn" disabled={busy} onClick={() => void act({ action: "toggle-recurring", id: r.id, active: !r.active })}>{r.active ? "Pause" : "Resume"}</button>
-          <button type="button" className="iv-btn danger" disabled={busy} onClick={() => { if (confirm("Delete this subscription? Invoices already created stay.")) void act({ action: "delete-recurring", id: r.id }); }}>Delete</button></div></div>; })}</div>}
+          <button type="button" className="iv-btn danger" disabled={busy} onClick={async () => { if ((await appConfirm("Delete this subscription? Invoices already created stay."))) void act({ action: "delete-recurring", id: r.id }); }}>Delete</button></div></div>; })}</div>}
       <p className="iv-hint">Invoices are created automatically on each due date whenever Invoicing is opened, so none are missed. Choose “Auto-sends” to email them straight away, or leave it to create drafts for you to check first.</p></div>}
 
     {tab === "settings" && <SettingsPanel settings={data.settings} onSave={async (s) => { await call({ action: "save-settings", settings: s }); await load(); }} />}
