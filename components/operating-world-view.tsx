@@ -6,7 +6,7 @@
 // completed records (idempotent). The owner taps the coins over each employee to collect them.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { HelpCircle, PanelRight, ArrowLeft, Bot, Coins, Gauge, History, Mic, Pause, Play, Send, Settings2, Sparkles, Volume2, VolumeX, Wand2, X, Zap, CalendarDays, Copy, Check, Loader2, Eye, EyeOff, Hammer, Lock, ChevronRight, LayoutGrid } from "lucide-react";
+import { HelpCircle, PanelRight, ArrowLeft, Bot, Coins, Gauge, History, Mic, Pause, Play, Send, Settings2, Sparkles, Volume2, VolumeX, Wand2, X, Zap, CalendarDays, Copy, Check, Loader2, Eye, EyeOff, Hammer, Lock, ChevronRight, LayoutGrid, Music } from "lucide-react";
 import { EMPLOYEES, EMPLOYEE_FOR_REWARD, REWARDS, UPGRADES, xpForLevel, allClearLine, briefing, levelFromXp, nextUpgrade, reactionLine, rewardWalkthrough, stageForLevel, upgradeTier, workingHoursBetween, type Approach, type BriefingOption, type EmployeeId, type OwSnapshot, type PanelKind, type RewardKind, type UpgradeTrack, type WalkStep, type DeptBoard } from "@/lib/operating-world/engine";
 import { appConfirm } from "./app-dialog";
 import "./operating-world.css";
@@ -806,7 +806,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
   const [sideOpen, setSideOpen] = useState(false);
   const [defence, setDefence] = useState<{ keys: string[]; stolen: number; demo: boolean } | null>(null);
   const [tour, setTour] = useState(false);
-  const [music, setMusic] = useState<MusicStyle>(() => readPref("ow-music", "chill") as MusicStyle);
+  const [music, setMusic] = useState<MusicStyle>(() => readPref("ow-music", "off") as MusicStyle);
   const [speech, setSpeech] = useState(() => readPref("ow-speech", "off") === "on");
   const [barColour, setBarColour] = useState("");
   const logoColour = useLogoColour(data?.profile.logo || "", `/api/operating-world?logo=1&clientId=${encodeURIComponent(scopeClientId || "agency")}`);
@@ -872,7 +872,15 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
 
   useEffect(() => { const m = (e: Event) => setMusic((e as CustomEvent).detail as MusicStyle); const sp = (e: Event) => setSpeech(Boolean((e as CustomEvent).detail)); window.addEventListener("ow-music", m); window.addEventListener("ow-speech", sp); return () => { window.removeEventListener("ow-music", m); window.removeEventListener("ow-speech", sp); }; }, []);
   // Background music: starts after the first tap (browsers require a gesture), stops when leaving the page.
-  useEffect(() => { if (music === "off") { stopMusic(); return; } const go = () => startMusic(music); go(); const once = () => { go(); window.removeEventListener("pointerdown", once); }; window.addEventListener("pointerdown", once); return () => { window.removeEventListener("pointerdown", once); stopMusic(); }; }, [music]);
+  useEffect(() => {
+    if (music === "off") { stopMusic(); return; }
+    const visible = () => typeof document !== "undefined" && document.visibilityState === "visible" && document.hasFocus();
+    const sync = () => { if (visible()) startMusic(music); else stopMusic(); };
+    const once = () => { sync(); window.removeEventListener("pointerdown", once); };
+    if (visible()) window.addEventListener("pointerdown", once); // browsers need a click before audio
+    document.addEventListener("visibilitychange", sync); window.addEventListener("blur", stopMusic); window.addEventListener("focus", sync); window.addEventListener("pagehide", stopMusic);
+    return () => { window.removeEventListener("pointerdown", once); document.removeEventListener("visibilitychange", sync); window.removeEventListener("blur", stopMusic); window.removeEventListener("focus", sync); window.removeEventListener("pagehide", stopMusic); stopMusic(); };
+  }, [music]);
   // HQ uses the same colour as the top bar (which follows the client's logo/brand).
   useEffect(() => { const read = () => { const el = document.querySelector(".tn-bar") as HTMLElement | null; if (!el) return; const m = getComputedStyle(el).backgroundColor.match(/\d+(\.\d+)?/g); if (!m || m.length < 3) return; if (m.length >= 4 && Number(m[3]) < 0.5) { const bg = getComputedStyle(el).backgroundImage.match(/rgba?\(([^)]+)\)/); if (bg) { const c = bg[1].split(",").map(Number); if (c[3] === undefined || c[3] > 0.5) { setBarColour(`#${c.slice(0, 3).map((v) => Math.round(v).toString(16).padStart(2, "0")).join("")}`); return; } } return; } setBarColour(`#${m.slice(0, 3).map((v) => Math.round(Number(v)).toString(16).padStart(2, "0")).join("")}`); }; read(); const t = setTimeout(read, 1500); return () => clearTimeout(t); }, [scope]);
 
@@ -1060,6 +1068,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
         <button type="button" className={sideOpen ? "on" : ""} onClick={() => setSideOpen(!sideOpen)} aria-label={sideOpen ? "Hide side panel" : "Show task queue, health and quick actions"} title="Panel"><PanelRight size={18} />{approaches.length > 0 && !sideOpen && <i>{approaches.length}</i>}</button>
         <button type="button" onClick={() => setDrawer(drawer === "history" ? "" : "history")} aria-label="Rewards and action history" title="History"><History size={18} /></button>
         <button type="button" onClick={() => setDrawer(drawer === "settings" ? "" : "settings")} aria-label="Game settings" title="Settings"><Settings2 size={18} /></button>
+        <button type="button" className={music !== "off" ? "on" : ""} onClick={() => { const n: MusicStyle = music === "off" ? "chill" : "off"; setMusic(n); writePref("ow-music", n); window.dispatchEvent(new CustomEvent("ow-music", { detail: n })); }} aria-label={music === "off" ? "Play background music" : "Mute music"} title={music === "off" ? "Music off" : "Music on"}><Music size={18} />{music === "off" && <i className="ow-strike" />}</button>
         <button type="button" onClick={() => { const n = !sound; setSound(n); writePref("ow-sound", n ? "on" : "off"); if (n) chime("coin"); }} aria-label={sound ? "Mute sounds" : "Turn sounds on"} title="Sound">{sound ? <Volume2 size={18} /> : <VolumeX size={18} />}</button>
         <button type="button" onClick={() => { const n = !reduced; setReduced(n); writePref("ow-motion", n ? "reduced" : "full"); }} aria-label={reduced ? "Turn animations on" : "Reduce motion"} title="Motion">{reduced ? <Play size={18} /> : <Pause size={18} />}</button>
       </div>

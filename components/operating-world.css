@@ -569,3 +569,5 @@ svg.ow-carrying { cursor: crosshair; }
 .ow-enc-prompt { position: fixed; right: 18px; bottom: 18px; z-index: 3400; display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 16px; background: #111827; color: #fff; box-shadow: 0 14px 34px rgba(0,0,0,.35); animation: ow-fade .25s ease-out both; }
 .ow-enc-prompt div { display: grid; } .ow-enc-prompt span { font-size: 13px; opacity: .85; } .ow-enc-prompt .ghost { color: #fff; border-color: rgba(255,255,255,.3); background: transparent; }
 .ow-dev h4, .ow-enc-menu h4 { margin: 4px 0 0; font-size: 13px; }
+.ow-hud-actions button { position: relative; }
+.ow-hud-actions button i.ow-strike, .ow-strike { position: absolute; right: auto; bottom: auto; min-width: 0; padding: 0; font-size: 0; border: 0; box-shadow: none; left: 50%; top: 50%; width: 22px; height: 2px; background: #ef4444; transform: translate(-50%, -50%) rotate(-45deg); border-radius: 2px; }
