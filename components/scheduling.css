@@ -128,3 +128,22 @@
 .app-shell.dark-mode .sch-ai-result{background:color-mix(in srgb,var(--brand-primary,#3b82f6) 14%,#20272d);border-color:#3c4850}
 .app-shell.dark-mode .sch-noslots{background:#171c20}
 .app-shell.dark-mode .sch-daystrip button.on{background:var(--brand-primary,#3b82f6);color:var(--brand-primary-fg,#fff)}
+
+/* Ask AI conversation */
+.sch-ai-chat{display:grid;gap:10px;background:#fff;border:1.5px solid color-mix(in srgb,var(--brand-primary,#3b82f6) 35%,#dce3e7);border-radius:16px;padding:12px 14px;box-shadow:0 6px 22px color-mix(in srgb,var(--brand-primary,#3b82f6) 10%,transparent)}
+.sch-ai-chat-head{display:flex;align-items:center;gap:8px}.sch-ai-chat-head b{flex:1}
+.sch-ai-turns{display:grid;gap:6px;max-height:260px;overflow:auto}
+.sch-ai-turn{max-width:80%;padding:8px 12px;border-radius:14px;font-size:14px;line-height:1.45;white-space:pre-wrap}
+.sch-ai-turn.user{justify-self:end;background:var(--brand-primary,#3b82f6);color:var(--brand-primary-fg,#fff);border-bottom-right-radius:4px}
+.sch-ai-turn.ai{justify-self:start;background:#f1f5f9;color:#0f172a;border-bottom-left-radius:4px}
+.sch-ai-turn.typing{display:flex;gap:4px;padding:12px 14px}.sch-ai-turn.typing i{width:6px;height:6px;border-radius:50%;background:#94a3b8;animation:sch-dot 1s infinite}.sch-ai-turn.typing i:nth-child(2){animation-delay:.15s}.sch-ai-turn.typing i:nth-child(3){animation-delay:.3s}
+@keyframes sch-dot{50%{opacity:.3;transform:translateY(-2px)}}
+.sch-ai-options{display:flex;gap:6px;flex-wrap:wrap}
+.sch-ai-options button{border:1.5px solid var(--brand-primary,#3b82f6);background:#fff;color:var(--brand-primary,#2563eb);border-radius:999px;padding:7px 13px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:transform .14s,background .14s}
+.sch-ai-options button:hover{transform:translateY(-1px);background:color-mix(in srgb,var(--brand-primary,#3b82f6) 10%,#fff)}
+.sch-ai-reply{display:flex;gap:8px}.sch-ai-reply input{flex:1;font:inherit;padding:9px 12px;border:1px solid #cfd8de;border-radius:10px;background:#fff;color:inherit;min-width:0}
+.sch-ai-reply input:hover,.sch-ai-reply input:focus{border-color:var(--brand-secondary,var(--brand-primary,#3b82f6));outline:none}
+.app-shell.dark-mode .sch-ai-chat{background:#20272d;border-color:#3c4850}
+.app-shell.dark-mode .sch-ai-turn.ai{background:#171c20;color:#e6eef2}
+.app-shell.dark-mode .sch-ai-options button{background:transparent;color:#cfe3ff}
+.app-shell.dark-mode .sch-ai-reply input{background:#171c20;border-color:#3c4850;color:#e6eef2}
