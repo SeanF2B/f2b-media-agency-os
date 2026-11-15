@@ -4,6 +4,7 @@ import { encryptRefreshToken } from "@/lib/google-ads-direct";
 import { encryptCalendarRefreshToken, syncGoogleCalendarTasks } from "@/lib/google-calendar";
 import { saveDriveConnection } from "@/lib/media-library/server";
 import { saveGmail } from "@/lib/bookkeeping-email";
+import { completeGoogleConnect } from "@/lib/scheduling/google";
 
 export const dynamic = "force-dynamic";
 
@@ -151,6 +152,9 @@ export async function GET(request: Request) {
   const workspace = await env.DB.prepare("SELECT data FROM workspace_documents WHERE id = 'f2b-agency'").first<{ data: string }>();
   if (!workspace) return finish(request, "workspace-unavailable");
   const data = JSON.parse(workspace.data);
+  // Scheduling: any staff member can connect their own calendar (admins can connect anyone's).
+  const schedState = new URL(request.url).searchParams.get("state") || "";
+  if (schedState.startsWith("sched:")) return completeGoogleConnect(request, user, data, schedState);
   const admin = data.ownerId === user.userId || data.staff?.some((person: { email?: string; role?: string }) => person.email?.toLowerCase() === user.email.toLowerCase() && ["Owner", "Admin"].includes(person.role || ""));
   if (!admin) return finish(request, "admin-required");
   const url = new URL(request.url);

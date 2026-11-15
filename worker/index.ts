@@ -173,6 +173,11 @@ const worker = {
       }),
       processDueAiTasks({ ...env, hasDirectSearchConsole: hasGoogleSearchConsoleConnection, readDirectSearchConsole: readGoogleSearchConsoleRows }, new Date(controller.scheduledTime)),
       processDueFinanceRecurring(env, new Date(controller.scheduledTime)),
+      // Scheduling: 24-hour and 1-hour appointment reminders (indexed, at most 50 per run).
+      import("../lib/scheduling/context").then(async ({ schedulingDeps, loadSchedulingWorkspace }) => {
+        const { processSchedulingReminders } = await import("../lib/scheduling/server");
+        return processSchedulingReminders(schedulingDeps(new Request(env.TASK_APP_URL || "https://f2b-media-agency-os.f2b-media.workers.dev")), loadSchedulingWorkspace);
+      }),
       processExpiredMarketingSubmissions(env.DB!, env.BUCKET, new Date(controller.scheduledTime)),
       processMonthlyClientReports(env.DB, env.BUCKET as never, new Date(controller.scheduledTime)),
       processOutreach(new Date(controller.scheduledTime)),

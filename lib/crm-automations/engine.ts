@@ -82,6 +82,8 @@ export function triggerMatches(automation: { id: string; scope_id: string; trigg
       if (config.match === "automation") return Boolean(payload.byAutomation);
       if (config.match === "title") return Boolean(config.titleContains) && String(payload.title || "").toLowerCase().includes(String(config.titleContains).toLowerCase());
       return true;
+    case "appointment_booked": case "appointment_rescheduled": case "appointment_cancelled": case "appointment_no_show": case "appointment_completed":
+      return !config.calendarId || config.calendarId === payload.calendarId;
     default: return false;
   }
 }

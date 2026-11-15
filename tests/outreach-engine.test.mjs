@@ -138,7 +138,7 @@ test("embedded schema matches the migration file", async () => {
   const { readFileSync } = await import("node:fs");
   const { OUTREACH_SCHEMA } = await import("../lib/outreach/schema-sql.mjs");
   // Comments are removed before splitting, so a ";" inside a comment can never cut a statement.
-  const sql = readFileSync(new URL("../drizzle/0048_outreach.sql", import.meta.url), "utf8").split("\n").map((line) => line.replace(/--.*$/, "")).join("\n");
+  const sql = readFileSync(new URL("../drizzle/0049_outreach.sql", import.meta.url), "utf8").split("\n").map((line) => line.replace(/--.*$/, "")).join("\n");
   const statements = sql.split(";").map((part) => part.replace(/\s+/g, " ").trim()).filter(Boolean);
   assert.deepEqual(OUTREACH_SCHEMA, statements);
   // Every statement must be complete and valid SQLite on its own (that's how the app runs them).

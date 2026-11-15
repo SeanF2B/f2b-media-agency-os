@@ -1,7 +1,7 @@
 // Shared model for native CRM Automations (used by the builder UI, the API and the runner).
 // Only erasable TypeScript syntax is used so `node --test` can load this file directly.
 
-export type TriggerType = "form_lead" | "tag_added" | "stage_changed" | "task_completed" | "schedule";
+export type TriggerType = "form_lead" | "tag_added" | "stage_changed" | "task_completed" | "schedule" | "appointment_booked" | "appointment_rescheduled" | "appointment_cancelled" | "appointment_no_show" | "appointment_completed";
 export type ActionType = "send_email" | "set_value" | "add_tag" | "remove_tag" | "move_stage" | "create_task" | "notify" | "wait" | "if_else";
 export type NodeType = "trigger" | ActionType;
 export type Branch = "yes" | "no";
@@ -24,6 +24,11 @@ export const TRIGGERS: Array<{ type: TriggerType; label: string; help: string; i
   { type: "stage_changed", label: "Pipeline stage changed", help: "Starts when a deal moves to a different stage.", icon: "Columns3" },
   { type: "task_completed", label: "Task completed", help: "Starts when a task is marked as done.", icon: "CircleCheck" },
   { type: "schedule", label: "Date / time", help: "Starts on a date you choose, once or on repeat.", icon: "CalendarClock" },
+  { type: "appointment_booked", label: "Appointment booked", help: "Starts when someone books through Scheduling (online or in the OS).", icon: "CalendarCheck" },
+  { type: "appointment_rescheduled", label: "Appointment rescheduled", help: "Starts when an appointment is moved to a new time.", icon: "CalendarClock" },
+  { type: "appointment_cancelled", label: "Appointment cancelled", help: "Starts when an appointment is cancelled.", icon: "CalendarX" },
+  { type: "appointment_no_show", label: "Appointment no-show", help: "Starts when an appointment is marked as a no-show.", icon: "UserX" },
+  { type: "appointment_completed", label: "Appointment completed", help: "Starts when an appointment is marked as completed (great for review requests).", icon: "CircleCheck" },
 ];
 
 export const ACTIONS: Array<{ type: ActionType | "sms"; label: string; help: string; icon: string; comingSoon?: boolean }> = [
@@ -212,6 +217,7 @@ export function nodeSummary(node: AutomationNode, lookup: Lookup = {}): string {
       if (c.type === "tag_added") return text(c.tag) ? `Tag · ${text(c.tag)}` : "Choose a tag";
       if (c.type === "stage_changed") return c.pipelineId ? `${c.fromStageId ? stage(c.fromStageId) : "Any stage"} → ${c.toStageId ? stage(c.toStageId) : "any stage"}` : "Choose a pipeline";
       if (c.type === "task_completed") return c.match === "automation" ? "Tasks made by automations" : c.match === "title" && text(c.titleContains) ? `Title contains "${text(c.titleContains, 40)}"` : "Any task";
+      if (typeof c.type === "string" && c.type.startsWith("appointment_")) return text(c.calendarName) ? `Calendar · ${text(c.calendarName)}` : "Any booking calendar";
       if (c.type === "schedule") return c.mode === "recurring" ? `Every ${c.repeat === "weekly" ? "week" : c.repeat === "monthly" ? "month" : "day"} at ${text(c.time) || "09:00"}` : text(c.at) ? `Once · ${text(c.at).replace("T", " at ")}` : "Choose a date and time";
       return "Click to choose what starts this automation";
     case "send_email": return text(c.subject) ? `${c.to === "custom" && text(c.toEmails) ? `Email ${text(c.toEmails, 40)}` : "Send email"} · ${text(c.subject, 60)}` : "Write the email";
