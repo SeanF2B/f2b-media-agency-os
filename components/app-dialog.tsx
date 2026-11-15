@@ -5,10 +5,10 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 type Request = { kind: "confirm" | "alert" | "prompt"; message: string; value?: string; resolve: (value: unknown) => void };
-let push: ((request: Request) => void) | null = null;
-const queue: Request[] = [];
-
-function open(request: Request) { if (push) push(request); else queue.push(request); }
+// Shared on window so every bundle chunk talks to the same host.
+type Bridge = { push: ((request: Request) => void) | null; queue: Request[] };
+const bridge = (): Bridge => { const w = globalThis as unknown as { __f2bDialog?: Bridge }; return (w.__f2bDialog ||= { push: null, queue: [] }); };
+function open(request: Request) { const b = bridge(); if (b.push) b.push(request); else b.queue.push(request); }
 export const appConfirm = (message: string) => new Promise<boolean>((resolve) => open({ kind: "confirm", message, resolve: resolve as (value: unknown) => void }));
 export const appAlert = (message: string) => new Promise<void>((resolve) => open({ kind: "alert", message, resolve: resolve as (value: unknown) => void }));
 export const appPrompt = (message: string, value = "") => new Promise<string | null>((resolve) => open({ kind: "prompt", message, value, resolve: resolve as (value: unknown) => void }));
@@ -19,9 +19,10 @@ export function AppDialogHost() {
   const pending = useRef<Request[]>([]);
   const okRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    push = (request) => { setCurrent((active) => { if (active) { pending.current.push(request); return active; } setText(request.value || ""); return request; }); };
-    while (queue.length) push(queue.shift()!);
-    return () => { push = null; };
+    const b = bridge();
+    b.push = (request) => { setCurrent((active) => { if (active) { pending.current.push(request); return active; } setText(request.value || ""); return request; }); };
+    while (b.queue.length) b.push(b.queue.shift()!);
+    return () => { b.push = null; };
   }, []);
   useEffect(() => { if (current && current.kind !== "prompt") window.setTimeout(() => okRef.current?.focus(), 20); }, [current]);
   if (!current || typeof document === "undefined") return null;
