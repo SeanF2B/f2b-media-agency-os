@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { useEffect, useMemo, useState } from "react";
 import { readFocusClient, setFocusClient, useFocusClient } from "@/lib/focus-client";
 import { BrandIcon } from "./brand-icon";
@@ -38,7 +39,7 @@ function ConnectionDots({ client, hasSite, onOpen }: { client: OpsClient; hasSit
 function QuickConnectLink({ client, missing }: { client: OpsClient; missing: string[] }) {
   const [copied, setCopied] = useState(false);
   const link = typeof window === "undefined" ? "" : `${window.location.origin}/?client=${encodeURIComponent(client.id)}&page=Integrations`;
-  const copy = async () => { try { await navigator.clipboard.writeText(link); } catch { window.prompt("Copy this link:", link); } setCopied(true); window.setTimeout(() => setCopied(false), 1600); };
+  const copy = async () => { try { await navigator.clipboard.writeText(link); } catch { (await appPrompt("Copy this link:", link)); } setCopied(true); window.setTimeout(() => setCopied(false), 1600); };
   const mail = `mailto:${encodeURIComponent((client as OpsClient & { email?: string }).email || "")}?subject=${encodeURIComponent(`Connect your accounts · ${client.name}`)}&body=${encodeURIComponent(`Hi,\n\nCould you connect these so we can manage everything in one place: ${missing.join(", ")}.\n\nOpen this link and follow the steps:\n${link}\n\nThanks!`)}`;
   return <span className="ops-quick-link"><button type="button" title={copied ? "Link copied" : "Copy a connect link for this client"} aria-label={`Copy connect link for ${client.name}`} onClick={() => void copy()}>{copied ? <Check size={14} /> : <Link2 size={14} />}</button><a href={mail} title="Email the connect link to the client" aria-label={`Email connect link to ${client.name}`}><Mail size={14} /></a></span>;
 }
@@ -101,7 +102,7 @@ export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenW
       const first = await fetch("/api/community-leads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId: client.id }) });
       const preview = await first.json().catch(() => ({})) as { status?: string; queries?: string[]; message?: string; error?: string; usage?: never };
       if (first.status === 409 && preview.status === "confirmation_required") {
-        if (!window.confirm(`${preview.message}\n\nSearches:\n${(preview.queries || []).join("\n")}`)) { set({ busy: false }); return; }
+        if (!(await appConfirm(`${preview.message}\n\nSearches:\n${(preview.queries || []).join("\n")}`))) { set({ busy: false }); return; }
       } else if (!first.ok) throw Object.assign(new Error(preview.error || "Search unavailable."), { usage: preview.usage });
       const response = await fetch("/api/community-leads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId: client.id, acknowledgeCost: true }) });
       const json = await response.json().catch(() => ({})) as { results?: CommunityResult[]; costUsd?: number | null; error?: string; usage?: never; failed?: string[] };

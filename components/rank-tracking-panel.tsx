@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { useEffect, useMemo, useState } from "react";
 
 type History = { at: string; position: number | null; url: string | null; competitors: Record<string, number | null>; error: string | null };
@@ -35,7 +36,7 @@ export function RankTrackingPanel({ clientId, clientName, defaultLocation }: { c
     const comp = competitors.split(",").map((item) => item.trim()).filter(Boolean);
     let { response, json } = await call({ action: "check", ids, competitors: comp });
     if (response.status === 409 && json.status === "confirmation_required") {
-      if (!window.confirm(json.message || "Run paid ranking checks?")) { setBusy(false); return; }
+      if (!(await appConfirm(json.message || "Run paid ranking checks?"))) { setBusy(false); return; }
       ({ response, json } = await call({ action: "check", ids, competitors: comp, acknowledgeCost: true }));
     }
     setBusy(false);

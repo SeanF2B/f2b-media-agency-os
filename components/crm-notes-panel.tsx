@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 export type CrmNote = { id: string; opportunity_id?: string; contact_id?: string; body: string; created_at: string; created_by?: string; created_by_name?: string };
@@ -64,7 +65,7 @@ export function CrmNotesPanel({ title, subtitle = "Notes and follow-ups for this
         <div className="crm-note-actions"><button type="button" className="secondary-button" onClick={() => { setDraft(""); setAdding(false); }}>Cancel</button><button type="submit" className="primary-button" disabled={busy || !draft.trim()}>{busy ? "Saving…" : "Save note"}</button></div>
       </form> : <button type="button" className="crm-note-add" onClick={() => setAdding(true)}>＋ Add note</button>}
       <div className="crm-note-list">
-        {shown.map((note) => <NoteCard key={note.id} note={note} onSave={(body) => run({ action: "updateActivity", id: note.id, body })} onDelete={() => { if (window.confirm("Delete this note? This can't be undone.")) void run({ action: "deleteActivity", id: note.id }); }} />)}
+        {shown.map((note) => <NoteCard key={note.id} note={note} onSave={(body) => run({ action: "updateActivity", id: note.id, body })} onDelete={async () => { if ((await appConfirm("Delete this note? This can't be undone."))) void run({ action: "deleteActivity", id: note.id }); }} />)}
         {!shown.length && <p className="crm-empty">{query ? "No notes match your search." : "No notes yet. Add the first one."}</p>}
       </div>
     </aside>

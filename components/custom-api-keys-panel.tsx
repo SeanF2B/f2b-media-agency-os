@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { useEffect, useState, type FormEvent } from "react";
 
 type SavedKey = { id: string; label: string; note: string; fingerprint: string; updatedAt: string };
@@ -46,7 +47,7 @@ export function CustomApiKeysPanel() {
   }
 
   async function remove(key: SavedKey) {
-    if (!window.confirm(`Remove “${key.label}” from Agency OS? Anything using this key will stop working.`)) return;
+    if (!(await appConfirm(`Remove “${key.label}” from Agency OS? Anything using this key will stop working.`))) return;
     setMessage(""); setIsError(false);
     try {
       const response = await fetch(`/api/settings/custom-api-keys?id=${encodeURIComponent(key.id)}`, { method: "DELETE" });

@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Sparkles, CalendarDays, ChevronLeft, ChevronRight, Clock, Copy, Link2, MapPin, Plus, RefreshCw, Settings2, Trash2, UserRound, Users, Video, Phone, Building2 } from "lucide-react";
 import "./scheduling.css";
@@ -184,7 +185,7 @@ export function SchedulingView({ scopeClientId }: { scopeClientId: string }) {
     {newAppt && <NewAppointment data={data} scope={scopeClientId} initial={newAppt} onClose={() => setNewAppt(null)} onSaved={async (msg) => { setNewAppt(null); setNote(msg); await load(); }} onCalendarsChanged={() => void load()} />}
     {catchUpOpen && !detail && !newAppt && <CatchUp data={data} scope={scopeClientId} onClose={() => setCatchUpOpen(false)} onChanged={() => void load()} />}
     {detail && <AppointmentDetail key={detail.id} data={data} scope={scopeClientId} booking={detail} onClose={() => setDetail(null)} onSaved={async (msg) => { setDetail(null); setNote(msg); await load(); }} />}
-    {editCal && <CalendarEditor data={data} value={editCal} busy={busy} onClose={() => setEditCal(null)} onSave={async (cal) => { const out = await act({ action: "saveCalendar", calendar: cal }, cal.id ? "Booking calendar saved." : "Booking calendar created. Copy its link or embed code to start taking bookings."); if (out) setEditCal(null); }} onDelete={editCal.id ? async () => { if (!window.confirm("Delete this booking calendar? Its booking link will stop working.")) return; const out = await act({ action: "deleteCalendar", id: editCal.id }, "Booking calendar deleted."); if (out) setEditCal(null); } : undefined} />}
+    {editCal && <CalendarEditor data={data} value={editCal} busy={busy} onClose={() => setEditCal(null)} onSave={async (cal) => { const out = await act({ action: "saveCalendar", calendar: cal }, cal.id ? "Booking calendar saved." : "Booking calendar created. Copy its link or embed code to start taking bookings."); if (out) setEditCal(null); }} onDelete={editCal.id ? async () => { if (!(await appConfirm("Delete this booking calendar? Its booking link will stop working."))) return; const out = await act({ action: "deleteCalendar", id: editCal.id }, "Booking calendar deleted."); if (out) setEditCal(null); } : undefined} />}
     {editAvail && <AvailabilityEditor staff={editAvail} busy={busy} onClose={() => setEditAvail(null)} onSave={async (v) => { const out = await act({ action: "saveAvailability", staffId: editAvail.id, ...v }, `${editAvail.name}'s availability saved.`); if (out) setEditAvail(null); }} />}
   </section>;
 }
@@ -402,7 +403,7 @@ function AppointmentDetail({ data, scope, booking, onClose, onSaved }: { data: D
       {booking.status !== "cancelled" && Date.parse(booking.start) <= Date.now() + 3_600_000 && <>
         <button type="button" className="iv-btn ok" disabled={busy || booking.status === "completed"} onClick={() => void send({ status: "completed" }, "Marked as completed.")}>Completed</button>
         <button type="button" className="iv-btn danger" disabled={busy || booking.status === "no_show"} onClick={() => void send({ status: "no_show" }, "Marked as a no-show.")}>No-show</button></>}
-      {live && <button type="button" className="iv-btn danger" disabled={busy} onClick={() => { if (window.confirm("Cancel this appointment? The customer will be emailed.")) void send({ status: "cancelled" }, "Appointment cancelled."); }}>Cancel appointment</button>}
+      {live && <button type="button" className="iv-btn danger" disabled={busy} onClick={async () => { if ((await appConfirm("Cancel this appointment? The customer will be emailed."))) void send({ status: "cancelled" }, "Appointment cancelled."); }}>Cancel appointment</button>}
     </footer>
   </Modal>;
 }

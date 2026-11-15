@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { useFocusClient } from "@/lib/focus-client";
 import { createCardDragFx, showFxError, type CardDragFx } from "@/lib/card-drag-fx";
@@ -207,13 +208,13 @@ export function CrmView({ onOpenClient, scopeClientId = "", conversations, initi
     finally { setBusy(false); }
   };
   const deleteContacts = async (ids: string[]) => {
-    if (!ids.length || !window.confirm(`Delete ${ids.length} contact${ids.length === 1 ? "" : "s"}? Their notes and tags are removed and any pipeline cards are unlinked. This cannot be undone.`)) return;
+    if (!ids.length || !(await appConfirm(`Delete ${ids.length} contact${ids.length === 1 ? "" : "s"}? Their notes and tags are removed and any pipeline cards are unlinked. This cannot be undone.`))) return;
     if (await bulk({ action: "deleteContacts", ids }, "{n} contact(s) deleted.")) setSelectedContactIds((current) => current.filter((id) => !ids.includes(id)));
   };
   const applySmartList = (list?: SmartList) => { setActiveListId(list?.id || ""); setContactFilters(list ? { ...list.filters } : {}); setSelectedContactIds([]); };
   const saveSmartList = async () => {
     const current = data.smartLists?.find((item) => item.id === activeListId);
-    const name = window.prompt(current ? "Update this smart list's name" : "Name this smart list", current?.name || "");
+    const name = (await appPrompt(current ? "Update this smart list's name" : "Name this smart list", current?.name || ""));
     if (!name?.trim()) return;
     setError("");
     const response = await fetch("/api/crm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "saveSmartList", id: current?.id || "", name: name.trim(), filters: contactFilters }) });
@@ -222,7 +223,7 @@ export function CrmView({ onOpenClient, scopeClientId = "", conversations, initi
     await load(); if (result.id) setActiveListId(result.id);
   };
   const deleteSmartList = async (list: SmartList) => {
-    if (!window.confirm(`Delete the smart list “${list.name}”? Contacts are not affected.`)) return;
+    if (!(await appConfirm(`Delete the smart list “${list.name}”? Contacts are not affected.`))) return;
     await fetch("/api/crm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "deleteSmartList", id: list.id }) });
     await load(); applySmartList();
   };
@@ -267,7 +268,7 @@ export function CrmView({ onOpenClient, scopeClientId = "", conversations, initi
     }
   };
   const deleteOpportunity = async (item: Opportunity) => {
-    if (!window.confirm(`Delete “${item.title}”? This removes the card and its notes and cannot be undone.`)) return;
+    if (!(await appConfirm(`Delete “${item.title}”? This removes the card and its notes and cannot be undone.`))) return;
     const snapshot = data;
     setError("");
     setData((current) => ({ ...current, opportunities: current.opportunities.filter((entry) => entry.id !== item.id), activities: current.activities.filter((note) => note.opportunity_id !== item.id) }));

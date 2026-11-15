@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 import "./media-library.css";
 import { readPhotoGeo } from "@/lib/media-library/exif";
@@ -170,7 +171,7 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
 
   const onDrop = (event: DragEvent) => { event.preventDefault(); setDragOver(false); if (event.dataTransfer.files?.length) queueUpload(event.dataTransfer.files); };
 
-  const copy = async (text: string, label = "Link copied") => { try { await navigator.clipboard.writeText(text); flash(label); } catch { window.prompt("Copy this link:", text); } };
+  const copy = async (text: string, label = "Link copied") => { try { await navigator.clipboard.writeText(text); flash(label); } catch { (await appPrompt("Copy this link:", text)); } };
   const absolute = (path: string) => `${window.location.origin}${path}`;
 
   const saveItem = async (patch: Partial<Pick<MediaItem, "name" | "folder" | "alt" | "project">> & { scope?: string }) => {
@@ -186,7 +187,7 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
   };
 
   const deleteItem = async (item: MediaItem) => {
-    if (!window.confirm(`Delete “${item.name}”? Its public link will stop working on any website or ad that uses it.`)) return;
+    if (!(await appConfirm(`Delete “${item.name}”? Its public link will stop working on any website or ad that uses it.`))) return;
     try {
       await api("/api/media-library", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "delete", ids: [item.id] }) });
       setItems((current) => current.filter((entry) => entry.id !== item.id)); setSelected(null); flash("Deleted");
@@ -195,7 +196,7 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
 
   const deletePicked = async () => {
     const ids = [...picks];
-    if (!ids.length || !window.confirm(`Delete ${ids.length} file${ids.length === 1 ? "" : "s"}? Their public links will stop working on any website or ad that uses them.`)) return;
+    if (!ids.length || !(await appConfirm(`Delete ${ids.length} file${ids.length === 1 ? "" : "s"}? Their public links will stop working on any website or ad that uses them.`))) return;
     try {
       for (let i = 0; i < ids.length; i += 100) await api("/api/media-library", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "delete", ids: ids.slice(i, i + 100) }) });
       setItems((current) => current.filter((entry) => !picks.has(entry.id))); setPicks(new Set()); flash(`Deleted ${ids.length}`);

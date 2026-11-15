@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { BarChart3, CircleCheck, FileText, Globe, Mail, Megaphone, MapPin, PenLine, Phone, Search, Settings, Share2, Users, Wrench, type LucideIcon } from "lucide-react";
 
@@ -76,7 +77,7 @@ export function TaskTable({ tasks, clients, staff, statuses, onStatus, onEdit, o
       {onBulkUpdate && <label>Priority<select value="" onChange={(event) => event.target.value && bulk({ priority: event.target.value })}><option value="">Change…</option>{PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}</select></label>}
       {onBulkUpdate && <label>Owner<select value="" onChange={(event) => event.target.value && bulk({ assigneeId: event.target.value === "__none" ? "" : event.target.value })}><option value="">Change…</option>{people.map((member) => <option key={member.id} value={member.id}>{member.name.split("|")[0].trim()}</option>)}<option value="__none">Unassigned</option></select></label>}
       {onBulkUpdate && <label>Due<input type="date" onChange={(event) => event.target.value && bulk({ due: event.target.value })} /></label>}
-      {onBulkDelete && <button type="button" className="tt-bulk-delete" onClick={() => { if (window.confirm(`Delete ${pickedIds.length} task${pickedIds.length === 1 ? "" : "s"}? This can't be undone.`)) { onBulkDelete(pickedIds); setPicked(new Set()); } }}>Delete</button>}
+      {onBulkDelete && <button type="button" className="tt-bulk-delete" onClick={async () => { if ((await appConfirm(`Delete ${pickedIds.length} task${pickedIds.length === 1 ? "" : "s"}? This can't be undone.`))) { onBulkDelete(pickedIds); setPicked(new Set()); } }}>Delete</button>}
       <button type="button" className="text-button" onClick={() => setPicked(new Set())}>Clear</button>
     </div>}
     <div className="tt-wrap"><table className="tt-table">

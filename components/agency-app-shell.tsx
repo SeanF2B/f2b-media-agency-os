@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { EmojiIcons } from "./emoji-icons";
 import { LiquidGlass } from "./liquid-glass";
 import { AiFieldAssist } from "./ai-field-assist";
+import { AppDialogHost } from "./app-dialog";
 
 const AgencyApp = dynamic(() => import("./agency-app").then((module) => module.AgencyApp), {
   ssr: false,
@@ -11,5 +12,5 @@ const AgencyApp = dynamic(() => import("./agency-app").then((module) => module.A
 });
 
 export function AgencyAppShell() {
-  return <><AgencyApp /><EmojiIcons /><LiquidGlass /><AiFieldAssist /></>;
+  return <><AgencyApp /><EmojiIcons /><LiquidGlass /><AiFieldAssist /><AppDialogHost /></>;
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { useEffect, useState, type CSSProperties } from "react";
 import { BrandIcon } from "./brand-icon";
 
@@ -95,7 +96,7 @@ export function IntegrationsView({ onNavigate }: { onNavigate: (page: string) =>
     } finally { setRetryingKey(""); }
   }
   async function configurePublicMarketingAccess() {
-    const approved = window.confirm("This will make only /f/*, /api/marketing-public*, /sitemap.xml, /robots.txt and the signed GoHighLevel webhook publicly reachable. Cloudflare Access will not authenticate or log requests to those paths. The CRM and management APIs stay protected. Continue?");
+    const approved = (await appConfirm("This will make only /f/*, /api/marketing-public*, /sitemap.xml, /robots.txt and the signed GoHighLevel webhook publicly reachable. Cloudflare Access will not authenticate or log requests to those paths. The CRM and management APIs stay protected. Continue?"));
     if (!approved) return;
     setSettingUpPublicAccess(true);
     setPublicAccessSetupMessage("Applying the approved path rules…");
