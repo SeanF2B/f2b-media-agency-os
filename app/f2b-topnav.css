@@ -1003,3 +1003,21 @@ html body .app-shell .billing-inv-status.s-paid { background:#ecfdf3; color:#067
 html body .app-shell .billing-error { color:#b42318; }
 html body .app-shell.dark-mode .billing-sub, html body .app-shell.dark-mode .billing-invoice, html body .app-shell.dark-mode .billing-mrr { background:rgba(255,255,255,.04); border-color:rgba(255,255,255,.1); color:#e4e7ec; }
 @media (max-width: 760px) { html body .app-shell .billing-sub { grid-template-columns:1fr; } html body .app-shell .billing-invoice { grid-template-columns:1fr auto; } html body .app-shell .billing-inv-client { display:none; } }
+
+/* AI widget: always-readable text (beats global text colour rules), light and dark */
+html body .ai-chat-panel > header, html body .ai-chat-panel > header *:not(svg):not(path) { color:#fff !important; }
+html body .ai-chat-panel > header b { font-size:15px; font-weight:700; }
+html body .ai-chat-panel > header small { opacity:.9; }
+html body .ai-chat-panel > header .ai-chat-icon { background:rgba(255,255,255,.18) !important; color:#fff !important; }
+html body .ai-chat-panel > header .ai-chat-icon svg { stroke:#fff !important; }
+html body .ai-chat-panel, html body .ai-chat-panel .ai-chat-chips, html body .ai-chat-panel .ai-chat-input { background:#fff !important; }
+html body .ai-chat-panel .ai-chat-list { background:#f8fafc !important; }
+html body .ai-chat-msg.bot p { color:#1f2a33 !important; background:#fff !important; }
+html body .ai-chat-msg.me p { color:#fff !important; }
+html body .ai-chat-actions button, html body .ai-chat-chips button { color:#1f2a33 !important; }
+html body .ai-chat-input input { color:#1f2a33 !important; background:#fff !important; }
+html body .ai-chat-input input::placeholder { color:#98a2b3 !important; }
+html body .ai-chat-toast, html body .ai-chat-toast p { color:#1f2a33 !important; background:#fff; }
+html body .ai-chat-toast .primary-button { color:#fff !important; }
+html body .ai-tour-card { color:#1f2a33 !important; } html body .ai-tour-card b { color:#1f2a33 !important; } html body .ai-tour-card p { color:#475467 !important; }
+html body .ai-tour-card .primary-button { color:#fff !important; }
