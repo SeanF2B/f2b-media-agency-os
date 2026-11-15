@@ -852,3 +852,19 @@ html body .books-export-menu button { padding:8px 10px; border:0; background:tra
 html body .books-export-menu button:hover { background:#f2f6fb; }
 html body .app-shell.dark-mode .books-export-menu { background:#1f2329; border-color:rgba(255,255,255,.14); }
 html body .app-shell.dark-mode .books-export-menu button { color:#e4e7ec; }
+
+/* Client books records use the same row layout as the agency Books */
+html body .app-shell .client-tax-list > div { grid-template-columns: 30px 92px minmax(0,1fr) auto auto !important; gap: 12px !important; padding-top: 9px !important; padding-bottom: 9px !important; border-top: 0 !important; }
+html body .app-shell .client-tax-list > div > .finance-kind { width: 26px; height: 26px; display: inline-grid; place-items: center; border-radius: 8px; font-size: 13px; }
+html body .app-shell .client-tax-list > div > .finance-kind.income { background: #e3f6ea; color: #067647; }
+html body .app-shell .client-tax-list > div > .finance-kind.expense { background: #fbe4e2; color: #b42318; }
+html body .app-shell .client-tax-list .client-tax-date { font-size: 12.5px; color: #667085; font-variant-numeric: tabular-nums; }
+html body .app-shell .client-tax-list > div > b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html body .app-shell .client-tax-list > div > strong { justify-self: end; font-size: 14px; font-variant-numeric: tabular-nums; }
+html body .app-shell .client-tax-list > div > .client-tax-auto { justify-self: end; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #f2f4f7; color: #667085; }
+html body .app-shell.dark-mode .client-tax-list > div > .finance-kind.income { background: rgba(18,183,106,.15); color: #6ce9a6; }
+html body .app-shell.dark-mode .client-tax-list > div > .finance-kind.expense { background: rgba(240,68,56,.15); color: #fda29b; }
+html body .app-shell.dark-mode .client-tax-list .client-tax-date { color: #98a2b3; }
+html body .app-shell.dark-mode .client-tax-list > div > .client-tax-auto { background: rgba(255,255,255,.08); color: #d0d5dd; }
+html body .ml-folder-new { display:flex; align-items:center; gap:6px; }
+html body .ml-folder-new input { flex:1; }
