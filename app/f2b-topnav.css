@@ -779,3 +779,47 @@ html body .lsr-note p { margin:4px 0 0; }
 html body .lsr-note .lsr-warn { color:#b54708; font-weight:600; }
 @media (max-width: 640px) { html body .lsr-stats { grid-template-columns:1fr; } }
 html body .app-shell.dark-mode .lsr-stat, html body .app-shell.dark-mode .lsr-note { background:rgba(255,255,255,.04); border-color:rgba(255,255,255,.1); }
+
+/* Lead Factory: ICP picker with icons, clean summary, live run panel, simpler list cards */
+html body .lead-icp-picker { position:relative; }
+html body .lead-icp-picker-trigger { display:flex; align-items:center; gap:10px; width:100%; min-height:46px; padding:6px 12px; border:1px solid #d0d5dd; border-radius:12px; background:#fff; text-align:left; cursor:pointer; font-size:14px; }
+html body .lead-icp-caret { margin-left:auto; color:#98a2b3; }
+html body .lead-icp-dot { flex:0 0 30px; width:30px; height:30px; display:inline-grid; place-items:center; border-radius:9px; }
+html body .lead-icp-dot.lg { flex-basis:42px; width:42px; height:42px; border-radius:12px; }
+html body .lead-icp-picker-scrim { position:fixed; inset:0; z-index:40; }
+html body .lead-icp-picker-menu { position:absolute; z-index:41; top:calc(100% + 6px); left:0; right:0; max-height:360px; overflow:auto; margin:0; padding:6px; list-style:none; background:#fff; border:1px solid #e4e7ec; border-radius:14px; box-shadow:0 16px 40px rgba(16,24,40,.16); display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:2px; }
+html body .lead-icp-picker-menu button { display:flex; align-items:center; gap:10px; width:100%; padding:8px 10px; border:0; border-radius:10px; background:transparent; text-align:left; cursor:pointer; }
+html body .lead-icp-picker-menu button:hover, html body .lead-icp-picker-menu button.active { background:#f2f6fb; }
+html body .lead-icp-option-text { display:grid; min-width:0; }
+html body .lead-icp-option-text b { font-size:13.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+html body .lead-icp-option-text small { font-size:12px; color:#667085; }
+html body .lead-selected-clean { display:flex !important; align-items:center; gap:12px; }
+html body .lead-selected-clean > div { flex:1; min-width:0; display:grid; gap:6px; }
+html body .lead-selected-chips { display:flex; flex-wrap:wrap; gap:6px; }
+html body .lead-run { margin-top:14px; padding:14px 16px; border-radius:14px; border:1px solid #dde9f7; background:#f7fbff; display:grid; gap:10px; }
+html body .lead-run.is-done { background:#f6fef9; border-color:#d1fadf; }
+html body .lead-run-head { display:flex; align-items:center; gap:10px; }
+html body .lead-run-head small { color:#667085; font-variant-numeric:tabular-nums; }
+html body .lead-run-head > button { margin-left:auto; }
+html body .lead-run-dot { width:10px; height:10px; border-radius:50%; background:#12b76a; }
+html body .lead-run-dot.live { background:#2e90fa; animation:lead-run-pulse 1.2s ease-in-out infinite; }
+@keyframes lead-run-pulse { 0%, 100% { box-shadow:0 0 0 0 rgba(46,144,250,.45); } 50% { box-shadow:0 0 0 6px rgba(46,144,250,0); } }
+html body .lead-run-bar { height:8px; border-radius:999px; background:#e4ebf3; overflow:hidden; }
+html body .lead-run-bar i { display:block; height:100%; border-radius:inherit; background:var(--brand-secondary, #0b74b8); transition:width .5s ease; }
+html body .lead-run-bar.indeterminate i { width:35% !important; animation:lead-run-slide 1.4s ease-in-out infinite; }
+@keyframes lead-run-slide { 0% { transform:translateX(-100%); } 100% { transform:translateX(300%); } }
+html body .lead-run-stats { display:flex; flex-wrap:wrap; gap:8px 20px; font-size:13px; color:#475467; }
+html body .lead-run-stats b { color:#1f2a33; }
+html body .lead-run-msg { margin:0; font-size:12.5px; color:#667085; }
+html body .lead-run-cancel { height:32px; padding:0 14px !important; color:#b42318 !important; }
+html body .lead-list-clean { display:grid; gap:10px; }
+html body .lead-list-head { display:flex; gap:10px; align-items:center; }
+html body .lead-list-head > div { display:grid; min-width:0; }
+html body .lead-list-head b { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+html body .lead-list-head span { font-size:12px; color:#667085; }
+html body .lead-list-clean .lead-saved-list-counts span { font-size:12px; padding:2px 9px; border-radius:999px; }
+html body .lead-list-clean .lead-saved-list-actions { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+html body .lead-list-clean .lead-list-enrich { height:34px; padding:0 14px !important; }
+html body .lead-list-clean .lead-list-action-button { height:34px; padding:0 12px; }
+html body .lead-list-clean .lead-list-delete-button { margin-left:auto; width:34px; height:34px; padding:0; display:inline-grid; place-items:center; border-radius:9px; border:1px solid #f4d4d0; background:#fff; color:#b42318; }
+html body .app-shell.dark-mode .lead-icp-picker-trigger, html body .app-shell.dark-mode .lead-icp-picker-menu { background:#1f2329; border-color:rgba(255,255,255,.14); }
