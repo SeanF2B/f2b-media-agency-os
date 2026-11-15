@@ -846,3 +846,9 @@ html body .app-shell.dark-mode .ops-quick-link { border-left-color:rgba(255,255,
 html body .app-shell.dark-mode .ops-quick-link > button, html body .app-shell.dark-mode .ops-quick-link > a { background:rgba(255,255,255,.06); border-color:rgba(255,255,255,.14); color:#9fc5ff; }
 html body .tt-logo { width:22px; height:22px; flex:0 0 22px; display:inline-grid; place-items:center; border-radius:6px; overflow:hidden; background:#fff; border:1px solid rgba(0,0,0,.08); }
 html body .tt-logo img { width:100%; height:100%; object-fit:contain; }
+html body .overview-finance-toolbar .books-export { position:relative; margin-left:auto; }
+html body .books-export-menu { position:absolute; right:0; top:calc(100% + 6px); z-index:30; display:grid; min-width:150px; padding:6px; border-radius:12px; background:#fff; border:1px solid #e4e7ec; box-shadow:0 12px 32px rgba(16,24,40,.14); }
+html body .books-export-menu button { padding:8px 10px; border:0; background:transparent; border-radius:8px; text-align:left; cursor:pointer; font-weight:600; color:#1f2a33; }
+html body .books-export-menu button:hover { background:#f2f6fb; }
+html body .app-shell.dark-mode .books-export-menu { background:#1f2329; border-color:rgba(255,255,255,.14); }
+html body .app-shell.dark-mode .books-export-menu button { color:#e4e7ec; }
