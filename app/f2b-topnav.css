@@ -685,3 +685,7 @@ html body .ml-card-meta .ml-card-geo { display: block; color: var(--brand-second
 html body .ml-ai-panel { display: grid; gap: 12px; min-width: min(560px, 86vw); }
 html body .ml-ai-panel .ml-error { color: #b42318; margin: 0; }
 html body .app-shell.dark-mode .ml-project-form { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.1); }
+
+/* Leads card: edit button top right */
+html body .app-shell .crm-card .crm-card-edit-top, html body .app-shell .crm-card-edit-top { position:absolute; top:10px; right:10px; z-index:3; width:30px; height:30px; display:inline-grid; place-items:center; padding:0; border-radius:9px; border:1px solid #e3e8ef; background:#fff; color:#475467; cursor:pointer; }
+html body .app-shell.dark-mode .crm-card-edit-top { background:rgba(255,255,255,.06); border-color:rgba(255,255,255,.14); color:#d0d5dd; }
