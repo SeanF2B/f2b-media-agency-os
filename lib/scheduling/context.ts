@@ -22,7 +22,8 @@ export async function loadSchedulingWorkspace(): Promise<(WorkspaceLite & { staf
   `).first<{ data: string }>();
   if (!row?.data) return null;
   const parsed = JSON.parse(row.data) as { ownerId: string; agencyName?: string; clients: ClientLite[]; staff: RawStaff[] };
-  const staffRaw = (parsed.staff || []).filter((s) => s && s.id && !s.isBot);
+  // AI teammates (no email, e.g. "Claude | Content Writer") can't take appointments.
+  const staffRaw = (parsed.staff || []).filter((s) => s && s.id && !s.isBot && /@/.test(String(s.email || "")) && !/^(claude-|f2b-ai)/.test(String(s.id)));
   return { ownerId: String(parsed.ownerId || ""), agencyName: parsed.agencyName || "F2B Media", clients: (parsed.clients || []).filter((c) => c && c.id), staff: staffRaw.map(({ id, name, email, role, avatar }) => ({ id, name, email, role, avatar })), staffRaw };
 }
 
