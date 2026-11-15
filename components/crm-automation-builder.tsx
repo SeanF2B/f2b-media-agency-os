@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  ArrowLeft, Bell, Euro, CalendarClock, CircleCheck, Columns3, Copy, FileInput, FlaskConical, GitBranch, History, Hourglass, ListTodo,
+  ArrowLeft, Bell, Euro, CalendarCheck, CalendarClock, CalendarX, UserX, CircleCheck, Columns3, Copy, FileInput, FlaskConical, GitBranch, History, Hourglass, ListTodo,
   Mail, Maximize, MessageSquare, Minus, Plus, Search, Tag, Trash2, X, Zap,
 } from "lucide-react";
 import {
@@ -16,7 +16,7 @@ type RunRow = { id: string; status: string; dry_run: number; trigger_summary: st
 type StepRow = { node_id: string; title: string; status: string; detail: string; created_at: string; updated_at: string };
 type Loaded = { automation: { id: string; name: string; status: "on" | "off"; sendsEmail: boolean; definition: AutomationDefinition }; options: Options; runs: RunRow[] };
 
-const ICONS: Record<string, typeof Mail> = { Euro, FileInput, Tag, Columns3, CircleCheck, CalendarClock, Mail, Bell, Hourglass, GitBranch, MessageSquare, ListTodo, TagRemove: Tag };
+const ICONS: Record<string, typeof Mail> = { Euro, FileInput, Tag, Columns3, CircleCheck, CalendarCheck, CalendarClock, CalendarX, UserX, Mail, Bell, Hourglass, GitBranch, MessageSquare, ListTodo, TagRemove: Tag };
 const iconFor = (node: AutomationNode) => {
   if (node.type === "trigger") return ICONS[TRIGGERS.find((item) => item.type === node.config?.type)?.icon || ""] || Zap;
   if (node.type === "remove_tag") return Tag;
@@ -296,6 +296,7 @@ function StepPanel({ node, options, onSave, onCancel, onDelete, onDuplicate }: {
           <TIcon size={16} /><span><b>{trigger.label}</b><small>{trigger.help}</small></span>
         </button>; })}
       </div>
+      {typeof config.type === "string" && config.type.startsWith("appointment_") && <Field label="Which booking calendar?" hint="Leave on “Any” to run for every calendar in this account."><AppointmentCalendarSelect value={str("calendarId")} onChange={(calendarId, calendarName) => set({ calendarId, calendarName })} /></Field>}
       {config.type === "form_lead" && <Field label="Which form?" hint="Leads from this form will start the automation.">
         <select value={str("formName")} onChange={(event) => set({ formName: event.target.value })}><option value="">Any website form</option>{options.forms.map((form) => <option key={form.name} value={form.name}>{form.name}</option>)}</select>
       </Field>}
@@ -466,4 +467,15 @@ function HistoryPanel({ runs, onRefresh, onClose }: { runs: RunRow[]; onRefresh:
       </li>)}</ul>}
     </div>
   </aside>;
+}
+
+// Booking calendars for appointment triggers (loaded on demand from Scheduling).
+function AppointmentCalendarSelect({ value, onChange }: { value: string; onChange: (id: string, name: string) => void }) {
+  const [calendars, setCalendars] = useState<Array<{ id: string; name: string }>>([]);
+  useEffect(() => {
+    let live = true;
+    fetch("/api/scheduling?view=calendars", { cache: "no-store" }).then((r) => r.ok ? r.json() : { calendars: [] }).then((d: { calendars?: Array<{ id: string; name: string }> }) => { if (live) setCalendars(d.calendars || []); }).catch(() => undefined);
+    return () => { live = false; };
+  }, []);
+  return <select value={value} onChange={(event) => onChange(event.target.value, calendars.find((c) => c.id === event.target.value)?.name || "")}><option value="">Any booking calendar</option>{calendars.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>;
 }

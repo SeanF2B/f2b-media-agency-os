@@ -1,0 +1,90 @@
+/* Scheduling tab. Builds on the shared .iv-* cards / dialogs / tabs; dark-mode variants at the bottom. */
+.sch{display:grid;gap:16px}
+.sch .iv-stats{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+.sch-perstaff{align-content:start}.sch-perstaff span{display:inline-flex;align-items:center;gap:6px;font-size:13px;margin-right:10px}.sch-perstaff span b{font-size:14px;letter-spacing:0}
+.sch-toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.sch-filters{display:flex;gap:8px;flex-wrap:wrap}
+.sch-select{display:inline-flex;align-items:center;gap:6px;border:1px solid #dce3e7;background:#fff;border-radius:10px;padding:0 10px;color:#26333b}
+.sch-select select{border:0;background:transparent;font:inherit;font-size:13px;font-weight:600;padding:8px 2px;color:inherit;cursor:pointer}
+.sch-avatar{display:inline-grid;place-items:center;border-radius:50%;overflow:hidden;flex:0 0 auto;font-weight:800;background:color-mix(in srgb,var(--brand-primary,#3b82f6) 16%,#fff);color:var(--brand-primary,#3b82f6);border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.sch-avatar img{width:100%;height:100%;object-fit:cover}
+
+/* Hover house rule: lift + secondary colour highlight */
+.sch .iv-btn,.sch-row,.sch-block,.sch-staff-pick button,.sch-times button,.sch-dash-row,.sch-select{transition:transform .14s ease,box-shadow .14s ease,border-color .14s ease,background .14s ease}
+.sch .iv-btn:hover:not(:disabled),.sch-row:hover,.sch-staff-pick button:hover:not(:disabled),.sch-times button:hover,.sch-dash-row:hover,.sch-select:hover{transform:translateY(-1px);border-color:var(--brand-secondary,var(--brand-primary,#3b82f6));box-shadow:0 4px 14px color-mix(in srgb,var(--brand-secondary,var(--brand-primary,#3b82f6)) 18%,transparent)}
+.sch-dialog input:hover,.sch-dialog select:hover,.sch-dialog textarea:hover{border-color:var(--brand-secondary,var(--brand-primary,#3b82f6))}
+
+/* Week grid */
+.sch-week-card{padding:12px}
+.sch-week-nav{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.sch-week-nav b{margin:0 6px;font-size:15px}.sch-week-nav .iv-btn:last-child{margin-left:auto}
+.sch-week{display:grid;grid-template-columns:52px repeat(7,minmax(0,1fr));border-top:1px solid #eef2f4;margin-top:8px;overflow-x:auto}
+.sch-hours{position:relative;margin-top:52px;height:var(--sch-h)}.sch-hours span{position:absolute;right:8px;transform:translateY(-50%);font-size:11px;color:#7b8a93}
+.sch-day{border-left:1px solid #eef2f4;min-width:92px}
+.sch-day-head{height:52px;display:grid;place-items:center;align-content:center;border-bottom:1px solid #eef2f4}.sch-day-head small{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#7b8a93}.sch-day-head b{font-size:18px}
+.sch-day.today .sch-day-head b{background:var(--brand-primary,#3b82f6);color:var(--brand-primary-fg,#fff);border-radius:999px;padding:0 9px}
+.sch-day-body{position:relative;height:var(--sch-h);cursor:copy}
+.sch-line{position:absolute;left:0;right:0;border-top:1px dashed #eef2f4;pointer-events:none}
+.sch-now{position:absolute;left:0;right:0;border-top:2px solid #e11d48;pointer-events:none;z-index:2}.sch-now::before{content:"";position:absolute;left:-4px;top:-5px;width:8px;height:8px;border-radius:50%;background:#e11d48}
+.sch-block{position:absolute;left:3px;right:3px;border:0;border-left:4px solid var(--c);border-radius:8px;background:color-mix(in srgb,var(--c) 15%,#fff);color:#0f172a;text-align:left;padding:4px 6px;font:inherit;font-size:11.5px;line-height:1.25;overflow:hidden;cursor:pointer;display:flex;flex-direction:column;gap:1px;z-index:1}
+.sch-block:hover{transform:translateY(-1px);box-shadow:0 6px 16px color-mix(in srgb,var(--c) 30%,transparent);z-index:3}
+.sch-block b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sch-block span,.sch-block em{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#475569;font-style:normal}
+.sch-block.cancelled{opacity:.45;text-decoration:line-through}.sch-block.no_show{background:repeating-linear-gradient(45deg,#fff1f2,#fff1f2 6px,#ffe4e6 6px,#ffe4e6 12px);border-left-color:#e11d48}.sch-block.completed{opacity:.75}
+
+/* Lists */
+.sch-list{display:grid;gap:6px}
+.sch-row,.sch-dash-row{display:grid;grid-template-columns:10px 130px 1fr auto auto;gap:12px;align-items:center;border:1px solid #e8edf0;background:#fff;border-radius:12px;padding:10px 12px;font:inherit;text-align:left;cursor:pointer;color:inherit}
+.sch-dash-row{grid-template-columns:110px 1fr}
+.sch-dot{width:10px;height:10px;border-radius:50%}
+.sch-when,.sch-what{display:grid;gap:2px;min-width:0}.sch-when small,.sch-what small{color:#63727b;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sch-who{display:flex}.sch-who .sch-avatar+.sch-avatar{margin-left:-8px}
+.sch-status.booked{background:#e0f2fe;color:#075985}.sch-status.completed{background:#dcfce7;color:#166534}.sch-status.no_show{background:#fee2e2;color:#991b1b}.sch-status.cancelled{background:#f1f5f9;color:#64748b}
+.sch-status-text.no_show,.sch-status-text.cancelled{color:#b42318}.sch-status-text.completed{color:#0c7a3d}
+@media(max-width:700px){.sch-row{grid-template-columns:10px 1fr auto}.sch-row .sch-what,.sch-row .sch-who{display:none}}
+
+/* Booking calendars */
+.sch-cal-grid,.sch-staff-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.sch-cal{border-top:4px solid var(--c)}.sch-cal.off{opacity:.65}
+.sch-cal h3{margin:0;font-size:17px}
+.sch-cal-top{display:flex;gap:8px;align-items:center}.sch-cal-kind{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--c)}
+.sch-cal-meta{display:grid;gap:4px;font-size:13px;color:#4b5a63}.sch-cal-meta span{display:inline-flex;gap:6px;align-items:center}
+.sch-cal-staff{display:flex;gap:4px;flex-wrap:wrap;min-height:26px}
+.sch-empty{place-items:center;text-align:center;padding:32px}
+
+/* Staff */
+.sch-staff-top{display:flex;gap:10px;align-items:center}.sch-staff-top div{display:grid}.sch-staff-top small{color:#63727b;font-size:12px}
+.sch-hours-sum{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12.5px;color:#4b5a63}
+.sch-sync{display:grid;gap:8px}.sch-sync>div{display:flex;align-items:center;gap:8px;font-size:13px;flex-wrap:wrap}.sch-sync>div>span{flex:1;min-width:150px}
+
+/* Dialog parts */
+.sch-dialog.wide{width:min(940px,100%)}
+.sch-h3{margin:6px 0 0;font-size:13px;letter-spacing:.05em;text-transform:uppercase;color:#63727b}
+.sch-staff-pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
+.sch-staff-pick.compact{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.sch-staff-pick button{display:flex;gap:8px;align-items:center;border:1.5px solid #dce3e7;background:#fff;border-radius:12px;padding:8px 10px;font:inherit;text-align:left;cursor:pointer;color:inherit}
+.sch-staff-pick button span{display:grid;min-width:0}.sch-staff-pick button small{color:#63727b;font-size:11px;font-weight:500}.sch-staff-pick button b{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sch-staff-pick button.on{border-color:var(--brand-primary,#3b82f6);background:color-mix(in srgb,var(--brand-primary,#3b82f6) 9%,#fff);box-shadow:inset 0 0 0 1px var(--brand-primary,#3b82f6)}
+.sch-staff-pick button:disabled{cursor:default;opacity:.7}
+.sch-times{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:6px}
+.sch-times button{border:1.5px solid #dce3e7;background:#fff;border-radius:10px;padding:8px;font:inherit;font-weight:700;cursor:pointer;color:inherit}
+.sch-times button.on{border-color:var(--brand-primary,#3b82f6);background:var(--brand-primary,#3b82f6);color:var(--brand-primary-fg,#fff)}
+.sch-questions{display:grid;gap:8px}.sch-q{display:grid;grid-template-columns:1fr 150px auto auto;gap:8px;align-items:center}.sch-q input[placeholder^="Options"]{grid-column:1/3}
+@media(max-width:700px){.sch-q{grid-template-columns:1fr}}
+.sch-weekly{display:grid;gap:6px}.sch-wrow{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid #eef2f4}.sch-wrow.off b{color:#94a3b8}
+.sch-windows{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.sch-win{display:inline-flex;align-items:center;gap:6px}.sch-win input{width:auto!important}
+.sch-inline{display:flex;gap:6px}.sch-chips{display:flex;gap:6px;flex-wrap:wrap}.sch-chip{display:inline-flex;gap:6px;align-items:center;background:#f1f5f9;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:600}.sch-chip button{border:0;background:transparent;cursor:pointer;color:inherit}
+.sch-detail{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}.sch-detail>div{display:grid;gap:2px;background:#f8fafb;border-radius:12px;padding:10px 12px}.sch-detail small{font-size:11px;color:#63727b;font-weight:700;text-transform:uppercase;letter-spacing:.05em}.sch-detail a{font-size:13px}
+.sch-dialog footer{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+/* Dashboard card */
+.sch-dash{gap:8px}.sch-dash-head{display:flex;justify-content:space-between;align-items:center}.sch-dash-head b{display:inline-flex;gap:6px;align-items:center}
+
+/* Dark mode */
+.app-shell.dark-mode .sch-select,.app-shell.dark-mode .sch-row,.app-shell.dark-mode .sch-dash-row,.app-shell.dark-mode .sch-staff-pick button,.app-shell.dark-mode .sch-times button{background:#20272d;border-color:#3c4850;color:#e6eef2}
+.app-shell.dark-mode .sch-week,.app-shell.dark-mode .sch-day,.app-shell.dark-mode .sch-day-head,.app-shell.dark-mode .sch-wrow{border-color:#2f3a41}
+.app-shell.dark-mode .sch-line{border-color:#2a343b}
+.app-shell.dark-mode .sch-block{background:color-mix(in srgb,var(--c) 28%,#1a2025);color:#f1f5f9}.app-shell.dark-mode .sch-block span,.app-shell.dark-mode .sch-block em{color:#cbd5e1}
+.app-shell.dark-mode .sch-when small,.app-shell.dark-mode .sch-what small,.app-shell.dark-mode .sch-cal-meta,.app-shell.dark-mode .sch-hours-sum,.app-shell.dark-mode .sch-staff-top small,.app-shell.dark-mode .sch-h3,.app-shell.dark-mode .sch-hours span,.app-shell.dark-mode .sch-day-head small,.app-shell.dark-mode .sch-detail small{color:#9fb0ba}
+.app-shell.dark-mode .sch-detail>div,.app-shell.dark-mode .sch-chip{background:#171c20}
+.app-shell.dark-mode .sch-staff-pick button.on{background:color-mix(in srgb,var(--brand-primary,#3b82f6) 22%,#20272d)}
+.app-shell.dark-mode .sch-avatar{border-color:#20272d}
+.app-shell.dark-mode .sch-status.booked{background:#0c2d44;color:#9cd4f5}.app-shell.dark-mode .sch-status.completed{background:#173a26;color:#9be7b8}.app-shell.dark-mode .sch-status.no_show{background:#4a1f1b;color:#f7a29b}.app-shell.dark-mode .sch-status.cancelled{background:#2b353c;color:#9fb0ba}
