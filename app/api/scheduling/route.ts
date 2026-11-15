@@ -277,15 +277,23 @@ async function suggest(ctx: Ctx) {
   const scopeId = ctx.scope ?? "*";
   // Recent threads with something the customer said (index: conv_threads(owner_id, last_at)).
   const threads = (await env.DB!.prepare("SELECT id, client_id, channel, contact, contact_name FROM conv_threads WHERE owner_id=?1 AND last_at>=?2 AND (?3 = '*' OR client_id = ?3) ORDER BY last_at DESC LIMIT 12").bind(ctx.ws.ownerId, since, scopeId).all<{ id: string; client_id: string; channel: string; contact: string; contact_name: string }>().catch(() => ({ results: [] }))).results || [];
+  const staffEmails = new Set(ctx.ws.staffRaw.map((p) => String(p.email || "").toLowerCase()).filter(Boolean));
+  const staffNames = new Set(ctx.ws.staffRaw.map((p) => String(p.name || "").split("|")[0].trim().toLowerCase()).filter(Boolean));
+  const isInternalContact = (name: string, contact: string) => staffEmails.has(contact.toLowerCase()) || staffNames.has(name.trim().toLowerCase()) || /noreply|no-reply|notification/i.test(contact);
   const chats: Array<{ who: string; channel: string; client: string; said: string[] }> = [];
   for (const t of threads) {
     const msgs = (await env.DB!.prepare("SELECT direction, body FROM conv_messages WHERE thread_id=?1 ORDER BY created_at DESC LIMIT 4").bind(t.id).all<{ direction: string; body: string }>().catch(() => ({ results: [] }))).results || [];
     const said = msgs.filter((m) => m.direction === "in").map((m) => m.body.replace(/\s+/g, " ").slice(0, 280));
-    if (said.length) chats.push({ who: t.contact_name || t.contact, channel: t.channel, client: ctx.ws.clients.find((c) => c.id === t.client_id)?.name || "Agency", said });
+    if (said.length && !isInternalContact(t.contact_name || "", t.contact)) chats.push({ who: t.contact_name || t.contact, channel: t.channel, client: ctx.ws.clients.find((c) => c.id === t.client_id)?.name || "Agency", said });
   }
   // Fresh open deals with no appointment yet.
-  const deals = (await env.DB!.prepare("SELECT o.id, o.title, o.client_id, s.name AS stage, c.first_name, c.last_name, c.phone FROM crm_opportunities o JOIN crm_pipeline_stages s ON s.id=o.stage_id LEFT JOIN crm_contacts c ON c.id=o.contact_id WHERE o.owner_id=?1 AND o.updated_at>=?2 AND s.category='open' AND (?3 = '*' OR o.client_id = ?3) AND NOT EXISTS (SELECT 1 FROM sched_bookings b WHERE b.opportunity_id=o.id) ORDER BY o.updated_at DESC LIMIT 8").bind(ctx.ws.ownerId, since, scopeId).all<{ id: string; title: string; client_id: string | null; stage: string; first_name: string | null; last_name: string | null; phone: string | null }>().catch(() => ({ results: [] }))).results || [];
-  const leads = deals.filter((d) => !/appointment|booked|won|lost/i.test(d.stage)).map((d) => ({ deal: d.title, stage: d.stage, contact: `${d.first_name || ""} ${d.last_name || ""}`.trim(), phone: d.phone || "", client: ctx.ws.clients.find((c) => c.id === d.client_id)?.name || "Agency" }));
+  const deals = (await env.DB!.prepare("SELECT o.id, o.title, o.client_id, s.name AS stage, c.first_name, c.last_name, c.phone, c.email FROM crm_opportunities o JOIN crm_pipeline_stages s ON s.id=o.stage_id LEFT JOIN crm_contacts c ON c.id=o.contact_id WHERE o.owner_id=?1 AND o.updated_at>=?2 AND s.category='open' AND COALESCE(o.source,'') <> 'client' AND COALESCE(c.source,'') <> 'client' AND (?3 = '*' OR o.client_id = ?3) AND NOT EXISTS (SELECT 1 FROM sched_bookings b WHERE b.opportunity_id=o.id) ORDER BY o.updated_at DESC LIMIT 8").bind(ctx.ws.ownerId, since, scopeId).all<{ id: string; title: string; client_id: string | null; stage: string; first_name: string | null; last_name: string | null; phone: string | null; email: string | null }>().catch(() => ({ results: [] }))).results || [];
+  // Never suggest your own team (test leads) or existing clients.
+  const teamEmails = new Set(ctx.ws.staffRaw.map((p) => String(p.email || "").toLowerCase()).filter(Boolean));
+  const teamNames = new Set(ctx.ws.staffRaw.map((p) => String(p.name || "").split("|")[0].trim().toLowerCase()).filter(Boolean));
+  const clientNames = ctx.ws.clients.map((c) => c.name.trim().toLowerCase()).filter((n) => n.length > 2);
+  const isInternal = (name: string, email = "", title = "") => teamEmails.has(email.toLowerCase()) || teamNames.has(name.trim().toLowerCase()) || clientNames.some((n) => `${name} ${title}`.toLowerCase().includes(n));
+  const leads = deals.filter((d) => !/appointment|booked|won|lost/i.test(d.stage) && !isInternal(`${d.first_name || ""} ${d.last_name || ""}`, d.email || "", d.title)).map((d) => ({ deal: d.title, stage: d.stage, contact: `${d.first_name || ""} ${d.last_name || ""}`.trim(), phone: d.phone || "", client: ctx.ws.clients.find((c) => c.id === d.client_id)?.name || "Agency" }));
   let value = { suggestions: [] as Array<{ label: string; prompt: string; why: string }> };
   if (chats.length || leads.length) {
     const provider = await resolveAiProvider(env, ctx.ws.ownerId);
