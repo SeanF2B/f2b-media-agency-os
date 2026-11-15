@@ -88,6 +88,41 @@ function chime(kind: "coin" | "level" | "pop" | "shower" | "steal" | "door" | "s
   } catch { /* audio blocked until the first tap */ }
 }
 
+// ───────────── Background music (generative, original) + character speech ─────────────
+type MusicStyle = "off" | "chill" | "upbeat" | "lofi";
+let musicTimer: ReturnType<typeof setInterval> | null = null;
+let musicGain: GainNode | null = null;
+function stopMusic() { if (musicTimer) clearInterval(musicTimer); musicTimer = null; if (musicGain && audioCtx) { const g = musicGain; g.gain.setTargetAtTime(0, audioCtx.currentTime, 0.4); setTimeout(() => g.disconnect(), 1500); } musicGain = null; }
+function startMusic(style: MusicStyle) {
+  stopMusic(); if (style === "off") return;
+  const ctx = audio(); if (!ctx) return;
+  const master = ctx.createGain(); master.gain.value = 0; master.connect(ctx.destination); if (reverb) master.connect(reverb); master.gain.setTargetAtTime(style === "upbeat" ? 0.05 : 0.045, ctx.currentTime, 1.2); musicGain = master;
+  const prog = style === "lofi" ? [[220, 261.6, 329.6, 392], [174.6, 220, 261.6, 329.6], [196, 246.9, 293.7, 349.2], [164.8, 196, 246.9, 293.7]] : [[220, 261.6, 329.6], [174.6, 220, 261.6], [130.8, 196, 261.6], [196, 246.9, 293.7]];
+  const bar = style === "upbeat" ? 1.9 : style === "lofi" ? 3.2 : 3.6; let step = 0;
+  const play = () => {
+    const chord = prog[step % prog.length], t0 = ctx.currentTime + 0.05;
+    chord.forEach((f) => { const o = ctx.createOscillator(), g = ctx.createGain(), lp = ctx.createBiquadFilter(); o.type = style === "lofi" ? "triangle" : "sine"; o.frequency.value = f; lp.type = "lowpass"; lp.frequency.value = style === "lofi" ? 900 : 1800; g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.5, t0 + 0.6); g.gain.exponentialRampToValueAtTime(0.0001, t0 + bar); o.connect(lp).connect(g).connect(master); o.start(t0); o.stop(t0 + bar + 0.1); });
+    const notes = style === "upbeat" ? 8 : 4;
+    for (let n = 0; n < notes; n++) { const f = chord[n % chord.length] * 2, t = t0 + (bar / notes) * n, o = ctx.createOscillator(), g = ctx.createGain(); o.type = "sine"; o.frequency.value = f; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(style === "upbeat" ? 0.35 : 0.22, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5); o.connect(g).connect(master); o.start(t); o.stop(t + 0.6); }
+    if (style !== "chill") { for (let k = 0; k < (style === "upbeat" ? 4 : 2); k++) { const t = t0 + (bar / (style === "upbeat" ? 4 : 2)) * k, len = Math.floor(ctx.sampleRate * 0.05), b = ctx.createBuffer(1, len, ctx.sampleRate), d = b.getChannelData(0); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 4); const src = ctx.createBufferSource(), g = ctx.createGain(), f = ctx.createBiquadFilter(); src.buffer = b; f.type = k % 2 ? "highpass" : "lowpass"; f.frequency.value = k % 2 ? 6000 : 160; g.gain.value = k % 2 ? 0.25 : 0.9; src.connect(f).connect(g).connect(master); src.start(t); } }
+    step++;
+  };
+  play(); musicTimer = setInterval(play, bar * 1000);
+}
+const VOICE_PITCH: Record<string, number> = { receptionist: 1.2, sales: 0.95, accountant: 1.1, projects: 0.85, marketing: 1.25, calendar: 1.0, owner: 1.0 };
+function speak(text: string, who = "owner") {
+  try {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const synth = window.speechSynthesis; synth.cancel();
+    const u = new SpeechSynthesisUtterance(text.replace(/[“”"]/g, ""));
+    const voices = synth.getVoices().filter((v) => /^en/i.test(v.lang));
+    const gb = voices.filter((v) => /en-(GB|IE)/i.test(v.lang));
+    const pool = gb.length ? gb : voices;
+    if (pool.length) u.voice = pool[Math.abs([...who].reduce((n, c) => n + c.charCodeAt(0), 0)) % pool.length];
+    u.pitch = VOICE_PITCH[who] || 1; u.rate = 1.03; u.volume = 0.9; synth.speak(u);
+  } catch { /* speech unavailable */ }
+}
+
 // ───────────── Isometric art (original, Clash-of-Clans-inspired) ─────────────
 const T = 30; // half a tile's width in px
 const iso = (x: number, y: number, z = 0): [number, number] => [500 + (x - y) * T, 110 + (x + y) * (T / 2) - z];
@@ -189,6 +224,12 @@ function Bean({ at, look, mood = "calm", scale = 1, className = "", label, onTap
     {alert && <g className="ow-alert" transform="translate(0 -62)"><circle r="7" fill="#dc2626" stroke="#fff" strokeWidth="1.8" /><text y="3.6" textAnchor="middle" fontSize="10" fontWeight="900" fill="#fff">!</text></g>}
   </g>;
 }
+
+/** Head-and-shoulders portrait used wherever someone speaks. */
+function Portrait({ look, bg, size = 44 }: { look: BeanLook; bg: string; size?: number }) {
+  return <span className="ow-portrait" style={{ width: size, height: size, background: `radial-gradient(circle at 50% 35%, ${shade(bg, 0.55)}, ${shade(bg, 0.15)})` }}><svg viewBox="-15 -57 30 30" width={size} height={size} aria-hidden="true"><Bean at={[0, 0]} look={look} label="" /></svg></span>;
+}
+const staffPortrait = (id: EmployeeId, size = 44) => <Portrait look={EMP_LOOK[id]} bg={EMPLOYEES[id].colour} size={size} />;
 
 /** Tappable coin stack over whoever earned it. */
 function CoinBubble({ x, y, amount, onCollect, label }: { x: number; y: number; amount: number; onCollect: () => void; label: string }) {
@@ -480,7 +521,7 @@ function DeptPanel({ id, data, wallet, approach, onOpen, onAct, onCharacter }: {
     boss: [{ label: "Customise character", act: "character" }, { label: "Upgrades", act: "upgrades" }, { label: "Rewards & history", act: "history" }, { label: "Settings", act: "settings" }],
   };
   return <div className="ow-dept-panel" key={id}>
-    <div className="ow-dept-head"><span className="ow-speaker" style={{ background: id === "boss" ? data.profile.primary : id === "leadgen" ? "#0e7490" : EMPLOYEES[id].colour }}>{person.name.charAt(0)}</span><div><small>{ROOM_NAME[id]} · {person.name}, {person.title}</small><p className={approach && approach.urgency >= 75 ? "shout" : ""}>{approach ? approach.line : board ? board.headline : `${wallet.coins.toLocaleString("en-IE")} coins · Level ${wallet.level}`}</p></div><span className="ow-live"><i /> Live</span></div>
+    <div className="ow-dept-head">{id === "boss" ? <Portrait look={ownerLookFrom(data.profile, data.profile.look || {}, upgradeTier(wallet.owned, "wardrobe"))} bg={data.profile.primary} size={52} /> : id === "leadgen" ? <Portrait look={LEADGEN_TEAM[0].look} bg="#0e7490" size={52} /> : staffPortrait(id, 52)}<div><small>{ROOM_NAME[id]} · {person.name}, {person.title}</small><p className={approach && approach.urgency >= 75 ? "shout" : ""}>{approach ? approach.line : board ? board.headline : `${wallet.coins.toLocaleString("en-IE")} coins · Level ${wallet.level}`}</p></div><span className="ow-live"><i /> Live</span></div>
     {board && <div className="ow-dept-stats">{board.stats.map((s) => <div key={s.label}><b>{s.value}</b><small>{s.label}</small></div>)}</div>}
     {upgradeTier(wallet.owned, "furniture") === 0 && id !== "boss" && id !== "leadgen" && <p className="ow-hint">Working off cardboard boxes… Upgrade <b>Office furniture</b> and <b>Office tech</b> to give {person.name} a proper desk.</p>}
     {board && board.feed.length > 0 && <ul className="ow-dept-feed">{board.feed.map((f, i) => <li key={i}><span>{f.text}</span><time>{new Date(f.at).toLocaleString("en-IE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</time></li>)}</ul>}
@@ -568,7 +609,7 @@ function GuidedTour({ steps, onClose }: { steps: TourStep[]; onClose: () => void
   useEffect(() => {
     const el = step.sel ? document.querySelector(step.sel) as HTMLElement | SVGElement | null : null;
     const update = () => setRect(el ? el.getBoundingClientRect() : null);
-    update(); const t = setInterval(update, 400); return () => clearInterval(t);
+    update(); window.addEventListener("resize", update); return () => window.removeEventListener("resize", update);
   }, [step]);
   useEffect(() => {
     if (!voice || typeof window === "undefined" || !("speechSynthesis" in window)) return;
@@ -643,6 +684,9 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
   const [sideOpen, setSideOpen] = useState(false);
   const [defence, setDefence] = useState<{ keys: string[]; stolen: number; demo: boolean } | null>(null);
   const [tour, setTour] = useState(false);
+  const [music, setMusic] = useState<MusicStyle>(() => readPref("ow-music", "off") as MusicStyle);
+  const [speech, setSpeech] = useState(() => readPref("ow-speech", "off") === "on");
+  const [barColour, setBarColour] = useState("");
   const [raid, setRaid] = useState<{ coins: number; count: number; n: number } | null>(null);
   const [bubble, setBubble] = useState<{ text: string; at: [number, number]; n: number } | null>(null);
   const bubbleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -703,6 +747,12 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
   // Live department boards: while inside HQ, refresh every 90s (only when the tab is visible — light on the database).
   useEffect(() => { if (view !== "hq" || demo) return; const t = setInterval(() => { if (document.visibilityState === "visible" && !panel) void load(true); }, 90_000); return () => clearInterval(t); }, [view, demo, panel, load]);
 
+  useEffect(() => { const m = (e: Event) => setMusic((e as CustomEvent).detail as MusicStyle); const sp = (e: Event) => setSpeech(Boolean((e as CustomEvent).detail)); window.addEventListener("ow-music", m); window.addEventListener("ow-speech", sp); return () => { window.removeEventListener("ow-music", m); window.removeEventListener("ow-speech", sp); }; }, []);
+  // Background music: starts after the first tap (browsers require a gesture), stops when leaving the page.
+  useEffect(() => { if (music === "off") { stopMusic(); return; } const go = () => startMusic(music); go(); const once = () => { go(); window.removeEventListener("pointerdown", once); }; window.addEventListener("pointerdown", once); return () => { window.removeEventListener("pointerdown", once); stopMusic(); }; }, [music]);
+  // HQ uses the same colour as the top bar (which follows the client's logo/brand).
+  useEffect(() => { const read = () => { const el = document.querySelector(".tn-bar") as HTMLElement | null; if (!el) return; const m = getComputedStyle(el).backgroundColor.match(/\d+(\.\d+)?/g); if (!m || m.length < 3) return; if (m.length >= 4 && Number(m[3]) < 0.5) { const bg = getComputedStyle(el).backgroundImage.match(/rgba?\(([^)]+)\)/); if (bg) { const c = bg[1].split(",").map(Number); if (c[3] === undefined || c[3] > 0.5) { setBarColour(`#${c.slice(0, 3).map((v) => Math.round(v).toString(16).padStart(2, "0")).join("")}`); return; } } return; } setBarColour(`#${m.slice(0, 3).map((v) => Math.round(Number(v)).toString(16).padStart(2, "0")).join("")}`); }; read(); const t = setTimeout(read, 1500); return () => clearTimeout(t); }, [scope]);
+
   const today = new Date().toISOString().slice(0, 10);
   const approaches = useMemo(() => {
     const list = demo ? briefing(demoSnapshot()) : data?.approaches || [];
@@ -710,6 +760,9 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
   }, [data, demo, snoozed, today]);
   const current = approaches[Math.min(index, Math.max(0, approaches.length - 1))];
   useEffect(() => { setIndex(0); }, [approaches.length]);
+  // Speech: the person talking reads their line aloud.
+  const lastSpoken = useRef("");
+  useEffect(() => { if (!speech || tour || !current || view !== "town") return; const key = `${current.id}:${current.line}`; if (lastSpoken.current === key) return; lastSpoken.current = key; const t = setTimeout(() => speak(current.line, current.employee), 500); return () => clearTimeout(t); }, [speech, current, tour, view]);
 
   // ── Wallet (real or demo) ──
   const wallet = useMemo(() => {
@@ -807,6 +860,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
   const say = (id: string, text: string, at: [number, number]) => {
     setPoked(id); setTimeout(() => setPoked((cur) => (cur === id ? "" : cur)), 450);
     setBubble({ text, at, n: Date.now() });
+    if (readPref("ow-speech", "off") === "on") speak(text, id in EMPLOYEES ? id : "owner");
     if (bubbleTimer.current) clearTimeout(bubbleTimer.current);
     bubbleTimer.current = setTimeout(() => setBubble(null), 3800);
     if (prefs.current.sound) chime("pop");
@@ -932,7 +986,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
           {/* Headquarters — grows with each Headquarters tier */}
           <IndustryProps industry={p.industry} primary={p.primary} secondary={p.secondary} />
           {/* Headquarters: run-down shop → offices → glass skyscraper (each Headquarters tier) */}
-          {(() => { const t = tier("hq"); const tower = t >= 4; const w = tower ? 3.0 : t >= 2 ? 4.0 : 3.6, h = tower ? 150 + (t - 4) * 46 : 58 + t * 22, x0 = tower ? 4.5 : 4.2, y0 = tower ? 4.4 : 4.1; const shabbyHq = t === 0; const L = iso(x0, y0 + w), R = iso(x0 + w, y0 + w); const b1 = lerp(L, R, 0.18), b2 = lerp(L, R, 0.82); const apex = iso(x0 + w / 2, y0 + w / 2, h + (tower ? 18 : 40)); const wall = tower ? "#7dd3fc" : tier("renovation") >= 3 ? "#292524" : tier("renovation") >= 2 ? "#7dd3fc" : tier("renovation") >= 1 ? shade(p.primary, 0.75) : shabbyHq ? "#d6cfbf" : "#f5efe3"; return <Spot id="b-hq" label="Enter headquarters" poked={poked} labelAt={[apex[0], apex[1] - 34]} badge={customers.length || undefined} badgeText="waiting" badgeAt={((d) => [d[0], d[1] - 44] as [number, number])(iso(x0 + w / 2, y0 + w, 0))} onTap={() => tapBuilding("hq")}>
+          {(() => { const t = tier("hq"); const tower = t >= 4; const w = tower ? 3.0 : t >= 2 ? 4.0 : 3.6, h = tower ? 150 + (t - 4) * 46 : 58 + t * 22, x0 = tower ? 4.5 : 4.2, y0 = tower ? 4.4 : 4.1; const shabbyHq = t === 0; const L = iso(x0, y0 + w), R = iso(x0 + w, y0 + w); const b1 = lerp(L, R, 0.18), b2 = lerp(L, R, 0.82); const apex = iso(x0 + w / 2, y0 + w / 2, h + (tower ? 18 : 40)); const brandWall = barColour || p.secondary; const wall = tower ? "#7dd3fc" : tier("renovation") >= 3 ? "#292524" : tier("renovation") >= 2 ? "#7dd3fc" : tier("renovation") >= 1 ? shade(brandWall, 0.25) : shabbyHq ? shade(brandWall, 0.35) : shade(brandWall, 0.12); return <Spot id="b-hq" label="Enter headquarters" poked={poked} labelAt={[apex[0], apex[1] - 34]} badge={customers.length || undefined} badgeText="waiting" badgeAt={((d) => [d[0], d[1] - 44] as [number, number])(iso(x0 + w / 2, y0 + w, 0))} onTap={() => tapBuilding("hq")}>
             <IsoBox x={x0 - 0.15} y={y0 - 0.15} w={w + 0.3} d={w + 0.3} h={8} color={tower ? "#e2e8f0" : "#a8a29e"} />
             <IsoBox x={x0} y={y0} w={w} d={w} h={h} z={8} color={wall} />
             {tower ? <>
@@ -944,14 +998,14 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
             </> : <>
               <IsoWindows x={x0} y={y0} w={w} d={w} floors={1 + t} floorH={22} base={22} glow={tier("interior") >= 1 || healthMood === "thriving"} />
               {(Object.keys(EMPLOYEES) as EmployeeId[]).map((id, i) => { const a = lerp(iso(x0 + w, y0 + w), iso(x0 + w, y0), 0.06 + i * 0.155), b2x = lerp(iso(x0 + w, y0 + w), iso(x0 + w, y0), 0.06 + i * 0.155 + 0.12); return <polygon key={id} points={pts([[a[0], a[1] - 14], [b2x[0], b2x[1] - 14], [b2x[0], b2x[1] - 18], [a[0], a[1] - 18]])} fill={EMPLOYEES[id].colour} opacity=".9" />; })}
-              <IsoRoof x={x0} y={y0} w={w} d={w} z={h + 8} rise={40} color={shabbyHq ? "#57534e" : p.secondary} />
+              <IsoRoof x={x0} y={y0} w={w} d={w} z={h + 8} rise={40} color={shabbyHq ? shade(brandWall, -0.45) : shade(brandWall, -0.3)} />
             </>}
             {shabbyHq && <g className="ow-shabby">{(() => { const a = lerp(iso(x0 + w, y0 + w), iso(x0 + w, y0), 0.62); return <g><rect x={a[0] - 2} y={a[1] - 44} width="26" height="16" fill="#a16207" transform={`rotate(-8 ${a[0]} ${a[1] - 36})`} /><rect x={a[0] - 2} y={a[1] - 38} width="26" height="4" fill="#78350f" transform={`rotate(10 ${a[0]} ${a[1] - 36})`} /></g>; })()}
               {[0.3, 0.7].map((u) => { const a = lerp(L, R, u); return <path key={u} d={`M${a[0]} ${a[1] - 50} l4 8 -3 6 5 9`} stroke="#78716c" strokeWidth="1.3" fill="none" />; })}
               {[[x0 - 0.3, y0 + w + 0.1], [x0 + w + 0.1, y0 + 1]].map(([gx, gy], i) => { const [sx, sy] = iso(gx, gy); return <path key={i} d={`M${sx - 6} ${sy} q2 -12 4 0 M${sx} ${sy} q1 -15 3 0 M${sx + 4} ${sy} q3 -11 5 0`} fill="#4d7c0f" />; })}</g>}
             <IsoDoor x={x0} y={y0} w={w} d={w} h={26} color={tower ? "#0f172a" : p.primary} />
             {!tower && <><polygon points={pts([[b1[0], b1[1] - h + 2], [b2[0], b2[1] - h + 2], [b2[0], b2[1] - h + 20], [b1[0], b1[1] - h + 20]])} fill={tier("signage") >= 1 ? "#111827" : shade(p.secondary, -0.1)} stroke={tier("signage") >= 1 ? p.primary : "none"} strokeWidth="2" />
-            {p.logo && (() => { const m = lerp(b1, b2, 0.08); return <image href={p.logo} x={m[0] - 2} y={m[1] - h + 2} width="16" height="16" preserveAspectRatio="xMidYMid meet" transform={`rotate(26.6 ${m[0] + 6} ${m[1] - h + 10})`} />; })()}
+            {p.logo && (() => { const m = lerp(b1, b2, 0.08); const r = lerp(iso(x0 + w, y0 + w), iso(x0 + w, y0), 0.5); return <g><image href={p.logo} x={m[0] - 2} y={m[1] - h + 2} width="16" height="16" preserveAspectRatio="xMidYMid meet" transform={`rotate(26.6 ${m[0] + 6} ${m[1] - h + 10})`} /><rect x={r[0] - 24} y={r[1] - h + 2} width="48" height="38" rx="5" fill="#fff" opacity=".95" transform={`skewY(-26.6) translate(0 ${r[0] * Math.tan(26.6 * Math.PI / 180)})`} /><image href={p.logo} x={r[0] - 20} y={r[1] - h + 5} width="40" height="32" preserveAspectRatio="xMidYMid meet" transform={`skewY(-26.6) translate(0 ${r[0] * Math.tan(26.6 * Math.PI / 180)})`} /></g>; })()}
             {(() => { const m = lerp(b1, b2, 0.5); return <text x={m[0]} y={m[1] - h + 15} textAnchor="middle" fontSize="9.5" fontWeight="900" fill="#fff" transform={`rotate(26.6 ${m[0]} ${m[1] - h + 11})`}>{p.name.length > 16 ? `${p.name.slice(0, 15)}…` : p.name}</text>; })()}</>}
             <g className="ow-flag" transform={`translate(${apex[0]} ${apex[1]})`}><rect x="-1.2" y="-30" width="2.4" height="30" fill="#57534e" /><path d="M1 -30 L22 -24 L1 -18 Z" fill={p.primary} /></g>
             {tier("signage") >= 2 && <g className="ow-neon" transform={`translate(${apex[0]} ${apex[1] + 22})`}><rect x="-62" y="-12" width="124" height="20" rx="6" fill="#111827" stroke={p.primary} strokeWidth="2" /><text y="3" textAnchor="middle" fontSize="10" fontWeight="900" fill="#fff">{p.name.slice(0, 18).toUpperCase()}</text></g>}
@@ -1009,7 +1063,7 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
         {view === "hq" ? <DeptPanel id={room} data={data} wallet={w} approach={room === "boss" || room === "leadgen" ? undefined : approaches.find((a) => a.employee === room)} onOpen={(k) => { if (!demo) setPanel({ kind: k }); }} onAct={(a) => setDrawer(a)} onCharacter={() => setCharOpen(true)} /> :
         <div className={`ow-dialogue${current ? "" : " clear"}`} aria-live="polite">
           {current ? <>
-            <div className="ow-speaker" style={{ background: EMPLOYEES[current.employee].colour }}>{EMPLOYEES[current.employee].name.charAt(0)}</div>
+            {staffPortrait(current.employee, 52)}
             <div className="ow-speech">
               <small>{EMPLOYEES[current.employee].name} · {EMPLOYEES[current.employee].title}{approaches.length > 1 ? ` · ${Math.min(index, approaches.length - 1) + 1} of ${approaches.length}` : ""}</small>
               <p className={current.mood === "panicked" ? "shout" : ""}>{current.line}</p>
@@ -1047,12 +1101,12 @@ export function OperatingWorldView({ scopeClientId, renderPanel, openNative, sav
       </aside>
     </div>
 
-    <div className="ow-toasts" aria-live="polite">{toasts.map((t) => <div className="ow-toast" key={t.id}><span className="ow-speaker sm" style={{ background: EMPLOYEES[t.employee].colour }}>{EMPLOYEES[t.employee].name.charAt(0)}</span><p>{t.text}</p>{t.coins > 0 && <b>+{t.coins} <Coins size={14} /></b>}</div>)}</div>
+    <div className="ow-toasts" aria-live="polite">{toasts.map((t) => <div className="ow-toast" key={t.id}>{staffPortrait(t.employee, 34)}<p>{t.text}</p>{t.coins > 0 && <b>+{t.coins} <Coins size={14} /></b>}</div>)}</div>
     {levelUp && <div className="ow-modal-scrim"><div className="ow-levelup" role="alertdialog" aria-label="Level up"><Sparkles size={30} /><h2>{levelUp}</h2><p>New upgrades may be unlocked — check the Headquarters track.</p><div className="ow-options center"><button type="button" onClick={() => { setLevelUp(""); setDrawer("upgrades"); }}>See upgrades</button><button type="button" className="ghost" onClick={() => setLevelUp("")}>Later</button></div></div></div>}
 
     {walk && walk.steps.length > 0 && (() => { const step = walk.steps[walk.at]; const last = walk.at === walk.steps.length - 1; const total = walk.steps.reduce((n, s) => n + s.coins, 0); return <div className="ow-modal-scrim"><div className="ow-walk" role="dialog" aria-label="Welcome back">
       {walk.at === 0 && <div className="ow-walk-head"><Coins size={22} /><div><b>Welcome back, {p.characterName}!</b><small>While you were away your team earned <strong>{total} coins</strong> from real work. Here's why:</small></div></div>}
-      <div className="ow-walk-step" key={walk.at}><span className="ow-speaker" style={{ background: EMPLOYEES[step.employee].colour }}>{EMPLOYEES[step.employee].name.charAt(0)}</span><div><small>{EMPLOYEES[step.employee].name} · {EMPLOYEES[step.employee].title}</small><p>{step.line}</p><ul>{step.items.slice(0, 6).map((it, i) => <li key={i}>{it}</li>)}{step.items.length > 6 && <li>…and {step.items.length - 6} more</li>}</ul><b className="ow-walk-coins">+{step.coins} coins · +{step.xp} XP</b></div></div>
+      <div className="ow-walk-step" key={walk.at}>{staffPortrait(step.employee, 52)}<div><small>{EMPLOYEES[step.employee].name} · {EMPLOYEES[step.employee].title}</small><p>{step.line}</p><ul>{step.items.slice(0, 6).map((it, i) => <li key={i}>{it}</li>)}{step.items.length > 6 && <li>…and {step.items.length - 6} more</li>}</ul><b className="ow-walk-coins">+{step.coins} coins · +{step.xp} XP</b></div></div>
       <div className="ow-walk-foot"><span className="ow-dots">{walk.steps.map((_, i) => <i key={i} className={i === walk.at ? "on" : ""} />)}</span>
         <button type="button" className="ghost" onClick={() => setWalk(null)}>Skip</button>
         {last ? <button type="button" onClick={() => { setWalk(null); void collect(); }}><Sparkles size={16} /> Collect {total} coins</button> : <button type="button" onClick={() => { if (prefs.current.sound) chime("coin"); setWalk({ ...walk, at: walk.at + 1 }); }}>Next <ChevronRight size={16} /></button>}
@@ -1174,7 +1228,7 @@ function BookingPicker({ scope, customer, onBooked, onMore }: { scope: string; c
   if (cals && !cals.length) return <div className="ow-book"><p className="ow-muted">No booking calendars for this account yet.</p><button type="button" className="ghost" onClick={onMore}>Set one up in Scheduling</button></div>;
   const list = (slots || []).slice(0, showAll ? 12 : 3);
   return <div className="ow-book">
-    <div className="ow-book-head"><span className="ow-speaker sm" style={{ background: EMPLOYEES.calendar.colour }}>C</span><p>{slots === null ? "Checking the diary…" : slots.length ? `I've checked the calendar — ${slots.length === 1 ? "this time is" : `these ${Math.min(list.length, slots.length)} times are`} free.` : "No free times in the next 10 days."}</p></div>
+    <div className="ow-book-head">{staffPortrait("calendar", 34)}<p>{slots === null ? "Checking the diary…" : slots.length ? `I've checked the calendar — ${slots.length === 1 ? "this time is" : `these ${Math.min(list.length, slots.length)} times are`} free.` : "No free times in the next 10 days."}</p></div>
     {cals && cals.length > 1 && <label>Appointment type<select value={calId} onChange={(e) => setCalId(e.target.value)}>{cals.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>}
     {slots === null ? <Loader2 size={16} className="ow-spin" /> : <div className="ow-slots">{list.map((s) => <button type="button" key={s.start} className={picked === s.start ? "" : "ghost"} onClick={() => setPicked(s.start)}>{new Date(s.start).toLocaleString("en-IE", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</button>)}{slots.length > 3 && !showAll && <button type="button" className="ghost" onClick={() => setShowAll(true)}>More times</button>}</div>}
     {picked && <><label>Notes<textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Site address, access, what to bring…" /></label>
@@ -1212,10 +1266,13 @@ function Drawer({ kind, data, wallet: w, demo, onClose, post, buy, onChanged }: 
       <label>Website<input value={form.website} placeholder="https://…" onChange={(e) => setForm({ ...form, website: e.target.value })} /></label>
       <small className="ow-muted">Colours and logo come from the account's branding; changes here only affect the game.</small>
       <button type="button" onClick={() => void act({ action: "saveProfile", ...form }, "Saved.")}>Save character</button>
+      <h4>Sound & voices</h4>
+      <div className="ow-modes">{(["off", "chill", "upbeat", "lofi"] as const).map((m) => <button type="button" key={m} className={readPref("ow-music", "off") === m ? "on" : "ghost"} onClick={() => { writePref("ow-music", m); window.dispatchEvent(new CustomEvent("ow-music", { detail: m })); setMsg({ ok: true, text: m === "off" ? "Music off" : `Music: ${m}` }); }}>{m === "off" ? "No music" : m === "lofi" ? "Lo-fi" : m[0].toUpperCase() + m.slice(1)}</button>)}</div>
+      <label className="ow-check"><input type="checkbox" defaultChecked={readPref("ow-speech", "off") === "on"} onChange={(e) => { writePref("ow-speech", e.target.checked ? "on" : "off"); window.dispatchEvent(new CustomEvent("ow-speech", { detail: e.target.checked })); if (e.target.checked) speak("Hi boss, I'll read things out from now on.", "receptionist"); }} /> Characters speak their lines out loud</label>
       <h4>AI operating mode</h4>
-      <div className="ow-modes">{(["manual", "copilot", "autopilot"] as const).map((m) => <button type="button" key={m} className={data.state.mode === m ? "on" : "ghost"} onClick={() => void act({ action: "setMode", mode: m, autopilotPaused: true }, `Mode: ${m}`)}>{m === "manual" ? "Manual" : m === "copilot" ? "Copilot" : "Autopilot"}</button>)}</div>
-      <p className="ow-muted">{data.state.mode === "manual" ? "AI spots what needs doing and recommends. You do the work." : data.state.mode === "copilot" ? "AI prepares replies and actions; you approve each one before anything is sent." : "Autopilot only runs rules you've switched on in Automations. Money and other important actions always need your approval."}</p>
-      {data.state.mode === "autopilot" && <button type="button" className={data.state.autopilotPaused ? "" : "danger"} onClick={() => void act({ action: "setMode", mode: "autopilot", autopilotPaused: !data.state.autopilotPaused }, data.state.autopilotPaused ? "Autopilot running" : "Autopilot paused")}>{data.state.autopilotPaused ? <><Play size={14} /> Resume autopilot</> : <><Pause size={14} /> Pause autopilot</>}</button>}
+      <div className="ow-modes">{(["manual", "copilot"] as const).map((m) => <button type="button" key={m} className={(data.state.mode === "autopilot" ? "copilot" : data.state.mode) === m ? "on" : "ghost"} onClick={() => void act({ action: "setMode", mode: m, autopilotPaused: true }, `Mode: ${m}`)}>{m === "manual" ? "Manual" : "Copilot"}</button>)}</div>
+      <p className="ow-muted">{data.state.mode === "manual" ? "AI spots what needs doing and recommends. You do the work." : "AI prepares replies and actions; you see each one and approve it before anything happens."}</p>
+      <p className="ow-hint">Nothing ever runs on its own: every send, booking, payment or change is shown to you first and only happens when you approve it.</p>
       {!data.aiReady && <p className="ow-err">No AI provider connected — drafts use templates. Add one in Settings → API Keys.</p>}
       <h4>Connected data</h4>
       <ul className="ow-sources">{Object.entries(data.sources).map(([k, v]) => <li key={k} className={v ? "on" : ""}>{v ? <Check size={12} /> : <EyeOff size={12} />} {k}</li>)}</ul>

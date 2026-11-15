@@ -65,7 +65,7 @@ Legend: ✅ in the game · 🔗 opens the existing screen inside the game · ⏳
 - **In-game booking:** on a lead card, *Book an appointment* shows real free slots from Scheduling; confirming uses the existing `book` action (availability re-checked, optional customer confirmation).
 - **Progression:** XP → levels (L2 = 100 XP, L5 = 1,000, L10 = 4,500). Stages: Startup → Established (L5) → Expanding (L10) → Growing (L15) → Market leader (L20) → Empire (L30) → Legend (L50). Levels unlock Headquarters tiers, which you then build with coins. Upgrades are never removed.
 - **Health:** working-day aware (weekends don't count as waiting). Neglect desaturates the scene and piles up paperwork; finishing work brings it back.
-- **Modes:** Manual (recommend), Copilot (prepare for approval — default), Autopilot (paused by default; only rules switched on in Automations). Every in-game action and AI draft is in the action history.
+- **Modes:** Manual (recommend) and Copilot (prepare for approval — default). There is no autonomous mode: every real action is shown first and only runs when approved. Every in-game action and AI draft is in the action history.
 - **Accessibility:** everything is clickable without walking, keyboard focus on customers, reduced-motion toggle (and respects the OS setting), sounds on by default with a mute button (browsers may hold the first sound until the first tap), solid-white pop-ups.
 - **Demo scenario:** a clearly labelled demo (five driveway leads, a draft invoice, a receipt, a project task) runs entirely in the browser, touches no data, and walks through to a level-5 HQ upgrade.
 

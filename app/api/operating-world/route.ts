@@ -92,7 +92,7 @@ async function loadState(ctx: Ctx) {
   await db.prepare("INSERT OR IGNORE INTO ow_state (owner_id, scope_id, started_at, profile, updated_at) VALUES (?1, ?2, ?3, '{}', ?3)").bind(ownerId, scopeId, now).run();
   const state = await db.prepare("SELECT started_at, mode, autopilot_paused, profile FROM ow_state WHERE owner_id=?1 AND scope_id=?2").bind(ownerId, scopeId).first<{ started_at: string; mode: string; autopilot_paused: number; profile: string }>();
   let profile: Record<string, string> = {}; try { profile = JSON.parse(state?.profile || "{}"); } catch { /* keep empty */ }
-  return { startedAt: state?.started_at || now, mode: state?.mode || "copilot", autopilotPaused: state?.autopilot_paused !== 0, profile };
+  return { startedAt: state?.started_at || now, mode: state?.mode === "manual" ? "manual" : "copilot", autopilotPaused: state?.autopilot_paused !== 0, profile };
 }
 
 async function wallet(ctx: Ctx) {
@@ -237,7 +237,7 @@ export async function POST(request: Request) {
       return respond({ ok: true, profile: businessProfile(ctx, next) });
     }
     if (action === "setMode") {
-      const mode = ["manual", "copilot", "autopilot"].includes(str(body.mode)) ? str(body.mode) : "copilot";
+      const mode = ["manual", "copilot"].includes(str(body.mode)) ? str(body.mode) : "copilot"; // no autonomous mode: everything is shown before it runs
       const paused = body.autopilotPaused === false ? 0 : 1;
       await loadState(ctx);
       await ctx.db.prepare("UPDATE ow_state SET mode=?3, autopilot_paused=?4, updated_at=?5 WHERE owner_id=?1 AND scope_id=?2").bind(ctx.ownerId, ctx.scopeId, mode, paused, new Date().toISOString()).run();
