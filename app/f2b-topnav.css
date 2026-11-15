@@ -1038,3 +1038,13 @@ html body.f2b-dark .ai-chat-toast :is(p, #f2b-ai-x) { color:#e9ecf1 !important; 
 html body.f2b-dark :is(.ai-tour-card, #f2b-ai-x) { background:#1f2329 !important; }
 html body.f2b-dark .ai-tour-card :is(b, #f2b-ai-x) { color:#fff !important; -webkit-text-fill-color:#fff !important; }
 html body.f2b-dark .ai-tour-card :is(p, #f2b-ai-x) { color:#c9cfd8 !important; -webkit-text-fill-color:#c9cfd8 !important; }
+html body .ai-chat-ticket { display:grid; gap:8px; padding:12px; margin:0 12px; border-radius:14px; border:1px solid #e4e7ec; background:#fff; }
+html body .ai-chat-ticket b { display:flex; align-items:center; gap:6px; font-size:14px; color:#1f2a33 !important; }
+html body .ai-chat-ticket :is(input, textarea, select, #f2b-ai-x) { width:100%; box-sizing:border-box; padding:9px 11px; border:1px solid #d0d5dd !important; border-radius:10px !important; font:inherit; font-size:13.5px; color:#1f2a33 !important; -webkit-text-fill-color:#1f2a33 !important; background:#fff !important; box-shadow:none !important; transform:none !important; }
+html body .ai-chat-ticket-row { display:flex; gap:8px; align-items:center; }
+html body .ai-chat-ticket-row select { width:auto !important; }
+html body .ai-chat-ticket-row .text-button { margin-left:auto; }
+html body .ai-chat-ticket .primary-button { height:36px; padding:0 14px !important; background:var(--brand-primary, #0b74b8) !important; border-color:var(--brand-primary, #0b74b8) !important; color:#fff !important; -webkit-text-fill-color:#fff !important; }
+html body.f2b-dark :is(.ai-chat-ticket, #f2b-ai-x) { background:#262b33 !important; border-color:rgba(255,255,255,.12) !important; }
+html body.f2b-dark .ai-chat-ticket :is(b, #f2b-ai-x) { color:#fff !important; -webkit-text-fill-color:#fff !important; }
+html body.f2b-dark .ai-chat-ticket :is(input, textarea, select, #f2b-ai-x) { background:#12151a !important; border-color:rgba(255,255,255,.16) !important; color:#fff !important; -webkit-text-fill-color:#fff !important; }

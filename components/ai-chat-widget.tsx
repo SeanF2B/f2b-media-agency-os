@@ -3,7 +3,7 @@
 // greets new users, pops up notifications (approvals, new leads, unread messages), runs page tours, and turns
 // typed or spoken requests into pre-filled forms (nothing is saved without your OK).
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Mic, MicOff, Send, X, Compass, Sparkles } from "lucide-react";
+import { Mic, MicOff, Send, X, Compass, Sparkles, LifeBuoy } from "lucide-react";
 
 export type AiCommand = { action: string; reply: string; fields: Record<string, string> };
 type Suggestion = { title: string; clientId: string; priority: string; service: string; why: string; source?: string };
@@ -46,7 +46,7 @@ const TOURS: Record<string, TourStep[]> = {
 const PAGE_FOCUS: Record<string, RegExp> = { CRM: /lead|follow|conversation|reply/i, Tasks: /approv|overdue|ai|task/i, Operations: /approv|ai|seo|ads|audit/i, Bookkeeping: /invoice|expense|income|receipt|payment/i };
 const forPage = (list: Suggestion[], page: string) => { const focus = PAGE_FOCUS[page]; if (!focus) return list; const hits = list.filter((item) => focus.test(`${item.source || ""} ${item.title} ${item.why}`)); return hits.length ? hits : []; };
 
-export function AiChatWidget({ page, pageName, clientId, avatar, enabled, onCommand, onNavigate, onSuggestion }: { page: string; pageName?: string; clientId?: string; avatar: ReactNode; enabled: boolean; onCommand: (command: AiCommand) => void; onNavigate: (page: string) => void; onSuggestion: (item: Suggestion) => void }) {
+export function AiChatWidget({ page, pageName, clientId, avatar, enabled, onCommand, onNavigate, onSuggestion, clients = [], onTicket }: { clients?: Array<{ id: string; name: string }>; onTicket?: () => void; page: string; pageName?: string; clientId?: string; avatar: ReactNode; enabled: boolean; onCommand: (command: AiCommand) => void; onNavigate: (page: string) => void; onSuggestion: (item: Suggestion) => void }) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [prompt, setPrompt] = useState("");
@@ -59,6 +59,21 @@ export function AiChatWidget({ page, pageName, clientId, avatar, enabled, onComm
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const label = pageName || PAGE_LABEL[page] || page;
+  // Support ticket form (lands in the agency's Tasks for that client).
+  const [ticket, setTicket] = useState<{ subject: string; details: string; priority: string; clientId: string } | null>(null);
+  const [ticketBusy, setTicketBusy] = useState(false);
+  const openTicket = () => { setToast(null); setOpen(true); setTicket({ subject: "", details: "", priority: "Normal", clientId: clientId || "" }); };
+  const sendTicket = async () => {
+    if (!ticket || ticket.subject.trim().length < 3) return;
+    setTicketBusy(true);
+    try {
+      const response = await fetch("/api/support-ticket", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(ticket) });
+      const json = await response.json().catch(() => ({})) as { number?: string; error?: string };
+      if (!response.ok) throw new Error(json.error || "The ticket couldn’t be sent.");
+      setTicket(null); say(`Ticket ${json.number} is in. It’s now a task for ${clients.find((c) => c.id === ticket.clientId)?.name || "the agency"} in Tasks.`, onTicket ? [{ label: "Open Tasks", run: onTicket }] : undefined);
+    } catch (reason) { say(reason instanceof Error ? reason.message : "The ticket couldn’t be sent."); }
+    finally { setTicketBusy(false); }
+  };
 
   const say = (text: string, actions?: Msg["actions"]) => setMessages((current) => [...current, { from: "bot", text, actions }].slice(-40));
 
@@ -108,7 +123,7 @@ export function AiChatWidget({ page, pageName, clientId, avatar, enabled, onComm
   };
   const openChat = () => {
     setToast(null); setOpen(true);
-    if (!messages.length) say(`Hi! I’m your AI assistant. You’re on ${label} — I can add leads, tasks, expenses and clients, open any section, or give you a tour.`, [...(TOURS[page] ? [{ label: `Tour ${label}`, run: () => startTour(page) }] : [{ label: "Tour the CRM", run: () => startTour("CRM") }]), ...(suggestions.length ? [{ label: `Everything waiting (${suggestions.length})`, run: () => openWithSuggestions(suggestions) }] : [])]);
+    if (!messages.length) say(`Hi! I’m your AI assistant. You’re on ${label} — I can add leads, tasks, expenses and clients, open any section, or give you a tour.`, [...(TOURS[page] ? [{ label: `Tour ${label}`, run: () => startTour(page) }] : [{ label: "Tour the CRM", run: () => startTour("CRM") }]), { label: "Raise a support ticket", run: openTicket }, ...(suggestions.length ? [{ label: `Everything waiting (${suggestions.length})`, run: () => openWithSuggestions(suggestions) }] : [])]);
     recommendHere();
   };
 
@@ -141,6 +156,7 @@ export function AiChatWidget({ page, pageName, clientId, avatar, enabled, onComm
     const request = text.trim(); if (!request || busy) return;
     setMessages((current) => [...current, { from: "me" as const, text: request }].slice(-40)); setPrompt(""); setBusy(true);
     if (/^(tour|show me around|walk ?through|how does this (page|work))/i.test(request)) { setBusy(false); startTour(TOURS[page] ? page : "CRM"); return; }
+    if (/\b(support ticket|raise a ticket|open a ticket|log a ticket)\b/i.test(request)) { setBusy(false); openTicket(); setTicket((current) => current ? { ...current, subject: request.replace(/^.*?\b(ticket)\b[:\s-]*(for|about)?\s*/i, "").slice(0, 140) } : current); return; }
     try {
       const response = await fetch("/api/ai-command", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: request, page, clientId }) });
       const json = await response.json().catch(() => ({})) as AiCommand & { error?: string };
@@ -175,8 +191,15 @@ export function AiChatWidget({ page, pageName, clientId, avatar, enabled, onComm
     </div>}
     {toast && !open && <div className="ai-chat-toast" role="status"><button type="button" className="ai-chat-toast-x" aria-label="Dismiss" onClick={() => setToast(null)}><X size={14} /></button><p>{toast.text}</p>{toast.action && <button type="button" className="primary-button" onClick={() => { const run = toast.action!.run; setToast(null); run(); }}>{toast.action.label}</button>}</div>}
     {open && <section className="ai-chat-panel" aria-label="AI assistant">
-      <header><span className="ai-chat-head-bot">{avatar}</span><div><b>AI Assistant</b><small>On {label}</small></div>{TOURS[page] && <button type="button" className="ai-chat-icon" title={`Tour ${label}`} aria-label={`Tour ${label}`} onClick={() => startTour(page)}><Compass size={17} /></button>}<button type="button" className="ai-chat-icon" aria-label="Close" onClick={() => setOpen(false)}><X size={17} /></button></header>
+      <header><span className="ai-chat-head-bot">{avatar}</span><div><b>AI Assistant</b><small>On {label}</small></div><button type="button" className="ai-chat-icon" title="Raise a support ticket" aria-label="Raise a support ticket" onClick={openTicket}><LifeBuoy size={17} /></button>{TOURS[page] && <button type="button" className="ai-chat-icon" title={`Tour ${label}`} aria-label={`Tour ${label}`} onClick={() => startTour(page)}><Compass size={17} /></button>}<button type="button" className="ai-chat-icon" aria-label="Close" onClick={() => setOpen(false)}><X size={17} /></button></header>
       <div className="ai-chat-list" ref={listRef}>{messages.map((message, index) => <div key={index} className={`ai-chat-msg ${message.from}`}><p>{message.text}</p>{message.actions && message.actions.length > 0 && <div className="ai-chat-actions">{message.actions.map((action) => <button type="button" key={action.label} onClick={action.run}>{action.label}</button>)}</div>}</div>)}{busy && <div className="ai-chat-msg bot typing"><p><i /><i /><i /></p></div>}</div>
+      {ticket && <form className="ai-chat-ticket" onSubmit={(event) => { event.preventDefault(); void sendTicket(); }}>
+        <b><LifeBuoy size={15} /> New support ticket</b>
+        {!clientId && <select value={ticket.clientId} onChange={(event) => setTicket({ ...ticket, clientId: event.target.value })} aria-label="Client"><option value="">Agency (no client)</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>}
+        <input autoFocus value={ticket.subject} onChange={(event) => setTicket({ ...ticket, subject: event.target.value })} placeholder="Subject" maxLength={140} required />
+        <textarea value={ticket.details} onChange={(event) => setTicket({ ...ticket, details: event.target.value })} placeholder="What do you need?" rows={3} maxLength={3000} />
+        <div className="ai-chat-ticket-row"><select value={ticket.priority} onChange={(event) => setTicket({ ...ticket, priority: event.target.value })} aria-label="Priority"><option>Normal</option><option>High</option><option>Urgent</option></select><button type="button" className="text-button" onClick={() => setTicket(null)}>Cancel</button><button type="submit" className="primary-button" disabled={ticketBusy || ticket.subject.trim().length < 3}>{ticketBusy ? "Sending…" : "Send ticket"}</button></div>
+      </form>}
       <div className="ai-chat-chips">{chips.map((chip) => <button type="button" key={chip} onClick={() => void ask(chip)} disabled={busy}><Sparkles size={11} /> {chip}</button>)}</div>
       <form className="ai-chat-input" onSubmit={(event) => { event.preventDefault(); void ask(prompt); }}><input value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder={listening ? "Listening…" : `Ask me anything about ${label}…`} aria-label="Message the AI assistant" /><button type="button" className={`ai-chat-icon${listening ? " on" : ""}`} onClick={talk} aria-label={listening ? "Stop" : "Talk"}>{listening ? <MicOff size={17} /> : <Mic size={17} />}</button><button type="submit" className="ai-chat-send" disabled={busy || !prompt.trim()} aria-label="Send"><Send size={16} /></button></form>
     </section>}

@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
 import { readConnectToken } from "@/lib/client-connect";
+import { POST as createTicket } from "../../../api/support-ticket/route";
 
 // Public (no login) page a client opens from the agency's quick link to connect their accounts. It explains
 // how to give the agency access to each missing service and lets them send the IDs, which are saved to their
@@ -41,8 +42,9 @@ async function load(token: string) {
   return client ? { client, data, updatedAt: row.updated_at } : null;
 }
 
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
   const { token } = await context.params;
+  const ticketDone = (new URL(request.url).searchParams.get("ticket") || "").replace(/[^A-Z0-9-]/gi, "").slice(0, 12);
   const found = await load(token);
   if (!found) return page("Link not valid", `<h1>This link isn’t valid</h1><p class="lead">Ask your agency to send you a new connection link.</p>`);
   const { client } = found;
@@ -51,6 +53,8 @@ export async function GET(_request: Request, context: RouteContext) {
   return page(`Connect your accounts · ${client.name}`, `<div class="top">${client.logo && /^(https:|data:image\/)/.test(client.logo) ? `<img src="${esc(client.logo)}" alt="">` : ""}<div><h1>${esc(client.name)}</h1></div></div>
     <p class="lead">${todo ? `Fill in what you can below and press Send — it goes straight to your marketing team. ${todo} item${todo === 1 ? "" : "s"} to go.` : "Everything is connected. Thank you!"}</p>
     ${todo ? `<form method="post">${rows}<section class="card"><h2>Anything else?</h2><textarea name="connectNotes" rows="3" maxlength="600" placeholder="Questions, or anything you couldn’t find"></textarea></section><button type="submit">Send to my marketing team</button></form>` : rows}
+    ${ticketDone ? `<section class="card" style="border-top-color:#12b76a"><h2>Ticket ${esc(ticketDone)} sent <span class="ok">Received</span></h2><p>Thanks — your team has it and will be in touch.</p></section>` : ""}
+    <form method="post" class="card ticket"><h2>Need help? Raise a support ticket</h2><p>Tell us what you need and it goes straight to your account team.</p><input name="ticketSubject" placeholder="Subject, e.g. Change opening hours on website" maxlength="140" required><textarea name="ticketDetails" rows="4" maxlength="3000" placeholder="Details" style="margin-top:8px"></textarea><div style="display:flex;gap:8px;margin-top:8px"><input name="ticketName" placeholder="Your name" maxlength="80"><select name="ticketPriority" style="padding:11px;border:1px solid #d0d5dd;border-radius:10px;font:inherit"><option>Normal</option><option>High</option><option>Urgent</option></select></div><button type="submit">Send ticket</button></form>
     <p class="foot">Secure link for ${esc(client.name)} only. No passwords are ever needed here.</p>`, client.color);
 }
 
@@ -60,6 +64,12 @@ export async function POST(request: Request, context: RouteContext) {
   if (!found) return page("Link not valid", `<h1>This link isn’t valid</h1><p class="lead">Ask your agency to send you a new connection link.</p>`);
   const form = await request.formData().catch(() => null);
   if (!form) return page("Try again", `<h1>Something went wrong</h1><p class="lead">Please go back and try again.</p>`);
+  if (form.get("ticketSubject") !== null) {
+    const response = await createTicket(new Request(new URL("/api/support-ticket", request.url), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token, subject: form.get("ticketSubject"), details: form.get("ticketDetails"), name: form.get("ticketName"), priority: form.get("ticketPriority") }) }));
+    const json = await response.json().catch(() => ({})) as { number?: string; error?: string };
+    if (!response.ok) return page("Try again", `<h1>Ticket not sent</h1><p class="lead">${esc(json.error || "Please go back and try again.")}</p>`, found.client.color);
+    return new Response(null, { status: 303, headers: { Location: `${new URL(request.url).pathname}?ticket=${encodeURIComponent(json.number || "")}` } });
+  }
   const updates: Partial<Client> = {};
   for (const item of ITEMS) { const value = String(form.get(String(item.key)) || "").trim().slice(0, 160); if (value && !item.done(found.client)) (updates as Record<string, string>)[item.key] = item.key === "googleAdsAccountId" ? value.replace(/[^\d-]/g, "") : value; }
   const notes = String(form.get("connectNotes") || "").trim().slice(0, 600);

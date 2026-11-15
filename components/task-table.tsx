@@ -2,10 +2,11 @@
 
 import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { Fragment, useMemo, useState, type ReactNode } from "react";
-import { BarChart3, CircleCheck, FileText, Globe, Mail, Megaphone, MapPin, PenLine, Phone, Search, Settings, Share2, Users, Wrench, type LucideIcon } from "lucide-react";
+import { BarChart3, LifeBuoy, CircleCheck, FileText, Globe, Mail, Megaphone, MapPin, PenLine, Phone, Search, Settings, Share2, Users, Wrench, type LucideIcon } from "lucide-react";
 
 // A small icon per task, picked from its service (or the title when no service is set).
 const TASK_ICON_RULES: Array<[RegExp, LucideIcon, string]> = [
+  [/support|ticket|🎫/i, LifeBuoy, "#d92d20"],
   [/google ads|ppc|meta ads|facebook ads|\bads?\b|campaign/i, Megaphone, "#e8590c"], [/seo|keyword|rank|backlink|search console/i, Search, "#2f9e44"],
   [/crm|lead|pipeline|contact/i, Users, "#7048e8"], [/web|site|domain|wordpress|dns|landing/i, Globe, "#1c7ed6"],
   [/email|newsletter|mail/i, Mail, "#0c8599"], [/social|instagram|tiktok|linkedin|post/i, Share2, "#d6336c"],
