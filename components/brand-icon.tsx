@@ -19,11 +19,19 @@ export const BRAND_DOMAINS: Record<string, string> = {
   "gmail-bookkeeping": "mail.google.com", "email-sending": "resend.com", twilio: "www.twilio.com", pagespeed: "pagespeed.web.dev",
   stripe: "stripe.com", openrouter: "openrouter.ai", cloudflare: "www.cloudflare.com", outscraper: "outscraper.com",
 };
+// Google's own product icons (their favicons are all the same "G").
+const PRODUCT_ICONS: Record<string, string> = {
+  "google-calendar": "https://www.gstatic.com/images/branding/product/2x/calendar_2020q4_48dp.png",
+  "google-drive": "https://www.gstatic.com/images/branding/product/2x/drive_2020q4_48dp.png",
+  "gmail-bookkeeping": "https://www.gstatic.com/images/branding/product/2x/gmail_2020q4_48dp.png",
+  ga4: "https://www.gstatic.com/analytics-suite/header/suite/v2/ic_analytics.svg",
+  "google-ads": "https://www.gstatic.com/images/branding/product/2x/google_ads_48dp.png", gads: "https://www.gstatic.com/images/branding/product/2x/google_ads_48dp.png",
+  "search-console": "https://www.gstatic.com/images/branding/product/2x/search_console_48dp.png", gsc: "https://www.gstatic.com/images/branding/product/2x/search_console_48dp.png",
+  "business-profile": "https://www.gstatic.com/images/branding/product/2x/google_my_business_48dp.png", gbp: "https://www.gstatic.com/images/branding/product/2x/google_my_business_48dp.png",
+};
 export function BrandIcon({ id, fallback, size = 20, className = "" }: { id: string; fallback: ReactNode; size?: number; className?: string }) {
-  const file = BRAND_FILES[id];
-  const domain = BRAND_DOMAINS[id];
-  const [stage, setStage] = useState<0 | 1 | 2>(file ? 0 : domain ? 1 : 2);
-  if (stage === 2) return <>{fallback}</>;
-  const src = stage === 0 ? `/brand/${file}` : `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain || "")}&sz=64`;
-  return <img className={`brand-icon ${className}`} src={src} referrerPolicy="no-referrer" loading="lazy" onError={() => setStage(stage === 0 && domain ? 1 : 2)} alt="" width={size} height={size} style={{ width: size, height: size, objectFit: "contain" }} />;
+  const sources = [BRAND_FILES[id] ? `/brand/${BRAND_FILES[id]}` : "", PRODUCT_ICONS[id] || "", BRAND_DOMAINS[id] ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(BRAND_DOMAINS[id])}&sz=64` : ""].filter(Boolean);
+  const [index, setIndex] = useState(0);
+  if (index >= sources.length) return <>{fallback}</>;
+  return <img key={sources[index]} className={`brand-icon ${className}`} src={sources[index]} referrerPolicy="no-referrer" loading="lazy" onError={() => setIndex(index + 1)} alt="" width={size} height={size} style={{ width: size, height: size, objectFit: "contain" }} />;
 }
