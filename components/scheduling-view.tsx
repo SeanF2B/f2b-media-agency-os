@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { CalendarDays, ChevronLeft, ChevronRight, Clock, Copy, Link2, MapPin, Plus, RefreshCw, Settings2, Trash2, UserRound, Users, Video, Phone, Building2 } from "lucide-react";
+import { Sparkles, CalendarDays, ChevronLeft, ChevronRight, Clock, Copy, Link2, MapPin, Plus, RefreshCw, Settings2, Trash2, UserRound, Users, Video, Phone, Building2 } from "lucide-react";
 import "./scheduling.css";
 
 type DayKey = "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
@@ -55,7 +55,8 @@ export function SchedulingView({ scopeClientId }: { scopeClientId: string }) {
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
-  const [newAppt, setNewAppt] = useState<{ date: string; time: string } | null>(null);
+  const [newAppt, setNewAppt] = useState<ApptDraft | null>(null);
+  const [catchUpOpen, setCatchUpOpen] = useState(true);
   const [detail, setDetail] = useState<Booking | null>(null);
   const [editCal, setEditCal] = useState<Partial<Calendar> | null>(null);
   const [editAvail, setEditAvail] = useState<Staff | null>(null);
@@ -105,10 +106,11 @@ export function SchedulingView({ scopeClientId }: { scopeClientId: string }) {
 
   return <section className="sch" aria-label="Scheduling">
     <header className="iv-head"><div><p className="eyebrow">SCHEDULING</p><h1>Appointments &amp; bookings</h1><p>Service calendars, consultations and staff availability, synced with Google Calendar and Apple / Outlook.</p></div>
-      <div className="iv-head-actions">{data.canManage && <button type="button" className="secondary-button" onClick={() => setEditCal(blankCalendar(data))}><Plus size={15} /> New booking calendar</button>}<button type="button" className="primary-button" disabled={!data.calendars.length} title={data.calendars.length ? "" : "Create a booking calendar first"} onClick={() => setNewAppt({ date: ymd(new Date()), time: "" })}><Plus size={15} /> New appointment</button></div></header>
+      <div className="iv-head-actions">{data.canManage && <button type="button" className="secondary-button" onClick={() => setEditCal(blankCalendar(data))}><Plus size={15} /> New booking calendar</button>}<button type="button" className="primary-button" onClick={() => setNewAppt({ date: ymd(new Date()), time: "" })}><Plus size={15} /> New appointment</button></div></header>
     {error && <div className="iv-error" role="alert">{error}</div>}{note && <div className="iv-note" role="status">{note}</div>}
     {!data.emailReady && <div className="iv-warn">Email isn't set up on the server, so confirmations and reminders won't send yet. Bookings still save.</div>}
 
+    <AiBar scope={scopeClientId} data={data} onCalendar={(c) => setEditCal(c)} onAppointment={(a) => setNewAppt(a)} onHours={async (hours) => { for (const h of hours) { const person = data.staff.find((x) => x.id === h.staffId); await act({ action: "saveAvailability", staffId: h.staffId, weekly: h.weekly, blocked: [...new Set([...(person?.blocked || []), ...h.daysOff])], dailyLimit: h.dailyLimit || person?.dailyLimit || 0, timezone: person?.timezone || "Europe/Dublin" }); } setNote("Working hours updated."); setTab("availability"); }} />
     <div className="iv-stats"><div><small>Next 7 days</small><b>{stats.upcoming}</b></div><div><small>Booked this month</small><b>{stats.month}</b></div><div><small>Show-up rate</small><b>{stats.showRate === null ? "—" : `${stats.showRate}%`}</b></div><div className={stats.noShow ? "bad" : ""}><small>No-shows</small><b>{stats.noShow}</b></div>
       <div className="sch-perstaff"><small>This month by person</small>{stats.perStaff.length ? stats.perStaff.map(({ s, n }) => <span key={s.id}><Avatar person={s} size={20} /> {s.name.split(" ")[0]} <b>{n}</b></span>) : <span className="iv-small">No bookings yet</span>}</div></div>
 
@@ -179,7 +181,8 @@ export function SchedulingView({ scopeClientId }: { scopeClientId: string }) {
         </div>; })}
     </div>}
 
-    {newAppt && <NewAppointment data={data} scope={scopeClientId} initial={newAppt} onClose={() => setNewAppt(null)} onSaved={async (msg) => { setNewAppt(null); setNote(msg); await load(); }} />}
+    {newAppt && <NewAppointment data={data} scope={scopeClientId} initial={newAppt} onClose={() => setNewAppt(null)} onSaved={async (msg) => { setNewAppt(null); setNote(msg); await load(); }} onCalendarsChanged={() => void load()} />}
+    {catchUpOpen && !detail && !newAppt && <CatchUp data={data} scope={scopeClientId} onClose={() => setCatchUpOpen(false)} onChanged={() => void load()} />}
     {detail && <AppointmentDetail key={detail.id} data={data} scope={scopeClientId} booking={detail} onClose={() => setDetail(null)} onSaved={async (msg) => { setDetail(null); setNote(msg); await load(); }} />}
     {editCal && <CalendarEditor data={data} value={editCal} busy={busy} onClose={() => setEditCal(null)} onSave={async (cal) => { const out = await act({ action: "saveCalendar", calendar: cal }, cal.id ? "Booking calendar saved." : "Booking calendar created. Copy its link or embed code to start taking bookings."); if (out) setEditCal(null); }} onDelete={editCal.id ? async () => { if (!window.confirm("Delete this booking calendar? Its booking link will stop working.")) return; const out = await act({ action: "deleteCalendar", id: editCal.id }, "Booking calendar deleted."); if (out) setEditCal(null); } : undefined} />}
     {editAvail && <AvailabilityEditor staff={editAvail} busy={busy} onClose={() => setEditAvail(null)} onSave={async (v) => { const out = await act({ action: "saveAvailability", staffId: editAvail.id, ...v }, `${editAvail.name}'s availability saved.`); if (out) setEditAvail(null); }} />}
@@ -279,56 +282,76 @@ function SlotPicker({ data, scope, calendarId, staffIds, date, exclude, value, o
   void data;
   if (err) return <div className="iv-error">{err}</div>;
   if (!slots) return <div className="iv-small">Finding free times…</div>;
-  if (!slots.length) return <div className="iv-small">No free times that day for {staffIds.length ? "the selected people" : "this calendar"}. Try another day or use a custom time.</div>;
+  if (!slots.length) return <div className="iv-small sch-noslots">No free times that day{staffIds.length ? " for the people selected" : ""}. Try another day, or pick any time below.</div>;
   return <div className="sch-times">{slots.map((s) => <button key={s.start} type="button" className={value === s.start ? "on" : ""} onClick={() => onPick(s)}>{time(s.start)}</button>)}</div>;
 }
 
-function NewAppointment({ data, scope, initial, onClose, onSaved }: { data: Data; scope: string; initial: { date: string; time: string }; onClose: () => void; onSaved: (msg: string) => void }) {
-  const [calendarId, setCalendarId] = useState(data.calendars.find((c) => c.active)?.id || data.calendars[0]?.id || "");
-  const cal = data.calendars.find((c) => c.id === calendarId);
-  const [staffIds, setStaffIds] = useState<string[]>([]);
-  const [date, setDate] = useState(initial.date);
+type ApptDraft = { date: string; time: string; calendarId?: string; staffIds?: string[]; name?: string; email?: string; phone?: string; notes?: string };
+
+function NewAppointment({ data, scope, initial, onClose, onSaved, onCalendarsChanged }: { data: Data; scope: string; initial: ApptDraft; onClose: () => void; onSaved: (msg: string) => void; onCalendarsChanged: () => void }) {
+  const [calendars, setCalendars] = useState<Calendar[]>(data.calendars);
+  const [calendarId, setCalendarId] = useState(initial.calendarId || data.calendars.find((c) => c.active)?.id || data.calendars[0]?.id || "");
+  const cal = calendars.find((c) => c.id === calendarId);
+  const [staffIds, setStaffIds] = useState<string[]>(initial.staffIds || []);
+  const [date, setDate] = useState(initial.date || ymd(new Date()));
   const [slot, setSlot] = useState("");
   const [custom, setCustom] = useState(Boolean(initial.time));
   const [customTime, setCustomTime] = useState(initial.time || "09:00");
-  const [form, setForm] = useState({ name: "", email: "", phone: "", notes: "" });
+  const [form, setForm] = useState({ name: initial.name || "", email: initial.email || "", phone: initial.phone || "", notes: initial.notes || "" });
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [notify, setNotify] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  useEffect(() => { setStaffIds([]); setSlot(""); }, [calendarId]);
-  const pool = data.staff.filter((s) => cal?.staffIds.includes(s.id) || custom);
+  // No appointment types yet? Make a simple "General appointment" so booking always works.
+  useEffect(() => {
+    if (calendars.length) return;
+    let live = true;
+    api<{ calendar: Calendar }>(scope, { action: "quickCalendar" }).then((r) => { if (!live) return; setCalendars([r.calendar]); setCalendarId(r.calendar.id); onCalendarsChanged(); }).catch((e) => { if (live) setErr(errText(e, "Couldn't get booking ready.")); });
+    return () => { live = false; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const firstRender = useState(true);
+  useEffect(() => { if (firstRender[0]) { firstRender[1](false); return; } setStaffIds([]); setSlot(""); }, [calendarId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const pool = data.staff.filter((s) => cal?.staffIds.includes(s.id) || custom || staffIds.includes(s.id));
+  const days = Array.from({ length: 14 }, (_, i) => addDays(new Date(), i));
+  const useAnyTime = () => { setCustom(true); if (!staffIds.length) setStaffIds(data.meId && data.staff.some((s) => s.id === data.meId) ? [data.meId] : data.staff[0] ? [data.staff[0].id] : []); };
+  const when = custom ? (customTime ? `${new Date(`${date}T12:00:00`).toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short" })} at ${customTime}` : "") : slot ? longDate(slot) : "";
   const save = async () => {
     setBusy(true); setErr("");
     try {
       const start = custom ? new Date(`${date}T${customTime}:00`).toISOString() : slot;
-      if (!start) throw new Error("Choose a time.");
+      if (!form.name.trim()) throw new Error("Add the customer's name.");
+      if (!start) throw new Error("Pick a time.");
       if (custom && !staffIds.length) throw new Error("Choose who the appointment is with.");
       await api(scope, { action: "book", calendarId, start, staffIds, force: custom, ...form, answers, notify });
-      onSaved(`Appointment booked for ${form.name}.`);
+      onSaved(`Booked: ${form.name} · ${when}.`);
     } catch (e) { setErr(errText(e, "Couldn't book this appointment.")); }
     finally { setBusy(false); }
   };
-  return <Modal title="New appointment" wide onClose={onClose} footer={<><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button type="button" className="primary-button" disabled={busy || !form.name.trim() || !calendarId} onClick={() => void save()}>{busy ? "Booking…" : "Book appointment"}</button></>}>
+  return <Modal title="New appointment" wide onClose={onClose} footer={<><span className="sch-foot-summary">{when ? <>📅 {when}</> : "Pick a time"}</span><span style={{ flex: 1 }} /><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button type="button" className="primary-button" disabled={busy || !form.name.trim() || !calendarId || (!custom && !slot)} onClick={() => void save()}>{busy ? "Booking…" : "Book appointment"}</button></>}>
     {err && <div className="iv-error" role="alert">{err}</div>}
+    <h3 className="sch-h3">1 · Who's it for?</h3>
     <div className="iv-grid">
-      <Field label="Booking calendar"><select value={calendarId} onChange={(e) => setCalendarId(e.target.value)}>{data.calendars.map((c) => <option key={c.id} value={c.id}>{data.scope === null && c.clientId ? `${data.clients.find((x) => x.id === c.clientId)?.name} · ` : ""}{c.name}{c.active ? "" : " (off)"}</option>)}</select></Field>
-      <Field label="Date"><input type="date" value={date} onChange={(e) => { setDate(e.target.value); setSlot(""); }} /></Field>
-      <Field label="Time"><label className="iv-check iv-small"><input type="checkbox" checked={custom} onChange={(e) => setCustom(e.target.checked)} /> Custom time (ignore availability)</label>{custom && <input type="time" value={customTime} onChange={(e) => setCustomTime(e.target.value)} />}</Field>
-    </div>
-    <Field label={cal?.assignMode === "collective" ? "With (everyone below joins)" : "With"} hint={staffIds.length ? undefined : cal?.assignMode === "round_robin" ? "Leave empty to auto-assign the least busy person" : "Pick one or more people, or leave empty for anyone free"}>
-      <div className="sch-staff-pick compact">{pool.map((s) => { const on = staffIds.includes(s.id); return <button key={s.id} type="button" className={on ? "on" : ""} aria-pressed={on} onClick={() => { setStaffIds(on ? staffIds.filter((x) => x !== s.id) : [...staffIds, s.id]); setSlot(""); }}><Avatar person={s} size={26} /><span><b>{s.name}</b></span></button>; })}</div>
-    </Field>
-    {!custom && cal && <SlotPicker data={data} scope={scope} calendarId={calendarId} staffIds={staffIds} date={date} value={slot} onPick={(s) => setSlot(s.start)} />}
-    <h3 className="sch-h3">Customer</h3>
-    <div className="iv-grid">
-      <Field label="Name"><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={120} /></Field>
-      <Field label="Email"><input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} maxLength={160} /></Field>
+      <Field label="Name"><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={120} autoFocus placeholder="Customer name" /></Field>
       <Field label="Phone"><input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} maxLength={40} /></Field>
+      <Field label="Email"><input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} maxLength={160} /></Field>
     </div>
-    {cal?.questions.length ? <div className="iv-grid">{cal.questions.map((q) => <Field key={q.id} label={q.label}>{q.type === "select" ? <select value={answers[q.id] || ""} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}><option value="">Choose…</option>{(q.options || []).map((o) => <option key={o}>{o}</option>)}</select> : <input value={answers[q.id] || ""} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })} />}</Field>)}</div> : null}
-    <Field label="Internal notes"><textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} maxLength={2000} /></Field>
-    <label className="iv-check iv-small"><input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} /> Email the customer a confirmation</label>
+    <h3 className="sch-h3">2 · What and with who?</h3>
+    {!calendars.length ? <div className="iv-small">Getting things ready…</div> : <>
+      <div className="sch-type-pick">{calendars.map((c) => <button key={c.id} type="button" className={c.id === calendarId ? "on" : ""} style={{ ["--c" as string]: c.color }} onClick={() => setCalendarId(c.id)}><b>{c.name}</b><small>{c.durationMin} min{data.scope === null && c.clientId ? ` · ${data.clients.find((x) => x.id === c.clientId)?.name || ""}` : ""}</small></button>)}</div>
+      <div className="sch-staff-pick compact">
+        {!custom && <button type="button" className={staffIds.length ? "" : "on"} aria-pressed={!staffIds.length} onClick={() => { setStaffIds([]); setSlot(""); }}><span className="sch-avatar" style={{ width: 26, height: 26, fontSize: 12 }}>★</span><span><b>{cal?.assignMode === "collective" ? "Everyone on this type" : "Anyone free"}</b></span></button>}
+        {pool.map((s) => { const on = staffIds.includes(s.id); return <button key={s.id} type="button" className={on ? "on" : ""} aria-pressed={on} onClick={() => { setStaffIds(on ? staffIds.filter((x) => x !== s.id) : [...staffIds, s.id]); setSlot(""); }}><Avatar person={s} size={26} /><span><b>{s.name}</b></span></button>; })}
+      </div>
+      {staffIds.length > 1 && <div className="iv-small">They'll all be booked together, so only times when everyone is free are shown.</div>}
+    </>}
+    <h3 className="sch-h3">3 · When?</h3>
+    <div className="sch-daystrip">{days.map((d) => { const k = ymd(d); return <button key={k} type="button" className={date === k ? "on" : ""} onClick={() => { setDate(k); setSlot(""); }}><small>{d.toLocaleDateString("en-IE", { weekday: "short" })}</small><b>{d.getDate()}</b><small>{d.toLocaleDateString("en-IE", { month: "short" })}</small></button>; })}
+      <label className="sch-otherdate" title="Pick another date"><CalendarDays size={15} /><input type="date" aria-label="Other date" value={date} onChange={(e) => { setDate(e.target.value); setSlot(""); }} /></label></div>
+    {custom ? <div className="sch-inline"><input type="time" aria-label="Time" value={customTime} onChange={(e) => setCustomTime(e.target.value)} /><button type="button" className="iv-btn" onClick={() => setCustom(false)}>Show free times instead</button></div>
+      : cal ? <><SlotPicker data={data} scope={scope} calendarId={calendarId} staffIds={staffIds} date={date} value={slot} onPick={(s) => setSlot(s.start)} /><button type="button" className="sch-linkbtn" onClick={useAnyTime}>Need a time that isn't listed? Pick any time</button></> : null}
+    {cal?.questions.length ? <><h3 className="sch-h3">Details</h3><div className="iv-grid">{cal.questions.map((q) => <Field key={q.id} label={q.label}>{q.type === "select" ? <select value={answers[q.id] || ""} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}><option value="">Choose…</option>{(q.options || []).map((o) => <option key={o}>{o}</option>)}</select> : <input value={answers[q.id] || ""} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })} />}</Field>)}</div></> : null}
+    <Field label="Notes (only your team sees these)"><textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} maxLength={2000} /></Field>
+    {(form.email.trim() || !form.phone) && <label className="iv-check iv-small"><input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} /> Email the customer a confirmation</label>}
   </Modal>;
 }
 
@@ -400,5 +423,83 @@ export function SchedulingDashboardCard({ scopeClientId, onOpen }: { scopeClient
   if (rows === null || !rows.length) return null;
   return <div className="iv-card sch-dash"><div className="sch-dash-head"><b><CalendarDays size={15} /> Upcoming appointments</b><button type="button" className="iv-btn" onClick={onOpen}>Open Scheduling</button></div>
     {rows.map((b) => <button key={b.id} type="button" className="sch-dash-row" onClick={onOpen}><span className="sch-when"><b>{new Date(b.start).toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short" })}</b><small>{time(b.start)}</small></span><span className="sch-what"><b>{b.name}</b><small>{b.calName}{b.staffNames ? ` · ${b.staffNames}` : ""}</small></span></button>)}
+  </div>;
+}
+
+type AiResult = { action: "calendar" | "appointment" | "hours" | "answer"; reply: string; calendar?: Partial<Calendar>; appointment?: ApptDraft; hours?: Array<{ staffId: string; weekly: Partial<Record<DayKey, Window[]>>; daysOff: string[]; dailyLimit: number }> };
+const AI_EXAMPLES = ["Free 60 min roof survey with Pat and Mick, customer picks who, 30 min travel buffer", "Book John Murphy 087 123 4567 for a survey Tuesday at 10am with Pat", "I work Mon–Thu 8 till 4, off on 24 and 26 December", "15 min discovery call for F2B on Google Meet, round robin"];
+
+/** "Ask AI" — describe what you need in plain English; the AI drafts it and you confirm. */
+function AiBar({ scope, data, onCalendar, onAppointment, onHours }: { scope: string; data: Data; onCalendar: (c: Partial<Calendar>) => void; onAppointment: (a: ApptDraft) => void; onHours: (h: NonNullable<AiResult["hours"]>) => Promise<void> }) {
+  const [prompt, setPrompt] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<AiResult | null>(null);
+  const [err, setErr] = useState("");
+  const [placeholder] = useState(() => AI_EXAMPLES[Math.floor(Math.random() * AI_EXAMPLES.length)]);
+  const ask = async (text = prompt) => {
+    if (!text.trim()) return;
+    setBusy(true); setErr(""); setResult(null);
+    try { setResult(await api<AiResult>(scope, { action: "ai", prompt: text })); }
+    catch (e) { setErr(errText(e, "The AI couldn't help with that.")); }
+    finally { setBusy(false); }
+  };
+  const staffName = (id: string) => data.staff.find((s) => s.id === id)?.name || "Someone";
+  const apply = async () => {
+    if (!result) return;
+    if (result.action === "calendar" && result.calendar) onCalendar(result.calendar);
+    if (result.action === "appointment" && result.appointment) onAppointment(result.appointment);
+    if (result.action === "hours" && result.hours) { setBusy(true); await onHours(result.hours); setBusy(false); }
+    setResult(null); setPrompt("");
+  };
+  return <div className="sch-ai">
+    <form className="sch-ai-bar" onSubmit={(e) => { e.preventDefault(); void ask(); }}>
+      <span className="sch-ai-icon"><Sparkles size={18} /></span>
+      <input value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder={`Ask AI to set up or book anything… e.g. “${placeholder}”`} aria-label="Ask AI to set up or book anything" maxLength={1500} />
+      <button type="submit" className="primary-button" disabled={busy || !prompt.trim()}>{busy ? "Thinking…" : "Ask AI"}</button>
+    </form>
+    {!prompt && !result && !busy && <div className="sch-ai-chips">{AI_EXAMPLES.map((x) => <button key={x} type="button" onClick={() => { setPrompt(x); void ask(x); }}>{x}</button>)}</div>}
+    {err && <div className="iv-error" role="alert">{err}</div>}
+    {result && <div className="sch-ai-result">
+      <p>{result.reply}</p>
+      {result.action === "calendar" && result.calendar && <ul><li><b>{result.calendar.name}</b> · {result.calendar.durationMin} min · {result.calendar.kind === "consultation" ? "Consultation" : "Service"}</li><li>With: {(result.calendar.staffIds || []).map(staffName).join(", ") || "nobody yet"} · {MODE_LABEL[result.calendar.assignMode || "customer_pick"]}</li>{(result.calendar.bufferBefore || result.calendar.bufferAfter) ? <li>Buffers: {result.calendar.bufferBefore || 0} min before, {result.calendar.bufferAfter || 0} min after</li> : null}{result.calendar.questions?.length ? <li>Asks: {result.calendar.questions.map((q) => q.label).join(" · ")}</li> : null}</ul>}
+      {result.action === "appointment" && result.appointment && <ul><li><b>{result.appointment.name || "Customer"}</b>{result.appointment.phone ? ` · ${result.appointment.phone}` : ""}</li><li>{new Date(`${result.appointment.date}T12:00:00`).toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "long" })}{result.appointment.time ? ` at ${result.appointment.time}` : ""}{result.appointment.staffIds?.length ? ` · with ${result.appointment.staffIds.map(staffName).join(", ")}` : ""}</li></ul>}
+      {result.action === "hours" && result.hours && <ul>{result.hours.map((h) => <li key={h.staffId}><b>{staffName(h.staffId)}</b>: {DAY_LIST.filter(([k]) => h.weekly[k]?.length).map(([k, l]) => `${l.slice(0, 3)} ${(h.weekly[k] || []).map((w) => w.join("–")).join(", ")}`).join(" · ") || "no change to hours"}{h.daysOff.length ? ` · off ${h.daysOff.join(", ")}` : ""}</li>)}</ul>}
+      <div className="iv-actions" style={{ justifyContent: "flex-start" }}>
+        {result.action !== "answer" && <button type="button" className="primary-button" disabled={busy} onClick={() => void apply()}>{result.action === "calendar" ? "Review & create" : result.action === "appointment" ? "Review & book" : "Apply hours"}</button>}
+        <button type="button" className="iv-btn" onClick={() => setResult(null)}>Dismiss</button>
+      </div>
+    </div>}
+  </div>;
+}
+
+/** Pops up on entry: asks about past appointments nobody has updated (showed / no-show / cancelled). */
+function CatchUp({ data, scope, onClose, onChanged }: { data: Data; scope: string; onClose: () => void; onChanged: () => void }) {
+  const [done, setDone] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [snoozed] = useState(() => { try { return sessionStorage.getItem("f2b-sched-catchup") === "later"; } catch { return false; } });
+  const pending = data.bookings.filter((b) => b.status === "booked" && Date.parse(b.end) < Date.now() - 15 * 60_000 && !done.includes(b.id)).sort((a, b) => b.start.localeCompare(a.start));
+  if (snoozed || !pending.length) return null;
+  const b = pending[0];
+  const cal = data.calendars.find((c) => c.id === b.calendarId);
+  const staff = b.staffIds.map((id) => data.staff.find((s) => s.id === id)?.name.split(" ")[0]).filter(Boolean).join(" & ");
+  const mark = async (status: string) => {
+    setBusy(true); setErr("");
+    try { await api(scope, { action: "updateBooking", id: b.id, status, notify: false }); setDone((d) => [...d, b.id]); onChanged(); }
+    catch (e) { setErr(errText(e, "Couldn't update that appointment.")); }
+    finally { setBusy(false); }
+  };
+  const later = () => { try { sessionStorage.setItem("f2b-sched-catchup", "later"); } catch { /* optional */ } onClose(); };
+  return <div className="sch-catchup" role="dialog" aria-label="Appointment catch-up">
+    <div className="sch-catchup-head"><span className="sch-star" aria-hidden="true">✦</span><div><b>Quick catch-up</b><small>{pending.length} past appointment{pending.length === 1 ? "" : "s"} still need{pending.length === 1 ? "s" : ""} an update</small></div><button type="button" className="iv-x" aria-label="Close" onClick={later}>✕</button></div>
+    <p>Did <b>{b.name}</b> turn up for <b>{cal?.name || "their appointment"}</b> on {new Date(b.start).toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short" })} at {time(b.start)}{staff ? ` with ${staff}` : ""}?</p>
+    {err && <div className="iv-error">{err}</div>}
+    <div className="sch-catchup-actions">
+      <button type="button" className="iv-btn ok" disabled={busy} onClick={() => void mark("completed")}>✓ Showed up</button>
+      <button type="button" className="iv-btn danger" disabled={busy} onClick={() => void mark("no_show")}>No-show</button>
+      <button type="button" className="iv-btn" disabled={busy} onClick={() => void mark("cancelled")}>It was cancelled</button>
+      <button type="button" className="sch-linkbtn" onClick={() => setDone((d) => [...d, b.id])}>Skip</button>
+    </div>
+    <small className="iv-small">No-shows and completed visits can trigger your Automations (e.g. a review request).</small>
   </div>;
 }

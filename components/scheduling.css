@@ -88,3 +88,43 @@
 .app-shell.dark-mode .sch-staff-pick button.on{background:color-mix(in srgb,var(--brand-primary,#3b82f6) 22%,#20272d)}
 .app-shell.dark-mode .sch-avatar{border-color:#20272d}
 .app-shell.dark-mode .sch-status.booked{background:#0c2d44;color:#9cd4f5}.app-shell.dark-mode .sch-status.completed{background:#173a26;color:#9be7b8}.app-shell.dark-mode .sch-status.no_show{background:#4a1f1b;color:#f7a29b}.app-shell.dark-mode .sch-status.cancelled{background:#2b353c;color:#9fb0ba}
+
+/* Ask AI */
+.sch-ai{display:grid;gap:8px}
+.sch-ai-bar{display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid color-mix(in srgb,var(--brand-primary,#3b82f6) 35%,#dce3e7);border-radius:16px;padding:6px 6px 6px 12px;box-shadow:0 6px 22px color-mix(in srgb,var(--brand-primary,#3b82f6) 10%,transparent);transition:border-color .14s,box-shadow .14s,transform .14s}
+.sch-ai-bar:focus-within,.sch-ai-bar:hover{border-color:var(--brand-secondary,var(--brand-primary,#3b82f6));transform:translateY(-1px)}
+.sch-ai-bar input{flex:1;border:0;background:transparent;font:inherit;font-size:14.5px;padding:8px 2px;color:inherit;outline:none;min-width:0}
+.sch-ai-icon{display:grid;place-items:center;width:30px;height:30px;border-radius:10px;color:#fff;background:linear-gradient(135deg,var(--brand-primary,#3b82f6),var(--brand-secondary,#8b5cf6));animation:sch-glow 2.6s ease-in-out infinite}
+@keyframes sch-glow{50%{box-shadow:0 0 0 6px color-mix(in srgb,var(--brand-primary,#3b82f6) 14%,transparent)}}
+.sch-ai-chips{display:flex;gap:6px;flex-wrap:wrap}.sch-ai-chips button{border:1px solid #dce3e7;background:#fff;border-radius:999px;padding:5px 11px;font:inherit;font-size:12px;color:#4b5a63;cursor:pointer;transition:transform .14s,border-color .14s}
+.sch-ai-chips button:hover{transform:translateY(-1px);border-color:var(--brand-secondary,var(--brand-primary,#3b82f6));color:inherit}
+.sch-ai-result{background:color-mix(in srgb,var(--brand-primary,#3b82f6) 6%,#fff);border:1px solid color-mix(in srgb,var(--brand-primary,#3b82f6) 25%,#dce3e7);border-radius:14px;padding:12px 14px;display:grid;gap:6px}
+.sch-ai-result p{margin:0;font-weight:600}.sch-ai-result ul{margin:0;padding-left:18px;font-size:13.5px;display:grid;gap:3px}
+
+/* New appointment */
+.sch-type-pick{display:flex;gap:8px;flex-wrap:wrap}
+.sch-type-pick button{display:grid;text-align:left;border:1.5px solid #dce3e7;border-left:4px solid var(--c);background:#fff;border-radius:12px;padding:8px 12px;font:inherit;cursor:pointer;color:inherit;transition:transform .14s,border-color .14s}
+.sch-type-pick button small{color:#63727b;font-size:12px}.sch-type-pick button:hover{transform:translateY(-1px)}
+.sch-type-pick button.on{background:color-mix(in srgb,var(--c) 10%,#fff);border-color:var(--c);border-left-width:4px}
+.sch-daystrip{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+.sch-daystrip button{flex:0 0 58px;display:grid;justify-items:center;gap:1px;border:1.5px solid #dce3e7;background:#fff;border-radius:12px;padding:7px 4px;font:inherit;cursor:pointer;color:inherit;transition:transform .14s,border-color .14s}
+.sch-daystrip button small{font-size:10.5px;color:#63727b;text-transform:uppercase;letter-spacing:.04em}.sch-daystrip button b{font-size:17px}
+.sch-daystrip button:hover{transform:translateY(-1px);border-color:var(--brand-secondary,var(--brand-primary,#3b82f6))}
+.sch-daystrip button.on{background:var(--brand-primary,#3b82f6);border-color:var(--brand-primary,#3b82f6);color:var(--brand-primary-fg,#fff)}.sch-daystrip button.on small{color:inherit;opacity:.85}
+.sch-otherdate{flex:0 0 auto;display:flex!important;align-items:center;gap:6px;border:1.5px dashed #cfd8de;border-radius:12px;padding:0 8px;font-weight:600}.sch-otherdate input{border:0!important;padding:6px 2px!important;width:auto!important}
+.sch-linkbtn{border:0;background:none;padding:2px 0;font:inherit;font-size:12.5px;font-weight:600;color:var(--brand-primary,#2563eb);cursor:pointer;justify-self:start;text-decoration:underline;text-underline-offset:3px}
+.sch-foot-summary{font-weight:700;font-size:14px}
+.sch-noslots{background:#f8fafb;border-radius:10px;padding:10px 12px}
+
+/* Catch-up assistant */
+.sch-catchup{position:fixed;right:22px;bottom:22px;z-index:900;width:min(380px,calc(100vw - 32px));background:#fff;color:#26333b;border:1px solid #dce3e7;border-radius:18px;padding:14px 16px;display:grid;gap:10px;box-shadow:0 22px 60px rgba(10,18,26,.25);animation:sch-pop .35s cubic-bezier(.2,1.3,.4,1)}
+@keyframes sch-pop{from{opacity:0;transform:translateY(16px) scale(.96)}}
+.sch-catchup p{margin:0;font-size:14.5px;line-height:1.45}
+.sch-catchup-head{display:flex;gap:10px;align-items:center}.sch-catchup-head div{flex:1;display:grid}.sch-catchup-head small{color:#63727b;font-size:12px}
+.sch-star{display:grid;place-items:center;width:34px;height:34px;font-size:22px;color:var(--brand-primary,#3b82f6);animation:sch-spin 6s linear infinite,sch-bob 2.4s ease-in-out infinite}
+@keyframes sch-spin{to{rotate:360deg}}@keyframes sch-bob{50%{translate:0 -3px}}
+.sch-catchup-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.app-shell.dark-mode .sch-ai-bar,.app-shell.dark-mode .sch-ai-chips button,.app-shell.dark-mode .sch-type-pick button,.app-shell.dark-mode .sch-daystrip button,.app-shell.dark-mode .sch-catchup{background:#20272d;border-color:#3c4850;color:#e6eef2}
+.app-shell.dark-mode .sch-ai-result{background:color-mix(in srgb,var(--brand-primary,#3b82f6) 14%,#20272d);border-color:#3c4850}
+.app-shell.dark-mode .sch-noslots{background:#171c20}
+.app-shell.dark-mode .sch-daystrip button.on{background:var(--brand-primary,#3b82f6);color:var(--brand-primary-fg,#fff)}
