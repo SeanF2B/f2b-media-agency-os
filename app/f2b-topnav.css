@@ -713,3 +713,17 @@ html body .app-shell .client-tax-row-actions { display: inline-flex; gap: 6px; j
 html body .app-shell .client-tax-row-actions .finance-icon-btn { width: 32px; height: 32px; display: inline-grid; place-items: center; padding: 0; border-radius: 9px; border: 1px solid #e3e8ef; background: #fff; color: #475467; cursor: pointer; }
 html body .app-shell .client-tax-row-actions .finance-icon-btn.danger { color: #b42318; border-color: #f4d4d0; }
 html body .app-shell.dark-mode .client-tax-row-actions .finance-icon-btn { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.14); color: #d0d5dd; }
+
+/* Media Library: bulk select + upload details */
+html body .ml-bulk { display:flex; align-items:center; gap:12px; margin:0 0 10px; min-height:36px; }
+html body .ml-bulk-all { display:inline-flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color:#475467; cursor:pointer; }
+html body .ml-card-wrap { position:relative; }
+html body .ml-card-wrap .ml-card { width:100%; }
+html body .ml-pick { position:absolute; top:8px; left:8px; z-index:2; width:26px; height:26px; display:grid; place-items:center; border-radius:8px; background:rgba(255,255,255,.92); box-shadow:0 1px 4px rgba(0,0,0,.18); opacity:0; transition:opacity .15s; cursor:pointer; }
+html body .ml-card-wrap:hover .ml-pick, html body .ml-card-wrap.is-picked .ml-pick, html body .ml-bulk.has-picks ~ .ml-grid .ml-pick { opacity:1; }
+html body .ml-card-wrap.is-picked .ml-card { outline:2px solid var(--brand-secondary, #0b74b8); outline-offset:2px; }
+@media (hover: none) { html body .ml-pick { opacity:1; } }
+html body .ml-upload-details { display:grid; gap:10px; }
+html body .ml-upload-details .ml-hint { margin:0; }
+html body .ml-upload-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+html body .ml-upload-files { margin:0; padding:8px 12px; list-style:none; border-radius:10px; background:#f8fafc; font-size:12.5px; color:#475467; display:grid; gap:2px; max-height:140px; overflow:auto; }

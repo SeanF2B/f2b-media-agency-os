@@ -57,6 +57,9 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
   const [uploadFolder, setUploadFolder] = useState("");
   const [uploadProject, setUploadProject] = useState<Project>({});
   const [projectOpen, setProjectOpen] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [picks, setPicks] = useState<Set<string>>(new Set());
+  const queueUpload = (files: FileList | File[]) => { const list = Array.from(files); if (list.length) setPendingFiles(list); };
   const [uploads, setUploads] = useState<Upload[]>([]);
   const [selected, setSelected] = useState<MediaItem | null>(null);
   const [panel, setPanel] = useState<"" | "stock" | "drive" | "link" | "mobile" | "ai">("");
@@ -121,7 +124,8 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
     if (matches && (!kind || item.kind === kind)) setItems((current) => [item, ...current.filter((existing) => existing.id !== item.id)]);
   };
 
-  const uploadFiles = async (files: FileList | File[]) => {
+  const uploadFiles = async (files: FileList | File[], projectOverride?: Project) => {
+    const baseProject = projectOverride ?? uploadProject;
     const list = Array.from(files);
     if (!list.length) return;
     if (!uploadScope) { setError("Choose a client library to upload into."); return; }
@@ -136,7 +140,7 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
         if (size) { query.set("w", String(size.w)); query.set("h", String(size.h)); }
         // Project details for local SEO: what was typed above, plus GPS and date from the photo itself when present.
         const geo = await readPhotoGeo(file);
-        const project = { ...uploadProject, ...(geo.lat != null ? { lat: geo.lat, lng: geo.lng } : {}), date: uploadProject.date || geo.takenAt || "" };
+        const project = { ...baseProject, ...(geo.lat != null ? { lat: geo.lat, lng: geo.lng } : {}), date: baseProject.date || geo.takenAt || "" };
         if (Object.values(project).some((value) => value !== "" && value != null)) query.set("project", JSON.stringify(project));
         const item = await uploadFile(file, query, (progress) => setUploads((current) => current.map((entry) => entry.id === id ? { ...entry, progress } : entry)));
         addItem(item);
@@ -148,7 +152,7 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
     window.setTimeout(() => setUploads((current) => current.filter((entry) => !entry.done)), 2500);
   };
 
-  const onDrop = (event: DragEvent) => { event.preventDefault(); setDragOver(false); if (event.dataTransfer.files?.length) void uploadFiles(event.dataTransfer.files); };
+  const onDrop = (event: DragEvent) => { event.preventDefault(); setDragOver(false); if (event.dataTransfer.files?.length) queueUpload(event.dataTransfer.files); };
 
   const copy = async (text: string, label = "Link copied") => { try { await navigator.clipboard.writeText(text); flash(label); } catch { window.prompt("Copy this link:", text); } };
   const absolute = (path: string) => `${window.location.origin}${path}`;
@@ -170,6 +174,15 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
     try {
       await api("/api/media-library", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "delete", ids: [item.id] }) });
       setItems((current) => current.filter((entry) => entry.id !== item.id)); setSelected(null); flash("Deleted");
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not delete."); }
+  };
+
+  const deletePicked = async () => {
+    const ids = [...picks];
+    if (!ids.length || !window.confirm(`Delete ${ids.length} file${ids.length === 1 ? "" : "s"}? Their public links will stop working on any website or ad that uses them.`)) return;
+    try {
+      for (let i = 0; i < ids.length; i += 100) await api("/api/media-library", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "delete", ids: ids.slice(i, i + 100) }) });
+      setItems((current) => current.filter((entry) => !picks.has(entry.id))); setPicks(new Set()); flash(`Deleted ${ids.length}`);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not delete."); }
   };
 
@@ -202,8 +215,8 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
         <button type="button" className="secondary-button" onClick={() => setPanel("ai")} disabled={!uploadScope}>✨ AI generate</button>
         <button type="button" className="secondary-button" onClick={() => setPanel("link")}>🔗 Import link</button>
         <button type="button" className="secondary-button" onClick={() => setPanel("mobile")}>📱 Mobile link</button>
-        <input ref={fileInput} type="file" hidden multiple accept="image/*,video/mp4,video/quicktime,video/webm,application/pdf" onChange={(event) => { const files = event.currentTarget.files; if (files) void uploadFiles(files); event.currentTarget.value = ""; }} />
-        <input ref={cameraInput} type="file" hidden accept="image/*,video/*" capture="environment" onChange={(event) => { const files = event.currentTarget.files; if (files) void uploadFiles(files); event.currentTarget.value = ""; }} />
+        <input ref={fileInput} type="file" hidden multiple accept="image/*,video/mp4,video/quicktime,video/webm,application/pdf" onChange={(event) => { const files = event.currentTarget.files; if (files) queueUpload(files); event.currentTarget.value = ""; }} />
+        <input ref={cameraInput} type="file" hidden accept="image/*,video/*" capture="environment" onChange={(event) => { const files = event.currentTarget.files; if (files) queueUpload(files); event.currentTarget.value = ""; }} />
       </div>
       <p className="ml-target">New files go to <b>{uploadScopeName}</b>{" "}
         <label className="ml-folder-input">· folder <input value={uploadFolder} onChange={(event) => setUploadFolder(event.target.value)} placeholder="optional, e.g. Job photos" maxLength={60} list="ml-folders" /></label>
@@ -228,15 +241,22 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
       </div>
       {folders.length > 0 && <div className="ml-folders">{["", ...folders].map((name) => <button type="button" key={name || "all"} className={folder === name ? "active" : ""} onClick={() => setFolder(name)}>{name ? `📁 ${name}` : "All folders"}</button>)}</div>}
 
+      {visible.length > 0 && <div className={`ml-bulk${picks.size ? " has-picks" : ""}`} role="toolbar" aria-label="Bulk actions">
+        <label className="ml-bulk-all"><input type="checkbox" checked={visible.length > 0 && visible.every((item) => picks.has(item.id))} onChange={(event) => setPicks(event.target.checked ? new Set(visible.map((item) => item.id)) : new Set())} /> {picks.size ? `${picks.size} selected` : "Select all"}</label>
+        {picks.size > 0 && <><button type="button" className="secondary-button ml-danger" onClick={() => void deletePicked()}>🗑 Delete {picks.size}</button><button type="button" className="text-button" onClick={() => setPicks(new Set())}>Clear</button></>}
+      </div>}
       <div className={`ml-grid${dragOver ? " is-drag" : ""}`}>
         {dragOver && <div className="ml-drop">Drop files to add them to {uploadScopeName}</div>}
         {visible.map((item) => (
-          <button type="button" key={item.id} className="ml-card" onClick={() => setSelected(item)} aria-label={`Open ${item.name}`}>
+          <div key={item.id} className={`ml-card-wrap${picks.has(item.id) ? " is-picked" : ""}`}>
+          <label className="ml-pick" title="Select"><input type="checkbox" checked={picks.has(item.id)} onChange={(event) => setPicks((current) => { const next = new Set(current); if (event.target.checked) next.add(item.id); else next.delete(item.id); return next; })} aria-label={`Select ${item.name}`} /></label>
+          <button type="button" className="ml-card" onClick={() => picks.size ? setPicks((current) => { const next = new Set(current); if (next.has(item.id)) next.delete(item.id); else next.add(item.id); return next; }) : setSelected(item)} aria-label={`Open ${item.name}`}>
             <span className="ml-thumb">
               {item.kind === "image" ? <img src={item.url} alt={item.alt || item.name} loading="lazy" /> : item.kind === "video" ? <><video src={`${item.url}#t=0.5`} preload="metadata" muted playsInline /><em>▶</em></> : <span className="ml-doc">PDF</span>}
             </span>
             <span className="ml-card-meta"><b>{item.name}</b><small>{listScope === "all" ? `${scopeName(item.scopeId)} · ` : ""}{formatSize(item.size)}{item.folder ? ` · ${item.folder}` : ""}</small>{(item.project?.location || item.project?.lat != null) && <small className="ml-card-geo">📍 {item.project?.location || "GPS from photo"}{item.project?.service ? ` · ${item.project.service}` : ""}</small>}</span>
           </button>
+          </div>
         ))}
         {!loading && visible.length === 0 && (
           <div className="ml-empty">
@@ -251,6 +271,17 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
       {selected && <DetailPanel item={selected} canMove={!inSubAccount} scopes={[...(status?.canUseAgency !== false ? [{ id: "agency", name: "Agency library" }] : []), ...allowedClients.map((client) => ({ id: client.id, name: client.name }))]} scopeName={scopeName} onClose={() => setSelected(null)} onSave={saveItem} onDelete={deleteItem} onCopy={(text, label) => void copy(text, label)} absolute={absolute} />}
       {panel === "stock" && status && <StockPanel providers={status.providers} isAdmin={status.isAdmin} target={uploadScope} targetName={uploadScopeName} folder={uploadFolder} onClose={() => setPanel("")} onAdded={(item) => { addItem(item); flash(`Added to ${uploadScopeName}`); }} onKeysChanged={() => setStatus(null)} />}
       {panel === "drive" && status && <DrivePanel drive={status.drive} isAdmin={status.isAdmin} target={uploadScope} targetName={uploadScopeName} folder={uploadFolder} onClose={() => setPanel("")} onAdded={(item) => { addItem(item); flash(`Added to ${uploadScopeName}`); }} />}
+      {pendingFiles.length > 0 && <Modal title={`Upload ${pendingFiles.length} file${pendingFiles.length === 1 ? "" : "s"} to ${uploadScopeName}`} onClose={() => setPendingFiles([])}>
+        <div className="ml-upload-details">
+          <p className="ml-hint">📍 Project details for local SEO. Saved with every file in this upload. Phone photos add their GPS location and date automatically.</p>
+          <label className="field"><span>Location</span><input autoFocus value={uploadProject.location || ""} onChange={(event) => setUploadProject({ ...uploadProject, location: event.target.value })} placeholder="e.g. Salthill, Galway" maxLength={160} /></label>
+          <label className="field"><span>Service / job</span><input value={uploadProject.service || ""} onChange={(event) => setUploadProject({ ...uploadProject, service: event.target.value })} placeholder="e.g. Slate roof replacement" maxLength={120} /></label>
+          <div className="ml-upload-row"><label className="field"><span>Date of job</span><input type="date" value={uploadProject.date || ""} onChange={(event) => setUploadProject({ ...uploadProject, date: event.target.value })} /></label><label className="field"><span>Folder</span><input value={uploadFolder} onChange={(event) => setUploadFolder(event.target.value)} placeholder="e.g. Job photos" maxLength={60} list="ml-folders" /></label></div>
+          <label className="field"><span>Notes</span><input value={uploadProject.notes || ""} onChange={(event) => setUploadProject({ ...uploadProject, notes: event.target.value })} placeholder="Before / after, materials used, customer quote" maxLength={600} /></label>
+          <ul className="ml-upload-files">{pendingFiles.slice(0, 6).map((file) => <li key={`${file.name}-${file.size}`}>{file.name}</li>)}{pendingFiles.length > 6 && <li>+ {pendingFiles.length - 6} more</li>}</ul>
+          <div className="ml-detail-actions"><button type="button" className="secondary-button" onClick={() => { const files = pendingFiles; setPendingFiles([]); void uploadFiles(files, {}); }}>Skip details</button><button type="button" className="primary-button" onClick={() => { const files = pendingFiles; setPendingFiles([]); void uploadFiles(files); }}>Upload {pendingFiles.length}</button></div>
+        </div>
+      </Modal>}
       {panel === "ai" && <AiPanel target={uploadScope} targetName={uploadScopeName} folder={uploadFolder} project={uploadProject} onClose={() => setPanel("")} onAdded={(item) => { addItem(item); flash(`Added to ${uploadScopeName}`); setPanel(""); setSelected(item); }} />}
       {panel === "link" && <LinkPanel target={uploadScope} targetName={uploadScopeName} folder={uploadFolder} onClose={() => setPanel("")} onAdded={(item) => { addItem(item); flash(`Added to ${uploadScopeName}`); setPanel(""); }} />}
       {panel === "mobile" && <MobilePanel clientId={inSubAccount ? scopeClientId : picker !== "all" && picker !== "agency" ? picker : ""} clientName={inSubAccount ? scopeName(scopeClientId) : picker !== "all" && picker !== "agency" ? scopeName(picker) : ""} onClose={() => setPanel("")} onCopy={(text) => void copy(text)} />}
