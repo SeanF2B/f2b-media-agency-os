@@ -440,6 +440,8 @@ function AiBar({ scope, data, onCalendar, onCreateCalendar, onAppointment, onHou
   const [err, setErr] = useState("");
   const [followUp, setFollowUp] = useState("");
   const [placeholder] = useState(() => AI_EXAMPLES[Math.floor(Math.random() * AI_EXAMPLES.length)]);
+  const [suggestions, setSuggestions] = useState<Array<{ label: string; prompt: string; why: string }> | null>(null);
+  useEffect(() => { let live = true; api<{ suggestions: Array<{ label: string; prompt: string; why: string }> }>(scope, { action: "suggest" }).then((r) => { if (live) setSuggestions(r.suggestions || []); }).catch(() => { if (live) setSuggestions([]); }); return () => { live = false; }; }, [scope]);
   const reset = () => { setThread([]); setResult(null); setDraft(null); setPrompt(""); setFollowUp(""); setErr(""); };
   const ask = async (text: string, keepThread = true) => {
     const clean = text.trim();
@@ -469,7 +471,9 @@ function AiBar({ scope, data, onCalendar, onCreateCalendar, onAppointment, onHou
       <input value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder={`Ask AI to set up or book anything… e.g. “${placeholder}”`} aria-label="Ask AI to set up or book anything" maxLength={1500} />
       <button type="submit" className="primary-button" disabled={busy || !prompt.trim()}>{busy ? "Thinking…" : "Ask AI"}</button>
     </form>}
-    {!started && !prompt && !busy && <div className="sch-ai-chips">{AI_EXAMPLES.map((x) => <button key={x} type="button" onClick={() => { setPrompt(x); void ask(x, false); }}>{x}</button>)}</div>}
+    {!started && !prompt && !busy && (suggestions === null ? <div className="sch-ai-chips"><span className="iv-small">Checking recent conversations for people to book…</span></div>
+      : suggestions.length ? <div className="sch-ai-suggest"><small><Sparkles size={12} /> Suggested from your conversations &amp; new leads</small><div className="sch-ai-chips">{suggestions.map((x) => <button key={x.label} type="button" className="suggested" title={x.why} onClick={() => { setPrompt(x.prompt); void ask(x.prompt, false); }}><b>{x.label}</b>{x.why && <span>{x.why}</span>}</button>)}</div></div>
+      : <div className="sch-ai-chips">{AI_EXAMPLES.map((x) => <button key={x} type="button" onClick={() => { setPrompt(x); void ask(x, false); }}>{x}</button>)}</div>)}
     {started && <div className="sch-ai-chat">
       <div className="sch-ai-chat-head"><span className="sch-ai-icon"><Sparkles size={16} /></span><b>Scheduling assistant</b><button type="button" className="iv-btn" onClick={reset}>Start over</button></div>
       <div className="sch-ai-turns">{thread.map((t, i) => <div key={i} className={`sch-ai-turn ${t.role}`}>{t.text}</div>)}{busy && <div className="sch-ai-turn ai typing"><i /><i /><i /></div>}</div>
