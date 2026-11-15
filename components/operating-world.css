@@ -432,3 +432,6 @@ html:has(.ow-panel) .toast { z-index: 95; }
 .ow-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(0,0,0,.2); }
 .ow-plate-in { cursor: pointer; }
 .ow-plate-in:hover rect { fill: #111827; }
+.ow-root .ow-exit svg, .ow-root button svg { width: 16px; height: 16px; flex: 0 0 auto; }
+.ow-root .ow-hud-actions button svg { width: 18px; height: 18px; }
+.ow-root .ow-exit { padding: 8px 14px; font-size: 13px; }
