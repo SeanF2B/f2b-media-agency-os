@@ -731,3 +731,20 @@ html body .ml-upload-drop { display:grid; gap:10px; padding:14px; border:2px das
 html body .ml-upload-drop p { margin:6px 0; }
 html body .ml-upload-pick { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
 html body .ml-upload-files li { display:flex; justify-content:space-between; gap:8px; text-align:left; }
+
+/* Media Library: tidy tick boxes + selection bar */
+html body .ml-pick input, html body .ml-bulk-all input {
+  appearance: none; -webkit-appearance: none; margin: 0; width: 18px; height: 18px; border-radius: 6px;
+  border: 1.5px solid #c4cad4 !important; background: #fff !important; display: inline-grid; place-items: center; cursor: pointer;
+  box-shadow: none !important; outline: none !important; transform: none !important; transition: background .12s, border-color .12s;
+}
+html body .ml-pick input:checked, html body .ml-bulk-all input:checked { background: var(--brand-secondary, #0b74b8) !important; border-color: var(--brand-secondary, #0b74b8) !important; }
+html body .ml-pick input:checked::after, html body .ml-bulk-all input:checked::after { content: ""; width: 9px; height: 5px; border: 2px solid #fff; border-top: 0; border-right: 0; transform: translateY(-1px) rotate(-45deg); }
+html body .ml-pick input:hover, html body .ml-bulk-all input:hover { border-color: var(--brand-secondary, #0b74b8) !important; }
+html body .ml-pick { top: 10px; left: 10px; width: auto; height: auto; padding: 3px; border-radius: 8px; background: rgba(255,255,255,.9); box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+html body .ml-bulk { gap: 10px; padding: 0; }
+html body .ml-bulk.has-picks { padding: 6px 8px 6px 12px; border-radius: 12px; background: #fff; border: 1px solid #e7ebf0; box-shadow: 0 2px 10px rgba(16,24,40,.05); width: fit-content; }
+html body .ml-bulk-all { gap: 9px; transform: none !important; }
+html body .ml-bulk .ml-danger { height: 32px; padding: 0 12px !important; font-size: 13px; box-shadow: none !important; }
+html body .ml-bulk .text-button { font-size: 13px; }
+html body .ml-card-wrap.is-picked .ml-card { outline: 2px solid var(--brand-secondary, #0b74b8); outline-offset: 0; border-radius: 14px; }
