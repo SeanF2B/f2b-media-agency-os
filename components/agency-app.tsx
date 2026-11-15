@@ -4709,7 +4709,9 @@ function TasksView({ scopeClientId = "", workspace, activeTimer, timerNow, curre
     if (status === "Blocked" && task && task.status !== "Blocked" && task.status !== "Pending") { setPendingReasonTask(task); setPendingReasonDraft(task.pendingReason || ""); setPendingReasonTargetStatus(status); return; }
     onStatus(id, status);
   };
-  const [workflowTab, setWorkflowTab] = useState<"board" | "table" | "approvals" | "history">("board");
+  // Tasks open on the Table view unless another view was last used (remembered per browser).
+  const [workflowTab, setWorkflowTabState] = useState<"board" | "table" | "approvals" | "history">(() => { try { const saved = window.localStorage.getItem("f2b-task-view"); return saved === "board" || saved === "approvals" || saved === "history" || saved === "table" ? saved : "table"; } catch { return "table"; } });
+  const setWorkflowTab = (next: "board" | "table" | "approvals" | "history") => { setWorkflowTabState(next); try { window.localStorage.setItem("f2b-task-view", next); } catch { /* storage unavailable */ } };
   const [approvalSubTab, setApprovalSubTab] = useState<"recommendations" | "ads">("recommendations");
   const [selectedRecommendationIds, setSelectedRecommendationIds] = useState<string[]>([]);
   const [refiningRecommendationId, setRefiningRecommendationId] = useState("");

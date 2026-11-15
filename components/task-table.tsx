@@ -21,7 +21,7 @@ function TaskIcon({ service, title }: { service?: string; title: string }) {
 // Monday-style table view of tasks: grouped by client, coloured labels, inline edits, multi-select and bulk actions.
 // Every change goes through the same handlers as the board, so the board updates live.
 type TableTask = { id: string; clientId: string; title: string; assigneeId: string; status: string; priority: string; service: string; estimate: number; due?: string; repeat?: string; aiRunAt?: string; paused?: boolean };
-type TableClient = { id: string; name: string; color?: string };
+type TableClient = { id: string; name: string; color?: string ; logo?: string };
 type TableStaff = { id: string; name: string; isBot?: boolean };
 export type TaskPatch = { status?: string; priority?: string; assigneeId?: string; due?: string };
 
@@ -55,7 +55,7 @@ export function TaskTable({ tasks, clients, staff, statuses, onStatus, onEdit, o
     for (const task of filtered) map.set(task.clientId || "", [...(map.get(task.clientId || "") || []), task]);
     const rank = (task: TableTask) => sort === "priority" ? PRIORITIES.indexOf(task.priority) : sort === "status" ? statuses.findIndex((item) => item.value === task.status) : 0;
     const cmp = (a: TableTask, b: TableTask) => sort === "title" ? a.title.localeCompare(b.title) : sort === "due" ? (a.due || "9999").localeCompare(b.due || "9999") : rank(a) - rank(b) || (a.due || "9999").localeCompare(b.due || "9999");
-    return [...map.entries()].map(([clientId, list]) => ({ clientId, name: clientById.get(clientId)?.name || "Internal", colour: clientById.get(clientId)?.color || "#7c8a96", list: list.sort(cmp) })).sort((a, b) => a.name.localeCompare(b.name));
+    return [...map.entries()].map(([clientId, list]) => ({ clientId, name: clientById.get(clientId)?.name || "Internal", colour: clientById.get(clientId)?.color || "#7c8a96", logo: clientById.get(clientId)?.logo || "", list: list.sort(cmp) })).sort((a, b) => a.name.localeCompare(b.name));
   }, [filtered, sort, clientById, statuses]);
   const visibleIds = groups.flatMap((group) => group.list.map((task) => task.id));
   const pickedIds = visibleIds.filter((id) => picked.has(id));
@@ -85,7 +85,7 @@ export function TaskTable({ tasks, clients, staff, statuses, onStatus, onEdit, o
       <tbody>{groups.map((group) => { const ids = group.list.map((task) => task.id); const open = !collapsed.has(group.clientId); return <Fragment key={group.clientId || "none"}>
         <tr className="tt-group" style={{ ["--tt-group" as string]: group.colour }}>
           <td><input type="checkbox" aria-label={`Select all in ${group.name}`} checked={ids.every((id) => picked.has(id))} onChange={(event) => togglePick(ids, event.target.checked)} /></td>
-          <td colSpan={8}><div className="tt-group-line"><button type="button" className="tt-group-toggle" aria-expanded={open} onClick={() => toggleGroup(group.clientId)}><span className="tt-caret" aria-hidden="true">{open ? "▾" : "▸"}</span><span className="tt-chip" aria-hidden="true" /><b>{group.name}</b></button><span className="tt-group-meta">{group.list.length} task{group.list.length === 1 ? "" : "s"}</span><span className="tt-group-bar" aria-hidden="true">{statuses.map((item) => { const n = group.list.filter((task) => task.status === item.value).length; return n ? <i key={item.value} title={`${item.label}: ${n}`} style={{ flex: n, background: STATUS_COLOURS[item.value] || "#999" }} /> : null; })}</span></div></td>
+          <td colSpan={8}><div className="tt-group-line"><button type="button" className="tt-group-toggle" aria-expanded={open} onClick={() => toggleGroup(group.clientId)}><span className="tt-caret" aria-hidden="true">{open ? "▾" : "▸"}</span>{group.logo ? <span className="tt-logo" aria-hidden="true"><img src={group.logo} alt="" /></span> : <span className="tt-chip" aria-hidden="true" />}<b>{group.name}</b></button><span className="tt-group-meta">{group.list.length} task{group.list.length === 1 ? "" : "s"}</span><span className="tt-group-bar" aria-hidden="true">{statuses.map((item) => { const n = group.list.filter((task) => task.status === item.value).length; return n ? <i key={item.value} title={`${item.label}: ${n}`} style={{ flex: n, background: STATUS_COLOURS[item.value] || "#999" }} /> : null; })}</span></div></td>
         </tr>
         {open && group.list.map((task) => { const owner = staffById.get(task.assigneeId); const overdue = Boolean(task.due && task.due < today && isOpen(task)); return <tr key={task.id} className={`tt-row ${picked.has(task.id) ? "picked" : ""}`} style={{ ["--tt-group" as string]: group.colour }}>
           <td className="tt-check"><input type="checkbox" aria-label={`Select ${task.title}`} checked={picked.has(task.id)} onChange={(event) => togglePick([task.id], event.target.checked)} /></td>
