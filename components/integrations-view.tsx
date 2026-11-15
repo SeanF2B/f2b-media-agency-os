@@ -119,7 +119,7 @@ export function IntegrationsView({ onNavigate }: { onNavigate: (page: string) =>
     {loading && <p role="status" className="integrations-message launchpad-state">Checking connection setup…</p>}
     {message && <div role="alert" className="launchpad-error"><span>{message}</span><button className="secondary-button" type="button" onClick={() => void load()} disabled={loading}>Try again</button></div>}
     {!loading && !message && (() => {
-      const keep = new Set(["google-ads", "meta-ads", "search-console", "ga4", "business-profile", "gohighlevel", "wordpress", "dataforseo", "google-calendar", "google-drive", "gmail-bookkeeping", "email-sending", "twilio"]);
+      const keep = new Set(["google-ads", "meta-ads", "search-console", "ga4", "business-profile", "wordpress", "dataforseo", "google-calendar", "google-drive", "gmail-bookkeeping", "email-sending", "twilio"]);
       const shown = items.filter((item) => keep.has(item.id)).sort((a, b) => Number(a.status === "ready") - Number(b.status === "ready"));
       const done = shown.filter((item) => item.status === "ready").length;
       const percent = shown.length ? Math.round(done / shown.length * 100) : 0;

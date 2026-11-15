@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { readFocusClient, setFocusClient, useFocusClient } from "@/lib/focus-client";
 import { BrandIcon } from "./brand-icon";
-import { BarChart3, ClipboardList, Factory, FileText, Globe, LayoutDashboard, MapPin, Megaphone, MessageCircle, Star, Search, Zap, type LucideIcon } from "lucide-react";
+import { BarChart3, ClipboardList, Factory, FileText, Globe, LayoutDashboard, Check, Link2, Mail, MapPin, Megaphone, MessageCircle, Star, Search, Zap, type LucideIcon } from "lucide-react";
 import { AiVisibilityPanel } from "./ai-visibility-panel";
 import { RankTrackingPanel } from "./rank-tracking-panel";
 import { SiteFormsPanel } from "./site-forms-panel";
@@ -32,7 +32,15 @@ const CONNECTIONS: Array<{ key: string; label: string; page: string; ok: (client
 function ConnectionDots({ client, hasSite, onOpen }: { client: OpsClient; hasSite: boolean; onOpen: (page: string) => void }) {
   const done = CONNECTIONS.filter((item) => item.ok(client, hasSite)).length;
   const pct = Math.round(done / CONNECTIONS.length * 100);
-  return <span className="ops-conn"><span className={`ops-conn-pct ${pct >= 80 ? "good" : pct >= 50 ? "mid" : "low"}`} style={{ ["--pct" as string]: `${pct}%` }} title={`${done} of ${CONNECTIONS.length} connected`}><b>{pct}%</b></span>{CONNECTIONS.map((item) => { const ok = item.ok(client, hasSite); return <button key={item.key} type="button" className={ok ? "ok" : "missing"} title={`${item.label}: ${ok ? "connected" : "not connected"}`} aria-label={`${item.label} ${ok ? "connected" : "not connected"}`} onClick={() => onOpen(ok ? item.page : "Integrations")}><BrandIcon id={item.key} size={16} fallback={item.icon} /><i /></button>; })}</span>;
+  return <span className="ops-conn"><span className={`ops-conn-pct ${pct >= 80 ? "good" : pct >= 50 ? "mid" : "low"}`} style={{ ["--pct" as string]: `${pct}%` }} title={`${done} of ${CONNECTIONS.length} connected`}><b>{pct}%</b></span>{CONNECTIONS.map((item) => { const ok = item.ok(client, hasSite); return <button key={item.key} type="button" className={ok ? "ok" : "missing"} title={`${item.label}: ${ok ? "connected" : "not connected"}`} aria-label={`${item.label} ${ok ? "connected" : "not connected"}`} onClick={() => onOpen(ok ? item.page : "Integrations")}><BrandIcon id={item.key} size={16} fallback={item.icon} /><i /></button>; })}{done < CONNECTIONS.length && <QuickConnectLink client={client} missing={CONNECTIONS.filter((item) => !item.ok(client, hasSite)).map((item) => item.label)} />}</span>;
+}
+// Quick link a client can open to connect their own accounts (their Launchpad), copied or emailed in one click.
+function QuickConnectLink({ client, missing }: { client: OpsClient; missing: string[] }) {
+  const [copied, setCopied] = useState(false);
+  const link = typeof window === "undefined" ? "" : `${window.location.origin}/?client=${encodeURIComponent(client.id)}&page=Integrations`;
+  const copy = async () => { try { await navigator.clipboard.writeText(link); } catch { window.prompt("Copy this link:", link); } setCopied(true); window.setTimeout(() => setCopied(false), 1600); };
+  const mail = `mailto:${encodeURIComponent((client as OpsClient & { email?: string }).email || "")}?subject=${encodeURIComponent(`Connect your accounts · ${client.name}`)}&body=${encodeURIComponent(`Hi,\n\nCould you connect these so we can manage everything in one place: ${missing.join(", ")}.\n\nOpen this link and follow the steps:\n${link}\n\nThanks!`)}`;
+  return <span className="ops-quick-link"><button type="button" title={copied ? "Link copied" : "Copy a connect link for this client"} aria-label={`Copy connect link for ${client.name}`} onClick={() => void copy()}>{copied ? <Check size={14} /> : <Link2 size={14} />}</button><a href={mail} title="Email the connect link to the client" aria-label={`Email connect link to ${client.name}`}><Mail size={14} /></a></span>;
 }
 type SiteRow = { clientId: string; backend: string; previewUrl: string; repo: string; branch: string; updatedAt: string };
 const OPS_TAB_ICONS: Partial<Record<string, LucideIcon>> = { overview: LayoutDashboard, seo: Search, ads: Megaphone, websites: Globe, forms: ClipboardList, local: MapPin, reports: FileText, automations: Zap, leadfactory: Factory, analytics: BarChart3 };
