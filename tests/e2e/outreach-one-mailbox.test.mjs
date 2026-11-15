@@ -34,7 +34,7 @@ DB.sqlite.prepare("INSERT INTO crm_pipelines (id, owner_id, name, created_at, up
 // ---------------------------------------------------------------- the outside world
 const dns = { dmarc: false, dkim: true };
 const inbox = []; // messages that will arrive in the mailbox
-const calls = []; const sentMime = []; const telegram = [];
+const calls = []; const sentMime = []; const telegram = []; const profileUpdates = []; const photoUploads = [];
 let deltaToken = 0;
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 const answer = (type, data) => ({ Status: 0, Answer: data.map((value) => ({ type: { TXT: 16, MX: 15, CNAME: 5 }[type], data: type === "TXT" ? `"${value}"` : value })) });
@@ -47,6 +47,8 @@ globalThis.fetch = async (input, init = {}) => {
     const p = decodeURIComponent(url.pathname.replace("/v1.0", ""));
     if (p === "/organization") return json({ value: [{ id: "t1", displayName: "F2B Media", verifiedDomains: [{ name: "f2b.onmicrosoft.com", isInitial: true }] }] });
     if (p === `/users/${MAILBOX}/mailFolders/inbox`) return json({ id: "inbox" });
+    if (p === `/users/${MAILBOX}` && method === "PATCH") { profileUpdates.push(JSON.parse(String(init.body))); return new Response(null, { status: 204 }); }
+    if (p === `/users/${MAILBOX}/photo/$value` && method === "PUT") { photoUploads.push({ type: init.headers["Content-Type"], bytes: init.body.length }); return new Response(null, { status: 200 }); }
     if (p === `/users/${MAILBOX}/sendMail` && method === "POST") { sentMime.push(Buffer.from(String(init.body), "base64").toString("utf8")); return new Response(null, { status: 202 }); }
     if (p === `/users/${MAILBOX}/mailFolders/inbox/messages/delta`) {
       const primed = url.searchParams.has("$deltatoken");
@@ -141,6 +143,18 @@ test("4. once DMARC is published, one click starts the ramp", async () => {
   assert.ok(box.limitToday > 0 && box.limitToday <= 15, "day-one allowance is small");
 });
 
+test("4b. sender name and real photo are edited here and pushed to the mailbox account", async () => {
+  await assert.rejects(() => act("mailbox-profile", { id: mailboxId, firstName: "Niamh", lastName: "Kelly", photo: "data:text/html;base64,PGgxPg==" }), /JPEG or PNG/);
+  const jpeg = `data:image/jpeg;base64,${Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 0xff, 0xd9]).toString("base64")}`;
+  const result = await act("mailbox-profile", { id: mailboxId, firstName: "Niamh", lastName: "Kelly", photo: jpeg });
+  assert.equal(result.synced, true);
+  assert.deepEqual(profileUpdates.at(-1), { givenName: "Niamh", surname: "Kelly", displayName: "Niamh Kelly" });
+  assert.deepEqual(photoUploads.at(-1), { type: "image/jpeg", bytes: 9 });
+  const state = await loadState(ctx, new URLSearchParams());
+  const box = state.mailboxes.find((item) => item.id === mailboxId);
+  assert.equal(box.displayName, "Niamh Kelly"); assert.equal(box.firstName, "Niamh"); assert.equal(box.photo, jpeg);
+});
+
 test("5. campaign launch is blocked until lawful basis + fresh SPF/DKIM/DMARC pass", async () => {
   await act("save-settings", { appUrl: "https://agency.test", senderAddress: "F2B Media, Galway, Ireland" });
   const saved = await act("campaign-save", {
@@ -193,6 +207,7 @@ test("7. the scheduled engine sends personalised mail, once per contact, with on
   const aoife = sentMime.map(readable).find((mime) => /To: .*aoife@westroofing\.ie/i.test(mime));
   assert.ok(aoife, "Aoife got her email");
   assert.match(aoife, /Subject: Quick question about West Roofing/);
+  assert.match(aoife, /From: "Niamh Kelly" <sean@f2b-outreach-demo\.ie>/, "the edited sender name is used");
   assert.match(aoife, /Hi Aoife,/);
   assert.match(aoife, /List-Unsubscribe: <https:\/\/agency\.test\/api\/marketing-public\/outreach-unsubscribe\?t=/);
   assert.match(aoife, /List-Unsubscribe-Post: List-Unsubscribe=One-Click/);

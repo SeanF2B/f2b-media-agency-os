@@ -20,6 +20,8 @@ export interface MailHost {
   createMailbox(input: { email: string; displayName: string; firstName: string; lastName: string; password: string }): Promise<{ id?: string; userPrincipalName?: string; primaryEmail?: string }>;
   assignSeat(userRef: string): Promise<void>;
   mailboxReady(userRef: string): Promise<boolean>;
+  updateName(userRef: string, name: { firstName: string; lastName: string }): Promise<void>;
+  setPhoto(userRef: string, bytes: Uint8Array, contentType: string): Promise<void>;
   sendMime(userRef: string, raw: string): Promise<{ accepted: boolean }>;
   inboxDelta(userRef: string, cursor: string): Promise<{ items: InboundMessage[]; cursor: string; primed: boolean }>;
   seats(): Promise<Array<{ sku: string; free: number; total: number }>>;
@@ -44,6 +46,8 @@ export async function mailHost(ownerId: string, name: HostName): Promise<MailHos
         await client.assignLicense(userRef, skuId);
       },
       mailboxReady: (userRef) => client.mailboxReady(userRef),
+      updateName: (userRef, name) => client.updateName(userRef, name),
+      setPhoto: (userRef, bytes, type) => client.setPhoto(userRef, bytes, type),
       sendMime: (userRef, raw) => client.sendMime(userRef, raw),
       inboxDelta: (userRef, cursor) => client.inboxDelta(userRef, cursor),
       seats: () => client.seats(),
@@ -62,6 +66,8 @@ export async function mailHost(ownerId: string, name: HostName): Promise<MailHos
     createMailbox: (input) => client.createMailbox({ email: input.email, firstName: input.firstName, lastName: input.lastName, password: input.password }),
     assignSeat: async () => undefined, // Google bills seats automatically when a user is created.
     mailboxReady: (userRef) => client.mailboxReady(userRef),
+    updateName: (userRef, name) => client.updateName(userRef, name),
+    setPhoto: (userRef, bytes, type) => client.setPhoto(userRef, bytes, type),
     sendMime: (userRef, raw) => client.sendMime(userRef, raw),
     inboxDelta: (userRef, cursor) => client.inboxDelta(userRef, cursor),
     seats: async () => [],

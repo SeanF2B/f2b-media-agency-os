@@ -54,6 +54,10 @@ CREATE TABLE IF NOT EXISTS outreach_mailboxes (
   host TEXT NOT NULL,                           -- microsoft | google | smtp
   host_user_id TEXT NOT NULL DEFAULT '',        -- Graph/Google user id
   display_name TEXT NOT NULL DEFAULT '',
+  first_name TEXT NOT NULL DEFAULT '',
+  last_name TEXT NOT NULL DEFAULT '',
+  photo_data TEXT NOT NULL DEFAULT '',          -- small square JPEG data URL of the real sender
+  profile_synced_at TEXT,
   signature_html TEXT NOT NULL DEFAULT '',
   client_id TEXT,
   group_label TEXT NOT NULL DEFAULT '',

@@ -12,6 +12,8 @@ export function createMicrosoftClient(config: { tenantId: string; clientId: stri
   createMailbox(input: { email: string; displayName: string; password: string; usageLocation?: string }): Promise<{ id?: string; userPrincipalName?: string }>;
   assignLicense(userId: string, skuId: string): Promise<unknown>;
   mailboxReady(userId: string): Promise<boolean>;
+  updateName(userId: string, name: { firstName: string; lastName: string }): Promise<void>;
+  setPhoto(userId: string, bytes: Uint8Array, contentType?: string): Promise<void>;
   sendMime(userId: string, rawMime: string): Promise<{ accepted: boolean }>;
   inboxDelta(userId: string, cursor: string): Promise<{ items: import("../server/hosts").InboundMessage[]; cursor: string; primed: boolean }>;
 };

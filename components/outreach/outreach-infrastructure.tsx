@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, CircleDashed, Copy, Flame, Globe, Loader2, Lock, Mail, Plus, RefreshCw, Search, ShieldCheck, Sparkles, Trash2, Undo2, X, XCircle } from "lucide-react";
+import { AlertTriangle, Camera, CheckCircle2, CircleDashed, Copy, Flame, Globe, Loader2, Lock, Mail, Plus, RefreshCw, Search, ShieldCheck, Sparkles, Trash2, Undo2, X, XCircle } from "lucide-react";
 import { money, outreachAction, pct, ago, type Health, type Mailbox, type OutreachState } from "./outreach-api";
 
 type Act = <T>(action: string, body?: Record<string, unknown>, success?: string) => Promise<T | null>;
@@ -57,7 +57,63 @@ function Connections({ state, act }: { state: OutreachState; act: Act }) {
   </div>;
 }
 
+export function SenderAvatar({ mailbox, size = 32 }: { mailbox: Pick<Mailbox, "photo" | "firstName" | "lastName" | "email">; size?: number }) {
+  const initials = `${mailbox.firstName?.[0] || mailbox.email[0] || "?"}${mailbox.lastName?.[0] || ""}`.toUpperCase();
+  return <span className="ox-avatar" style={{ width: size, height: size, fontSize: Math.round(size * 0.38) }} aria-hidden="true">{mailbox.photo ? <img src={mailbox.photo} alt="" /> : initials}</span>;
+}
+
+/** Centre-crops and resizes a real photo to a small square JPEG in the browser (keeps uploads tiny). */
+function squarePhoto(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) { reject(new Error("Choose a JPEG, PNG or WebP photo.")); return; }
+    const url = URL.createObjectURL(file); const image = new Image();
+    image.onload = () => {
+      const side = Math.min(image.width, image.height); const canvas = document.createElement("canvas"); canvas.width = 256; canvas.height = 256;
+      const context = canvas.getContext("2d"); if (!context) { reject(new Error("This browser can't resize images.")); return; }
+      context.drawImage(image, (image.width - side) / 2, (image.height - side) / 2, side, side, 0, 0, 256, 256);
+      URL.revokeObjectURL(url); resolve(canvas.toDataURL("image/jpeg", 0.85));
+    };
+    image.onerror = () => { URL.revokeObjectURL(url); reject(new Error("That file couldn't be read as an image.")); };
+    image.src = url;
+  });
+}
+
+/** Sender name and real photo for one mailbox — pushed to Microsoft 365 / Google so recipients see them. */
+function SenderDrawer({ mailbox, act, onClose }: { mailbox: Mailbox; act: Act; onClose: () => void }) {
+  const [firstName, setFirstName] = useState(mailbox.firstName);
+  const [lastName, setLastName] = useState(mailbox.lastName);
+  const [photo, setPhoto] = useState<string | null | undefined>(undefined); // undefined = unchanged, null = remove
+  const [error, setError] = useState(""); const [busy, setBusy] = useState(false);
+  const preview = photo === undefined ? mailbox.photo : photo || "";
+  const save = async () => {
+    setBusy(true); setError("");
+    const result = await act<{ synced: boolean; syncError: string }>("mailbox-profile", { id: mailbox.id, firstName, lastName, ...(photo !== undefined ? { photo } : {}) }, "Sender profile saved");
+    setBusy(false);
+    if (result && !result.synced && result.syncError) { setError(`Saved here, but the mailbox account wasn't updated: ${result.syncError}`); return; }
+    if (result) onClose();
+  };
+  return <div className="ox-drawer-backdrop" onClick={onClose}><aside className="ox-drawer" role="dialog" aria-label={`Sender profile for ${mailbox.email}`} onClick={(event) => event.stopPropagation()}>
+    <header><h2>Sender profile</h2><button type="button" className="ox-icon" onClick={onClose} aria-label="Close"><X size={16} /></button></header>
+    <p className="ox-muted">{mailbox.email} · shown as the From name and profile photo in {mailbox.host === "google" ? "Gmail" : "Outlook"}.</p>
+    <div className="ox-row"><SenderAvatar mailbox={{ ...mailbox, firstName, lastName, photo: preview }} size={72} />
+      <div className="ox-stack" style={{ gap: 6 }}>
+        <label className="secondary-button ox-upload"><Camera size={15} /> {preview ? "Replace photo" : "Upload photo"}<input type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) void squarePhoto(file).then(setPhoto).catch((reason) => setError(reason.message)); event.target.value = ""; }} /></label>
+        {preview && <button type="button" className="ox-link" onClick={() => setPhoto(null)}>Remove photo</button>}
+      </div>
+    </div>
+    <small className="ox-muted">Use a real photo of the person who handles these replies. It's cropped square and resized here before upload.</small>
+    <div className="ox-grid2">
+      <label className="ox-field">First name<input value={firstName} maxLength={40} onChange={(event) => setFirstName(event.target.value)} /></label>
+      <label className="ox-field">Last name<input value={lastName} maxLength={40} onChange={(event) => setLastName(event.target.value)} /></label>
+    </div>
+    <p className="ox-muted">Recipients will see: <b>{`${firstName} ${lastName}`.trim() || "—"}</b> &lt;{mailbox.email}&gt;</p>
+    {error && <p className="ox-warn-text"><AlertTriangle size={14} /> {error}</p>}
+    <div className="ox-row-end"><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button type="button" className="primary-button" disabled={busy || !firstName.trim()} onClick={() => void save()}>{busy ? <Loader2 size={15} className="ox-spin" /> : null} Save</button></div>
+  </aside></div>;
+}
+
 function MailboxTable({ state, act }: { state: OutreachState; act: Act }) {
+  const [editing, setEditing] = useState<Mailbox | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [groupBy, setGroupBy] = useState<"domain" | "group">("domain");
@@ -85,7 +141,7 @@ function MailboxTable({ state, act }: { state: OutreachState; act: Act }) {
     <div className="ox-table-wrap"><table className="ox-table ox-mailboxes"><thead><tr><th><input type="checkbox" aria-label="Select all" checked={all} onChange={() => setSelected(all ? [] : rows.map((mailbox) => mailbox.id))} /></th><th>Mailbox</th><th>Warm-up</th><th>Today</th><th>Health</th><th>Campaigns</th><th>Cost / mo</th></tr></thead>
       {groups.map(([group, items]) => <tbody key={group}><tr className="ox-group"><td colSpan={7}>{group} <small>{items.length}</small></td></tr>{items.map((mailbox) => <tr key={mailbox.id} className={selected.includes(mailbox.id) ? "sel" : ""}>
         <td><input type="checkbox" aria-label={`Select ${mailbox.email}`} checked={selected.includes(mailbox.id)} onChange={() => setSelected(selected.includes(mailbox.id) ? selected.filter((id) => id !== mailbox.id) : [...selected, mailbox.id])} /></td>
-        <td><b>{mailbox.email}</b><small>{mailbox.host === "google" ? "Google" : "Microsoft"} · <span className={`ox-status ${mailbox.status}`}>{mailbox.status}</span>{mailbox.tags.map((tag) => <span key={tag} className="ox-tag">{tag}</span>)}</small>{mailbox.pausedReason && <small className="ox-warn-text">{mailbox.pausedReason}</small>}</td>
+        <td><button type="button" className="ox-sender" onClick={() => setEditing(mailbox)} title="Edit sender name and photo"><SenderAvatar mailbox={mailbox} /><span><b>{mailbox.displayName || mailbox.email}</b><small>{mailbox.email}</small></span></button><small>{mailbox.host === "google" ? "Google" : "Microsoft"} · <span className={`ox-status ${mailbox.status}`}>{mailbox.status}</span>{mailbox.tags.map((tag) => <span key={tag} className="ox-tag">{tag}</span>)}</small>{mailbox.pausedReason && <small className="ox-warn-text">{mailbox.pausedReason}</small>}</td>
         <td><button type="button" className="ox-flame-btn" onClick={() => void act("mailboxes-bulk", { ids: [mailbox.id], op: mailbox.status === "ramping" ? "warmup-pause" : "warmup-start" }, mailbox.status === "ramping" ? "Warm-up paused" : "Warm-up started")} title={mailbox.rampReason}><FlameMeter progress={mailbox.rampProgress} active={mailbox.status === "ramping"} /><small>{mailbox.status === "ramping" ? `${Math.round(mailbox.rampProgress * 100)}%` : mailbox.rampProgress >= 1 ? "Warm" : "Start"}</small></button></td>
         <td><span className="ox-meter" aria-label={`${mailbox.sentToday} of ${mailbox.limitToday} sent today`}><span style={{ width: `${mailbox.limitToday ? Math.min(100, (mailbox.sentToday / mailbox.limitToday) * 100) : 0}%` }} /></span><small>{mailbox.sentToday}/{mailbox.limitToday}</small></td>
         <td><HealthPill health={mailbox.health} /></td>
@@ -93,6 +149,7 @@ function MailboxTable({ state, act }: { state: OutreachState; act: Act }) {
         <td>{money(mailbox.monthlyCostCents)}</td>
       </tr>)}</tbody>)}
     </table></div>
+    {editing && <SenderDrawer mailbox={editing} act={act} onClose={() => setEditing(null)} />}
   </div>;
 }
 

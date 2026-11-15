@@ -11,6 +11,8 @@ export function createGoogleClient(serviceAccount: { client_email: string; priva
   serviceRecords(domain: string): DnsRecordSpec[];
   createMailbox(input: { email: string; firstName: string; lastName: string; password: string }): Promise<{ id?: string; primaryEmail?: string }>;
   mailboxReady(email: string): Promise<boolean>;
+  updateName(email: string, name: { firstName: string; lastName: string }): Promise<void>;
+  setPhoto(email: string, bytes: Uint8Array, contentType?: string): Promise<void>;
   sendMime(email: string, rawMime: string): Promise<{ accepted: boolean; id: string }>;
   inboxDelta(email: string, cursor: string): Promise<{ items: InboundMessage[]; cursor: string; primed: boolean; gap?: boolean }>;
 };

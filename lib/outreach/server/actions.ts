@@ -99,7 +99,7 @@ export async function loadState(ctx: Ctx, query: URLSearchParams) {
     mailboxes: mailboxes.map((mailbox) => {
       const health = parseJson<Row>(mailbox.health_json, {});
       const allowance = dailyAllowance({ rampStartedAt: mailbox.ramp_started_at, targetDaily: mailbox.target_daily, domainRegisteredAt: domainMap[mailbox.domain]?.registered_at || null, healthBand: health.band || "grey", sentToday: todayCounts[mailbox.id] || 0 });
-      return { id: mailbox.id, email: mailbox.email, domain: mailbox.domain, host: mailbox.host, displayName: mailbox.display_name, group: mailbox.group_label, tags: parseJson<string[]>(mailbox.tags_json, []), clientId: mailbox.client_id, status: mailbox.status, pausedReason: mailbox.paused_reason, targetDaily: mailbox.target_daily, sentToday: todayCounts[mailbox.id] || 0, limitToday: allowance.limit, rampPhase: allowance.phase, rampReason: allowance.reason, rampProgress: rampProgress({ rampStartedAt: mailbox.ramp_started_at, targetDaily: mailbox.target_daily }), health, monthlyCostCents: mailbox.monthly_cost_cents, renewsAt: mailbox.renews_at, campaigns: campaigns.filter((campaign) => parseJson<string[]>(campaign.mailbox_ids_json, []).includes(mailbox.id)).map((campaign) => ({ id: campaign.id, name: campaign.name })) };
+      return { id: mailbox.id, email: mailbox.email, domain: mailbox.domain, host: mailbox.host, displayName: mailbox.display_name, firstName: mailbox.first_name || String(mailbox.display_name || "").split(" ")[0] || "", lastName: mailbox.last_name || String(mailbox.display_name || "").split(" ").slice(1).join(" "), photo: mailbox.photo_data || "", profileSyncedAt: mailbox.profile_synced_at, group: mailbox.group_label, tags: parseJson<string[]>(mailbox.tags_json, []), clientId: mailbox.client_id, status: mailbox.status, pausedReason: mailbox.paused_reason, targetDaily: mailbox.target_daily, sentToday: todayCounts[mailbox.id] || 0, limitToday: allowance.limit, rampPhase: allowance.phase, rampReason: allowance.reason, rampProgress: rampProgress({ rampStartedAt: mailbox.ramp_started_at, targetDaily: mailbox.target_daily }), health, monthlyCostCents: mailbox.monthly_cost_cents, renewsAt: mailbox.renews_at, campaigns: campaigns.filter((campaign) => parseJson<string[]>(campaign.mailbox_ids_json, []).includes(mailbox.id)).map((campaign) => ({ id: campaign.id, name: campaign.name })) };
     }),
     domains: domains.map((domain) => ({ id: domain.id, domain: domain.domain, host: domain.mail_host, protected: Boolean(domain.protected), check: parseJson<Row>(domain.last_check_json, {}), expiresAt: domain.expires_at, annualCostCents: domain.annual_cost_cents, dmarcStage: domain.dmarc_stage })),
     campaigns: campaigns.map((campaign) => ({
@@ -257,6 +257,39 @@ const HANDLERS: Record<string, (ctx: Ctx, body: Row) => Promise<Row>> = {
     const check = await checkDomainAuth(ctx.ownerId, domain, host, adapter.dkimSelectors);
     await audit(ctx.ownerId, ctx.actor, "connect-existing-mailbox", email, { domain, auth: check.allPass });
     return { ok: true, check };
+  },
+  async "mailbox-profile"(ctx, body) {
+    // The sender's real name and photo, pushed to the mailbox account so Outlook / Gmail show them.
+    const database = db();
+    const mailbox = await database.prepare("SELECT * FROM outreach_mailboxes WHERE owner_id = ?1 AND id = ?2").bind(ctx.ownerId, str(body.id, 60)).first<Row>();
+    if (!mailbox) throw new ActionError("Mailbox not found.", 404);
+    const clean = (value: unknown) => str(value, 40).replace(/[\r\n"<>]/g, "");
+    const firstName = clean(body.firstName), lastName = clean(body.lastName);
+    if (!firstName) throw new ActionError("Enter a first name.");
+    let photo: string | null = null; let bytes: Uint8Array | null = null; let type = "image/jpeg";
+    if (typeof body.photo === "string" && body.photo) {
+      const match = /^data:(image\/(?:jpeg|png));base64,([A-Za-z0-9+/=]+)$/.exec(body.photo);
+      if (!match) throw new ActionError("Upload a JPEG or PNG photo.");
+      if (match[2].length > 160_000) throw new ActionError("That photo is too large — use one under 100 KB (it's resized automatically in the app).");
+      type = match[1]; photo = body.photo; bytes = Uint8Array.from(atob(match[2]), (char) => char.charCodeAt(0));
+    }
+    const removePhoto = body.photo === null;
+    const displayName = `${firstName} ${lastName}`.trim();
+    let synced = false; let syncError = "";
+    if (mailbox.host === "microsoft" || mailbox.host === "google") {
+      try {
+        const host = await mailHost(ctx.ownerId, mailbox.host as HostName);
+        const ref = mailbox.host_user_id || mailbox.email;
+        await host.updateName(ref, { firstName, lastName });
+        if (bytes) await host.setPhoto(ref, bytes, type);
+        synced = true;
+      } catch (error) { syncError = error instanceof Error ? error.message : "Couldn't update the mailbox account."; }
+    }
+    const now = nowIso();
+    await database.prepare("UPDATE outreach_mailboxes SET first_name = ?3, last_name = ?4, display_name = ?5, photo_data = CASE WHEN ?6 IS NOT NULL THEN ?6 WHEN ?7 = 1 THEN '' ELSE photo_data END, profile_synced_at = CASE WHEN ?8 = 1 THEN ?9 ELSE profile_synced_at END, updated_at = ?9 WHERE owner_id = ?1 AND id = ?2")
+      .bind(ctx.ownerId, mailbox.id, firstName, lastName, displayName, photo, removePhoto ? 1 : 0, synced ? 1 : 0, now).run();
+    await audit(ctx.ownerId, ctx.actor, "mailbox-profile", mailbox.email, { synced, photo: Boolean(bytes), removedPhoto: removePhoto });
+    return { ok: true, displayName, synced, syncError };
   },
   async "domain-check"(ctx, body) {
     const domain = str(body.domain, 253).toLowerCase();

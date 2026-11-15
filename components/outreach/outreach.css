@@ -285,3 +285,11 @@
 @keyframes oxFlicker { 0%, 100% { transform: scale(var(--lvl)) rotate(-3deg); filter: drop-shadow(0 0 5px #f59e0b77); } 50% { transform: scale(calc(var(--lvl) * 1.08)) rotate(3deg); filter: drop-shadow(0 0 10px #f97316aa); } }
 @media (prefers-reduced-motion: reduce) { .ox *, .ox-drawer, .ox-toast { animation: none !important; transition: none !important; } }
 @media (max-width: 900px) { .ox-inbox { grid-template-columns: 1fr; } .ox-grid2 { grid-template-columns: 1fr; } .ox-span2 { grid-column: auto; } .ox-identity { grid-template-columns: 1fr 1fr; } .ox-skeleton { grid-template-columns: 1fr; } }
+
+/* sender profile */
+.ox-avatar { flex: none; display: inline-grid; place-items: center; overflow: hidden; border-radius: 50%; background: color-mix(in srgb, var(--ox-p, #2878a8) 18%, transparent); color: var(--ox-p, #2878a8); font-weight: 800; }
+.ox-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.ox-sender { display: flex; align-items: center; gap: 9px; border: 1px solid transparent; border-radius: 10px; padding: 3px 8px 3px 3px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color .18s, transform .18s; }
+.ox-sender:hover { border-color: var(--ox-s); transform: translateY(-1px); }
+.ox-sender span { display: grid; }
+.ox-upload { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
