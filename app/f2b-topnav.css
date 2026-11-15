@@ -823,3 +823,9 @@ html body .lead-list-clean .lead-list-enrich { height:34px; padding:0 14px !impo
 html body .lead-list-clean .lead-list-action-button { height:34px; padding:0 12px; }
 html body .lead-list-clean .lead-list-delete-button { margin-left:auto; width:34px; height:34px; padding:0; display:inline-grid; place-items:center; border-radius:9px; border:1px solid #f4d4d0; background:#fff; color:#b42318; }
 html body .app-shell.dark-mode .lead-icp-picker-trigger, html body .app-shell.dark-mode .lead-icp-picker-menu { background:#1f2329; border-color:rgba(255,255,255,.14); }
+
+/* Recurring items: this period's receipt (tick when uploaded) */
+html body .app-shell .finance-row .finance-receipt-upload { width:32px; height:32px; display:inline-grid; place-items:center; padding:0; border-radius:9px; border:1px solid #e3e8ef; background:#fff; color:#475467; cursor:pointer; margin-left:6px; }
+html body .app-shell .finance-row .finance-receipt-upload.busy { opacity:.6; pointer-events:none; }
+html body .app-shell .finance-row .finance-receipt-done { display:inline-flex; align-items:center; gap:4px; height:28px; padding:0 10px; margin-left:6px; border-radius:999px; background:#ecfdf3; color:#067647; font-size:12px; font-weight:700; text-decoration:none; white-space:nowrap; }
+html body .app-shell .finance-row .finance-icon-btn + .finance-delete, html body .app-shell .finance-row .finance-receipt-done + .finance-icon-btn, html body .app-shell .finance-row .finance-receipt-upload + .finance-icon-btn { margin-left:6px; }
