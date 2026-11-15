@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { dataForSeoCredentials, DATAFORSEO_SETUP_MESSAGE } from "@/lib/dataforseo-credentials";
 import { getChatGPTUser } from "../../chatgpt-auth";
+import { aiHeaders, aiModel, resolveAiProvider } from "@/lib/ai-provider";
 
 // Community Lead Discovery (Operations → Local & community). Finds public Reddit / Quora questions through
 // Google results via the agency's DataForSEO account — no scraping and no Reddit/Quora API. Results become a
@@ -55,14 +56,37 @@ export async function POST(request: Request) {
   const ctx = await context(String(body.clientId || ""));
   if ("response" in ctx) return ctx.response;
   const { login, password } = (await dataForSeoCredentials(ctx.db, ctx.ownerId)) || { login: "", password: "" };
-  if (!login || !password) return respond({ error: DATAFORSEO_SETUP_MESSAGE }, 503);
+  const provider = (!login || !password) ? await resolveAiProvider(env as never, ctx.ownerId) : null;
+  const useAiSearch = (!login || !password) && provider?.name === "OpenRouter";
+  if ((!login || !password) && !useAiSearch) return respond({ error: DATAFORSEO_SETUP_MESSAGE }, 503);
   const used = await usage(ctx.db, ctx.ownerId, ctx.client.id);
   if (used.lastRun && Date.now() - new Date(used.lastRun).getTime() < LIMITS.daysBetweenRuns * 86_400_000) return respond({ error: `Already searched for ${ctx.client.name} on ${new Date(used.lastRun).toLocaleDateString("en-IE")}. Next search allowed after ${LIMITS.daysBetweenRuns} days.`, usage: used }, 429);
   if (used.clientRuns >= LIMITS.runsPerClientPerMonth) return respond({ error: `Monthly limit reached for ${ctx.client.name} (${LIMITS.runsPerClientPerMonth} searches).`, usage: used }, 429);
   if (used.workspaceRuns >= LIMITS.workspaceRunsPerMonth) return respond({ error: `Workspace monthly limit reached (${LIMITS.workspaceRunsPerMonth} searches).`, usage: used }, 429);
   const topics = Array.isArray(body.topics) ? body.topics.map((item) => String(item).trim().slice(0, 60)).filter(Boolean).slice(0, 2) : [];
   const queries = queriesFor(ctx.client, topics);
-  if (body.acknowledgeCost !== true) return respond({ status: "confirmation_required", queries, message: `This runs ${queries.length} paid Google searches through DataForSEO (a few cents).` }, 409);
+  if (body.acknowledgeCost !== true) return respond({ status: "confirmation_required", queries, message: useAiSearch ? `This runs one AI web search through OpenRouter (a few cents) to find recent public questions.` : `This runs ${queries.length} paid Google searches through DataForSEO (a few cents).` }, 409);
+  if (useAiSearch && provider) {
+    // No DataForSEO: one OpenRouter web-search call. Only links the search actually cited are kept (never invented URLs).
+    const topics = [...new Set(queries.map((query) => query.replace(/^site:\S+\s+/, "")))].slice(0, 3);
+    let results: Array<{ url: string; title: string; snippet: string; platform: string }> = [];
+    try {
+      const response = await fetch(`${provider.baseUrl}/chat/completions`, { method: "POST", headers: aiHeaders(env as never, provider)!, signal: AbortSignal.timeout(60_000), body: JSON.stringify({
+        model: aiModel(env as never, undefined, provider), plugins: [{ id: "web", max_results: 10 }], max_tokens: 900,
+        messages: [{ role: "user", content: `Find up to 10 recent public questions (last 12 months) on Reddit, Boards.ie or Quora where people in or near ${(ctx.client.seoLocations || [])[0] || "Ireland"} ask for advice or recommendations about: ${topics.join("; ")}. Reply with one line per thread: URL | title. Only real thread URLs.` }],
+      }) });
+      const json = await response.json().catch(() => null) as any;
+      const message = json?.choices?.[0]?.message;
+      const cited = new Map<string, { title: string; snippet: string }>();
+      for (const note of message?.annotations || []) { const c = note?.url_citation; if (c?.url) cited.set(String(c.url).split("#")[0], { title: String(c.title || ""), snippet: String(c.content || "").slice(0, 300) }); }
+      const allowed = /^https:\/\/((www|old)\.)?reddit\.com\/r\/[^/]+\/comments\/|^https:\/\/(www\.)?boards\.ie\/|^https:\/\/([a-z]+\.)?quora\.com\//i;
+      results = [...cited.entries()].filter(([url]) => allowed.test(url)).slice(0, 15).map(([url, info]) => ({ url, title: (info.title || url).slice(0, 200), snippet: info.snippet, platform: /reddit/i.test(url) ? "Reddit" : /boards\.ie/i.test(url) ? "Boards.ie" : "Quora" }));
+      const cost = typeof json?.usage?.cost === "number" ? json.usage.cost : null;
+      await ctx.db.prepare(TABLE).run(); await ctx.db.prepare(INDEX).run();
+      await ctx.db.prepare("INSERT INTO community_lead_runs (run_id, owner_id, client_id, created_at, queries_json, result_count, provider_cost_usd) VALUES (?1,?2,?3,?4,?5,?6,?7)").bind(crypto.randomUUID(), ctx.ownerId, ctx.client.id, new Date().toISOString(), JSON.stringify(topics), results.length, cost).run();
+      return respond({ results, queries: topics, costUsd: cost, failed: [], source: "ai-web-search", usage: await usage(ctx.db, ctx.ownerId, ctx.client.id) });
+    } catch { return respond({ error: "The web search didn’t respond. Try again in a minute." }, 502); }
+  }
   const auth = `Basic ${btoa(`${login}:${password}`)}`;
   const runs = await Promise.all(queries.map(async (keyword) => {
     try {
