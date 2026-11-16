@@ -2657,3 +2657,6 @@ html body .app-shell.dark-mode .krb-kw, html body .app-shell.dark-mode .krb-step
 html body .app-shell.dark-mode .krb-row { border-bottom-color: #2f3a41; }
 html body .app-shell.dark-mode .krb-search input, html body .app-shell.dark-mode .krb-bar select, html body .app-shell.dark-mode .krb-newgroup { background: #202024; border-color: #45464c; color: #f4f5f7; }
 @media (max-width: 760px) { html body .app-shell .krb-row { grid-template-columns: 28px 1fr 90px; } html body .app-shell .krb-row > span:nth-child(5), html body .app-shell .krb-row > span:nth-child(4) { display: none; } }
+html body .app-shell .krb-scanned { margin: 6px 0 0; font-size: 13px; color: #475569; }
+html body .app-shell .krb-search .krb-scan { height: 40px; white-space: nowrap; }
+html body .app-shell .crv-why { font-size: 12.5px; color: #64748b; margin-left: auto; }

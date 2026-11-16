@@ -283,28 +283,47 @@ ${footer(report, sources.map(([, sec]) => sec))}`;
 }
 
 /* ------------------------------------------------------------------ Keyword research */
+// Laid out like a Google Keyword Planner plan: groups A, B, C… with colour-coded competition rows,
+// quick wins and a competition split. Research isn't period-based, so there's no period comparison.
 function keywordsBody(report: ClientReport, o: Opts) {
   const { money, num } = fmt(report);
   const k = report.keywordResearch?.status === "ok" ? report.keywordResearch.data! : null;
   const all = k ? k.groups.flatMap((g) => g.keywords) : [];
-  const ranked = all.filter((kw) => kw.position != null);
-  const bids = all.filter((kw) => kw.highBid != null);
-  const avgHigh = bids.length ? bids.reduce((s, kw) => s + (kw.highBid || 0), 0) / bids.length : null;
-  const na = "<span class=\"na-inline\">Unavailable</span>";
+  const level = (c: string | null) => { const v = String(c || "").toLowerCase(); return v.includes("high") ? "high" : v.includes("med") ? "medium" : v.includes("low") ? "low" : "unknown"; };
+  const label = { high: "High", medium: "Medium", low: "Low", unknown: "N/A" } as const;
+  const letter = (i: number) => i < 26 ? String.fromCharCode(65 + i) : String(i + 1);
+  const counts = { low: 0, medium: 0, high: 0, unknown: 0 }; all.forEach((kw) => { counts[level(kw.competition)]++; });
+  const withBids = all.filter((kw) => kw.lowBid != null && kw.highBid != null);
+  const avgLow = withBids.length ? withBids.reduce((t, kw) => t + (kw.lowBid || 0), 0) / withBids.length : null;
+  const avgHigh = withBids.length ? withBids.reduce((t, kw) => t + (kw.highBid || 0), 0) / withBids.length : null;
+  const anyDiff = all.some((kw) => kw.difficulty != null), anyRank = all.some((kw) => kw.position != null);
+  const locations = [...new Set(all.map((kw) => kw.location).filter(Boolean))].slice(0, 3).join(", ") || "Ireland";
+  const logo = safeImg(report.client.logo);
+  const prepared = new Date(report.generatedAt).toLocaleDateString("en-IE", { day: "numeric", month: "long", year: "numeric" });
+  const head = `<header class="top kwp-top"><div class="client">${logo ? `<img src="${esc(logo)}" alt="${esc(report.client.name)}">` : `<span class="client-name">${esc(report.client.name)}</span>`}</div><div class="title"><h1>Your keyword research plan</h1><p>${esc(report.client.name)} · ${esc(locations)} · English · Google Search</p><div class="period"><span>${icon("calendar", 18)} <b>Prepared:</b> ${esc(prepared)}</span><span class="sep"></span><span><b>${num(all.length)}</b> keywords in <b>${num(k?.groups.length || 0)}</b> group${k?.groups.length === 1 ? "" : "s"}</span></div></div><div class="agency">${o.agencyIconUrl ? `<img src="${esc(o.agencyIconUrl)}" alt="">` : ""}</div></header>`;
+  if (!k) return `${head}${card("", "Keyword groups", "tag", "blue", "", { section: report.keywordResearch })}`;
+  const na = "<span class=\"na-inline\">N/A</span>";
   const kpis = `<div class="kpis k4">${[
-    kpi("search", "blue", "Keywords researched", k ? num(k.total) : na, "", k ? `${num(k.groups.length)} groups` : ""),
-    kpi("users", "violet", "Monthly searches", k ? num(k.totalVolume) : na, "", "Combined average monthly volume"),
-    kpi("coins", "amber", "Avg. top-of-page bid", avgHigh == null ? na : money(avgHigh, 2), "", "Google Ads high-range estimate"),
-    kpi("trophy", "green", "Already ranking", k ? `${num(ranked.length)}` : na, "", ranked.length ? `${num(ranked.filter((kw) => (kw.position || 99) <= 10).length)} on page one` : "Add rank tracking to see positions"),
+    kpi("search", "blue", "Keywords", num(all.length), "", `${num(k.groups.length)} group${k.groups.length === 1 ? "" : "s"}`),
+    kpi("users", "violet", "Searches / month", num(k.totalVolume), "", "Estimated demand, not clicks"),
+    kpi("coins", "amber", "Typical top-of-page bid", avgLow == null ? na : `${money(avgLow, 2)} – ${money(avgHigh, 2)}`, "", "Google Ads estimate per click"),
+    kpi("trophy", "green", "Low competition", num(counts.low), "", `${num(counts.medium)} medium · ${num(counts.high)} high`),
   ].join("")}</div>`;
-  const palette = ["#2f6ff0", "#16a34a", "#d99a00", "#6d4fd8", "#0d9488", "#dc2626", "#64748b", "#9cc3fb"];
-  const share = k && k.totalVolume ? `<div class="donut-row">${donut(k.groups.map((g, i) => ({ value: g.volume || 0.0001, color: palette[i % palette.length] })), num(k.totalVolume), "searches / month", 170)}<ul class="keys big">${k.groups.map((g, i) => `<li><i style="background:${palette[i % palette.length]}"></i><span class="kname">${esc(g.name)}</span><b>${num(g.volume)}</b></li>`).join("")}</ul></div>` : "";
-  const diff = (d: number | null) => d == null ? "—" : `<span class="pill ${d < 30 ? "good" : d < 60 ? "flat" : "bad"}">${d}</span>`;
-  const groupCards = k ? k.groups.map((g) => card("", g.name, "tag", "blue", `<table class="t compact"><thead><tr><th>Keyword</th><th>Monthly searches</th><th>Competition</th><th>Bid range</th><th>Difficulty</th><th>Rank</th></tr></thead><tbody>${g.keywords.map((kw) => `<tr><td>${esc(kw.keyword)}${kw.tags.length ? ` <small class="muted">${esc(kw.tags.join(" · "))}</small>` : ""}</td><td>${kw.volume == null ? "—" : num(kw.volume)}</td><td>${esc(kw.competition || "—")}</td><td>${kw.lowBid == null && kw.highBid == null ? "—" : `${money(kw.lowBid, 2)} – ${money(kw.highBid, 2)}`}</td><td>${diff(kw.difficulty)}</td><td>${kw.position == null ? "—" : `<b>#${num(kw.position, 1)}</b>`}</td></tr>`).join("")}</tbody></table>`, { extra: ` <small>(${g.keywords.length} keywords · ${num(g.volume)} searches)</small>` })).join("") : "";
-  return `${header(report, o, "Keyword Research Report", "Grouped keyword opportunities with search volume, competition and current rankings")}
+  const total = Math.max(all.length, 1);
+  const split = `<div class="kwp-split">${(["low", "medium", "high", "unknown"] as const).filter((lv) => counts[lv]).map((lv) => `<i class="kwp-${lv}" style="width:${(counts[lv] / total) * 100}%"></i>`).join("")}</div><p class="kwp-legend">${(["low", "medium", "high", "unknown"] as const).map((lv) => `<span class="kwp-chip kwp-${lv}">${label[lv]} ${num(counts[lv])}</span>`).join("")}</p>`;
+  const summary = `<table class="t kwp-sum"><thead><tr><th>Group</th><th>Theme</th><th>Keywords</th><th>Searches / month</th><th>Low / Med / High</th></tr></thead><tbody>${k.groups.map((g, i) => `<tr><td><span class="kwp-letter">${letter(i)}</span></td><td><b>${esc(g.name)}</b></td><td>${num(g.keywords.length)}</td><td>${num(g.volume)}</td><td><span class="kwp-chip kwp-low">${g.keywords.filter((kw) => level(kw.competition) === "low").length}</span><span class="kwp-chip kwp-medium">${g.keywords.filter((kw) => level(kw.competition) === "medium").length}</span><span class="kwp-chip kwp-high">${g.keywords.filter((kw) => level(kw.competition) === "high").length}</span></td></tr>`).join("")}</tbody><tfoot><tr><td></td><td>Total</td><td>${num(all.length)}</td><td>${num(k.totalVolume)}</td><td></td></tr></tfoot></table>`;
+  const wins = all.filter((kw) => level(kw.competition) === "low" && (kw.volume || 0) > 0).sort((x, y) => (y.volume || 0) - (x.volume || 0)).slice(0, 8);
+  const winsHtml = wins.length ? `<div class="kwp-wins">${wins.map((kw) => `<span class="kwp-win"><b>${esc(kw.keyword)}</b><small>${num(kw.volume)}/mo</small></span>`).join("")}</div><p class="note">Low-competition terms with real search demand — the easiest place to start.</p>` : `<p class="muted">No low-competition keywords with search volume in these groups yet.</p>`;
+  const groupTable = (g: (typeof k.groups)[number]) => `<table class="t kwp-t"><thead><tr><th>Keyword</th><th>Avg. searches / mo</th><th>Competition</th><th>Bid low</th><th>Bid high</th>${anyDiff ? "<th>SEO difficulty</th>" : ""}${anyRank ? "<th>Google rank</th>" : ""}</tr></thead><tbody>${[...g.keywords].sort((x, y) => (y.volume || 0) - (x.volume || 0)).map((kw) => { const lv = level(kw.competition); return `<tr class="kwp-row kwp-${lv}"><td>${esc(kw.keyword)}${kw.tags.length ? ` <small class="muted">${esc(kw.tags.join(" · "))}</small>` : ""}</td><td>${kw.volume == null ? "N/A" : num(kw.volume)}</td><td><b>${label[lv]}</b></td><td>${kw.lowBid == null ? "N/A" : money(kw.lowBid, 2)}</td><td>${kw.highBid == null ? "N/A" : money(kw.highBid, 2)}</td>${anyDiff ? `<td>${kw.difficulty == null ? "N/A" : `${kw.difficulty}/100`}</td>` : ""}${anyRank ? `<td>${kw.position == null ? "Not ranking" : `<b>#${num(kw.position, 1)}</b>`}</td>` : ""}</tr>`; }).join("")}</tbody></table>`;
+  const groups = k.groups.map((g, i) => `<section class="card kwp-group"><header class="card-h"><span class="kwp-letter big">${letter(i)}</span><div><h2>Group ${letter(i)} · ${esc(g.name)}</h2><p>${num(g.keywords.length)} keyword${g.keywords.length === 1 ? "" : "s"} · ${num(g.volume)} searches a month · sorted by search volume</p></div></header>${groupTable(g)}</section>`).join("");
+  const sources = [report.keywordResearch?.source, report.rankings?.status === "ok" ? report.rankings.source : ""].filter(Boolean).join(" · ");
+  const foot = `<footer class="foot"><div class="foot-main">${icon("info", 20)}<div><b>How to read this.</b> Searches per month show demand, not guaranteed clicks or leads. Bids are Google Ads top-of-page estimates, not what you'll actually pay. Competition is the Google Ads auction rating${anyDiff ? "; SEO difficulty is shown separately" : ""}. N/A means no figure was available — it is not zero. Sources: ${esc(sources || "saved keyword research")}. Read-only research: no campaigns, bids or pages were changed.</div></div><div class="foot-side">${icon("calendar", 18)}<span>Prepared ${esc(prepared)}<br><span class="kwp-chip kwp-low">Low</span><span class="kwp-chip kwp-medium">Med</span><span class="kwp-chip kwp-high">High</span></span></div></footer>`;
+  return `${head}
 ${kpis}
-${k ? `<div class="row r-5-5">${card("", "Search volume by group", "chart", "blue", share, { section: report.keywordResearch })}${card("next-card", "Recommendations", "target", "blue", list(report.recommendations, "next"))}</div>${groupCards}` : card("", "Keyword groups", "tag", "blue", "", { section: report.keywordResearch })}
-${footer(report, [report.keywordResearch, report.rankings])}`;
+<div class="row r-5-5">${card("", "Keyword groups", "tag", "blue", summary, { section: report.keywordResearch })}${card("", "Competition at a glance", "chart", "blue", `${split}<h3 class="kwp-h3">Quick wins</h3>${winsHtml}`)}</div>
+${report.recommendations.length ? card("next-card", "Recommended next steps", "target", "blue", list(report.recommendations, "next")) : ""}
+${groups}
+${foot}`;
 }
 
 /* ------------------------------------------------------------------ document */
@@ -348,7 +367,7 @@ ol.done,ol.next{list-style:none;margin:0;padding:0;display:grid;gap:9px;font-siz
 .foot{display:grid;grid-template-columns:1fr 260px;gap:14px;margin-top:4px}.foot-main,.foot-side{display:flex;gap:12px;align-items:flex-start;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;font-size:12px;color:#334155;line-height:1.55}.foot-side{align-items:center;font-size:13px}.missing{margin-top:6px;color:#92400e}
 .page>.card{margin-bottom:14px}.src-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}.src{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#f8fafd;display:grid;gap:4px}.src-top{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:13.5px}.src small{font-size:11.5px;color:var(--muted);line-height:1.4}
 .fnd-list{display:grid;gap:10px}.fnd{display:grid;grid-template-columns:72px 1fr;gap:12px;border:1px solid var(--line);border-left:4px solid #94a3b8;border-radius:12px;padding:12px 14px;break-inside:avoid}.fnd.high{border-left-color:#dc2626;background:#fffafa}.fnd.medium{border-left-color:#d99a00;background:#fffdf6}.fnd-pr{align-self:start;justify-self:start;font-size:11.5px;font-weight:800;padding:3px 9px;border-radius:999px;background:#eef2f6;color:#475569}.fnd.high .fnd-pr{background:#fee2e2;color:#b91c1c}.fnd.medium .fnd-pr{background:#fff4d6;color:#a16207}.fnd-area{font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}.fnd h3{margin:2px 0 4px;font-size:15.5px}.fnd p{margin:2px 0;font-size:13px;color:#334155}
-@page{size:A4 portrait;margin:8mm}
+.kwp-top .title h1{font-size:34px}.kwp-letter{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:8px;background:#1d3a63;color:#fff;font-weight:800;font-size:13px}.kwp-letter.big{width:40px;height:40px;font-size:18px;border-radius:12px}\n.kwp-split{display:flex;height:16px;border-radius:999px;overflow:hidden;background:#eef2f6;margin:6px 0 10px}.kwp-split i{display:block;height:100%}.kwp-legend{display:flex;flex-wrap:wrap;gap:6px;margin:0}\n.kwp-chip{display:inline-block;padding:2px 9px;border-radius:6px;font-size:12px;font-weight:700;margin-right:4px}.kwp-low{background:#d9ecd5;color:#166534}.kwp-medium{background:#fcefb9;color:#854d0e}.kwp-high{background:#f5d3d3;color:#991b1b}.kwp-unknown{background:#e6e8ec;color:#475569}\n.kwp-split .kwp-low{background:#4caf50}.kwp-split .kwp-medium{background:#f2c037}.kwp-split .kwp-high{background:#e05252}.kwp-split .kwp-unknown{background:#b6bec9}\n.kwp-h3{margin:16px 0 8px;font-size:15px}.kwp-wins{display:flex;flex-wrap:wrap;gap:8px}.kwp-win{display:inline-flex;gap:6px;align-items:baseline;background:#eef8ec;border:1px solid #cfe8c9;border-radius:999px;padding:5px 11px;font-size:13px}.kwp-win small{color:#4b6b45}\n.kwp-t th{background:#1d3a63;color:#fff}.kwp-t td{border-bottom:1px solid #fff}.kwp-row.kwp-low td{background:#eaf6e7}.kwp-row.kwp-medium td{background:#fdf6d8}.kwp-row.kwp-high td{background:#fbe6e6}.kwp-row.kwp-unknown td{background:#f1f3f6}.kwp-row td{color:#1c2330}\n.kwp-group{break-inside:auto}.kwp-group .card-h{align-items:center}\n@page{size:A4 portrait;margin:8mm}
 @media print{body{background:#fff}.page{width:1200px;padding:0;zoom:.6}.card,.kpi{box-shadow:none}.row{break-inside:avoid}}`;
 
 export function renderClientReportHtml(report: ClientReport, opts: Opts) {

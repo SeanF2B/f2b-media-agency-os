@@ -419,7 +419,9 @@ function keywordRecommendations(report: ClientReport): string[] {
   if (top) out.push(`Build or strengthen a dedicated page for the “${top.name}” group (${top.volume.toLocaleString("en-IE")} searches a month).`);
   const loose = k.groups.find((g) => g.name === "Ungrouped"); if (loose) out.push(`Sort ${loose.keywords.length} ungrouped keyword${loose.keywords.length > 1 ? "s" : ""} into groups so each maps to one page.`);
   const paid = all.filter((kw) => kw.tags.includes("Google Ads")).length; if (paid) out.push(`${paid} keyword${paid > 1 ? "s are" : " is"} tagged for Google Ads — add them to the matching ad groups.`);
-  for (const task of report.work.planned) if (out.length < 5 && !out.includes(task)) out.push(task);
+  const pricey = all.filter((kw) => (kw.highBid || 0) >= 2 && kw.volume).sort((x, y) => n(y.highBid) - n(x.highBid))[0];
+  if (pricey && out.length < 5) out.push(`“${pricey.keyword}” has high-value clicks (up to ${pricey.highBid!.toFixed(2)} per click) — worth ranking for organically to save ad spend.`);
+  // Only keyword-based steps here: unrelated client tasks don't belong in a keyword plan.
   return out.slice(0, 5);
 }
 

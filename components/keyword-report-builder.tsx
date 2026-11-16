@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { competitionLabel, competitionLevel, type SavedKeywordData } from "./saved-keywords-panel";
 
 // Reports → Keywords: search keyword ideas, tick them, add to a group, then pick which groups go in the report.
@@ -11,7 +11,10 @@ const num = (v: number | null | undefined) => v == null ? "—" : v.toLocaleStri
 const bid = (lo: number | null, hi: number | null) => lo == null && hi == null ? "—" : `€${(lo ?? 0).toFixed(2)}–€${(hi ?? lo ?? 0).toFixed(2)}`;
 const NEW_GROUP = "__new__";
 
-export function KeywordReportBuilder({ clientId, clientName, picked, onPicked }: { clientId: string; clientName: string; picked: string[]; onPicked: (ids: string[]) => void }) {
+// Saves ticked keywords into a group when Generate preview is pressed before anything was grouped, and returns the groups to report on.
+export type KeywordPrepare = () => Promise<string[]>;
+
+export function KeywordReportBuilder({ clientId, clientName, picked, onPicked, prepareRef, onTicked }: { clientId: string; clientName: string; picked: string[]; onPicked: (ids: string[]) => void; prepareRef?: MutableRefObject<KeywordPrepare | null>; onTicked?: (count: number) => void }) {
   const [saved, setSaved] = useState<SavedKeywordData | null>(null);
   const [seeds, setSeeds] = useState("");
   const [area, setArea] = useState("Ireland");
@@ -22,11 +25,31 @@ export function KeywordReportBuilder({ clientId, clientName, picked, onPicked }:
   const [newGroup, setNewGroup] = useState("");
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
+  const [scan, setScan] = useState<{ site: string; summary: string } | null>(null);
+  const scanned = useRef("");
 
   const loadSaved = useCallback(async () => {
     try { const r = await fetch(`/api/seo/saved-keywords?clientId=${encodeURIComponent(clientId)}`, { cache: "no-store" }); if (r.ok) setSaved(await r.json() as SavedKeywordData); } catch { /* shown as empty */ }
   }, [clientId]);
-  useEffect(() => { setIdeas(null); setTicked(new Set()); setMsg(""); void loadSaved(); }, [loadSaved]);
+  useEffect(() => { setIdeas(null); setTicked(new Set()); setMsg(""); setScan(null); void loadSaved(); }, [loadSaved]);
+  useEffect(() => { onTicked?.(ticked.size); }, [ticked, onTicked]);
+
+  // AI reads the client's own website and fills in the services to research (cached per client so it's one AI call).
+  const scanSite = useCallback(async (auto = false) => {
+    const cacheKey = `f2b-kw-seeds:${clientId}`;
+    if (auto) { try { const hit = JSON.parse(window.localStorage.getItem(cacheKey) || "null") as { seeds: string[]; area: string; site: string; summary: string } | null; if (hit?.seeds?.length) { setSeeds(hit.seeds.join(", ")); if (hit.area) setArea(hit.area); setScan({ site: hit.site, summary: hit.summary }); return; } } catch { /* no cache */ } }
+    setBusy("scan"); if (!auto) setMsg("");
+    try {
+      const r = await fetch("/api/seo/keyword-seeds", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId }) });
+      const j = await r.json().catch(() => ({})) as { seeds?: string[]; area?: string; website?: string; summary?: string; error?: string };
+      if (!r.ok || !j.seeds?.length) throw new Error(j.error || "Couldn't scan the website.");
+      setSeeds((cur) => auto && cur.trim() ? cur : j.seeds!.join(", ")); if (j.area) setArea(j.area);
+      setScan({ site: j.website || "", summary: j.summary || "" });
+      try { window.localStorage.setItem(cacheKey, JSON.stringify({ seeds: j.seeds, area: j.area || "", site: j.website || "", summary: j.summary || "" })); } catch { /* storage unavailable */ }
+    } catch (e) { if (!auto) setMsg(e instanceof Error ? e.message : "Couldn't scan the website."); }
+    finally { setBusy((b) => b === "scan" ? "" : b); }
+  }, [clientId]);
+  useEffect(() => { if (scanned.current === clientId) return; scanned.current = clientId; void scanSite(true); }, [clientId, scanSite]);
 
   // Every group is in the report unless you untick it.
   const groupIds = useMemo(() => [...(saved?.groups || []).map((g) => g.id), ...((saved?.keywords || []).some((k) => !k.groupId) ? ["ungrouped"] : [])], [saved]);
@@ -76,6 +99,28 @@ export function KeywordReportBuilder({ clientId, clientName, picked, onPicked }:
     finally { setBusy(""); }
   };
 
+  // Generate preview with nothing grouped yet: put the ticked keywords in a group named after the search, then report on it.
+  const latest = useRef({ ideas, ticked, saved, seeds, picked, location });
+  latest.current = { ideas, ticked, saved, seeds, picked, location };
+  useEffect(() => {
+    if (!prepareRef) return;
+    prepareRef.current = async () => {
+      const cur = latest.current;
+      const rows = (cur.ideas || []).filter((i) => cur.ticked.has(i.keyword));
+      if (!rows.length) return cur.picked;
+      const name = (cur.seeds.split(/[\n,]+/)[0] || "Keywords").trim().replace(/^./, (c) => c.toUpperCase()).slice(0, 60);
+      const existing = (cur.saved?.groups || []).find((g) => g.name.toLowerCase() === name.toLowerCase());
+      const after = existing ? null : await call({ action: "createGroup", name });
+      const target = existing?.id || after?.groups.find((g) => g.name.toLowerCase() === name.toLowerCase())?.id || "";
+      await call({ action: "save", groupId: target, keywords: rows.map((i) => ({ keyword: i.keyword, location: cur.location, geo: "2372", language: "English", avgMonthlySearches: i.avgMonthlySearches, competition: i.competition, competitionIndex: i.competitionIndex, lowTopOfPageBid: i.lowTopOfPageBid, highTopOfPageBid: i.highTopOfPageBid, difficulty: i.difficulty ?? null, source: "Google Keyword Planner", checkedAt: new Date().toISOString() })) });
+      setTicked(new Set());
+      const ids = [...new Set([...cur.picked, target || "ungrouped"])];
+      onPicked(ids);
+      return ids;
+    };
+    return () => { prepareRef.current = null; };
+  }); // eslint-disable-line react-hooks/exhaustive-deps
+
   const groups = [...(saved?.groups || []).map((g) => ({ id: g.id, name: g.name })), ...((saved?.keywords || []).some((k) => !k.groupId) ? [{ id: "ungrouped", name: "Ungrouped" }] : [])];
   const inGroup = (id: string) => (saved?.keywords || []).filter((k) => (id === "ungrouped" ? !k.groupId : k.groupId === id)).sort((a, b) => (b.avgMonthlySearches || 0) - (a.avgMonthlySearches || 0));
   const toggleGroup = (id: string) => onPicked(picked.includes(id) ? picked.filter((g) => g !== id) : [...picked, id]);
@@ -83,10 +128,12 @@ export function KeywordReportBuilder({ clientId, clientName, picked, onPicked }:
   return <div className="krb">
     <div className="krb-step"><span className="krb-n">1</span><div><b>Find keywords</b><small>Services or topics for {clientName}, separated by commas.</small></div></div>
     <form className="krb-search" onSubmit={(e) => { e.preventDefault(); void search(); }}>
-      <input value={seeds} onChange={(e) => setSeeds(e.target.value)} placeholder="e.g. boiler repair, heat pump installation" aria-label="Services or topics" />
+      <input value={seeds} onChange={(e) => setSeeds(e.target.value)} placeholder={busy === "scan" ? `Scanning ${clientName}'s website…` : `Services ${clientName} offers, or press Scan website`} aria-label="Services or topics" data-no-ai />
       <input value={area} onChange={(e) => setArea(e.target.value)} placeholder="Ireland" aria-label="Target area" className="krb-area" />
-      <button type="submit" className="primary-button" disabled={busy === "search"}>{busy === "search" ? "Searching…" : "Find keywords"}</button>
+      <button type="button" className="secondary-button krb-scan" disabled={busy === "scan"} onClick={() => void scanSite()} title="AI reads the client's website and fills in the services to research">{busy === "scan" ? "Scanning…" : "✨ Scan website"}</button>
+      <button type="submit" className="primary-button" disabled={busy === "search" || busy === "scan"}>{busy === "search" ? "Searching…" : "Find keywords"}</button>
     </form>
+    {scan && <p className="krb-scanned">Read from <b>{scan.site}</b>{scan.summary ? ` — ${scan.summary}` : ""} Edit the list if anything's missing.</p>}
 
     {ideas && ideas.length > 0 && <div className="krb-results">
       <div className="krb-bar">
@@ -112,6 +159,6 @@ export function KeywordReportBuilder({ clientId, clientName, picked, onPicked }:
       <label className="krb-group-head"><input type="checkbox" checked={picked.includes(g.id)} onChange={() => toggleGroup(g.id)} /><b>{g.name}</b><small>{list.length} keyword{list.length === 1 ? "" : "s"} · {num(vol)} searches/mo</small></label>
       <div className="krb-chips">{list.slice(0, 18).map((k) => { const lv = competitionLevel(k.competition); return <span key={k.id} className={`krb-chip lv-${lv}`} title={`${num(k.avgMonthlySearches)}/mo · ${competitionLabel[lv]} competition · ${bid(k.lowTopOfPageBid, k.highTopOfPageBid)}`}>{k.keyword}<small>{num(k.avgMonthlySearches)}</small></span>; })}{list.length > 18 && <span className="krb-more">+{list.length - 18} more</span>}</div>
     </div>; })}</div>}
-    <div className="krb-step"><span className="krb-n">3</span><div><b>Generate the report</b><small>Pick the period and press Generate preview.</small></div></div>
+    <div className="krb-step"><span className="krb-n">3</span><div><b>Generate the report</b><small>Press Generate preview — ticked keywords are grouped for you if you haven't already.</small></div></div>
   </div>;
 }

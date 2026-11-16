@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ReportGeneratingAnimation } from "./report-generating-animation";
-import { KeywordReportBuilder } from "./keyword-report-builder";
+import { KeywordReportBuilder, type KeywordPrepare } from "./keyword-report-builder";
 
 type ReportType = "ads" | "seo" | "audit" | "audit-ads" | "audit-website" | "keywords";
 export type ReportsMode = "reports" | "audits" | "keywords";
@@ -26,7 +26,7 @@ const STEPS: Record<ReportType, string[]> = {
   audit: ["Gathering details…", "Checking Google Ads spend, clicks and conversions…", "Reading organic traffic and rankings…", "Checking Google Business, backlinks and AI visibility…", "Matching leads and sources in the CRM…", "Writing findings and an action plan…", "Finalising your audit…"],
   "audit-ads": ["Gathering details…", "Reading Google Ads campaigns, spend and conversions…", "Checking cost per conversion and click-through rate…", "Matching Google Ads leads in the CRM…", "Checking lead tracking…", "Writing findings and an action plan…", "Finalising your audit…"],
   "audit-website": ["Gathering details…", "Opening the live website…", "Checking pages, links and sitemap…", "Running Google PageSpeed on mobile…", "Reading organic traffic and rankings…", "Writing findings and an action plan…", "Finalising your audit…"],
-  keywords: ["Gathering details…", "Loading saved keyword groups…", "Reading search volumes and bid ranges…", "Checking current Google rankings…", "Sizing each group's opportunity…", "Writing recommendations…", "Finalising your keyword report…"],
+  keywords: ["Saving your keyword groups…", "Pulling search volumes…", "Sorting keywords into groups…", "Checking competition and bids…", "Checking current Google rankings…", "Spotting quick wins…", "Building your keyword plan…"],
 };
 const META: Record<ReportType, { name: string; short: string; desc: string }> = {
   ads: { name: "Google Ads report", short: "Google Ads", desc: "Spend, leads, cost per lead, pipeline, won revenue, ROAS" },
@@ -63,6 +63,8 @@ export function ClientReportsView({ clientId, clientName, mode = "reports" }: { 
   const [error, setError] = useState(""); const [notice, setNotice] = useState(""); const [live, setLive] = useState(true);
   const [history, setHistory] = useState<Saved[]>([]);
   const [groups, setGroups] = useState<string[]>([]);
+  const [tickedCount, setTickedCount] = useState(0);
+  const prepareRef = useRef<KeywordPrepare | null>(null);
   useEffect(() => { setGroups([]); }, [clientId]);
   const frame = useRef<HTMLIFrameElement>(null);
   const range = useMemo(() => rangeFor(preset, from, to), [preset, from, to]);
@@ -76,14 +78,20 @@ export function ClientReportsView({ clientId, clientName, mode = "reports" }: { 
   const generate = useCallback(async (quiet = false) => {
     if (!quiet) { setBusy(true); setError(""); setNotice(""); }
     try {
-      const response = await fetch(`/api/client-reports?${query}&format=html`, { cache: "no-store" });
+      let q = query;
+      // Keywords ticked but not grouped yet: save them into a group first so the report has something to show.
+      if (!quiet && mode === "keywords" && prepareRef.current && tickedCount > 0) {
+        const ids = await prepareRef.current();
+        const params = new URLSearchParams(query); if (ids.length) params.set("groups", ids.join(",")); q = params.toString();
+      }
+      const response = await fetch(`/api/client-reports?${q}&format=html`, { cache: "no-store" });
       if (!response.ok) { const payload = await response.json().catch(() => ({})) as { error?: string }; throw new Error(payload.error || "The report could not be generated."); }
       setHtml(await response.text()); setLoadedAt(new Date().toISOString());
       // Every generated report is filed in the client's Reports folder automatically (once per type and period).
       if (!quiet) autoSaveRef.current?.();
     } catch (reason) { if (!quiet) setError(reason instanceof Error ? reason.message : "The report could not be generated."); }
     finally { if (!quiet) setBusy(false); }
-  }, [query]);
+  }, [query, mode, tickedCount]);
   // Live dashboard: re-read (cached) data every 15 minutes while the preview is open and visible.
   useEffect(() => {
     if (!html || !live) return;
@@ -116,19 +124,20 @@ export function ClientReportsView({ clientId, clientName, mode = "reports" }: { 
       <header className="crv-head">
         <div><h2>{cfg.title}</h2><p>{cfg.intro} <b>{clientName}</b>, built from connected data and real CRM leads. Missing sources are shown as unavailable, never as zero.</p></div>
       </header>
-      {mode === "keywords" && <KeywordReportBuilder key={clientId} clientId={clientId} clientName={clientName} picked={groups} onPicked={(ids) => { setGroups(ids); setHtml(""); }} />}
+      {mode === "keywords" && <KeywordReportBuilder key={clientId} clientId={clientId} clientName={clientName} picked={groups} onPicked={(ids) => { setGroups(ids); setHtml(""); }} prepareRef={prepareRef} onTicked={setTickedCount} />}
       {mode !== "keywords" && <div className={`crv-types ${cfg.types.length === 1 ? "single" : ""}`} role="radiogroup" aria-label="Report type">
         {cfg.types.map((value) => <button key={value} type="button" role="radio" aria-checked={type === value} className={`crv-type ${type === value ? "on" : ""}`} onClick={() => { setType(value); setHtml(""); }}><TypeMark type={value} /><span><b>{META[value].name}</b><small>{META[value].desc}</small></span></button>)}
       </div>}
       <div className="crv-controls">
-        <label className="crv-field"><span>Period</span><select value={preset} onChange={(event) => { setPreset(event.target.value as Preset); setHtml(""); }}>{PRESETS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+{mode !== "keywords" && <>        <label className="crv-field"><span>Period</span><select value={preset} onChange={(event) => { setPreset(event.target.value as Preset); setHtml(""); }}>{PRESETS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         {preset === "custom" && <><label className="crv-field"><span>From</span><input type="date" value={from} max={to || undefined} onChange={(event) => { setFrom(event.target.value); setHtml(""); }} /></label><label className="crv-field"><span>To</span><input type="date" value={to} min={from || undefined} onChange={(event) => { setTo(event.target.value); setHtml(""); }} /></label></>}
-        <span className="crv-range">{fmtDate(range.start)} – {fmtDate(range.end)} · compared with the period before</span>
-        <button type="button" className="primary-button crv-go" disabled={busy || (preset === "custom" && (!from || !to)) || (mode === "keywords" && !groups.length)} onClick={() => void generate()}>{busy ? "Generating…" : html ? "Regenerate" : "Generate preview"}</button>
+        <span className="crv-range">{fmtDate(range.start)} – {fmtDate(range.end)} · compared with the period before</span></>}
+        {mode === "keywords" && !groups.length && !tickedCount && <span className="crv-why">Tick some keywords above first</span>}
+        <button type="button" className="primary-button crv-go" disabled={busy || (preset === "custom" && (!from || !to)) || (mode === "keywords" && !groups.length && !tickedCount)} onClick={() => void generate()}>{busy ? "Generating…" : html ? "Regenerate" : "Generate preview"}</button>
       </div>
       {error && <p className="error-text" role="alert">{error}</p>}
       {notice && <p className="crv-notice" role="status">{notice}</p>}
-      {busy && <ReportGeneratingAnimation steps={STEPS[type]} title={`Generating ${clientName}'s ${META[type].name.toLowerCase()}`} />}
+      {busy && <ReportGeneratingAnimation steps={STEPS[type]} variant={type === "keywords" ? "keywords" : "report"} title={`Generating ${clientName}'s ${META[type].name.toLowerCase()}`} />}
       {html && !busy && <div className="crv-preview">
         <div className="crv-bar">
           <span className="crv-live"><i className={live ? "on" : ""} />{live ? "Live · refreshes every 15 min" : "Auto-refresh off"} · last updated {new Date(loadedAt).toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit" })}</span>

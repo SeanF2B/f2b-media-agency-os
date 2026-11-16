@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 const DEFAULT_STEPS = ["Gathering details…", "Connecting to your data sources…", "Reading performance data…", "Matching CRM leads and deals…", "Building charts…", "Checking every figure…", "Finalising your report…"];
 
-export type GeneratingVariant = "report" | "payslip" | "accountant";
+export type GeneratingVariant = "report" | "payslip" | "accountant" | "keywords";
 
 /** €, £ or $ from the business's tax country (IE / GB / US); falls back to the currency code. */
 export function currencySymbolFor(country?: string, currency?: string) {
@@ -81,6 +81,26 @@ function AccountantArt({ symbol }: { symbol: string }) {
   </>;
 }
 
+// Keyword research: a search bar types a query, keyword chips pop out and drop into labelled group folders,
+// while a volume bar chart grows alongside.
+function KeywordArt() {
+  const chips = [[52, 64, 38], [96, 64, 46], [148, 64, 30], [52, 78, 44], [102, 78, 34], [142, 78, 40]];
+  return <Monitor>
+    <rect x="52" y="34" width="150" height="18" rx="9" className="rga-tile" />
+    <circle cx="63" cy="43" r="4" className="rga-kw-lens" /><path d="M66 46 l3 3" className="rga-kw-lens" />
+    <rect x="74" y="40" width="80" height="6" rx="3" className="rga-ink rga-kw-type" />
+    <rect x="156" y="38" width="1.6" height="10" className="rga-kw-caret" />
+    {chips.map(([x, y, w], i) => <rect key={i} x={x} y={y} width={w} height="9" rx="4.5" className={`rga-kw-chip c${i % 3}`} style={{ animationDelay: `${0.35 * i}s` }} />)}
+    {[0, 1, 2].map((i) => <g key={i} transform={`translate(${56 + i * 50} 104)`}>
+      <path d="M0 6 h12 l4 -5 h22 a3 3 0 0 1 3 3 v36 a3 3 0 0 1 -3 3 h-35 a3 3 0 0 1 -3 -3 z" className={`rga-kw-folder c${i}`} />
+      <text x="20" y="33" textAnchor="middle" className="rga-kw-letter">{"ABC"[i]}</text>
+      <rect x="9" y="-6" width="22" height="8" rx="4" className={`rga-kw-drop c${i}`} style={{ animationDelay: `${0.5 + i * 0.6}s` }} />
+    </g>)}
+    {[22, 36, 28, 48, 40, 58].map((h, i) => <rect key={i} x={214 + i * 10} y={150 - h} width="7" height={h} rx="2" className="rga-bar" style={{ animationDelay: `${0.15 * i}s` }} />)}
+    <circle cx="262" cy="40" r="5" className="rga-pulse" />
+  </Monitor>;
+}
+
 /** Animated "at work" scene shown while something generates. `report` = charts on a computer (default),
  *  `payslip` = payslip + currency coin, `accountant` = receipts being checked and a calculator. */
 export function ReportGeneratingAnimation({ steps = DEFAULT_STEPS, title = "Generating your report", variant = "report", symbol = "€" }: { steps?: string[]; title?: string; variant?: GeneratingVariant; symbol?: string }) {
@@ -97,7 +117,7 @@ export function ReportGeneratingAnimation({ steps = DEFAULT_STEPS, title = "Gene
           <linearGradient id="rga-screen" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="#f5f9ff" /><stop offset="1" stopColor="#e8f0fe" /></linearGradient>
           <linearGradient id="rga-area" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="#2f6ff0" stopOpacity=".35" /><stop offset="1" stopColor="#2f6ff0" stopOpacity="0" /></linearGradient>
         </defs>
-        {variant === "payslip" ? <PayslipArt symbol={symbol} /> : variant === "accountant" ? <AccountantArt symbol={symbol} /> : <ReportArt />}
+        {variant === "keywords" ? <KeywordArt /> : variant === "payslip" ? <PayslipArt symbol={symbol} /> : variant === "accountant" ? <AccountantArt symbol={symbol} /> : <ReportArt />}
         <path d="M296 30 l3 7 7 3 -7 3 -3 7 -3 -7 -7 -3 7 -3z" className="rga-spark" />
         <path d="M22 90 l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2z" className="rga-spark s2" />
       </svg>
