@@ -2165,3 +2165,21 @@ html body .app-shell .main-area .pipeline-toolbar-filters label > span:first-chi
 html body .app-shell .pipeline-card.is-compact .task-pending-reason { padding: 4px 8px !important; font-size: 11.5px !important; display: block !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-radius: 8px !important; }
 html body .app-shell .pipeline-card.is-compact .task-pending-reason :is(small, button) { display: none !important; }
 html body .app-shell .pipeline-card.is-compact .pipeline-card-details > :not(summary) { display: none !important; }
+
+/* ── Task board: compact cards (details, checklist and documents open in the pop-up) ── */
+.app-shell .pipeline-card.is-compact { padding: 10px 11px; gap: 7px; }
+.app-shell .pipeline-card.is-compact .pipeline-card-details { border: 0; background: transparent; }
+.app-shell .pipeline-card.is-compact .pipeline-card-details > summary { padding: 4px 0; gap: 6px 10px; }
+.app-shell .pipeline-card.is-compact .pipeline-card-summary-copy b { font-size: 13.5px; line-height: 1.3; }
+.app-shell .pipeline-card.is-compact .task-client-mark { width: 34px; height: 34px; }
+.app-shell .pipeline-card.is-compact .pipeline-card-footer { gap: 6px; padding-top: 6px; }
+.task-card-open-button { display: inline-flex; align-items: center; gap: 8px; padding: 4px 9px; border-radius: 8px; background: color-mix(in srgb, var(--brand-primary, #1677c8) 10%, transparent); color: var(--brand-primary, #1677c8); font-size: 11.5px; font-weight: 800; white-space: nowrap; transition: transform .15s ease, background .15s ease; }
+.task-card-open-button em { font-style: normal; font-weight: 700; opacity: .8; }
+.pipeline-card.is-compact:hover .task-card-open-button { background: color-mix(in srgb, var(--brand-primary, #1677c8) 18%, transparent); transform: translateY(-1px); }
+.dark-mode .task-card-open-button { color: color-mix(in srgb, var(--brand-primary, #1677c8) 55%, #fff); }
+.task-pending-chip { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; margin: 0; padding: 5px 9px; border: 1px solid #efd8a4; border-radius: 8px; background: #fff9ea; color: #70531d; font: inherit; font-size: 11px; font-weight: 700; text-align: left; cursor: pointer; }
+.task-pending-chip span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-pending-chip:hover { background: #fdf0d2; }
+.dark-mode .task-pending-chip { background: #3a3220; border-color: #5c4b25; color: #f3dca6; }
+.app-shell .workflow-submit-review-controls.is-compact { display: flex; justify-content: flex-end; margin: 0; padding: 0; border: 0; background: transparent; }
+.app-shell .workflow-submit-review-controls.is-compact .workflow-submit-review-button { padding: 6px 11px; font-size: 11.5px; }
