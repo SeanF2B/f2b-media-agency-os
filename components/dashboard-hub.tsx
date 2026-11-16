@@ -1,7 +1,7 @@
 "use client";
 import { useSampleData } from "@/hooks/use-sample-data";
 import { useEffect, useMemo, useState, type ReactNode, lazy, Suspense } from "react";
-import { BarChart3, BookOpen, CalendarPlus, CheckCircle2, ClipboardList, Image as ImageIcon, Mail, MessageSquare, MousePointerClick, Phone, Plus, Sparkles, UserPlus, Users } from "lucide-react";
+import { BarChart3, BookOpen, CalendarPlus, CheckCircle2, ClipboardList, Compass, ListChecks, Image as ImageIcon, Mail, MessageSquare, MousePointerClick, Phone, Plus, Sparkles, UserPlus, Users } from "lucide-react";
 import { BrandIcon } from "./brand-icon";
 const AppointmentsDashboard = lazy(() => import("./scheduling-view").then((module) => ({ default: module.AppointmentsDashboard })));
 import { CampaignPicker } from "./campaign-picker";
@@ -109,6 +109,8 @@ export function DashboardHub({ activityPanel = null, scopeClientId, clients, tas
 
   const showAppts = !scopeClientId || clients.find((c) => c.id === scopeClientId)?.appointmentBased !== false;
   const actions: Array<{ label: string; hint: string; icon: ReactNode; run: () => void; tint: string }> = [
+    { label: "Open tasks", hint: "Board, approvals & history", icon: <ListChecks size={18} />, run: () => onNavigate("Tasks"), tint: "blue" },
+    ...(!scopeClientId ? [{ label: "Operations", hint: "Ads, SEO, websites, email", icon: <Compass size={18} />, run: () => onNavigate("Operations"), tint: "violet" }] : []),
     { label: "New task", hint: "Add work for the team", icon: <Plus size={18} />, run: onAddTask, tint: "blue" },
     { label: "View leads", hint: "Pipeline & contacts", icon: <Users size={18} />, run: () => onNavigate("CRM"), tint: "violet" },
     { label: "Conversations", hint: "Texts, WhatsApp, email", icon: <MessageSquare size={18} />, run: () => onNavigate("Conversations"), tint: "teal" },
