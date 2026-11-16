@@ -1838,3 +1838,4 @@ html body .app-shell .dfs-connect-dot { width: 8px; height: 8px; border-radius: 
 body.f2b-dark .app-shell .dfs-connect { background: rgba(255,255,255,.04); }
 body.f2b-dark .app-shell .dfs-connect-error { color: #fda29b; }
 @media (max-width: 720px) { html body .app-shell .dfs-connect { grid-template-columns: 1fr; } }
+html body .app-shell .launchpad-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
