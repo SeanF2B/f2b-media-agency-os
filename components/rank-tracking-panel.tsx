@@ -2,6 +2,7 @@
 
 import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { useEffect, useMemo, useState } from "react";
+import { DataForSeoConnect } from "./dataforseo-connect";
 
 type History = { at: string; position: number | null; url: string | null; competitors: Record<string, number | null>; error: string | null };
 type Tracked = { id: string; keyword: string; location: string; device: string; grp: string; history: History[] };
@@ -58,7 +59,7 @@ export function RankTrackingPanel({ clientId, clientName, defaultLocation }: { c
   };
 
   return <div className="rank">
-    {(!ready || !host) && <div className="rank-setup" role="status">{!ready && <p>🔌 <b>DataForSEO isn’t connected.</b> Add a key named “DataForSEO” (value <code>login:password</code>) in Settings → APIs, then “Check rankings” will work.</p>}{!host && <p>🌐 <b>{clientName} has no website saved.</b> Add it in the client profile so positions can be matched to their site.</p>}</div>}
+    {(!ready || !host) && <div className="rank-setup" role="status">{!ready && <DataForSeoConnect onConnected={() => setReady(true)} />}{!host && <p>🌐 <b>{clientName} has no website saved.</b> Add it in the client profile so positions can be matched to their site.</p>}</div>}
     <div className="aiv-form">
       <label className="aiv-wide"><span>Keywords to track (one per line or comma-separated)</span><textarea rows={2} value={input} onChange={(event) => setInput(event.target.value)} placeholder="roof repair galway, roofers near me" /></label>
       <label><span>Location (DataForSEO name, e.g. Galway,Ireland)</span><input value={location} onChange={(event) => setLocation(event.target.value)} /></label>

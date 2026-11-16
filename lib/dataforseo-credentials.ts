@@ -18,4 +18,4 @@ export async function dataForSeoCredentials(db: D1Database | undefined, ownerId:
   } catch { return null; }
 }
 
-export const DATAFORSEO_SETUP_MESSAGE = "Connect DataForSEO once in Settings → APIs: add a key named “DataForSEO” with the value login:password (your DataForSEO API login and password).";
+export const DATAFORSEO_SETUP_MESSAGE = "DataForSEO isn’t connected yet. Use the “Connect DataForSEO” box in Operations → SEO to enter your API login and password once.";
