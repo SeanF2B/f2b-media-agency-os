@@ -1757,3 +1757,11 @@ html body .app-shell.topnav-layout .tn-left :is(.client-scope-trigger, #f2b-pick
 html body .app-shell.topnav-layout .tn-left .client-scope-trigger :is(span, svg, b, #f2b-pick-a) { color: #101828 !important; -webkit-text-fill-color: #101828 !important; opacity: 1 !important; }
 html body.f2b-dark .app-shell.topnav-layout .tn-left :is(.client-scope-trigger, #f2b-pick-a), html body .app-shell.dark-mode.topnav-layout .tn-left :is(.client-scope-trigger, #f2b-pick-a) { background: #1f262d !important; color: #f2f4f7 !important; -webkit-text-fill-color: #f2f4f7 !important; border-color: rgba(255,255,255,.18) !important; }
 html body.f2b-dark .app-shell.topnav-layout .tn-left .client-scope-trigger :is(span, svg, b, #f2b-pick-a), html body .app-shell.dark-mode.topnav-layout .tn-left .client-scope-trigger :is(span, svg, b, #f2b-pick-a) { color: #f2f4f7 !important; -webkit-text-fill-color: #f2f4f7 !important; }
+/* Leads tab bar: identical look and behaviour for every tab, no re-animating bar */
+html body .app-shell .main-area :is(.crm-tabs, .iv-tabs, [role="tablist"]) { animation: none !important; }
+html body .app-shell .crm-tabs { display: flex; gap: 4px; }
+html body .app-shell .crm-tabs > button, html body .app-shell .crm-tabs > a { height: 42px; padding: 0 16px !important; border-radius: 12px !important; border: 1px solid transparent !important; background: transparent !important; box-shadow: none !important; outline: none !important; font-weight: 700; transition: background-color .18s ease, color .18s ease !important; animation: none !important; transform: none !important; }
+html body .app-shell .crm-tabs > :is(button, a):hover { background: rgba(127,138,160,.12) !important; }
+html body .app-shell .crm-tabs > :is(button, a):focus-visible { box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-primary, #0b74b8) 45%, transparent) !important; }
+html body .app-shell .crm-tabs > :is(button, a):is([aria-selected="true"], .active, .on) { background: var(--brand-primary, #0b74b8) !important; color: #fff !important; -webkit-text-fill-color: #fff !important; border-color: transparent !important; }
+html body .app-shell .crm-tabs > :is(button, a):is([aria-selected="true"], .active, .on) svg { stroke: #fff !important; color: #fff !important; }
