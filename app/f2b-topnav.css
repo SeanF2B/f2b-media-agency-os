@@ -1173,3 +1173,505 @@ body.f2b-dark .app-shell .dh-split-row.good { background: #15291e !important; }
 body.f2b-dark :is(.app-shell .dh-split-row b, .app-shell .dh-split-head b, .app-shell .dh-split-total b, .app-shell .dh-split-row span, .app-shell .dh-split-total span, #f2b-dh-y) { color: #f2f4f7 !important; -webkit-text-fill-color: #f2f4f7 !important; }
 body.f2b-dark :is(.app-shell .dh-split-row.good b, #f2b-dh-y) { color: #6fdc9b !important; -webkit-text-fill-color: #6fdc9b !important; }
 body.f2b-dark :is(.app-shell .dh-split-head small, .app-shell .dh-split-note, .app-shell .dh-split-total small, #f2b-dh-y) { color: #a8b3bd !important; -webkit-text-fill-color: #a8b3bd !important; }
+/* Sales pipeline: stage value as rings instead of bars */
+html body .app-shell .overview-pipeline-rings { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; margin: 14px 0; }
+html body .app-shell .overview-stage-ring { display: grid; justify-items: center; gap: 2px; padding: 12px 8px; border-radius: 16px; border: 1px solid #e8edf1; background: #fff; text-align: center; }
+html body .app-shell .overview-stage-ring .ring-track { fill: none; stroke: #eef1f4; stroke-width: 8; }
+html body .app-shell .overview-stage-ring .ring-fill { fill: none; stroke: var(--brand-primary, #1f6feb); stroke-width: 8; stroke-linecap: round; transition: stroke-dasharray .6s ease; }
+html body .app-shell .overview-stage-ring.won .ring-fill { stroke: #22a55b; }
+html body .app-shell .overview-stage-ring.lost .ring-fill { stroke: #e5484d; }
+html body .app-shell .overview-stage-ring text { font-size: 14px; font-weight: 700; fill: #101828; }
+html body .app-shell .overview-stage-ring b { font-size: 16px; margin-top: 4px; color: #101828; }
+html body .app-shell .overview-stage-ring.won b { color: #157a43; }
+html body .app-shell .overview-stage-ring span { font-size: 12.5px; font-weight: 600; color: #344054; }
+html body .app-shell .overview-stage-ring em { font-style: normal; font-size: 11.5px; color: #667085; }
+body.f2b-dark .app-shell .overview-stage-ring { background: #1a2025 !important; border-color: #33404a !important; }
+body.f2b-dark .app-shell .overview-stage-ring .ring-track { stroke: #2b353d; }
+body.f2b-dark .app-shell .overview-stage-ring text { fill: #f2f4f7; }
+body.f2b-dark :is(.app-shell .overview-stage-ring b, .app-shell .overview-stage-ring span, #f2b-ring-x) { color: #f2f4f7 !important; -webkit-text-fill-color: #f2f4f7 !important; }
+body.f2b-dark :is(.app-shell .overview-stage-ring.won b, #f2b-ring-x) { color: #6fdc9b !important; -webkit-text-fill-color: #6fdc9b !important; }
+body.f2b-dark :is(.app-shell .overview-stage-ring em, #f2b-ring-x) { color: #a8b3bd !important; -webkit-text-fill-color: #a8b3bd !important; }
+/* Task table: rounded, roomier, no straight accent lines; status ring + quick add per company */
+html body .app-shell .tt-row td:first-child { box-shadow: none !important; }
+html body .app-shell .tt-table td { padding: 8px 14px !important; height: 46px; }
+html body .app-shell .tt-table th { padding: 12px 14px !important; }
+html body .app-shell .tt-table td:first-child, html body .app-shell .tt-table th:first-child { padding-left: 18px !important; }
+html body .app-shell .tt-table td:last-child, html body .app-shell .tt-table th:last-child { padding-right: 18px !important; }
+html body .app-shell .tt-group td { padding-top: 14px !important; padding-bottom: 8px !important; border-bottom: 0 !important; }
+html body .app-shell .tt-group-bar { display: none !important; }
+html body .app-shell .tt-group-line { display: flex; align-items: center; gap: 10px; }
+html body .app-shell .tt-group-ring { display: inline-flex; align-items: center; gap: 6px; }
+html body .app-shell .tt-group-ring small { display: inline-flex; gap: 4px; }
+html body .app-shell .tt-group-ring small i { font-style: normal; font-size: 10.5px; font-weight: 700; color: #fff; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; display: inline-grid; place-items: center; }
+html body .app-shell .tt-quick-add { width: 26px; height: 26px; border-radius: 999px; border: 1px dashed rgba(127,138,160,.6); background: transparent; color: inherit; cursor: pointer; font-size: 15px; line-height: 1; display: inline-grid; place-items: center; opacity: .75; transition: opacity .15s, transform .15s, background .15s; }
+html body .app-shell .tt-quick-add:hover { opacity: 1; transform: scale(1.08); background: var(--brand-primary, #1f6feb); color: #fff; border-color: transparent; }
+html body .app-shell .tt-row:last-child td:first-child { border-bottom-left-radius: 14px; }
+html body .app-shell .tt-row:last-child td:last-child { border-bottom-right-radius: 14px; }
+/* Chat widget: the blinking AI bot (same as the mobile logo) */
+html body .ai-chat-eyes { display: grid; place-items: center; width: 100%; height: 100%; border-radius: inherit; background: color-mix(in srgb, var(--brand-primary, #3b82f6) 14%, #fff); }
+html body.f2b-dark .ai-chat-eyes { background: #1d2733; }
+html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-icon { transform: scale(2.1); }
+html body .ai-chat-eyes .ai-eyes-face i { animation: tn-bot-blink 2.6s ease-in-out infinite; }
+html body .ai-chat-eyes .ai-eyes-face i:nth-child(2) { animation-delay: .08s; }
+/* Chat launcher: solid brand bubble with a big blinking bot, no white ring */
+html body .ai-chat-launcher:has(.ai-chat-eyes) { width: 64px; height: 64px; background: var(--brand-primary, #0b74b8) !important; box-shadow: 0 10px 28px color-mix(in srgb, var(--brand-primary, #0b74b8) 45%, transparent) !important; border: 0 !important; }
+html body .ai-chat-launcher:has(.ai-chat-eyes)::after { inset: -4px; border-width: 2px; border-color: color-mix(in srgb, var(--brand-primary, #0b74b8) 45%, transparent); }
+html body .ai-chat-launcher .ai-chat-eyes { background: transparent !important; color: #fff; }
+html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-icon { transform: scale(3) !important; color: #fff !important; }
+html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-icon * { -webkit-text-fill-color: currentColor; }
+html body .ai-chat-launcher:has(.ai-chat-eyes) .ai-chat-online { right: 2px; bottom: 2px; }
+@media (max-width: 860px) { html body .ai-chat-launcher:has(.ai-chat-eyes) { width: 56px; height: 56px; } html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-icon { transform: scale(2.6) !important; } }
+html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-face { border-color: #fff !important; background: rgba(255,255,255,.12) !important; }
+html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-face i { background: #fff !important; box-shadow: 0 0 5px rgba(255,255,255,.9) !important; }
+html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-antenna, html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-antenna::before, html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-antenna::after { background: #fff !important; border-color: #fff !important; }
+/* Ad spend report embedded inside the Marketing card */
+html body .app-shell .dh-ads-embed { margin-top: 14px; }
+html body .app-shell .dh-ads-embed > .panel { margin: 0 !important; padding: 0 !important; background: transparent !important; border: 0 !important; box-shadow: none !important; backdrop-filter: none !important; }
+html body .app-shell .dh-ads-embed .panel-heading .eyebrow { display: none; }
+html body .app-shell .dh-ads-embed .panel-heading h2 { font-size: 14px !important; }
+/* ===== Mobile top bar: sticky, compact, no AI button (the chat widget is the assistant) ===== */
+@media (max-width: 860px) {
+  html body .app-shell.topnav-layout .tn-bar { position: sticky !important; top: 0; z-index: 1200; margin: 0 -12px 10px !important; padding: calc(8px + env(safe-area-inset-top, 0px)) 10px 8px !important; border-radius: 0 0 18px 18px !important; display: flex !important; align-items: center; gap: 8px; flex-wrap: nowrap !important; }
+  html body .app-shell.topnav-layout .tn-brand .tn-bot-logo, html body .app-shell.topnav-layout .ai-assistant-quick-link { display: none !important; }
+  html body .app-shell.topnav-layout .tn-brand .tn-logo:not(.tn-logo-client) { display: grid !important; place-items: center; width: 36px; height: 36px; overflow: hidden; border-radius: 10px; }
+  html body .app-shell.topnav-layout .tn-brand .tn-logo img { max-width: 34px !important; max-height: 34px !important; object-fit: contain; }
+  html body .app-shell.topnav-layout .tn-left { display: flex !important; align-items: center; gap: 6px; min-width: 0; flex: 1 1 auto; }
+  html body .app-shell.topnav-layout .tn-left .client-scope { min-width: 0; flex: 0 1 auto; }
+  html body .app-shell.topnav-layout .tn-left .client-scope > label { display: none !important; }
+  html body .app-shell.topnav-layout .tn-left .client-scope-trigger { display: inline-flex !important; align-items: center; gap: 4px; max-width: 118px; height: 36px; padding: 0 10px !important; border-radius: 12px !important; font-size: 13px !important; }
+  html body .app-shell.topnav-layout .tn-left .client-scope-trigger svg { flex: none; width: 14px; height: 14px; }
+  html body .app-shell.topnav-layout .tn-left .client-scope-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  html body .app-shell.topnav-layout .tn-left .client-scope-caret { flex: none; position: static !important; margin: 0 !important; }
+  html body .app-shell.topnav-layout .tn-right { flex: none; display: flex !important; align-items: center; gap: 4px; }
+  html body .app-shell.topnav-layout .tn-right .top-actions { display: flex !important; gap: 4px; }
+  html body .app-shell.topnav-layout .tn-right .icon-button, html body .app-shell.topnav-layout .tn-right .profile-trigger { width: 34px !important; height: 34px !important; min-width: 34px; padding: 0 !important; border-radius: 10px !important; }
+  html body .app-shell.topnav-layout .tn-right :is(.install-app-button, .notes-quick-trigger, .theme-toggle) { display: none !important; }
+}
+@media (max-width: 420px) {
+  html body .app-shell.topnav-layout .tn-left .client-scope-trigger { max-width: 96px; }
+  html body .app-shell.topnav-layout .tn-right .activity-quick-trigger { display: none !important; }
+}
+/* Launcher bot size fix: fits inside the bubble */
+html body .ai-chat-launcher .ai-chat-eyes { overflow: hidden; }
+html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-icon { transform: translateY(-1px) scale(1.7) !important; }
+@media (max-width: 860px) { html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-icon { transform: translateY(-1px) scale(1.5) !important; } }
+/* AI employees picker + data rows in the chat widget */
+html body .ai-emp-wrap { position: relative; min-width: 0; display: grid; }
+html body .ai-emp-trigger { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; border-radius: 8px; padding: 1px 6px 1px 0; }
+html body .ai-emp-trigger:hover b { text-decoration: underline; text-underline-offset: 3px; }
+html body .ai-emp-menu { position: absolute; top: calc(100% + 8px); left: -6px; width: 290px; max-height: 360px; overflow: auto; z-index: 5; background: #fff; border: 1px solid #e4e9ee; border-radius: 14px; box-shadow: 0 18px 40px rgba(16,24,40,.18); padding: 6px; display: grid; gap: 2px; }
+html body .ai-emp-menu button { all: unset; cursor: pointer; display: flex; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 10px; }
+html body .ai-emp-menu button:hover, html body .ai-emp-menu button.is-on { background: color-mix(in srgb, var(--brand-primary, #1f6feb) 10%, #fff); }
+html body .ai-emp-menu b { display: block; font-size: 13.5px; color: #101828; -webkit-text-fill-color: #101828; }
+html body .ai-emp-menu small { display: block; font-size: 11.5px; color: #667085; -webkit-text-fill-color: #667085; }
+html body .ai-emp-ico { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: #f2f4f7; font-size: 16px; flex: none; }
+html body .ai-emp-rows { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+html body .ai-emp-row { display: grid; gap: 1px; padding: 7px 9px; border-radius: 10px; background: #f5f7f9; border: 1px solid #e8edf1; }
+html body .ai-emp-row span { font-size: 11px; color: #667085; -webkit-text-fill-color: #667085; }
+html body .ai-emp-row b { font-size: 14.5px; color: #101828; -webkit-text-fill-color: #101828; }
+html body .ai-emp-row.good { background: #effaf3; border-color: #cdebd8; } html body .ai-emp-row.good b { color: #157a43; -webkit-text-fill-color: #157a43; }
+html body .ai-emp-row.expense, html body .ai-emp-row.bad { background: #fff2f2; border-color: #f6d4d4; } html body .ai-emp-row.expense b, html body .ai-emp-row.bad b { color: #b42318; -webkit-text-fill-color: #b42318; }
+body.f2b-dark :is(.ai-emp-menu, #f2b-emp-x) { background: #1d2429 !important; border-color: #33404a !important; }
+body.f2b-dark .ai-emp-menu button:hover, body.f2b-dark .ai-emp-menu button.is-on { background: #26313a !important; }
+body.f2b-dark :is(.ai-emp-menu b, .ai-emp-row b, #f2b-emp-x) { color: #f2f4f7 !important; -webkit-text-fill-color: #f2f4f7 !important; }
+body.f2b-dark :is(.ai-emp-menu small, .ai-emp-row span, #f2b-emp-x) { color: #a8b3bd !important; -webkit-text-fill-color: #a8b3bd !important; }
+body.f2b-dark .ai-emp-ico { background: #26313a !important; }
+body.f2b-dark .ai-emp-row { background: #1a2025 !important; border-color: #33404a !important; }
+body.f2b-dark .ai-emp-row.good { background: #15291e !important; } body.f2b-dark :is(.ai-emp-row.good b, #f2b-emp-x) { color: #6fdc9b !important; -webkit-text-fill-color: #6fdc9b !important; }
+body.f2b-dark .ai-emp-row.expense, body.f2b-dark .ai-emp-row.bad { background: #2c1a1a !important; } body.f2b-dark :is(.ai-emp-row.expense b, .ai-emp-row.bad b, #f2b-emp-x) { color: #ff9b94 !important; -webkit-text-fill-color: #ff9b94 !important; }
+/* Launcher: fixed "normal" bot colours (dark bubble, blue glowing bot) regardless of client brand */
+html body .ai-chat-launcher:has(.ai-chat-eyes) { background: radial-gradient(circle at 30% 25%, #22324a, #0f1724) !important; box-shadow: 0 10px 28px rgba(31,111,235,.35) !important; }
+html body .ai-chat-launcher:has(.ai-chat-eyes)::after { border-color: rgba(66,186,255,.45) !important; }
+html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-face { border-color: #69c5ff !important; background: rgba(66,186,255,.08) !important; }
+html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-face i { background: #42baff !important; box-shadow: 0 0 6px #28aaff !important; }
+html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-antenna, html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-antenna::before, html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-antenna::after { background: #69c5ff !important; border-color: #69c5ff !important; }
+
+/* ===== Mobile fixes ===== */
+@media (max-width: 860px) {
+  /* never let the page slide sideways; wide tab rows scroll inside themselves */
+  html, body { overflow-x: hidden; }
+  html body .app-shell .main-area { max-width: 100vw; overflow-x: clip; }
+  html body .app-shell :is(.crm-tabs, .iv-tabs, .settings-tabs, .ops-tabs, [role="tablist"]) { display: flex !important; flex-wrap: nowrap !important; overflow-x: auto !important; max-width: 100%; scrollbar-width: none; -webkit-overflow-scrolling: touch; gap: 4px; }
+  html body .app-shell :is(.crm-tabs, .iv-tabs, .settings-tabs, .ops-tabs, [role="tablist"])::-webkit-scrollbar { display: none; }
+  html body .app-shell :is(.crm-tabs, .iv-tabs, .settings-tabs, .ops-tabs, [role="tablist"]) > * { flex: none !important; white-space: nowrap; }
+  /* top-bar menu */
+  html body .app-shell.topnav-layout .tn-more { display: inline-grid !important; place-items: center; width: 36px; height: 36px; border-radius: 11px; border: 1px solid rgba(127,138,160,.3); background: transparent; font-size: 17px; cursor: pointer; color: inherit; }
+  html body .app-shell.topnav-layout .tn-right { position: relative; }
+  html body .app-shell.topnav-layout .tn-right .top-actions { display: none !important; }
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions { display: grid !important; position: absolute; top: calc(100% + 10px); right: 0; z-index: 1300; width: 230px; padding: 8px; gap: 2px; border-radius: 16px; background: #fff; border: 1px solid #e4e9ee; box-shadow: 0 18px 40px rgba(16,24,40,.2); }
+  html body.f2b-dark .app-shell.topnav-layout .tn-right.menu-open .top-actions { background: #1d2429; border-color: #33404a; }
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions > :is(button, a, label) { display: flex !important; align-items: center; gap: 10px; width: 100% !important; height: 42px !important; padding: 0 10px !important; border-radius: 10px !important; justify-content: flex-start !important; background: transparent !important; border: 0 !important; font-size: 14px; font-weight: 600; }
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions > :is(button, a):hover { background: rgba(127,138,160,.12) !important; }
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions > :is(button, a)[aria-label]:not(.theme-toggle)::after { content: attr(aria-label); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions .theme-toggle { display: flex !important; }
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions .theme-toggle span { display: inline !important; }
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions :is(.ai-assistant-quick-link, .install-app-button) { display: none !important; }
+  html body .app-shell.topnav-layout .tn-more-backdrop { position: fixed; inset: 0; z-index: 1250; }
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions, html body .app-shell.topnav-layout .tn-more { position: relative; z-index: 1301; }
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions { position: absolute; }
+  /* client logo in the top bar */
+  html body .app-shell.topnav-layout .tn-brand .tn-logo-client { display: grid !important; place-items: center; width: 58px; height: 38px; padding: 3px 5px; border-radius: 11px; background: #fff; border: 1px solid rgba(127,138,160,.25); overflow: hidden; }
+  html body .app-shell.topnav-layout .tn-brand .tn-logo-client img { width: 100% !important; height: 100% !important; max-width: none !important; object-fit: contain; }
+  /* Leads on mobile: pipeline first, minimal chrome */
+  html body .app-shell .crm-heading p, html body .app-shell .crm-heading .crm-eyebrow { display: none !important; }
+  html body .app-shell .crm-heading { display: flex !important; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px !important; }
+  html body .app-shell .crm-heading h1 { font-size: 26px !important; margin: 0 !important; }
+  html body .app-shell .crm-heading .primary-button { padding: 9px 12px !important; font-size: 13px !important; }
+  html body .app-shell .crm-tabs { padding: 4px !important; margin-bottom: 8px !important; }
+  html body .app-shell .crm-toolbar { display: flex !important; flex-wrap: wrap; gap: 8px !important; padding: 8px !important; }
+  html body .app-shell .crm-toolbar > label:first-child { flex: 1 1 100%; }
+  html body .app-shell .crm-toolbar > label > span, html body .app-shell .crm-toolbar > label { font-size: 0; }
+  html body .app-shell .crm-toolbar input, html body .app-shell .crm-toolbar select { font-size: 14px !important; }
+  html body .app-shell .crm-toolbar :is(button.secondary-button) { display: none !important; }
+  html body .app-shell .crm-kanban { display: flex !important; overflow-x: auto !important; scroll-snap-type: x mandatory; gap: 10px !important; padding-bottom: 8px; grid-template-columns: none !important; }
+  html body .app-shell .crm-kanban > .crm-stage { flex: 0 0 86vw !important; max-width: 86vw; scroll-snap-align: start; }
+  /* tasks: quick move shown on mobile */
+  html body .app-shell .task-quick-move { display: inline-block !important; height: 30px; border-radius: 9px; font-size: 12.5px; padding: 0 8px; }
+}
+html body .app-shell .task-quick-move { display: none; }
+/* Lead card: delete at the top beside edit */
+html body .app-shell .crm-opportunity .crm-card-delete-top { position: absolute; top: 8px; right: 44px; z-index: 2; width: 30px; height: 30px; display: inline-grid; place-items: center; padding: 0; border-radius: 9px; border: 1px solid #f3d0d0; background: #fff5f5; color: #c0392b; cursor: pointer; }
+html body .app-shell .crm-opportunity .crm-card-delete-top:hover { background: #fde4e4; }
+html body .app-shell .crm-opportunity .crm-card-top { padding-right: 76px !important; }
+html body.f2b-dark .app-shell .crm-opportunity .crm-card-delete-top { background: rgba(229,72,77,.12); border-color: rgba(229,72,77,.35); color: #ff9b94; }
+.tn-more { display: none; }
+/* Employee menu sits inside the white-text header: force readable colours */
+html body .ai-chat-panel > header .ai-emp-menu :is(b, #f2b-emp-a), html body.f2b-dark .ai-chat-panel > header .ai-emp-menu :is(b, #f2b-emp-a) { color: #101828 !important; -webkit-text-fill-color: #101828 !important; opacity: 1 !important; }
+html body .ai-chat-panel > header .ai-emp-menu :is(small, #f2b-emp-a), html body.f2b-dark .ai-chat-panel > header .ai-emp-menu :is(small, #f2b-emp-a) { color: #667085 !important; -webkit-text-fill-color: #667085 !important; opacity: 1 !important; }
+html body .ai-chat-panel > header .ai-emp-menu :is(span, div, #f2b-emp-a) { color: #101828 !important; -webkit-text-fill-color: #101828 !important; }
+html body .ai-chat-panel > header .ai-emp-menu { background: #fff !important; }
+html body .ai-chat-panel > header .ai-emp-menu .ai-emp-ico { background: #f2f4f7 !important; }
+html body .ai-chat-panel > header .ai-emp-menu button:hover, html body .ai-chat-panel > header .ai-emp-menu button.is-on { background: color-mix(in srgb, var(--brand-primary, #1f6feb) 10%, #fff) !important; }
+html body .ai-chat-panel > header .ai-emp-trigger b { text-decoration: none !important; }
+/* Scheduling: inline Ask AI bar removed (the chat widget does this) */
+html body .app-shell .sch-ai-bar { display: none !important; }
+/* Launcher: light tile with blue bot (normal colours) */
+html body .ai-chat-launcher:has(.ai-chat-eyes) { background: #fff !important; box-shadow: 0 8px 24px rgba(16,24,40,.18) !important; }
+html body.f2b-dark .ai-chat-launcher:has(.ai-chat-eyes) { background: #1b2430 !important; }
+html body .ai-chat-launcher:has(.ai-chat-eyes)::after { border-color: rgba(66,186,255,.35) !important; }
+html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-face { border-color: #2f9ff5 !important; background: transparent !important; }
+html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-face i { background: #2f9ff5 !important; box-shadow: 0 0 5px rgba(47,159,245,.7) !important; }
+html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-antenna, html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-antenna::before, html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-antenna::after { background: #2f9ff5 !important; border-color: #2f9ff5 !important; }
+/* Task filters: clean selects */
+html body .app-shell .pipeline-toolbar label { display: inline-flex !important; align-items: center; gap: 6px; padding: 0 !important; border: 0 !important; background: transparent !important; font-size: 12px; font-weight: 600; }
+html body .app-shell .pipeline-toolbar select { height: 34px !important; padding: 0 28px 0 10px !important; border-radius: 10px !important; border: 1px solid rgba(127,138,160,.35) !important; font-size: 13px !important; font-weight: 600 !important; box-shadow: none !important; outline: none; max-width: 170px; }
+/* Task group ring: count sits in the ring, no extra bubbles */
+html body .app-shell .tt-group-ring { position: relative; width: 26px; height: 26px; }
+html body .app-shell .tt-group-ring small { display: none !important; }
+html body .app-shell .tt-group-ring b.tt-ring-n { position: absolute; inset: 0; display: grid; place-items: center; font-size: 10px; font-weight: 700; }
+/* Conversations on mobile: list OR thread, thread fills the screen with the reply box always visible */
+html body .app-shell .cv-back { display: none; }
+@media (max-width: 700px) {
+  html body .app-shell .cv-grid { display: flex !important; flex-direction: column; min-height: 0 !important; }
+  html body .app-shell .cv-grid > .cv-list { flex: 1 1 auto; min-height: 0; overflow: auto; border-right: 0 !important; }
+  html body .app-shell .cv-grid > .cv-chat { display: none !important; }
+  html body .app-shell .cv-grid.has-thread > .cv-list { display: none !important; }
+  html body .app-shell .cv-grid.has-thread > .cv-chat { display: flex !important; flex: 1 1 auto; min-height: 0; }
+  html body .app-shell .cv-back { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; border: 1px solid rgba(127,138,160,.3); background: transparent; font-size: 22px; line-height: 1; cursor: pointer; color: inherit; flex: none; }
+  html body .app-shell .cv-chat-head { flex-wrap: nowrap !important; }
+  html body .app-shell .cv-chat-head > div:nth-child(2) { min-width: 0; flex: 1; }
+  html body .app-shell .cv-chat-head b, html body .app-shell .cv-chat-head small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+  html body .app-shell .cv-compose { position: sticky; bottom: 0; }
+  html body .app-shell .crm-notice, html body .app-shell .cv-banner { font-size: 12px !important; padding: 8px 10px !important; }
+}
+@media (max-width: 860px) {
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions > :is(button, a)[title]:not([aria-label])::after { content: attr(title); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions .activity-quick-trigger { display: flex !important; }
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions .activity-quick-trigger::after { content: "Recent activity" !important; }
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions .profile-trigger::after { content: "Profile" !important; }
+}
+/* Launcher: always a dark background with the blue bot (light and dark mode) */
+html body .ai-chat-launcher:has(.ai-chat-eyes), html body.f2b-dark .ai-chat-launcher:has(.ai-chat-eyes) { background: radial-gradient(circle at 30% 25%, #1f2a3a, #0d141f) !important; box-shadow: 0 8px 24px rgba(13,20,31,.35) !important; }
+html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-face { border-color: #42b4ff !important; }
+html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-face i { background: #42b4ff !important; box-shadow: 0 0 6px rgba(66,180,255,.85) !important; }
+html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-antenna, html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-antenna::before, html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-antenna::after { background: #42b4ff !important; border-color: #42b4ff !important; }
+/* Dashboard: pending approvals (yellow waiting, green all done) */
+html body .app-shell .dh-approvals { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+html body .app-shell .dh-approval { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; cursor: pointer; text-align: left; border: 1px solid; transition: transform .15s; }
+html body .app-shell .dh-approval:hover { transform: translateY(-2px); }
+html body .app-shell .dh-approval.waiting { background: #fff8e1; border-color: #f5d77a; }
+html body .app-shell .dh-approval.clear { background: #effaf3; border-color: #cdebd8; }
+html body .app-shell .dh-approval-icon { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; flex: none; background: #fff; }
+html body .app-shell .dh-approval.waiting .dh-approval-icon { color: #b07800; } html body .app-shell .dh-approval.clear .dh-approval-icon { color: #1f8a4c; }
+html body .app-shell .dh-approval-text { flex: 1; min-width: 0; display: grid; }
+html body .app-shell .dh-approval-text b { font-size: 14px; color: #101828; } html body .app-shell .dh-approval-text small { font-size: 12px; color: #667085; }
+html body .app-shell .dh-approval-n { min-width: 36px; height: 36px; padding: 0 10px; border-radius: 999px; display: grid; place-items: center; font-weight: 800; font-size: 16px; color: #fff; }
+html body .app-shell .dh-approval.waiting .dh-approval-n { background: #f0b400; } html body .app-shell .dh-approval.clear .dh-approval-n { background: #22a55b; }
+body.f2b-dark .app-shell .dh-approval.waiting { background: #2d2610 !important; border-color: #6b5413 !important; }
+body.f2b-dark .app-shell .dh-approval.clear { background: #15291e !important; border-color: #24533a !important; }
+body.f2b-dark .app-shell .dh-approval-icon { background: rgba(255,255,255,.06) !important; }
+body.f2b-dark :is(.app-shell .dh-approval-text b, #f2b-appr-x) { color: #f2f4f7 !important; -webkit-text-fill-color: #f2f4f7 !important; }
+body.f2b-dark :is(.app-shell .dh-approval-text small, #f2b-appr-x) { color: #a8b3bd !important; -webkit-text-fill-color: #a8b3bd !important; }
+body.f2b-dark :is(.app-shell .dh-approval-n, #f2b-appr-x) { color: #fff !important; -webkit-text-fill-color: #fff !important; }
+@media (max-width: 520px) { html body .app-shell .dh-approvals { grid-template-columns: 1fr; } }
+/* Chat launcher: slight gentle bob */
+html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-icon { animation: f2b-bot-bob 3.2s ease-in-out infinite; }
+@keyframes f2b-bot-bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -2px; } }
+/* Dashboard: lead pipeline chevrons + recent enquiries */
+html body .app-shell .dh-chevrons { display: flex; gap: 0; margin: 14px 0 6px; overflow-x: auto; scrollbar-width: none; padding: 2px; }
+html body .app-shell .dh-chevron { flex: 1 0 110px; position: relative; display: grid; justify-items: center; gap: 1px; padding: 10px 18px 10px 26px; border: 0; cursor: pointer; background: #eef4ff; color: #1d4ed8; clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%, 14px 50%); margin-right: -8px; transition: filter .15s; }
+html body .app-shell .dh-chevron:first-child { clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%); padding-left: 16px; border-radius: 12px 0 0 12px; }
+html body .app-shell .dh-chevron:last-child { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 14px 50%); border-radius: 0 12px 12px 0; margin-right: 0; }
+html body .app-shell .dh-chevron:hover { filter: brightness(.96); }
+html body .app-shell .dh-chevron:nth-child(2) { background: #e8f6ff; color: #0369a1; } html body .app-shell .dh-chevron:nth-child(3) { background: #f1ebff; color: #6d28d9; }
+html body .app-shell .dh-chevron:nth-child(4) { background: #fff4e5; color: #b45309; } html body .app-shell .dh-chevron:nth-child(5) { background: #ffeef2; color: #be185d; }
+html body .app-shell .dh-chevron:nth-child(6) { background: #e9f8f1; color: #047857; } html body .app-shell .dh-chevron:nth-child(7) { background: #eaf7ee; color: #15803d; }
+html body .app-shell .dh-chevron.won { background: #dcf4e4 !important; color: #157a43 !important; } html body .app-shell .dh-chevron.lost { background: #fde8e8 !important; color: #b42318 !important; }
+html body .app-shell .dh-chevron b { font-size: 20px; line-height: 1.1; color: inherit; } html body .app-shell .dh-chevron span { font-size: 11.5px; font-weight: 600; white-space: nowrap; color: inherit; } html body .app-shell .dh-chevron small { font-size: 10.5px; opacity: .75; color: inherit; }
+body.f2b-dark .app-shell .dh-chevron { filter: brightness(.55) saturate(1.3); } body.f2b-dark .app-shell .dh-chevron :is(b, span, small) { filter: brightness(2.2); }
+html body .app-shell .dh-recent { margin: 14px 0 6px; }
+html body .app-shell .dh-recent-head { display: flex; justify-content: space-between; align-items: center; } html body .app-shell .dh-recent-head h3 { margin: 0; font-size: 14px; }
+html body .app-shell .dh-recent-table { display: grid; margin-top: 6px; }
+html body .app-shell .dh-recent-row { display: grid; grid-template-columns: minmax(0, 2.2fr) 1.2fr .8fr 1fr .6fr; align-items: center; gap: 10px; padding: 8px 6px; border-bottom: 1px solid rgba(127,138,160,.15); cursor: pointer; font-size: 13px; }
+html body .app-shell .dh-recent-row:hover { background: rgba(127,138,160,.07); }
+html body .app-shell .dh-recent-who { display: flex; align-items: center; gap: 10px; min-width: 0; }
+html body .app-shell .dh-recent-who img, html body .app-shell .dh-recent-who > i { width: 30px; height: 30px; border-radius: 999px; object-fit: contain; background: #fff; border: 1px solid #e8edf1; flex: none; display: grid; place-items: center; font-style: normal; font-weight: 700; font-size: 12px; color: #475467; }
+html body .app-shell .dh-recent-who span { display: grid; min-width: 0; } html body .app-shell .dh-recent-who b, html body .app-shell .dh-recent-who small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } html body .app-shell .dh-recent-who small { color: #667085; font-size: 11.5px; }
+html body .app-shell .dh-recent-src, html body .app-shell .dh-recent-date { color: #667085; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html body .app-shell .dh-recent-val { font-weight: 700; }
+html body .app-shell .dh-recent-stage { justify-self: start; padding: 3px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700; background: #eef2ff; color: #4338ca; white-space: nowrap; }
+html body .app-shell .dh-recent-stage.won { background: #dcf4e4; color: #157a43; } html body .app-shell .dh-recent-stage.lost { background: #fde8e8; color: #b42318; }
+@media (max-width: 700px) { html body .app-shell .dh-recent-row { grid-template-columns: minmax(0, 1fr) auto; } html body .app-shell .dh-recent-src, html body .app-shell .dh-recent-date, html body .app-shell .dh-recent-val { display: none; } }
+body.f2b-dark .app-shell .dh-recent-who img, body.f2b-dark .app-shell .dh-recent-who > i { background: #1d2429; border-color: #33404a; }
+/* Launcher: dark rounded tile */
+html body .ai-chat-launcher:has(.ai-chat-eyes) { border-radius: 20px !important; }
+html body .ai-chat-launcher:has(.ai-chat-eyes)::after { border-radius: 24px !important; }
+html body .ai-chat-launcher:has(.ai-chat-eyes) .ai-chat-eyes { border-radius: 20px; }
+/* AI lives in the chat widget only: no AI buttons in the top bar */
+html body .app-shell .tn-right .ai-assistant-quick-link, html body .app-shell .tn-brand .tn-bot-logo { display: none !important; }
+html body .app-shell.topnav-layout .tn-brand .tn-logo:not(.tn-logo-client) { display: grid !important; }
+/* Sample data toggle */
+html body .app-shell .dh-sample-toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; cursor: pointer; justify-self: end; }
+html body .app-shell .dh-sample-banner { padding: 8px 12px; border-radius: 12px; background: #fff8e1; border: 1px solid #f5d77a; font-size: 12.5px; font-weight: 600; color: #8a6100; }
+body.f2b-dark .app-shell .dh-sample-banner { background: #2d2610; border-color: #6b5413; color: #f5d77a; }
+/* Scheduling: calendar in full view — fills the window, scrolls inside, day headers stay visible; AI example chips removed */
+html body .app-shell .sch-ai-chips { display: none !important; }
+html body .app-shell .sch-week-card { display: flex; flex-direction: column; height: calc(100dvh - 110px); min-height: 560px; }
+html body .app-shell .sch-week-card .sch-week { flex: 1 1 auto; min-height: 0; overflow: auto !important; }
+html body .app-shell .sch-week-card .sch-day-head { position: sticky; top: 0; z-index: 3; background: var(--surface, #fff); }
+html body.f2b-dark .app-shell .sch-week-card .sch-day-head, html body .app-shell.dark-mode .sch-week-card .sch-day-head { background: #1f262c; }
+html body .app-shell .sch-connect-pair { display: inline-flex; gap: 6px; }
+html body .app-shell .sch-add-staff { display: grid; place-items: center; align-content: center; gap: 6px; min-height: 220px; border: 2px dashed rgba(127,138,160,.4) !important; background: transparent !important; cursor: pointer; text-align: center; color: inherit; }
+html body .app-shell .sch-add-staff:hover { border-color: var(--brand-primary, #1f6feb) !important; }
+html body .app-shell .sch-add-plus { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; font-size: 22px; background: color-mix(in srgb, var(--brand-primary, #1f6feb) 14%, transparent); color: var(--brand-primary, #1f6feb); }
+html body .app-shell .sch-add-staff small { opacity: .7; font-size: 12px; }
+/* Dashboard: split columns 3-up + campaign selectors + expense rows */
+html body .app-shell .dh-split { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+@media (max-width: 1000px) { html body .app-shell .dh-split { grid-template-columns: 1fr !important; } }
+html body .app-shell .dh-split-head { flex-wrap: wrap; }
+html body .app-shell .dh-camp { margin-left: auto; max-width: 60%; height: 30px; border-radius: 9px; font-size: 12px; padding: 0 8px; border: 1px solid rgba(127,138,160,.35); }
+html body .app-shell .dh-split-row.expense { background: #fff2f2; } html body .app-shell .dh-split-row.expense b { color: #b42318; }
+body.f2b-dark .app-shell .dh-split-row.expense { background: #2c1a1a !important; } body.f2b-dark :is(.app-shell .dh-split-row.expense b, #f2b-exp-x) { color: #ff9b94 !important; -webkit-text-fill-color: #ff9b94 !important; }
+/* Ad spend report: tidy, matching sizes, spend in red */
+html body .app-shell .dh-ads-wrap > .panel { padding: 16px 18px !important; }
+html body .app-shell .dh-ads-wrap .panel-heading .eyebrow { display: none; }
+html body .app-shell .dh-ads-wrap .panel-heading h2 { font-size: 17px !important; margin: 0 0 2px !important; color: #b42318 !important; -webkit-text-fill-color: #b42318 !important; }
+body.f2b-dark :is(.app-shell .dh-ads-wrap .panel-heading h2, #f2b-ads-h) { color: #ff9b94 !important; -webkit-text-fill-color: #ff9b94 !important; }
+html body .app-shell .dh-ads-wrap .panel-heading p { font-size: 12.5px !important; opacity: .75; }
+html body .app-shell .ad-report-card { padding: 14px !important; border-radius: 14px !important; }
+html body .app-shell .ad-report-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+html body .app-shell .ad-report-head b, html body .app-shell .ad-report-head h3 { font-size: 15px !important; }
+html body .app-shell .ad-report-head select { margin-left: auto; max-width: 55%; height: 32px; border-radius: 9px; font-size: 13px; }
+html body .app-shell .ad-report-stats { display: grid !important; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)) !important; gap: 8px !important; }
+html body .app-shell .ad-report-stats > div { display: grid; gap: 2px; padding: 10px 12px !important; border-radius: 10px !important; background: rgba(127,138,160,.08); }
+html body .app-shell .ad-report-stats > div b { font-size: 18px !important; line-height: 1.2; }
+html body .app-shell .ad-report-stats > div span { font-size: 11.5px !important; opacity: .75; }
+html body .app-shell .ad-report-off p, html body .app-shell .ad-report-card p { font-size: 13px !important; }
+/* Dashboard: Search Console top pages / searches / trending */
+html body .app-shell .dh-gsc { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 4px; }
+html body .app-shell .dh-gsc-col { border: 1px solid #e8edf1; border-radius: 14px; padding: 4px 12px 10px; background: #fff; }
+html body .app-shell .dh-gsc-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(127,138,160,.12); font-size: 13px; }
+html body .app-shell .dh-gsc-row:last-child { border-bottom: 0; }
+html body .app-shell .dh-gsc-row span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html body .app-shell .dh-gsc-row b.good { color: #157a43; }
+html body .app-shell .dh-gsc-row small { grid-column: 1 / -1; font-size: 11px; color: #8a96a3; }
+@media (max-width: 900px) { html body .app-shell .dh-gsc { grid-template-columns: 1fr; } }
+body.f2b-dark .app-shell .dh-gsc-col { background: #1a2025 !important; border-color: #33404a !important; }
+body.f2b-dark :is(.app-shell .dh-gsc-row b.good, #f2b-gsc-x) { color: #6fdc9b !important; -webkit-text-fill-color: #6fdc9b !important; }
+/* Lead card: big back / forward stage buttons */
+html body .app-shell .crm-stage-arrows { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+html body .app-shell .crm-stage-arrow { display: flex; align-items: center; justify-content: flex-start; gap: 6px; height: 40px; padding: 0 12px; border-radius: 12px; border: 1px solid rgba(127,138,160,.3); background: rgba(127,138,160,.08); font-size: 22px; font-weight: 700; line-height: 1; cursor: pointer; color: inherit; min-width: 0; }
+html body .app-shell .crm-stage-arrow.next { justify-content: flex-end; background: var(--brand-primary, #0b74b8); border-color: transparent; color: #fff; -webkit-text-fill-color: #fff; }
+html body .app-shell .crm-stage-arrow span { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html body .app-shell .crm-stage-arrow:disabled { opacity: .35; cursor: default; }
+/* Top bar in dark mode: logo on white tile, picker matches dark bar */
+body.f2b-dark .app-shell.topnav-layout :is(.tn-brand .tn-logo-client, #f2b-tn-logo) { background: #fff !important; border-color: rgba(255,255,255,.2) !important; }
+body.f2b-dark .app-shell.topnav-layout .tn-left :is(.client-scope-trigger, #f2b-tn-pick) { background: rgba(255,255,255,.07) !important; border: 1px solid rgba(255,255,255,.16) !important; color: #f2f4f7 !important; -webkit-text-fill-color: #f2f4f7 !important; box-shadow: none !important; }
+body.f2b-dark .app-shell.topnav-layout .tn-left .client-scope-trigger :is(span, svg, #f2b-tn-pick) { color: #f2f4f7 !important; -webkit-text-fill-color: #f2f4f7 !important; }
+/* Leads by source: icon per source, headers aligned */
+html body .app-shell .overview-source-table .src-name { display: flex !important; align-items: center; gap: 8px; position: relative; }
+html body .app-shell .src-ico { position: relative; z-index: 1; width: 24px; height: 24px; border-radius: 8px; display: inline-grid; place-items: center; background: color-mix(in srgb, var(--brand-primary, #1f6feb) 14%, transparent); color: var(--brand-primary, #1f6feb); flex: none; }
+html body .app-shell .overview-source-table .head span:first-child { text-align: left !important; justify-self: start !important; }
+html body .app-shell .dh-recent-src { display: inline-flex; align-items: center; gap: 5px; }
+/* Campaign picker with logos + spend */
+html body .cp { position: relative; min-width: 0; flex: 1 1 auto; max-width: 420px; }
+html body .cp-trigger { display: flex; align-items: center; gap: 8px; width: 100%; height: 36px; padding: 0 10px; border-radius: 10px; border: 1px solid rgba(127,138,160,.35); background: rgba(127,138,160,.06); cursor: pointer; color: inherit; font: inherit; font-size: 13px; text-align: left; }
+html body .cp-name { flex: 1; min-width: 0; display: grid; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html body .cp-name > span, html body .cp-name small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html body .cp-name small { font-size: 11px; opacity: .65; }
+html body .cp-spend { flex: none; font-size: 12.5px; color: #b42318; }
+body.f2b-dark :is(.cp-spend, #f2b-cp-x) { color: #ff9b94 !important; -webkit-text-fill-color: #ff9b94 !important; }
+html body .cp-caret { flex: none; opacity: .6; font-size: 11px; }
+html body .cp-logo { width: 22px; height: 22px; border-radius: 6px; object-fit: contain; background: #fff; border: 1px solid rgba(127,138,160,.25); flex: none; }
+html body .cp-logo-fb { display: inline-grid; place-items: center; font-size: 11px; font-weight: 700; color: #475467; background: #f2f4f7; }
+html body .cp-menu { position: absolute; z-index: 60; top: calc(100% + 6px); right: 0; width: min(440px, 92vw); max-height: 380px; overflow: auto; padding: 6px; border-radius: 14px; background: #fff; border: 1px solid #e4e9ee; box-shadow: 0 18px 40px rgba(16,24,40,.2); display: grid; gap: 2px; }
+body.f2b-dark .cp-menu { background: #1d2429; border-color: #33404a; }
+html body .cp-opt { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; border: 0; background: transparent; cursor: pointer; text-align: left; color: inherit; font: inherit; font-size: 13px; }
+html body .cp-opt:hover, html body .cp-opt.is-on { background: rgba(127,138,160,.12); }
+html body .cp-opt.is-paused { opacity: .6; }
+html body .cp-toggle { margin-top: 4px; padding: 8px; border-radius: 10px; border: 1px dashed rgba(127,138,160,.4); background: transparent; cursor: pointer; font-size: 12.5px; color: inherit; }
+html body .cp-empty { margin: 8px; font-size: 12.5px; opacity: .7; }
+html body .dh-camp-wrap { margin-left: auto; min-width: 0; flex: 1 1 200px; display: flex; justify-content: flex-end; }
+html body .ad-report-head .cp { margin-left: auto; }
+/* Dashboard period picker in the top bar */
+html body .app-shell .tn-date-slot:empty { display: none; }
+html body .app-shell .tn-date { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 8px 0 10px; border-radius: 12px; border: 1px solid rgba(127,138,160,.3); font-size: 13px; }
+html body .app-shell .tn-date select, html body .app-shell .tn-date input { border: 0 !important; background: transparent !important; font: inherit; font-weight: 600; color: inherit; height: 32px; padding: 0 2px !important; box-shadow: none !important; }
+html body .app-shell .tn-date input { width: 128px; }
+@media (max-width: 860px) { html body .app-shell .tn-date span { display: none; } html body .app-shell .tn-date select { max-width: 94px; } html body .app-shell .tn-date input { width: 112px; } }
+/* Calendar fits by stretching hours (JS); card no longer forced taller than the window */
+html body .app-shell .sch-week-card { height: auto !important; min-height: 0 !important; }
+html body .app-shell .sch-week-card .sch-week { overflow: visible !important; }
+html body .app-shell .dh-client-note { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; }
+html body .app-shell .dh-client-note img { width: 24px; height: 24px; border-radius: 7px; object-fit: contain; background: #fff; border: 1px solid rgba(127,138,160,.25); }
+html body .app-shell .dh-client-note small { font-weight: 500; opacity: .6; }
+/* Operations → Google Ads: compact controls row (no empty gap) */
+html body .app-shell .google-ads-view-heading.is-embedded { display: flex !important; justify-content: flex-end; align-items: center; margin: 6px 0 10px !important; padding: 0 !important; min-height: 0 !important; }
+html body .app-shell .google-ads-view-heading.is-embedded .google-ads-view-controls { display: flex !important; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; width: 100%; }
+html body .app-shell .google-ads-view-heading.is-embedded .google-ads-view-controls > * { margin: 0 !important; }
+html body .app-shell .google-ads-view-heading.is-embedded .google-ads-view-controls label { display: inline-flex !important; align-items: center; gap: 8px; flex-direction: row !important; }
+html body .app-shell .google-ads-view-heading.is-embedded .google-ads-view-controls label > span { white-space: nowrap; }
+html body .app-shell .google-ads-view-heading.is-embedded select { height: 34px; min-width: 170px; }
+/* Scheduling filters: one clean box (no select-inside-box double border) */
+html body .app-shell .sch-select { display: inline-flex !important; align-items: center; gap: 8px; height: 38px; padding: 0 10px !important; border-radius: 12px !important; border: 1px solid rgba(127,138,160,.35) !important; background: rgba(127,138,160,.06) !important; box-shadow: none !important; }
+html body .app-shell .sch-select select { border: 0 !important; background: transparent !important; box-shadow: none !important; outline: none !important; height: 34px !important; padding: 0 22px 0 0 !important; font-weight: 600; font-size: 13.5px; min-width: 120px; }
+/* Focus-client chip in top bar: readable logo */
+html body .app-shell .client-focus .client-scope-trigger.is-focused { gap: 8px; padding-left: 6px !important; }
+html body .app-shell .client-focus .client-dot.has-logo { width: 26px !important; height: 26px !important; border-radius: 8px !important; background: #fff !important; border: 1px solid rgba(127,138,160,.25); display: inline-grid; place-items: center; overflow: hidden; }
+html body .app-shell .client-focus .client-dot.has-logo img { width: 100% !important; height: 100% !important; object-fit: contain; }
+/* Desktop top bar: never overflow off-screen */
+@media (min-width: 861px) {
+  html body .app-shell.topnav-layout .tn-bar { gap: 12px; }
+  html body .app-shell.topnav-layout .tn-right { min-width: 0; flex-shrink: 1; display: flex; align-items: center; gap: 6px; }
+  html body .app-shell.topnav-layout .tn-right .top-actions { flex-wrap: nowrap; min-width: 0; }
+  html body .app-shell .tn-date select { max-width: 130px; }
+}
+/* Chevrons: no scrollbar line, full height */
+html body .app-shell .dh-chevrons::-webkit-scrollbar { display: none; }
+html body .app-shell .dh-chevron { min-height: 64px; align-content: center; }
+html body .app-shell .dh-chevron:only-child { clip-path: none; border-radius: 12px; padding: 10px 16px; }
+/* Leads by source: landing pages */
+html body .app-shell .src-label { display: grid; min-width: 0; position: relative; z-index: 1; }
+html body .app-shell .src-pages { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+html body .app-shell .src-pages small { font-size: 11px; font-weight: 500; padding: 1px 7px; border-radius: 999px; background: rgba(127,138,160,.12); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Dashboard: appointments with time stamps, stats and date filter */
+html body .app-shell .dh-appt-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+html body .app-shell .dh-appt-filters button, html body .app-shell .dh-appt-filters input { height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(127,138,160,.3); background: transparent; font-size: 12.5px; font-weight: 600; cursor: pointer; color: inherit; }
+html body .app-shell .dh-appt-filters .is-on { background: var(--brand-primary, #0b74b8) !important; border-color: transparent !important; color: #fff !important; -webkit-text-fill-color: #fff !important; }
+html body .app-shell .dh-appt-stats { display: flex; gap: 14px; font-size: 12.5px; color: #667085; margin-bottom: 8px; } html body .app-shell .dh-appt-stats b { color: inherit; font-size: 15px; margin-right: 3px; }
+html body .app-shell .dh-appt-list { list-style: none; margin: 0; padding: 0; display: grid; }
+html body .app-shell .dh-appt-list li { display: grid; grid-template-columns: 52px 34px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 4px; border-bottom: 1px solid rgba(127,138,160,.14); }
+html body .app-shell .dh-appt-list li:last-child { border-bottom: 0; }
+html body .app-shell .dh-appt-list time { font-weight: 700; font-size: 13.5px; display: grid; } html body .app-shell .dh-appt-list time small { font-weight: 500; font-size: 11px; opacity: .65; }
+html body .app-shell .dh-appt-av { width: 34px; height: 34px; border-radius: 999px; display: grid; place-items: center; font-weight: 700; font-size: 13px; background: color-mix(in srgb, var(--brand-primary, #0b74b8) 16%, transparent); color: var(--brand-primary, #0b74b8); }
+html body .app-shell .dh-appt-who { display: grid; min-width: 0; } html body .app-shell .dh-appt-who b { font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } html body .app-shell .dh-appt-who small { font-size: 11.5px; color: #667085; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } html body .app-shell .dh-appt-staff { font-weight: 600; }
+html body .app-shell .dh-appt-status { padding: 4px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+html body .app-shell .dh-appt-status.ok { background: #e7f6ec; color: #157a43; } html body .app-shell .dh-appt-status.live { background: #e8f0ff; color: #1d4ed8; } html body .app-shell .dh-appt-status.pending { background: #fff4e0; color: #b45309; } html body .app-shell .dh-appt-status.done { background: #eef1f4; color: #667085; } html body .app-shell .dh-appt-status.bad { background: #fde8e8; color: #b42318; }
+body.f2b-dark .app-shell .dh-appt-status.ok { background: #15291e; color: #6fdc9b; } body.f2b-dark .app-shell .dh-appt-status.live { background: #172440; color: #8fb4ff; } body.f2b-dark .app-shell .dh-appt-status.pending { background: #2d2610; color: #f5c46b; } body.f2b-dark .app-shell .dh-appt-status.done { background: #232a30; color: #a8b3bd; } body.f2b-dark .app-shell .dh-appt-status.bad { background: #3a1f1f; color: #ff9b94; }
+body.f2b-dark :is(.app-shell .dh-appt-who small, .app-shell .dh-appt-stats, #f2b-appt-x) { color: #a8b3bd !important; -webkit-text-fill-color: #a8b3bd !important; }
+/* Scheduling → Dashboard: appointments with time stamps + staff availability */
+html body .app-shell .sch-dash { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 14px; }
+@media (max-width: 1000px) { html body .app-shell .sch-dash { grid-template-columns: 1fr; } }
+html body .app-shell .sch-dash-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+html body .app-shell .sch-dash-head h3 { margin: 0; font-size: 16px; }
+html body .app-shell .sch-dash-nav { display: flex; align-items: center; gap: 6px; }
+html body .app-shell .sch-dash-nav input { height: 32px; border-radius: 9px; padding: 0 8px; font: inherit; font-size: 13px; }
+html body .app-shell .sch-dash-stats { display: flex; gap: 14px; font-size: 12.5px; opacity: .8; margin-bottom: 6px; } html body .app-shell .sch-dash-stats b { font-size: 15px; margin-right: 3px; }
+html body .app-shell .sch-dash-list { list-style: none; margin: 0; padding: 0; }
+html body .app-shell .sch-dash-list li { display: grid; grid-template-columns: 52px 34px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 4px; border-bottom: 1px solid rgba(127,138,160,.14); cursor: pointer; border-radius: 8px; }
+html body .app-shell .sch-dash-list li:hover { background: rgba(127,138,160,.07); }
+html body .app-shell .sch-dash-list time { font-weight: 700; font-size: 13.5px; }
+html body .app-shell .sch-dash-av { width: 34px; height: 34px; border-radius: 999px; display: grid; place-items: center; font-weight: 700; font-size: 13px; background: color-mix(in srgb, var(--c) 18%, transparent); color: var(--c); }
+html body .app-shell .sch-dash-who { display: grid; min-width: 0; } html body .app-shell .sch-dash-who b { font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } html body .app-shell .sch-dash-who small { font-size: 11.5px; opacity: .7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } html body .app-shell .sch-dash-staff { font-weight: 600; }
+html body .app-shell .sch-dash-status { padding: 4px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+html body .app-shell .sch-dash-status.ok { background: #e7f6ec; color: #157a43; } html body .app-shell .sch-dash-status.live { background: #e8f0ff; color: #1d4ed8; } html body .app-shell .sch-dash-status.done { background: #eef1f4; color: #667085; } html body .app-shell .sch-dash-status.bad { background: #fde8e8; color: #b42318; }
+body.f2b-dark .app-shell .sch-dash-status.ok { background: #15291e; color: #6fdc9b; } body.f2b-dark .app-shell .sch-dash-status.live { background: #172440; color: #8fb4ff; } body.f2b-dark .app-shell .sch-dash-status.done { background: #232a30; color: #a8b3bd; } body.f2b-dark .app-shell .sch-dash-status.bad { background: #3a1f1f; color: #ff9b94; }
+html body .app-shell .sch-dash-empty { padding: 18px 4px; }
+html body .app-shell .sch-dash-staff-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+html body .app-shell .sch-dash-person { display: grid; gap: 6px; align-content: start; }
+html body .app-shell .sch-dash-person-top { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; } html body .app-shell .sch-dash-person-top div { display: grid; min-width: 0; } html body .app-shell .sch-dash-person-top b { font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } html body .app-shell .sch-dash-person-top small { font-size: 11.5px; opacity: .7; }
+html body .app-shell .sch-slot { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 8px; border-radius: 9px; font-size: 12px; background: rgba(127,138,160,.07); }
+html body .app-shell .sch-slot em { font-style: normal; font-weight: 700; font-size: 11px; padding: 2px 8px; border-radius: 999px; }
+html body .app-shell .sch-slot.booked em { background: #fde8e8; color: #b42318; } html body .app-shell .sch-slot.free em { background: #e7f6ec; color: #157a43; }
+html body .app-shell .sch-slot.off { justify-content: center; opacity: .6; font-style: italic; }
+body.f2b-dark .app-shell .sch-slot.booked em { background: #3a1f1f; color: #ff9b94; } body.f2b-dark .app-shell .sch-slot.free em { background: #15291e; color: #6fdc9b; }
+/* Delete lives in the edit popup (bottom-left) for lead cards and tasks */
+html body .modal-delete-button { margin-right: auto; display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 14px; border-radius: 10px; border: 1px solid #f3d0d0; background: #fff5f5; color: #c0392b; font-weight: 700; cursor: pointer; }
+html body .modal-delete-button:hover { background: #fde4e4; }
+body.f2b-dark .modal-delete-button { background: rgba(229,72,77,.12); border-color: rgba(229,72,77,.35); color: #ff9b94; }
+html body .crm-modal footer, html body .modal-actions { display: flex; align-items: center; gap: 8px; }
+html body .app-shell .crm-opportunity .crm-card-top { padding-right: 40px !important; }
+/* Task table: clean group rows, visible caret, zebra rows */
+html body .app-shell .tt-group td { background: transparent !important; box-shadow: none !important; border: 0 !important; }
+html body .app-shell .tt-group-toggle { outline: none !important; box-shadow: none !important; border-radius: 8px; }
+html body .app-shell .tt-group-toggle:focus-visible { box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-primary, #1f6feb) 45%, transparent) !important; }
+html body .app-shell .tt-group-toggle::before { display: none !important; }
+html body .app-shell .tt-group-toggle .tt-caret { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 7px; font-size: 13px !important; line-height: 1; color: #344054 !important; -webkit-text-fill-color: #344054 !important; background: rgba(127,138,160,.14); }
+body.f2b-dark :is(.app-shell .tt-group-toggle .tt-caret, #f2b-caret-x) { color: #e6eaee !important; -webkit-text-fill-color: #e6eaee !important; background: rgba(255,255,255,.1) !important; }
+html body .app-shell .tt-table tbody tr.tt-row:nth-child(odd) td { background: rgba(127,138,160,.06); }
+html body .app-shell .tt-table tbody tr.tt-row:nth-child(even) td { background: transparent; }
+html body .app-shell .tt-table tbody tr.tt-row:hover td { background: color-mix(in srgb, var(--brand-primary, #1f6feb) 8%, transparent) !important; }
+html body .app-shell .tt-row:last-child td:first-child, html body .app-shell .tt-row:last-child td:last-child { border-radius: 0 !important; }
+/* Task group toggle: no box on hover/focus/click */
+html body .app-shell :is(.tt-group-toggle, .tt-group-toggle:hover, .tt-group-toggle:focus, .tt-group-toggle:active, .tt-group-toggle:focus-visible, #f2b-tt-tg) { border: 0 !important; outline: 0 !important; box-shadow: none !important; background: transparent !important; transform: none !important; padding: 0 !important; }
+/* ===== Mobile: nothing wider than the screen ===== */
+@media (max-width: 860px) {
+  html body .app-shell.topnav-layout .tn-bar { margin-left: 0 !important; margin-right: 0 !important; }
+  html body .app-shell .main-area, html body .app-shell .main-area > * { max-width: 100% !important; min-width: 0 !important; box-sizing: border-box; }
+  html body .app-shell .main-area :is(section, .panel, .iv-card, .studio-panel, .crm-workspace, .task-table-view) { max-width: 100%; min-width: 0; box-sizing: border-box; }
+  html body .app-shell .tt-toolbar, html body .app-shell .tt-views { display: flex !important; flex-wrap: wrap !important; max-width: 100% !important; gap: 6px; }
+  html body .app-shell .tt-views { flex-wrap: nowrap !important; overflow-x: auto !important; scrollbar-width: none; }
+  html body .app-shell .tt-views::-webkit-scrollbar { display: none; }
+  html body .app-shell .tt-wrap { max-width: 100% !important; overflow-x: hidden !important; }
+  /* task table becomes a simple list: task + status only */
+  html body .app-shell .tt-table { table-layout: auto !important; width: 100% !important; min-width: 0 !important; }
+  html body .app-shell .tt-table :is(th, td):nth-child(n+3):not(:nth-child(4)) { display: none !important; }
+  html body .app-shell .tt-table .tt-group td { display: table-cell !important; }
+  html body .app-shell .tt-table :is(th, td):first-child { width: 34px; padding-left: 10px !important; }
+  html body .app-shell .tt-table td:nth-child(2) { white-space: normal !important; word-break: break-word; }
+  html body .app-shell .tt-table td:nth-child(4) select { max-width: 112px; }
+  html body .app-shell .ai-approval-tab, html body .app-shell .task-view-switch-row { max-width: 100%; flex-wrap: wrap; }
+  html body .app-shell .task-view-switch-row, html body .app-shell [class*="task-tabs"], html body .app-shell [class*="view-tabs"] { overflow-x: auto; scrollbar-width: none; }
+  html body .app-shell .pipeline-toolbar { flex-wrap: wrap !important; max-width: 100%; }
+  html body .app-shell .pipeline-toolbar select { max-width: 100% !important; }
+}
+/* ===== Mobile: straight to the point on every section ===== */
+@media (max-width: 860px) {
+  /* page headers: title + main action on one line, no eyebrow/description */
+  html body .app-shell :is(.page-heading, .welcome-row, .crm-heading, .iv-head, .activity-page-heading) :is(.eyebrow, p.muted, .muted, .crm-eyebrow) { display: none !important; }
+  html body .app-shell :is(.page-heading, .iv-head) > div:first-child > p:not(.eyebrow) { display: none !important; }
+  html body .app-shell :is(.page-heading, .welcome-row, .iv-head) { display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: space-between; gap: 10px; flex-wrap: nowrap !important; margin-bottom: 10px !important; }
+  html body .app-shell :is(.page-heading, .welcome-row, .iv-head) h1 { font-size: 26px !important; line-height: 1.1; margin: 0 !important; }
+  html body .app-shell :is(.page-heading, .iv-head) :is(.primary-button) { padding: 9px 12px !important; font-size: 13px !important; white-space: nowrap; }
+  /* Tasks: hide secondary header buttons, compact toggles */
+  html body .app-shell .task-heading-actions { display: flex !important; gap: 6px; flex-wrap: nowrap; }
+  html body .app-shell .task-heading-actions .task-sound-toggle { display: none !important; }
+  html body .app-shell .task-view-switch-row { display: flex !important; flex-wrap: nowrap !important; gap: 8px !important; }
+  html body .app-shell .task-view-switch-row > label { flex: 1 1 0; min-width: 0; padding: 8px 10px !important; margin: 0 !important; }
+  html body .app-shell .pipeline-toolbar > div:first-child { display: none !important; }
+  html body .app-shell .pipeline-toolbar { padding: 8px !important; gap: 6px !important; }
+  html body .app-shell .pipeline-toolbar label > span { display: none !important; }
+  html body .app-shell .pipeline-toolbar label { flex: 1 1 45%; }
+  html body .app-shell .pipeline-toolbar select { width: 100% !important; max-width: none !important; }
+  /* generic: hide long helper paragraphs under section headers */
+  html body .app-shell :is(.panel-heading, .lead-section-heading, .iv-card-head) > div > p { display: none !important; }
+}
+
+/* Mobile top bar: fixed to the top (always visible on scroll), same colours as desktop */
+@media (max-width: 860px) {
+  html body .app-shell.topnav-layout .tn-bar { position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; width: 100% !important; z-index: 1200 !important; margin: 0 !important; border-radius: 0 0 16px 16px !important; box-shadow: 0 6px 20px rgba(16,24,40,.12); }
+  html body .app-shell.topnav-layout .main-area { padding-top: calc(62px + env(safe-area-inset-top, 0px)) !important; }
+}
+html body .app-shell .rank-setup { display: grid; gap: 6px; padding: 10px 14px; border-radius: 12px; background: #fff8e1; border: 1px solid #f5d77a; margin-bottom: 12px; font-size: 13px; }
+html body .app-shell .rank-setup p { margin: 0; }
+body.f2b-dark .app-shell .rank-setup { background: #2d2610; border-color: #6b5413; }

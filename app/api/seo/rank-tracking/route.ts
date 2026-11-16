@@ -87,7 +87,9 @@ export async function POST(request: Request) {
     await Promise.all(chunk.map(async (kw) => {
       try {
         const task: Record<string, unknown> = { keyword: kw.keyword, language_code: "en", device: kw.device, depth: 100 };
-        if (/^ireland$/i.test(kw.location)) task.location_code = 2372; else task.location_name = kw.location;
+        const IE: Record<string, string> = { dublin: "Dublin,County Dublin,Ireland", galway: "Galway,County Galway,Ireland", cork: "Cork,County Cork,Ireland", limerick: "Limerick,County Limerick,Ireland", waterford: "Waterford,County Waterford,Ireland", kilkenny: "Kilkenny,County Kilkenny,Ireland", sligo: "Sligo,County Sligo,Ireland", athlone: "Athlone,County Westmeath,Ireland" };
+        const loc = String(kw.location || "").trim();
+        if (!loc || /^ireland$/i.test(loc)) task.location_code = 2372; else task.location_name = IE[loc.toLowerCase().replace(/,\s*ireland$/, "")] || loc;
         const response = await fetch("https://api.dataforseo.com/v3/serp/google/organic/live/regular", { method: "POST", headers: { Authorization: auth, "Content-Type": "application/json" }, body: JSON.stringify([task]), signal: AbortSignal.timeout(30_000) });
         const json = await response.json().catch(() => null) as any;
         const t = json?.tasks?.[0];
