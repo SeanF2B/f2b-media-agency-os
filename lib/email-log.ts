@@ -2,8 +2,40 @@
 // Never throws: logging must not break sending.
 type LogDb = { prepare(sql: string): { bind(...values: unknown[]): { run(): Promise<unknown>; first<T = Record<string, unknown>>(): Promise<T | null> }; run(): Promise<unknown> }; batch(statements: unknown[]): Promise<unknown> };
 
-export async function logSystemEmail(db: LogDb | undefined, m: { ownerId?: string; clientId?: string | null; to: string; name?: string; subject: string; text: string }) {
+/** Rough category for the System emails list, from the subject when the caller doesn't say. */
+export function systemEmailKind(subject: string) {
+  const s = subject.toLowerCase();
+  if (/chess/.test(s)) return "Chess";
+  if (/invoice|receipt|payment/.test(s)) return "Invoices";
+  if (/invit|join|sign in|login|workspace access/.test(s)) return "Team invites";
+  if (/appointment|booking|booked|reminder|resched|cancel/.test(s)) return "Scheduling";
+  if (/^\[test\]/.test(s)) return "Tests";
+  if (/lead|enquiry|form|submission/.test(s)) return "Leads & forms";
+  if (/task|approval|review|done|overdue|assigned/.test(s)) return "Tasks";
+  if (/report/.test(s)) return "Reports";
+  return "Notifications";
+}
+const SYSTEM_EMAILS_SQL = "CREATE TABLE IF NOT EXISTS system_emails (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, client_id TEXT NOT NULL DEFAULT '', kind TEXT NOT NULL, to_email TEXT NOT NULL, to_name TEXT NOT NULL DEFAULT '', subject TEXT NOT NULL, body TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL)";
+const SYSTEM_EMAILS_IDX = "CREATE INDEX IF NOT EXISTS system_emails_owner_created_idx ON system_emails(owner_id, created_at DESC)";
+let systemEmailsReady: Promise<unknown> | null = null;
+export function ensureSystemEmailsTable(db: LogDb) {
+  systemEmailsReady ||= db.prepare(SYSTEM_EMAILS_SQL).run().then(() => db.prepare(SYSTEM_EMAILS_IDX).run()).catch((error) => { systemEmailsReady = null; throw error; });
+  return systemEmailsReady;
+}
+
+export async function logSystemEmail(db: LogDb | undefined, m: { ownerId?: string; clientId?: string | null; to: string; name?: string; subject: string; text: string; kind?: string; conversation?: boolean }) {
   if (!db || !m.to) return;
+  // Every system email also lands in Operations → Email → System emails (one indexed insert).
+  try {
+    let owner = m.ownerId || "";
+    if (!owner) owner = (await db.prepare("SELECT owner_id FROM workspace_documents WHERE id='f2b-agency'").bind().first<{ owner_id: string }>())?.owner_id || "";
+    if (owner) {
+      m = { ...m, ownerId: owner };
+      await ensureSystemEmailsTable(db);
+      await db.prepare("INSERT INTO system_emails (id, owner_id, client_id, kind, to_email, to_name, subject, body, created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)").bind(crypto.randomUUID(), owner, m.clientId || "", (m.kind || systemEmailKind(m.subject)).slice(0, 40), m.to.trim().toLowerCase().slice(0, 200), String(m.name || "").slice(0, 120), m.subject.slice(0, 300), m.text.slice(0, 4000), new Date().toISOString()).run();
+    }
+  } catch (error) { console.error("logSystemEmail:system_emails", error); }
+  if (m.conversation === false) return;
   try {
     let ownerId = m.ownerId || "";
     if (!ownerId) ownerId = (await db.prepare("SELECT owner_id FROM workspace_documents WHERE id='f2b-agency'").bind().first<{ owner_id: string }>())?.owner_id || "";

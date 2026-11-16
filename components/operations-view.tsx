@@ -57,7 +57,7 @@ type SeoMode = "keywords" | "competitors" | "ranks" | "audit" | "backlinks" | "l
 type SiteMode = "sites" | "forms" | "media";
 /** Older links/state used more tabs; map them onto the current areas (+ the sub-view they opened). */
 export function normalizeOpsTab(value: string): { tab: OperationsTab; sub?: string } {
-  const legacy: Record<string, { tab: OperationsTab; sub?: string }> = { keywords: { tab: "seo", sub: "keywords" }, local: { tab: "seo", sub: "local" }, ai: { tab: "seo", sub: "ai" }, backlinks: { tab: "seo", sub: "backlinks" }, audits: { tab: "reports", sub: "audits" }, media: { tab: "websites", sub: "media" }, forms: { tab: "websites", sub: "forms" }, automations: { tab: "email", sub: "automations" }, emails: { tab: "email" }, leadfactory: { tab: "overview" } };
+  const legacy: Record<string, { tab: OperationsTab; sub?: string }> = { keywords: { tab: "seo", sub: "keywords" }, local: { tab: "seo", sub: "local" }, ai: { tab: "seo", sub: "ai" }, backlinks: { tab: "seo", sub: "backlinks" }, audits: { tab: "reports", sub: "audits" }, media: { tab: "websites", sub: "media" }, forms: { tab: "websites", sub: "forms" }, automations: { tab: "email", sub: "automations" }, "system-emails": { tab: "email", sub: "system" }, emails: { tab: "email" }, leadfactory: { tab: "overview" } };
   return legacy[value] || { tab: (OPS_TABS.some(([key]) => key === value) || value === "onboarding" ? value : "clients") as OperationsTab };
 }
 export type CommunityResult = { url: string; title: string; snippet: string; platform: string };
@@ -103,11 +103,11 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
   const [siteMode, setSiteMode] = useState<SiteMode>("sites");
   const [reportMode, setReportMode] = useState<"audits" | "reports">("reports");
   const [seoMode, setSeoMode] = useState<SeoMode>("keywords");
-  const [emailStart, setEmailStart] = useState<"campaigns" | "automations">("campaigns");
+  const [emailStart, setEmailStart] = useState<"campaigns" | "automations" | "system">("campaigns");
   // Old links (e.g. "forms", "local", "automations") land on the right section inside the new tabs.
   useEffect(() => {
     if (!sub) return;
-    if (tab === "seo") setSeoMode(sub as SeoMode); else if (tab === "websites") setSiteMode(sub as SiteMode); else if (tab === "reports") setReportMode(sub as "audits"); else if (tab === "email" && sub === "automations") setEmailStart("automations");
+    if (tab === "seo") setSeoMode(sub as SeoMode); else if (tab === "websites") setSiteMode(sub as SiteMode); else if (tab === "reports") setReportMode(sub as "audits"); else if (tab === "email" && (sub === "automations" || sub === "system")) setEmailStart(sub);
     onTab(tab);
   }, [rawTab]); // eslint-disable-line react-hooks/exhaustive-deps
   const [community, setCommunity] = useState<Record<string, { busy?: boolean; error?: string; results?: CommunityResult[]; cost?: number | null; note?: string; usage?: { clientRuns: number; lastRun: string | null; workspaceRuns: number; monthCostUsd: number } }>>({});

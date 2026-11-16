@@ -4,6 +4,7 @@ import "./email-marketing.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Copy, GripVertical, Image as ImageIcon, Minus, Monitor, MousePointerClick, Pause, Play, Plus, Rocket, Save, Send, Smartphone, Sparkles, Trash2, Type, Heading1, MoveVertical, Mail, ChevronLeft } from "lucide-react";
 import { appAlert, appConfirm, appPrompt } from "./app-dialog";
+import { SystemEmailsView } from "./system-emails-view";
 import { BLOCK_TYPES, DEFAULT_STYLE, MERGE_FIELDS, newBlock, renderEmailHtml, type EmailBlock, type EmailStyle } from "@/lib/email-marketing/render";
 
 // Operations → Email: a drag-and-drop Email Builder, AI-assisted campaigns (sequences with wait
@@ -104,8 +105,8 @@ function EmailBuilder({ doc, onChange, clientId, extra }: { doc: Doc; onChange: 
 }
 
 /* ---------------- Main view ---------------- */
-export function EmailMarketingView({ clientId, clientName, clientLogo, clientColor, automations, initialMode = "campaigns" }: { clientId: string; clientName: string; clientLogo?: string; clientColor?: string; automations?: React.ReactNode; initialMode?: "campaigns" | "builder" | "automations" }) {
-  const [mode, setMode] = useState<"campaigns" | "builder" | "automations">(initialMode === "automations" && !automations ? "campaigns" : initialMode);
+export function EmailMarketingView({ clientId, clientName, clientLogo, clientColor, automations, initialMode = "campaigns" }: { clientId: string; clientName: string; clientLogo?: string; clientColor?: string; automations?: React.ReactNode; initialMode?: "campaigns" | "builder" | "automations" | "system" }) {
+  const [mode, setMode] = useState<"campaigns" | "builder" | "automations" | "system">(initialMode === "automations" && !automations ? "campaigns" : initialMode);
   const [data, setData] = useState<{ templates: Template[]; campaigns: Campaign[]; sending: boolean; me: string } | null>(null);
   const [error, setError] = useState("");
   const baseStyle = useMemo<EmailStyle>(() => ({ ...DEFAULT_STYLE, brand: /^#[0-9a-f]{6}$/i.test(clientColor || "") ? clientColor! : DEFAULT_STYLE.brand, logo: /^https?:/.test(clientLogo || "") ? clientLogo : "" }), [clientColor, clientLogo]);
@@ -117,12 +118,13 @@ export function EmailMarketingView({ clientId, clientName, clientLogo, clientCol
 
   return <div className="em">
     <div className="ops-subbar em-subbar">
-      <span className="ops-seg" role="tablist" aria-label="Email sections">{([["campaigns", "Campaigns"], ["builder", "Email builder"], ...(automations ? [["automations", "Automations"]] : [])] as Array<[typeof mode, string]>).map(([key, text]) => <button key={key} type="button" role="tab" aria-selected={mode === key} className={mode === key ? "active" : ""} onClick={() => setMode(key)}>{text}</button>)}</span>
-      {data && !data.sending && mode !== "automations" && <span className="em-warn">Sending isn’t set up on the server yet (Resend). You can still build and save.</span>}
+      <span className="ops-seg" role="tablist" aria-label="Email sections">{([["campaigns", "Campaigns"], ["builder", "Email builder"], ...(automations ? [["automations", "Automations"]] : []), ["system", "System emails"]] as Array<[typeof mode, string]>).map(([key, text]) => <button key={key} type="button" role="tab" aria-selected={mode === key} className={mode === key ? "active" : ""} onClick={() => setMode(key)}>{text}</button>)}</span>
+      {data && !data.sending && (mode === "campaigns" || mode === "builder") && <span className="em-warn">Sending isn’t set up on the server yet (Resend). You can still build and save.</span>}
     </div>
     {error && <p className="ops-empty" role="alert">{error}</p>}
     {mode === "automations" && automations}
-    {mode !== "automations" && !data && <div className="page-loading" role="status" aria-label="Loading email…"><i /></div>}
+    {mode === "system" && <SystemEmailsView />}
+    {(mode === "campaigns" || mode === "builder") && !data && <div className="page-loading" role="status" aria-label="Loading email…"><i /></div>}
     {mode === "builder" && data && <TemplatesPane key={clientId} clientId={clientId} clientName={clientName} templates={data.templates} baseStyle={baseStyle} me={data.me} onChanged={load} />}
     {mode === "campaigns" && data && <CampaignsPane key={clientId} clientId={clientId} clientName={clientName} campaigns={data.campaigns} templates={data.templates} baseStyle={baseStyle} me={data.me} sending={data.sending} onChanged={load} />}
   </div>;

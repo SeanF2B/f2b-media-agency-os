@@ -2108,3 +2108,14 @@ html body .crm-card-src.src-google-ads { background: #e0ecff; color: #1d4ed8; } 
 html body .crm-card-icons { display: inline-flex; align-items: center; gap: 7px; margin-left: auto; color: #8a96a3; font-size: 11px; font-weight: 600; }
 html body .crm-card-icons > span { display: inline-flex; align-items: center; gap: 3px; }
 html body .app-shell.dark-mode .crm-card-src { background: #26313a; color: #c3ccd4; } html body .app-shell.dark-mode .crm-card-type { background: #2e2850; color: #c4b5fd; }
+
+/* Team → sign-in link panel */
+.team-signin { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 0 0 16px; padding: 12px 14px; border: 1px solid var(--f2b-border, #d9dee3); border-radius: 14px; background: var(--f2b-white, #fff); }
+.app-shell.dark-mode .team-signin { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.14); }
+.team-signin-text { display: flex; align-items: center; gap: 10px; min-width: 220px; }
+.team-signin-text svg { color: var(--brand-primary, #0b74b8); flex: none; }
+.team-signin-text div { display: grid; }
+.team-signin-text span { font-size: 13px; opacity: .75; }
+.team-signin-link { flex: 1; min-width: 200px; padding: 8px 10px; border-radius: 9px; background: color-mix(in srgb, currentColor 6%, transparent); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.team-signin-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.team-signin-actions button { display: inline-flex; align-items: center; gap: 6px; }

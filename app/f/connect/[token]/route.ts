@@ -55,7 +55,7 @@ export async function GET(request: Request, context: RouteContext) {
     ${todo ? `<form method="post">${rows}<section class="card"><h2>Anything else?</h2><textarea name="connectNotes" rows="3" maxlength="600" placeholder="Questions, or anything you couldn’t find"></textarea></section><button type="submit">Send to my marketing team</button></form>` : rows}
     ${ticketDone ? `<section class="card" style="border-top-color:#12b76a"><h2>Ticket ${esc(ticketDone)} sent <span class="ok">Received</span></h2><p>Thanks — your team has it and will be in touch.</p></section>` : ""}
     <form method="post" class="card ticket"><h2>Need help? Raise a support ticket</h2><p>Tell us what you need and it goes straight to your account team.</p><input name="ticketSubject" placeholder="Subject, e.g. Change opening hours on website" maxlength="140" required><textarea name="ticketDetails" rows="4" maxlength="3000" placeholder="Details" style="margin-top:8px"></textarea><div style="display:flex;gap:8px;margin-top:8px"><input name="ticketName" placeholder="Your name" maxlength="80"><select name="ticketPriority" style="padding:11px;border:1px solid #d0d5dd;border-radius:10px;font:inherit"><option>Normal</option><option>High</option><option>Urgent</option></select></div><button type="submit">Send ticket</button></form>
-    <p class="foot">Secure link for ${esc(client.name)} only. No passwords are ever needed here.</p>`, client.color);
+    <p class="foot">Secure link for ${esc(client.name)} only. No passwords are ever needed here.<br><img src="/f/connect/brand-logo" alt="F2B Media" style="height:18px;margin-top:10px;opacity:.85"></p>`, client.color);
 }
 
 export async function POST(request: Request, context: RouteContext) {

@@ -110,3 +110,16 @@
 .em-locked .em-edit { pointer-events: none; opacity: .7; }
 @media (max-width: 1100px) { .em-builder, .em-campaign-grid { grid-template-columns: 1fr; } .em-preview { position: static; } }
 @media (max-width: 640px) { .em-head, .em-two, .em-three { grid-template-columns: 1fr; } }
+
+/* System emails log */
+.sysmail { display: grid; gap: 12px; }
+.sysmail-search { display: inline-flex; align-items: center; gap: 6px; flex: 1; min-width: 220px; border: 1px solid var(--em-border); border-radius: 10px; padding: 0 10px; background: var(--em-card); }
+.sysmail-search input { border: 0 !important; background: transparent !important; padding: 9px 0 !important; box-shadow: none !important; }
+.sysmail .ops-toolbar select { width: auto; }
+.sysmail .ops-toolbar button { display: inline-flex; align-items: center; gap: 6px; }
+.sysmail-when { white-space: nowrap; color: var(--em-muted); font-size: 13px; }
+.sysmail-kind { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; background: color-mix(in srgb, var(--brand-primary, #0b74b8) 12%, transparent); white-space: nowrap; }
+.sysmail-body-row td { background: color-mix(in srgb, currentColor 3%, transparent); }
+.sysmail-body { margin: 0; white-space: pre-wrap; font: 13px/1.55 inherit; font-family: inherit; max-height: 360px; overflow: auto; }
+.sysmail-more { justify-self: center; }
+
