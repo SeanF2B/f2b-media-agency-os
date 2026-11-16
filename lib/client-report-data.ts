@@ -11,8 +11,10 @@ import { loadCachedMarketingData } from "./marketing-data-history";
 import { hasGoogleAnalyticsDirectConnection, readGoogleAnalyticsReport } from "./google-analytics-direct";
 import { completedTasksForReport, previousReportWindow } from "./report-evidence";
 import { clientWebsite } from "./client-website";
+import { runPageSpeedInsights, runPublicTechnicalAudit } from "./website-audit-run";
 
-export type ReportType = "seo" | "ads" | "audit" | "keywords";
+export type ReportType = "seo" | "ads" | "audit" | "audit-ads" | "audit-website" | "keywords";
+export const isAuditType = (type: ReportType) => type === "audit" || type === "audit-ads" || type === "audit-website";
 type Window = { start: string; end: string };
 type Status = "ok" | "unavailable" | "not_connected";
 export type Section<T> = { status: Status; note?: string; source?: string; updatedAt?: string; data?: T };
@@ -238,7 +240,7 @@ async function aiVisibility(db: D1Database, ownerId: string, client: Client, cur
 }
 
 /* ---------------------------------------------------------------- work & recommendations */
-const SERVICE_TEST: Record<ReportType, RegExp> = { seo: /seo|website|content|blog|google business|gbp|local|backlink|technical|page/i, ads: /google ads|ppc|ads|campaign|ad copy|keyword/i, audit: /audit|seo|google ads|ppc|website|google business|gbp|analytics|tracking/i, keywords: /keyword|seo|content|blog|page/i };
+const SERVICE_TEST: Record<ReportType, RegExp> = { seo: /seo|website|content|blog|google business|gbp|local|backlink|technical|page/i, ads: /google ads|ppc|ads|campaign|ad copy|keyword/i, audit: /audit|seo|google ads|ppc|website|google business|gbp|analytics|tracking/i, "audit-ads": /google ads|ppc|ads|campaign|ad copy|conversion|tracking/i, "audit-website": /website|seo|page|speed|technical|content|google business|gbp/i, keywords: /keyword|seo|content|blog|page/i };
 function work(workspace: Workspace, client: Client, type: ReportType, current: Window) {
   const done = completedTasksForReport((workspace.tasks || []) as never[], (workspace.activity || []) as never[], client.id, current.start, current.end).tasks as Array<{ title: string; service: string; completedAt: string }>;
   const completed = done.filter((task) => SERVICE_TEST[type].test(`${task.service} ${task.title}`) && !(type === "seo" && /google ads/i.test(task.service))).slice(0, 8);
@@ -259,9 +261,12 @@ export type ClientReport = {
   /** Marketing audit only: Google Ads lead attribution alongside the SEO one, and evidence-based findings. */
   adsAttribution?: Section<Attribution>;
   findings?: AuditFinding[];
+  /** Website audit only: live PageSpeed (mobile) and a technical crawl of the public site. */
+  website?: Section<WebsiteAuditData>;
   /** Keyword research report only. */
   keywordResearch?: Section<KeywordResearchData>;
 };
+export type WebsiteAuditData = { url: string; speed: { score: number | null; lcp: string; cls: string; tbt: string; fcp: string; opportunities: Array<{ title: string; displayValue: string }> } | null; speedNote?: string; pagesChecked: number; brokenLinks: number; sitemapUrls: number | null; issues: Array<{ severity: "high" | "medium" | "info"; title: string; detail: string; pages: number }> };
 export type AuditFinding = { priority: "high" | "medium" | "low"; area: string; title: string; evidence: string; action: string };
 export type ResearchKeyword = { keyword: string; volume: number | null; competition: string | null; lowBid: number | null; highBid: number | null; difficulty: number | null; tags: string[]; location: string; position: number | null };
 export type KeywordResearchData = { total: number; totalVolume: number; groups: Array<{ name: string; keywords: ResearchKeyword[]; volume: number }> };
@@ -292,14 +297,20 @@ export async function buildClientReport(db: D1Database, workspace: Workspace, cl
   const client = (workspace.clients || []).find((item) => item.id === clientId);
   if (!client) throw new Error("Choose a client in this workspace.");
   const comparison = previousReportWindow(period.start, period.end);
-  const channel: LeadChannel = type === "ads" ? "google_ads" : "seo";
+  const channel: LeadChannel = type === "ads" || type === "audit-ads" ? "google_ads" : "seo";
   const attribution = await crmAttribution(db, ownerId, client.id, channel, period, comparison).catch((error) => off<Attribution>("unavailable", error instanceof Error ? error.message : "CRM data could not be read."));
   const report: ClientReport = {
     type, generatedAt: new Date().toISOString(), period, comparison,
     client: { id: client.id, name: client.name, logo: client.logo || "", color: /^#[0-9a-f]{6}$/i.test(client.branding?.primary || "") ? client.branding!.primary! : /^#[0-9a-f]{6}$/i.test(client.color || "") ? client.color! : "#1f6feb", currency: /^[A-Z]{3}$/.test(client.currency || "") ? client.currency! : "EUR", website: clientWebsite(client) },
     attribution, work: work(workspace, client, type, period), recommendations: [], missing: [],
   };
-  if (type === "ads") report.ads = await adsData(db, ownerId, client, period, comparison);
+  if (type === "ads" || type === "audit-ads") report.ads = await adsData(db, ownerId, client, period, comparison);
+  else if (type === "audit-website") {
+    [report.traffic, report.rankings, report.backlinks, report.business, report.aiVisibility, report.website] = await Promise.all([
+      organicTraffic(db, ownerId, client, period, comparison), rankings(db, ownerId, client, period, comparison), backlinks(db, ownerId, client, period, comparison),
+      business(db, ownerId, client, period, comparison), aiVisibility(db, ownerId, client, period, comparison), websiteAudit(report.client.website),
+    ]);
+  }
   else if (type === "keywords") {
     report.rankings = await rankings(db, ownerId, client, period, comparison);
     report.keywordResearch = await keywordResearch(db, ownerId, client, report.rankings);
@@ -315,13 +326,37 @@ export async function buildClientReport(db: D1Database, workspace: Workspace, cl
       ]);
     }
   }
-  const labels: Record<string, string> = { keywordResearch: "Saved keywords", attribution: "CRM leads & revenue", ads: "Google Ads", traffic: "Organic traffic", rankings: "Google rankings", backlinks: "Backlinks", competitors: "Competitors", business: "Google Business Profile", aiVisibility: "ChatGPT & Claude visibility" };
+  const labels: Record<string, string> = { website: "Website checks", keywordResearch: "Saved keywords", attribution: "CRM leads & revenue", ads: "Google Ads", traffic: "Organic traffic", rankings: "Google rankings", backlinks: "Backlinks", competitors: "Competitors", business: "Google Business Profile", aiVisibility: "ChatGPT & Claude visibility" };
   for (const key of Object.keys(labels)) { const section = (report as unknown as Record<string, Section<unknown> | undefined>)[key]; if (section && section.status !== "ok") report.missing.push({ label: labels[key], note: section.note || "Unavailable" }); }
-  if (type === "audit") report.findings = auditFindings(report);
-  report.recommendations = type === "audit" ? (report.findings || []).filter((f) => f.priority !== "low").map((f) => f.action).slice(0, 5) : recommend(report);
-  if (type === "audit" && report.recommendations.length < 5) for (const task of report.work.planned) if (report.recommendations.length < 5 && !report.recommendations.includes(task)) report.recommendations.push(task);
+  if (type === "audit-ads") report.adsAttribution = report.attribution;
+  if (isAuditType(type)) report.findings = auditFindings(report);
+  report.recommendations = isAuditType(type) ? [...new Set((report.findings || []).filter((f) => f.priority !== "low").map((f) => f.action))].slice(0, 5) : recommend(report);
+  if (isAuditType(type) && report.recommendations.length < 5) for (const task of report.work.planned) if (report.recommendations.length < 5 && !report.recommendations.includes(task)) report.recommendations.push(task);
   if (type === "keywords") report.recommendations = keywordRecommendations(report);
   return report;
+}
+
+async function websiteAudit(site: string): Promise<Section<WebsiteAuditData>> {
+  let url: URL;
+  try { url = new URL(/^https?:\/\//i.test(site) ? site : `https://${site}`); url.protocol = "https:"; url.pathname = "/"; url.search = ""; url.hash = ""; } catch { return off("not_connected", "No website on this client yet. Add it to the client record."); }
+  if (!site) return off("not_connected", "No website on this client yet. Add it to the client record.");
+  const siteUrl = url.origin;
+  try {
+    const first = await runPublicTechnicalAudit(siteUrl, [siteUrl]);
+    const links = (first.pages[0]?.internalLinks || []).filter((link) => !/\.(?:jpg|jpeg|png|gif|webp|svg|pdf|xml|css|js)(?:$|\?)/i.test(link)).slice(0, 14);
+    const [crawl, speed] = await Promise.all([
+      links.length ? runPublicTechnicalAudit(siteUrl, [siteUrl, ...links]) : Promise.resolve(first),
+      runPageSpeedInsights(siteUrl, siteUrl, "mobile").then((r) => ({ ok: true as const, r })).catch((e) => ({ ok: false as const, note: e instanceof Error ? e.message : "PageSpeed couldn't run." })),
+    ]);
+    const data: WebsiteAuditData = {
+      url: siteUrl,
+      speed: speed.ok ? { score: speed.r.lighthousePerformanceScore, lcp: speed.r.lab.lcp.display, cls: speed.r.lab.cls.display, tbt: speed.r.lab.tbt.display, fcp: speed.r.lab.fcp.display, opportunities: speed.r.opportunities.map((o) => ({ title: o.title, displayValue: o.displayValue })) } : null,
+      ...(speed.ok ? {} : { speedNote: speed.note }),
+      pagesChecked: crawl.pages.length, brokenLinks: crawl.brokenLinks.length, sitemapUrls: crawl.sitemap.checked ? crawl.sitemap.urlsFound : null,
+      issues: crawl.findings.map((f) => ({ severity: f.severity, title: f.title, detail: f.detail, pages: f.pages.length })),
+    };
+    return ok(data, "Live check of the public website + Google PageSpeed (mobile)", new Date().toISOString());
+  } catch (e) { return off("unavailable", e instanceof Error ? e.message.slice(0, 200) : "The website couldn't be checked."); }
 }
 
 /** Marketing audit: each finding is triggered by a real figure (or a missing connection) in this report. */
@@ -355,8 +390,17 @@ function auditFindings(report: ClientReport): AuditFinding[] {
   if (ai && ai.overall < 0.5) add("low", "AI visibility", "Low AI assistant visibility", `Mentioned in ${pct(ai.overall)} of ChatGPT and Claude test questions.`, "Add clear service + location pages and FAQs that AI assistants can cite.");
   const bl = report.backlinks?.data;
   if (bl?.previous?.referringDomains != null && bl.referringDomains != null && bl.referringDomains < bl.previous.referringDomains) add("low", "SEO", "Referring domains fell", `${bl.referringDomains} versus ${bl.previous.referringDomains}.`, "Check for lost links and plan new local citations.");
+  const w = report.website?.data;
+  if (w) {
+    const sp = w.speed?.score;
+    if (sp != null && sp < 50) add("high", "Website", "Slow on mobile", `Google PageSpeed mobile score ${sp}/100${w.speed?.lcp ? ` · largest content loads in ${w.speed.lcp}` : ""}.`, `Fix the biggest speed issues first: ${(w.speed?.opportunities || []).slice(0, 2).map((o) => o.title.toLowerCase()).join(", ") || "compress images and defer scripts"}.`);
+    else if (sp != null && sp < 90) add("medium", "Website", "Mobile speed could be better", `Google PageSpeed mobile score ${sp}/100.`, `Improve: ${(w.speed?.opportunities || []).slice(0, 2).map((o) => o.title.toLowerCase()).join(", ") || "image sizes and unused code"}.`);
+    if (w.brokenLinks) add("high", "Website", `${w.brokenLinks} broken link${w.brokenLinks > 1 ? "s" : ""}`, `Found while checking ${w.pagesChecked} pages.`, "Fix or redirect the broken links so visitors and Google don't hit dead ends.");
+    for (const issue of w.issues.filter((i) => !/broken/i.test(i.title)).slice(0, 6)) add(issue.severity === "info" ? "low" : issue.severity, "Website", issue.title, `${issue.detail}${issue.pages ? ` (${issue.pages} page${issue.pages > 1 ? "s" : ""})` : ""}`.slice(0, 300), issue.severity === "high" ? "Fix this on the affected pages first." : "Tidy this up on the affected pages.");
+  } else if (report.website) add("medium", "Website", "Website couldn't be checked", report.website.note || "Unavailable.", "Add the client's website to their record so it can be checked.");
   const rank = { high: 0, medium: 1, low: 2 };
-  return out.sort((x, y) => rank[x.priority] - rank[y.priority]).slice(0, 12);
+  const scoped = report.type === "audit-ads" ? out.filter((f) => /google ads|crm|tracking/i.test(f.area)) : report.type === "audit-website" ? out.filter((f) => !/google ads/i.test(f.area) && !(f.area === "CRM" && /ads/i.test(f.title))) : out;
+  return scoped.sort((x, y) => rank[x.priority] - rank[y.priority]).slice(0, 12);
 }
 
 function keywordRecommendations(report: ClientReport): string[] {

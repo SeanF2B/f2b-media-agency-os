@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ReportGeneratingAnimation } from "./report-generating-animation";
 
-type ReportType = "ads" | "seo" | "audit" | "keywords";
+type ReportType = "ads" | "seo" | "audit" | "audit-ads" | "audit-website" | "keywords";
 export type ReportsMode = "reports" | "audits" | "keywords";
 type Saved = { id: string; type: ReportType; periodStart: string; periodEnd: string; kind: string; createdAt: string; summary?: { leads?: number | null; wonRevenue?: number | null; missing?: string[] } };
 const PRESETS = [["lastMonth", "Last month"], ["thisMonth", "This month to date"], ["30d", "Last 30 days"], ["90d", "Last 90 days"], ["custom", "Custom range"]] as const;
@@ -23,22 +23,28 @@ const STEPS: Record<ReportType, string[]> = {
   ads: ["Gathering details…", "Reading Google Ads spend, clicks and conversions…", "Matching Google Ads leads in the CRM…", "Working out pipeline value and won revenue…", "Calculating cost per lead and ROAS…", "Drawing charts…", "Finalising your report…"],
   seo: ["Gathering details…", "Reading organic traffic from Google…", "Checking keyword rankings…", "Loading backlinks, competitors and Google Business…", "Checking ChatGPT and Claude visibility tests…", "Matching SEO leads and won revenue in the CRM…", "Finalising your report…"],
   audit: ["Gathering details…", "Checking Google Ads spend, clicks and conversions…", "Reading organic traffic and rankings…", "Checking Google Business, backlinks and AI visibility…", "Matching leads and sources in the CRM…", "Writing findings and an action plan…", "Finalising your audit…"],
+  "audit-ads": ["Gathering details…", "Reading Google Ads campaigns, spend and conversions…", "Checking cost per conversion and click-through rate…", "Matching Google Ads leads in the CRM…", "Checking lead tracking…", "Writing findings and an action plan…", "Finalising your audit…"],
+  "audit-website": ["Gathering details…", "Opening the live website…", "Checking pages, links and sitemap…", "Running Google PageSpeed on mobile…", "Reading organic traffic and rankings…", "Writing findings and an action plan…", "Finalising your audit…"],
   keywords: ["Gathering details…", "Loading saved keyword groups…", "Reading search volumes and bid ranges…", "Checking current Google rankings…", "Sizing each group's opportunity…", "Writing recommendations…", "Finalising your keyword report…"],
 };
 const META: Record<ReportType, { name: string; short: string; desc: string }> = {
   ads: { name: "Google Ads report", short: "Google Ads", desc: "Spend, leads, cost per lead, pipeline, won revenue, ROAS" },
   seo: { name: "SEO report", short: "SEO", desc: "Organic leads, rankings, traffic, backlinks, Google Business, AI visibility" },
-  audit: { name: "Marketing audit", short: "Marketing audit", desc: "Score, what was checked, evidence-based findings and a 30-day action plan" },
+  audit: { name: "Full marketing audit", short: "Marketing audit", desc: "Everything: Google Ads, SEO, Google Business and tracking with a 30-day plan" },
+  "audit-ads": { name: "Google Ads audit", short: "Google Ads audit", desc: "Campaigns, wasted spend, conversions, cost per lead and lead quality" },
+  "audit-website": { name: "Website audit", short: "Website audit", desc: "Live speed test, broken links, technical SEO, rankings and local visibility" },
   keywords: { name: "Keyword research report", short: "Keyword research", desc: "Saved keyword groups with search volume, competition, bids and current rankings" },
 };
 const MODE: Record<ReportsMode, { types: ReportType[]; title: string; intro: string; savedTitle: string; savedSub: string; empty: string }> = {
   reports: { types: ["ads", "seo"], title: "Performance reports", intro: "Branded SEO and Google Ads reports for", savedTitle: "Saved reports", savedSub: "Monthly reports are saved automatically on the 1st of each month for clients with Google Ads or SEO services.", empty: "No saved reports" },
-  audits: { types: ["audit"], title: "Marketing audits", intro: "A branded audit of Google Ads, SEO, Google Business and tracking for", savedTitle: "Saved audits", savedSub: "Every audit you generate is filed in this client's Reports folder automatically.", empty: "No saved audits" },
+  audits: { types: ["audit-website", "audit-ads", "audit"], title: "Marketing audits", intro: "Pick an audit — website, Google Ads or the full marketing audit — branded for", savedTitle: "Saved audits", savedSub: "Every audit you generate is filed in this client's Reports folder automatically.", empty: "No saved audits" },
   keywords: { types: ["keywords"], title: "Keyword research", intro: "A branded keyword report from the saved keyword groups for", savedTitle: "Saved keyword reports", savedSub: "Every keyword report you generate is filed in this client's Reports folder automatically. Manage keywords in SEO → Keywords.", empty: "No saved keyword reports" },
 };
 const AUTO_REFRESH_MS = 15 * 60_000;
 
 function TypeMark({ type }: { type: ReportType }) {
+  if (type === "audit-website") return <span className="crv-mark seo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2" /><path d="M3 8h18M8 21h8M12 18v3" /></svg></span>;
+  if (type === "audit-ads") return <span className="crv-mark ads"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M3 10v4h3l7 5V5L6 10z" /><path d="M17 9a4 4 0 0 1 0 6" /></svg></span>;
   if (type === "audit") return <span className="crv-mark audit"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4h6v3H9zM9 12l2 2 4-4M9 17h6" /></svg></span>;
   if (type === "keywords") return <span className="crv-mark kw"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 12V4h8l10 10-8 8z" /><circle cx="7.5" cy="8.5" r="1.5" /></svg></span>;
   return type === "ads"

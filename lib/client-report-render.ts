@@ -240,29 +240,46 @@ function auditBody(report: ClientReport, o: Opts) {
   const t = report.traffic?.status === "ok" ? report.traffic.data! : null;
   const findings = report.findings || [];
   const counts = { high: findings.filter((f) => f.priority === "high").length, medium: findings.filter((f) => f.priority === "medium").length, low: findings.filter((f) => f.priority === "low").length };
-  const sources: Array<[string, Section<unknown> | undefined]> = [["Google Ads", report.ads], ["Organic traffic", report.traffic], ["Rankings", report.rankings], ["Backlinks", report.backlinks], ["Google Business", report.business], ["AI visibility", report.aiVisibility], ["CRM leads", report.attribution]];
+  const scope = report.type === "audit-ads" ? "ads" : report.type === "audit-website" ? "website" : "full";
+  const w = report.website?.status === "ok" ? report.website.data! : null;
+  const sources: Array<[string, Section<unknown> | undefined]> = scope === "ads" ? [["Google Ads", report.ads], ["CRM leads", report.attribution]]
+    : scope === "website" ? [["Website checks", report.website], ["Organic traffic", report.traffic], ["Rankings", report.rankings], ["Backlinks", report.backlinks], ["Google Business", report.business], ["AI visibility", report.aiVisibility], ["CRM leads", report.attribution]]
+    : [["Google Ads", report.ads], ["Organic traffic", report.traffic], ["Rankings", report.rankings], ["Backlinks", report.backlinks], ["Google Business", report.business], ["AI visibility", report.aiVisibility], ["CRM leads", report.attribution]];
   const connected = sources.filter(([, sec]) => sec?.status === "ok").length;
   const score = Math.max(0, Math.min(100, Math.round(100 - counts.high * 15 - counts.medium * 7 - counts.low * 3 - (sources.length - connected) * 4)));
   const scoreTone = score >= 75 ? "#16a34a" : score >= 50 ? "#d99a00" : "#dc2626";
   const kpis = `<div class="kpis k4">${[
     kpi("gauge", score >= 75 ? "green" : score >= 50 ? "amber" : "red", "Audit score", `<span style="color:${scoreTone}">${score}</span><small style="font-size:15px;color:#64748b"> / 100</small>`, `<span class="pill ${counts.high ? "bad" : "good"}">${counts.high} high priority</span>`, `${counts.medium} to review · ${counts.low} notes`),
     kpi("layers", "blue", "Sources included", `${connected} of ${sources.length}`, `<span class="pill ${connected === sources.length ? "good" : "flat"}">${connected === sources.length ? "All connected" : "Some missing"}</span>`),
-    kpi("coins", "red", "Ad spend", ads ? money(ads.current.spend) : na, change(ads?.current.spend, ads?.previous?.spend ?? null), aa ? `${num(aa.current.leads)} Ads leads` : ""),
-    kpi("chart", "teal", "Organic traffic", t ? num(t.current) : na, change(t?.current, t?.previous), sa ? `${num(sa.current.leads)} SEO leads` : ""),
+    ...(scope === "ads" ? [
+      kpi("coins", "red", "Ad spend", ads ? money(ads.current.spend) : na, change(ads?.current.spend, ads?.previous?.spend ?? null), aa ? `${num(aa.current.leads)} Ads leads` : ""),
+      kpi("target", "teal", "Cost / conversion", ads ? money(ads.current.costPerConversion, 2) : na, change(ads?.current.costPerConversion, ads?.previous?.costPerConversion ?? null, true), ads ? `${num(ads.current.conversions, 1)} conversions` : ""),
+    ] : scope === "website" ? [
+      kpi("gauge", w?.speed?.score == null ? "blue" : w.speed.score >= 90 ? "green" : w.speed.score >= 50 ? "amber" : "red", "Mobile speed", w?.speed?.score != null ? `${w.speed.score}<small style="font-size:15px;color:#64748b"> / 100</small>` : na, w?.speed?.lcp ? `<span class="pill flat">LCP ${esc(w.speed.lcp)}</span>` : "", w ? `${w.pagesChecked} pages checked` : ""),
+      kpi("chart", "teal", "Organic traffic", t ? num(t.current) : na, change(t?.current, t?.previous), sa ? `${num(sa.current.leads)} SEO leads` : ""),
+    ] : [
+      kpi("coins", "red", "Ad spend", ads ? money(ads.current.spend) : na, change(ads?.current.spend, ads?.previous?.spend ?? null), aa ? `${num(aa.current.leads)} Ads leads` : ""),
+      kpi("chart", "teal", "Organic traffic", t ? num(t.current) : na, change(t?.current, t?.previous), sa ? `${num(sa.current.leads)} SEO leads` : ""),
+    ]),
   ].join("")}</div>`;
+  const websiteCard = w ? `<div class="minis">${[["Mobile speed", w.speed?.score != null ? `${w.speed.score}/100` : "—"], ["Largest content", w.speed?.lcp || "—"], ["Layout shift", w.speed?.cls || "—"], ["Blocking time", w.speed?.tbt || "—"], ["Pages checked", String(w.pagesChecked)], ["Broken links", String(w.brokenLinks)], ["Sitemap pages", w.sitemapUrls == null ? "No sitemap found" : String(w.sitemapUrls)]].map(([l, v]) => `<div class="mini"><div><span>${esc(l)}</span><b>${esc(v)}</b></div></div>`).join("")}</div>${w.speed?.opportunities.length ? `<p class="sub" style="margin-top:10px"><b>Speed fixes:</b> ${w.speed.opportunities.map((op) => esc(`${op.title}${op.displayValue ? ` (${op.displayValue})` : ""}`)).join(" · ")}</p>` : w.speedNote ? `<p class="sub">${esc(w.speedNote)}</p>` : ""}` : "";
   const status = (sec?: Section<unknown>) => sec?.status === "ok" ? `<span class="pill good">Included</span>` : sec?.status === "unavailable" ? `<span class="pill bad">Unavailable</span>` : `<span class="pill flat">Not connected</span>`;
   const sourceGrid = `<div class="src-grid">${sources.map(([label, sec]) => `<div class="src"><div class="src-top"><b>${esc(label)}</b>${status(sec)}</div>${sec?.status !== "ok" && sec?.note ? `<small>${esc(sec.note)}</small>` : sec?.source ? `<small>${esc(sec.source)}</small>` : ""}</div>`).join("")}</div>`;
   const prLabel = { high: "High", medium: "Review", low: "Note" } as const;
   const findingList = findings.length ? `<div class="fnd-list">${findings.map((f) => `<div class="fnd ${f.priority}"><span class="fnd-pr">${prLabel[f.priority]}</span><div><div class="fnd-area">${esc(f.area)}</div><h3>${esc(f.title)}</h3><p><b>Evidence:</b> ${esc(f.evidence)}</p><p><b>Next step:</b> ${esc(f.action)}</p></div></div>`).join("")}</div>` : `<p class="muted">No issues were found in the connected data for this period.</p>`;
   const adsSummary = ads ? `<div class="minis">${[["Clicks", num(ads.current.clicks), change(ads.current.clicks, ads.previous?.clicks ?? null)], ["CTR", `${ads.current.ctrPercent.toFixed(2)}%`, change(ads.current.ctrPercent, ads.previous?.ctrPercent ?? null, false, "pp")], ["Conversions", num(ads.current.conversions, 1), change(ads.current.conversions, ads.previous?.conversions ?? null)], ["Cost / conversion", money(ads.current.costPerConversion, 2), change(ads.current.costPerConversion, ads.previous?.costPerConversion ?? null, true)]].map(([l, v, c]) => `<div class="mini"><div><span>${l}</span><b>${v} ${c}</b></div></div>`).join("")}</div>` : "";
   const traffic = t ? `<div class="big-line"><b>${num(t.current)}</b>${change(t.current, t.previous)}</div><p class="sub">${esc(t.metric)}</p>${areaChart(t.daily.map((d) => ({ label: dayLabel(d.date), value: d.value, previous: d.previous })))}` : "";
-  return `${header(report, o, "Marketing Audit", "Google Ads, SEO, Google Business and tracking — checked against real connected data")}
+  const title = scope === "ads" ? ["Google Ads Audit", "Campaigns, conversions, cost per lead and lead quality — checked against real account data"] : scope === "website" ? ["Website Audit", "Speed, technical health, rankings and local visibility — checked live against the public site"] : ["Marketing Audit", "Google Ads, SEO, Google Business and tracking — checked against real connected data"];
+  const middle = scope === "ads" ? card("", "Google Ads", "megaphone", "blue", adsSummary, { section: report.ads })
+    : scope === "website" ? `<div class="row r-5-5">${card("", "Website health", "gauge", "blue", websiteCard, { section: report.website })}${card("", "Organic traffic", "chart", "blue", traffic, { section: report.traffic })}</div>`
+    : `<div class="row r-5-5">${card("", "Google Ads", "megaphone", "blue", adsSummary, { section: report.ads })}${card("", "Organic traffic", "chart", "blue", traffic, { section: report.traffic })}</div>`;
+  return `${header(report, o, title[0], title[1])}
 ${kpis}
 ${card("", "What was checked", "layers", "blue", sourceGrid, { sub: "Missing sources are shown as unavailable, never as zero." })}
 ${card("", "Findings", "target", "blue", findingList, { extra: ` <small>(${findings.length})</small>` })}
-<div class="row r-5-5">${card("", "Google Ads", "megaphone", "blue", adsSummary, { section: report.ads })}${card("", "Organic traffic", "chart", "blue", traffic, { section: report.traffic })}</div>
+${middle}
 <div class="row r-5-5">${card("done-card", "Completed work", "check", "green", list(report.work.completed.map((x) => x.title), "done"))}${card("next-card", "Action plan", "target", "blue", list(report.recommendations, "next"), { extra: " <small>(Next 30 days)</small>" })}</div>
-${footer(report, [report.ads, report.traffic, report.rankings, report.backlinks, report.business, report.aiVisibility, report.attribution])}`;
+${footer(report, sources.map(([, sec]) => sec))}`;
 }
 
 /* ------------------------------------------------------------------ Keyword research */
@@ -335,7 +352,7 @@ ol.done,ol.next{list-style:none;margin:0;padding:0;display:grid;gap:9px;font-siz
 @media print{body{background:#fff}.page{width:1200px;padding:0;zoom:.6}.card,.kpi{box-shadow:none}.row{break-inside:avoid}}`;
 
 export function renderClientReportHtml(report: ClientReport, opts: Opts) {
-  const body = report.type === "ads" ? adsBody(report, opts) : report.type === "audit" ? auditBody(report, opts) : report.type === "keywords" ? keywordsBody(report, opts) : seoBody(report, opts);
+  const body = report.type === "ads" ? adsBody(report, opts) : report.type === "audit" || report.type === "audit-ads" || report.type === "audit-website" ? auditBody(report, opts) : report.type === "keywords" ? keywordsBody(report, opts) : seoBody(report, opts);
   const label = { ads: "Google Ads report", seo: "SEO report", audit: "Marketing audit", keywords: "Keyword research report" }[report.type];
   const title = `${report.client.name} — ${label} ${report.period.start} to ${report.period.end}`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${esc(title)}</title><style>${CSS}</style></head><body><main class="page">${body}</main></body></html>`;
