@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { BarChart3, BookOpen, CalendarPlus, CheckCircle2, ClipboardList, Image as ImageIcon, Mail, MessageSquare, MousePointerClick, Phone, Plus, Sparkles, UserPlus, Users } from "lucide-react";
 import { BrandIcon } from "./brand-icon";
 
-type HubTask = { id: string; clientId: string; title: string; status: string; assigneeId: string; due?: string; dueAt?: string; completedAt?: string; service?: string };
+type HubTask = { id: string; clientId: string; title: string; status: string; assigneeId: string; due?: string; dueAt?: string; completedAt?: string; service?: string; reviewStatus?: string; aiRunState?: string; aiApprovals?: Array<{ status: string }> };
 type HubClient = { id: string; name: string; logo?: string; googleAdsAccountId?: string };
 type HubStaff = { id: string; name: string; isBot?: boolean };
 type Stat = { value: number; previous: number | null } | null;
@@ -54,6 +54,8 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
   const inScope = (t: HubTask) => !scopeClientId || t.clientId === scopeClientId;
   const upcoming = useMemo(() => tasks.filter((t) => inScope(t) && !/^done$/i.test(t.status) && (showAi || !bots.has(t.assigneeId))).sort((a, b) => (a.dueAt || a.due || "9999").localeCompare(b.dueAt || b.due || "9999")).slice(0, 6), [tasks, showAi, bots, scopeClientId]); // eslint-disable-line react-hooks/exhaustive-deps
   const completed = useMemo(() => tasks.filter((t) => inScope(t) && /^done$/i.test(t.status) && t.completedAt).sort((a, b) => (b.completedAt || "").localeCompare(a.completedAt || "")).slice(0, 6), [tasks, scopeClientId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const aiPending = tasks.filter((t) => inScope(t) && ((t.aiApprovals || []).some((a) => a.status === "pending") || t.aiRunState === "needs_review")).length;
+  const humanPending = tasks.filter((t) => inScope(t) && t.reviewStatus === "submitted").length;
   const clientOf = (id: string) => clients.find((c) => c.id === id);
   const logo = (id: string) => { const c = clientOf(id); return c?.logo ? <img className="dh-logo" src={c.logo} alt="" /> : <span className="dh-logo dh-logo-fallback">{(c?.name || "•").slice(0, 1)}</span>; };
   const m = metrics?.marketing;
@@ -71,6 +73,9 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
   return <div className="dh">
     <section className="dh-actions" aria-label="Quick actions">{actions.map((a) => <button type="button" key={a.label} className={`dh-action ${a.tint}`} onClick={a.run}><span className="dh-action-icon">{a.icon}</span><span><b>{a.label}</b><small>{a.hint}</small></span></button>)}</section>
 
+    <section className="dh-approvals" aria-label="Pending approvals">
+      {[{ key: "ai", label: "AI approvals", n: aiPending, icon: <Sparkles size={18} />, hint: "Changes the AI wants you to approve" }, { key: "human", label: "Team approvals", n: humanPending, icon: <Users size={18} />, hint: "Work your team submitted for review" }].map((a) => <button type="button" key={a.key} className={`dh-approval ${a.n ? "waiting" : "clear"}`} onClick={() => onNavigate("Tasks")}><span className="dh-approval-icon">{a.icon}</span><span className="dh-approval-text"><b>{a.label}</b><small>{a.n ? a.hint : "All done"}</small></span><span className="dh-approval-n">{a.n ? a.n : "✓"}</span></button>)}
+    </section>
     {valuePanel}
     <section className="panel dh-panel" aria-label="Website and marketing results">
       <div className="dh-head"><div><p className="eyebrow">📈 LAST 30 DAYS</p><h2>Marketing</h2></div>
