@@ -354,3 +354,6 @@ html body .app-shell.dark-mode .sch-dash-panel-tools .sch-seg button.on{backgrou
 .sch-block.short b{font-size:11.5px}
 .sch-day:nth-child(even) .sch-day-body{background:rgba(127,138,160,.025)}
 .sch-day.today .sch-day-body{background:color-mix(in srgb,var(--brand-primary,#2563eb) 3%,transparent)}
+/* Short bookings on the staff timeline: always show the start time (never an empty box) */
+.sch-tl-item.narrow{min-width:46px;padding:0 5px;justify-content:center}
+.sch-tl-item.narrow b{font-size:10px}
