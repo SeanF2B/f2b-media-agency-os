@@ -583,7 +583,7 @@ export async function getGoogleAdsCallStats(ownerId: string, customerId: string,
   const range = `segments.date BETWEEN '${window.start.replace(/[^0-9-]/g, "")}' AND '${window.end.replace(/[^0-9-]/g, "")}'`;
   const sum = (payload: unknown, pick: (row: any) => number) => (payload as Array<{ results?: Array<any> }>).flatMap((batch) => batch.results || []).reduce((total, row) => total + pick(row), 0);
   const [calls, conversions] = await Promise.all([
-    googleAdsPost(ownerId, customerId, "googleAds:searchStream", { query: `SELECT metrics.phone_calls FROM customer WHERE ${range}` }).then((r) => sum(r.payload, (row) => Number(row.metrics?.phoneCalls || 0))).catch(() => null),
+    googleAdsPost(ownerId, customerId, "googleAds:searchStream", { query: `SELECT campaign.id, metrics.phone_calls FROM campaign WHERE ${range}` }).then((r) => sum(r.payload, (row) => Number(row.metrics?.phoneCalls || 0))).catch(() => null),
     googleAdsPost(ownerId, customerId, "googleAds:searchStream", { query: `SELECT segments.conversion_action_category, metrics.all_conversions FROM customer WHERE ${range}` }).then((r) => sum(r.payload, (row) => /PHONE_CALL|CALL/i.test(String(row.segments?.conversionActionCategory || "")) ? Number(row.metrics?.allConversions || 0) : 0)).catch(() => null),
   ]);
   return { calls, callConversions: conversions };
