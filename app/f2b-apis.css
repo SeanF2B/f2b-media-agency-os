@@ -100,3 +100,10 @@ html body .app-shell .launchpad-heading .launchpad-actions { display: flex !impo
 html body .app-shell .launchpad-heading .launchpad-actions button { position: static !important; transform: none !important; height: 38px; min-height: 38px; padding: 0 14px !important; font-size: 13px !important; white-space: nowrap; border-radius: 10px; }
 html body .app-shell .launchpad-heading .launchpad-actions .primary-button { background: var(--brand-primary, #0f6fa8) !important; color: var(--brand-primary-fg, #fff) !important; }
 @media (max-width: 640px) { html body .app-shell .launchpad-heading .launchpad-actions { width: 100%; } html body .app-shell .launchpad-heading .launchpad-actions button { flex: 1; } }
+
+/* Reports · Audits · Keywords share one layout */
+.crv-mark.audit { background: #fff4d6; color: #b7791f; }
+.crv-mark.kw { background: #efeafd; color: #6d4fd8; }
+.crv-types.single { grid-template-columns: minmax(0, 1fr); }
+.crv-types.single .crv-type { cursor: default; }
+html body .app-shell .crv-history li > .crv-mark { flex: none !important; display: inline-grid !important; width: 36px !important; height: 36px !important; }

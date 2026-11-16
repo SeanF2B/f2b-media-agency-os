@@ -12,7 +12,7 @@ import { hasGoogleAnalyticsDirectConnection, readGoogleAnalyticsReport } from ".
 import { completedTasksForReport, previousReportWindow } from "./report-evidence";
 import { clientWebsite } from "./client-website";
 
-export type ReportType = "seo" | "ads";
+export type ReportType = "seo" | "ads" | "audit" | "keywords";
 type Window = { start: string; end: string };
 type Status = "ok" | "unavailable" | "not_connected";
 export type Section<T> = { status: Status; note?: string; source?: string; updatedAt?: string; data?: T };
@@ -238,7 +238,7 @@ async function aiVisibility(db: D1Database, ownerId: string, client: Client, cur
 }
 
 /* ---------------------------------------------------------------- work & recommendations */
-const SERVICE_TEST: Record<ReportType, RegExp> = { seo: /seo|website|content|blog|google business|gbp|local|backlink|technical|page/i, ads: /google ads|ppc|ads|campaign|ad copy|keyword/i };
+const SERVICE_TEST: Record<ReportType, RegExp> = { seo: /seo|website|content|blog|google business|gbp|local|backlink|technical|page/i, ads: /google ads|ppc|ads|campaign|ad copy|keyword/i, audit: /audit|seo|google ads|ppc|website|google business|gbp|analytics|tracking/i, keywords: /keyword|seo|content|blog|page/i };
 function work(workspace: Workspace, client: Client, type: ReportType, current: Window) {
   const done = completedTasksForReport((workspace.tasks || []) as never[], (workspace.activity || []) as never[], client.id, current.start, current.end).tasks as Array<{ title: string; service: string; completedAt: string }>;
   const completed = done.filter((task) => SERVICE_TEST[type].test(`${task.service} ${task.title}`) && !(type === "seo" && /google ads/i.test(task.service))).slice(0, 8);
@@ -256,14 +256,43 @@ export type ClientReport = {
   work: { completed: Array<{ title: string; completedAt: string }>; planned: string[] };
   recommendations: string[];
   missing: Array<{ label: string; note: string }>;
+  /** Marketing audit only: Google Ads lead attribution alongside the SEO one, and evidence-based findings. */
+  adsAttribution?: Section<Attribution>;
+  findings?: AuditFinding[];
+  /** Keyword research report only. */
+  keywordResearch?: Section<KeywordResearchData>;
 };
+export type AuditFinding = { priority: "high" | "medium" | "low"; area: string; title: string; evidence: string; action: string };
+export type ResearchKeyword = { keyword: string; volume: number | null; competition: string | null; lowBid: number | null; highBid: number | null; difficulty: number | null; tags: string[]; location: string; position: number | null };
+export type KeywordResearchData = { total: number; totalVolume: number; groups: Array<{ name: string; keywords: ResearchKeyword[]; volume: number }> };
+
+async function keywordResearch(db: D1Database, ownerId: string, client: Client, ranks?: Section<RankingsData>): Promise<Section<KeywordResearchData>> {
+  try {
+    const [groupsRes, rowsRes] = await db.batch([
+      db.prepare("SELECT id, name FROM seo_keyword_groups WHERE owner_id = ?1 AND client_id = ?2 ORDER BY sort_order, name").bind(ownerId, client.id),
+      db.prepare("SELECT keyword, location, group_id, tags, avg_monthly_searches, competition, low_bid, high_bid, difficulty, updated_at FROM seo_saved_keywords WHERE owner_id = ?1 AND client_id = ?2 ORDER BY avg_monthly_searches DESC, keyword").bind(ownerId, client.id),
+    ]);
+    const groups = (groupsRes.results || []) as Array<{ id: string; name: string }>;
+    const rows = (rowsRes.results || []) as Array<{ keyword: string; location: string; group_id: string | null; tags: string; avg_monthly_searches: number | null; competition: string | null; low_bid: number | null; high_bid: number | null; difficulty: number | null; updated_at: string }>;
+    if (!rows.length) return off("not_connected", "No saved keywords for this client yet. Save keywords in SEO → Keywords, then generate this report.");
+    const pos = new Map((ranks?.data?.keywords || []).map((k) => [k.keyword.toLowerCase(), k.position]));
+    const toKw = (r: (typeof rows)[number]): ResearchKeyword => ({ keyword: r.keyword, volume: r.avg_monthly_searches, competition: r.competition, lowBid: r.low_bid, highBid: r.high_bid, difficulty: r.difficulty, tags: (() => { try { return JSON.parse(r.tags) as string[]; } catch { return []; } })(), location: r.location, position: pos.get(r.keyword.toLowerCase()) ?? null });
+    const out = groups.map((g) => ({ name: g.name, keywords: rows.filter((r) => r.group_id === g.id).map(toKw) }));
+    const known = new Set(groups.map((g) => g.id));
+    const loose = rows.filter((r) => !r.group_id || !known.has(r.group_id)).map(toKw);
+    if (loose.length) out.push({ name: "Ungrouped", keywords: loose });
+    const withVol = out.filter((g) => g.keywords.length).map((g) => ({ ...g, volume: g.keywords.reduce((sum, k) => sum + n(k.volume), 0) }));
+    const latest = rows.map((r) => r.updated_at).sort().pop();
+    return ok({ total: rows.length, totalVolume: withVol.reduce((sum, g) => sum + g.volume, 0), groups: withVol }, "Saved keyword research (Google Ads Keyword Planner / DataForSEO)", latest || new Date().toISOString());
+  } catch { return off("not_connected", "No saved keywords for this client yet. Save keywords in SEO → Keywords, then generate this report."); }
+}
 
 export async function buildClientReport(db: D1Database, workspace: Workspace, clientId: string, type: ReportType, period: Window): Promise<ClientReport> {
   const ownerId = String(workspace.ownerId || "");
   const client = (workspace.clients || []).find((item) => item.id === clientId);
   if (!client) throw new Error("Choose a client in this workspace.");
   const comparison = previousReportWindow(period.start, period.end);
-  const channel: LeadChannel = type === "seo" ? "seo" : "google_ads";
+  const channel: LeadChannel = type === "ads" ? "google_ads" : "seo";
   const attribution = await crmAttribution(db, ownerId, client.id, channel, period, comparison).catch((error) => off<Attribution>("unavailable", error instanceof Error ? error.message : "CRM data could not be read."));
   const report: ClientReport = {
     type, generatedAt: new Date().toISOString(), period, comparison,
@@ -271,16 +300,77 @@ export async function buildClientReport(db: D1Database, workspace: Workspace, cl
     attribution, work: work(workspace, client, type, period), recommendations: [], missing: [],
   };
   if (type === "ads") report.ads = await adsData(db, ownerId, client, period, comparison);
-  else {
+  else if (type === "keywords") {
+    report.rankings = await rankings(db, ownerId, client, period, comparison);
+    report.keywordResearch = await keywordResearch(db, ownerId, client, report.rankings);
+  } else {
     [report.traffic, report.rankings, report.backlinks, report.competitors, report.business, report.aiVisibility] = await Promise.all([
       organicTraffic(db, ownerId, client, period, comparison), rankings(db, ownerId, client, period, comparison), backlinks(db, ownerId, client, period, comparison),
       competitors(db, ownerId, client, period), business(db, ownerId, client, period, comparison), aiVisibility(db, ownerId, client, period, comparison),
     ]);
+    if (type === "audit") {
+      [report.ads, report.adsAttribution] = await Promise.all([
+        adsData(db, ownerId, client, period, comparison),
+        crmAttribution(db, ownerId, client.id, "google_ads", period, comparison).catch((error) => off<Attribution>("unavailable", error instanceof Error ? error.message : "CRM data could not be read.")),
+      ]);
+    }
   }
-  const labels: Record<string, string> = { attribution: "CRM leads & revenue", ads: "Google Ads", traffic: "Organic traffic", rankings: "Google rankings", backlinks: "Backlinks", competitors: "Competitors", business: "Google Business Profile", aiVisibility: "ChatGPT & Claude visibility" };
+  const labels: Record<string, string> = { keywordResearch: "Saved keywords", attribution: "CRM leads & revenue", ads: "Google Ads", traffic: "Organic traffic", rankings: "Google rankings", backlinks: "Backlinks", competitors: "Competitors", business: "Google Business Profile", aiVisibility: "ChatGPT & Claude visibility" };
   for (const key of Object.keys(labels)) { const section = (report as unknown as Record<string, Section<unknown> | undefined>)[key]; if (section && section.status !== "ok") report.missing.push({ label: labels[key], note: section.note || "Unavailable" }); }
-  report.recommendations = recommend(report);
+  if (type === "audit") report.findings = auditFindings(report);
+  report.recommendations = type === "audit" ? (report.findings || []).filter((f) => f.priority !== "low").map((f) => f.action).slice(0, 5) : recommend(report);
+  if (type === "audit" && report.recommendations.length < 5) for (const task of report.work.planned) if (report.recommendations.length < 5 && !report.recommendations.includes(task)) report.recommendations.push(task);
+  if (type === "keywords") report.recommendations = keywordRecommendations(report);
   return report;
+}
+
+/** Marketing audit: each finding is triggered by a real figure (or a missing connection) in this report. */
+function auditFindings(report: ClientReport): AuditFinding[] {
+  const out: AuditFinding[] = [];
+  const pct = (v: number) => `${Math.round(v * 100)}%`;
+  const ads = report.ads?.data, a = report.adsAttribution?.data, s = report.attribution.data;
+  const add = (priority: AuditFinding["priority"], area: string, title: string, evidence: string, action: string) => out.push({ priority, area, title, evidence, action });
+  if (ads) {
+    const cur = ads.current, prev = ads.previous;
+    const zero = ads.campaigns.filter((c) => c.spend > 0 && c.conversions === 0).sort((x, y) => y.spend - x.spend);
+    if (zero.length) add("high", "Google Ads", `Spend with no conversions in ${zero.length} campaign${zero.length > 1 ? "s" : ""}`, `“${zero[0].name}” spent ${zero[0].spend.toFixed(2)} ${report.client.currency} with no recorded conversions.`, `Review search terms, ads and landing page for “${zero[0].name}”, or pause it.`);
+    if (prev && cur.costPerConversion != null && prev.costPerConversion != null && cur.costPerConversion > prev.costPerConversion * 1.25) add("medium", "Google Ads", "Cost per conversion rose", `Up from ${prev.costPerConversion.toFixed(2)} to ${cur.costPerConversion.toFixed(2)} ${report.client.currency} versus the previous period.`, "Check bids, negative keywords and recent ad or landing-page changes.");
+    if (cur.clicks > 0 && cur.ctrPercent < 2) add("medium", "Google Ads", "Low click-through rate", `CTR is ${cur.ctrPercent.toFixed(2)}% across ${cur.clicks} clicks.`, "Refresh ad copy and tighten ad groups so ads match searches more closely.");
+    if (cur.spend > 0 && cur.conversions === 0) add("high", "Google Ads", "No conversions recorded at all", `Spend of ${cur.spend.toFixed(2)} ${report.client.currency} this period with zero conversions.`, "Check conversion tracking is firing on every form and call button.");
+  } else if (report.ads) add("medium", "Google Ads", report.ads.status === "not_connected" ? "Google Ads not connected" : "Google Ads data unavailable", report.ads.note || "No Google Ads data for this period.", "Link the client's Google Ads account in their profile so spend and leads can be audited.");
+  if (a && a.current.leads > 0 && a.current.qualified === 0) add("medium", "CRM", "Ads leads not progressing", `${a.current.leads} Google Ads lead${a.current.leads > 1 ? "s" : ""} but none reached Qualified.`, "Update CRM stages so lead quality and return on ad spend can be measured.");
+  const unknown = Math.max(a?.unknownShare || 0, s?.unknownShare || 0);
+  if (unknown > 0.3) add("high", "Tracking", "Many leads have no source", `${pct(unknown)} of leads this period have no recorded source.`, "Make sure every website form carries the lead tracker and Google click IDs (auto-tagging on).");
+  const t = report.traffic?.data;
+  if (t && t.previous != null && t.previous > 0 && t.current < t.previous * 0.8) add("high", "SEO", "Organic traffic dropped", `${t.metric}: ${t.current} versus ${t.previous} the period before (${pct(1 - t.current / t.previous)} down).`, "Check Search Console for lost pages or queries and recent site changes.");
+  else if (!t && report.traffic) add("medium", "SEO", "Organic traffic not measured", report.traffic.note || "No GA4 or Search Console connected.", "Link GA4 and Search Console to this client.");
+  const near = (report.rankings?.data?.keywords || []).filter((k) => k.position != null && k.position > 10 && k.position <= 20);
+  if (near.length) add("medium", "SEO", `${near.length} keyword${near.length > 1 ? "s" : ""} on page two`, near.slice(0, 3).map((k) => `“${k.keyword}” #${k.position}`).join(", "), "Improve those pages (content depth, internal links, titles) to reach page one.");
+  const drops = (report.rankings?.data?.keywords || []).filter((k) => k.change != null && k.change <= -3);
+  if (drops.length) add("medium", "SEO", "Ranking drops", drops.slice(0, 3).map((k) => `“${k.keyword}” ${k.previousPosition}→${k.position}`).join(", "), "Review the ranking pages for those keywords and competitor changes.");
+  const gb = report.business?.data;
+  if (gb?.previous && gb.calls != null && gb.previous.calls != null && gb.calls < gb.previous.calls) add("low", "Google Business", "Fewer calls from Google Business", `${gb.calls} calls versus ${gb.previous.calls} the period before.`, "Post weekly updates and ask recent customers for reviews.");
+  else if (!gb && report.business) add("low", "Google Business", "Google Business Profile not linked", report.business.note || "No profile linked.", "Link the client's Google Business Profile location.");
+  const ai = report.aiVisibility?.data;
+  if (ai && ai.overall < 0.5) add("low", "AI visibility", "Low AI assistant visibility", `Mentioned in ${pct(ai.overall)} of ChatGPT and Claude test questions.`, "Add clear service + location pages and FAQs that AI assistants can cite.");
+  const bl = report.backlinks?.data;
+  if (bl?.previous?.referringDomains != null && bl.referringDomains != null && bl.referringDomains < bl.previous.referringDomains) add("low", "SEO", "Referring domains fell", `${bl.referringDomains} versus ${bl.previous.referringDomains}.`, "Check for lost links and plan new local citations.");
+  const rank = { high: 0, medium: 1, low: 2 };
+  return out.sort((x, y) => rank[x.priority] - rank[y.priority]).slice(0, 12);
+}
+
+function keywordRecommendations(report: ClientReport): string[] {
+  const k = report.keywordResearch?.data; if (!k) return [];
+  const out: string[] = [];
+  const all = k.groups.flatMap((g) => g.keywords.map((kw) => ({ ...kw, group: g.name })));
+  const easy = all.filter((kw) => kw.volume && (kw.difficulty == null || kw.difficulty < 30) && (kw.position == null || kw.position > 10)).sort((x, y) => n(y.volume) - n(x.volume)).slice(0, 3);
+  if (easy.length) out.push(`Target quick wins first: ${easy.map((kw) => `“${kw.keyword}”`).join(", ")} — good volume, lower difficulty.`);
+  const top = [...k.groups].sort((x, y) => y.volume - x.volume)[0];
+  if (top) out.push(`Build or strengthen a dedicated page for the “${top.name}” group (${top.volume.toLocaleString("en-IE")} searches a month).`);
+  const loose = k.groups.find((g) => g.name === "Ungrouped"); if (loose) out.push(`Sort ${loose.keywords.length} ungrouped keyword${loose.keywords.length > 1 ? "s" : ""} into groups so each maps to one page.`);
+  const paid = all.filter((kw) => kw.tags.includes("Google Ads")).length; if (paid) out.push(`${paid} keyword${paid > 1 ? "s are" : " is"} tagged for Google Ads — add them to the matching ad groups.`);
+  for (const task of report.work.planned) if (out.length < 5 && !out.includes(task)) out.push(task);
+  return out.slice(0, 5);
 }
 
 /** Data-driven next steps: each one is triggered by a real figure in this report, plus planned tasks. */

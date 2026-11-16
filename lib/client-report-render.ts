@@ -229,6 +229,67 @@ ${kpis}
 ${footer(report, [report.traffic, report.rankings, report.backlinks, report.competitors, report.business, report.aiVisibility, report.attribution])}`;
 }
 
+
+/* ------------------------------------------------------------------ Marketing audit */
+function auditBody(report: ClientReport, o: Opts) {
+  const { money, num, pct } = fmt(report);
+  const na = "<span class=\"na-inline\">Unavailable</span>";
+  const ads = report.ads?.status === "ok" ? report.ads.data! : null;
+  const aa = report.adsAttribution?.status === "ok" ? report.adsAttribution.data! : null;
+  const sa = report.attribution.status === "ok" ? report.attribution.data! : null;
+  const t = report.traffic?.status === "ok" ? report.traffic.data! : null;
+  const findings = report.findings || [];
+  const counts = { high: findings.filter((f) => f.priority === "high").length, medium: findings.filter((f) => f.priority === "medium").length, low: findings.filter((f) => f.priority === "low").length };
+  const sources: Array<[string, Section<unknown> | undefined]> = [["Google Ads", report.ads], ["Organic traffic", report.traffic], ["Rankings", report.rankings], ["Backlinks", report.backlinks], ["Google Business", report.business], ["AI visibility", report.aiVisibility], ["CRM leads", report.attribution]];
+  const connected = sources.filter(([, sec]) => sec?.status === "ok").length;
+  const score = Math.max(0, Math.min(100, Math.round(100 - counts.high * 15 - counts.medium * 7 - counts.low * 3 - (sources.length - connected) * 4)));
+  const scoreTone = score >= 75 ? "#16a34a" : score >= 50 ? "#d99a00" : "#dc2626";
+  const kpis = `<div class="kpis k4">${[
+    kpi("gauge", score >= 75 ? "green" : score >= 50 ? "amber" : "red", "Audit score", `<span style="color:${scoreTone}">${score}</span><small style="font-size:15px;color:#64748b"> / 100</small>`, `<span class="pill ${counts.high ? "bad" : "good"}">${counts.high} high priority</span>`, `${counts.medium} to review · ${counts.low} notes`),
+    kpi("layers", "blue", "Sources included", `${connected} of ${sources.length}`, `<span class="pill ${connected === sources.length ? "good" : "flat"}">${connected === sources.length ? "All connected" : "Some missing"}</span>`),
+    kpi("coins", "red", "Ad spend", ads ? money(ads.current.spend) : na, change(ads?.current.spend, ads?.previous?.spend ?? null), aa ? `${num(aa.current.leads)} Ads leads` : ""),
+    kpi("chart", "teal", "Organic traffic", t ? num(t.current) : na, change(t?.current, t?.previous), sa ? `${num(sa.current.leads)} SEO leads` : ""),
+  ].join("")}</div>`;
+  const status = (sec?: Section<unknown>) => sec?.status === "ok" ? `<span class="pill good">Included</span>` : sec?.status === "unavailable" ? `<span class="pill bad">Unavailable</span>` : `<span class="pill flat">Not connected</span>`;
+  const sourceGrid = `<div class="src-grid">${sources.map(([label, sec]) => `<div class="src"><div class="src-top"><b>${esc(label)}</b>${status(sec)}</div>${sec?.status !== "ok" && sec?.note ? `<small>${esc(sec.note)}</small>` : sec?.source ? `<small>${esc(sec.source)}</small>` : ""}</div>`).join("")}</div>`;
+  const prLabel = { high: "High", medium: "Review", low: "Note" } as const;
+  const findingList = findings.length ? `<div class="fnd-list">${findings.map((f) => `<div class="fnd ${f.priority}"><span class="fnd-pr">${prLabel[f.priority]}</span><div><div class="fnd-area">${esc(f.area)}</div><h3>${esc(f.title)}</h3><p><b>Evidence:</b> ${esc(f.evidence)}</p><p><b>Next step:</b> ${esc(f.action)}</p></div></div>`).join("")}</div>` : `<p class="muted">No issues were found in the connected data for this period.</p>`;
+  const adsSummary = ads ? `<div class="minis">${[["Clicks", num(ads.current.clicks), change(ads.current.clicks, ads.previous?.clicks ?? null)], ["CTR", `${ads.current.ctrPercent.toFixed(2)}%`, change(ads.current.ctrPercent, ads.previous?.ctrPercent ?? null, false, "pp")], ["Conversions", num(ads.current.conversions, 1), change(ads.current.conversions, ads.previous?.conversions ?? null)], ["Cost / conversion", money(ads.current.costPerConversion, 2), change(ads.current.costPerConversion, ads.previous?.costPerConversion ?? null, true)]].map(([l, v, c]) => `<div class="mini"><div><span>${l}</span><b>${v} ${c}</b></div></div>`).join("")}</div>` : "";
+  const traffic = t ? `<div class="big-line"><b>${num(t.current)}</b>${change(t.current, t.previous)}</div><p class="sub">${esc(t.metric)}</p>${areaChart(t.daily.map((d) => ({ label: dayLabel(d.date), value: d.value, previous: d.previous })))}` : "";
+  return `${header(report, o, "Marketing Audit", "Google Ads, SEO, Google Business and tracking — checked against real connected data")}
+${kpis}
+${card("", "What was checked", "layers", "blue", sourceGrid, { sub: "Missing sources are shown as unavailable, never as zero." })}
+${card("", "Findings", "target", "blue", findingList, { extra: ` <small>(${findings.length})</small>` })}
+<div class="row r-5-5">${card("", "Google Ads", "megaphone", "blue", adsSummary, { section: report.ads })}${card("", "Organic traffic", "chart", "blue", traffic, { section: report.traffic })}</div>
+<div class="row r-5-5">${card("done-card", "Completed work", "check", "green", list(report.work.completed.map((x) => x.title), "done"))}${card("next-card", "Action plan", "target", "blue", list(report.recommendations, "next"), { extra: " <small>(Next 30 days)</small>" })}</div>
+${footer(report, [report.ads, report.traffic, report.rankings, report.backlinks, report.business, report.aiVisibility, report.attribution])}`;
+}
+
+/* ------------------------------------------------------------------ Keyword research */
+function keywordsBody(report: ClientReport, o: Opts) {
+  const { money, num } = fmt(report);
+  const k = report.keywordResearch?.status === "ok" ? report.keywordResearch.data! : null;
+  const all = k ? k.groups.flatMap((g) => g.keywords) : [];
+  const ranked = all.filter((kw) => kw.position != null);
+  const bids = all.filter((kw) => kw.highBid != null);
+  const avgHigh = bids.length ? bids.reduce((s, kw) => s + (kw.highBid || 0), 0) / bids.length : null;
+  const na = "<span class=\"na-inline\">Unavailable</span>";
+  const kpis = `<div class="kpis k4">${[
+    kpi("search", "blue", "Keywords researched", k ? num(k.total) : na, "", k ? `${num(k.groups.length)} groups` : ""),
+    kpi("users", "violet", "Monthly searches", k ? num(k.totalVolume) : na, "", "Combined average monthly volume"),
+    kpi("coins", "amber", "Avg. top-of-page bid", avgHigh == null ? na : money(avgHigh, 2), "", "Google Ads high-range estimate"),
+    kpi("trophy", "green", "Already ranking", k ? `${num(ranked.length)}` : na, "", ranked.length ? `${num(ranked.filter((kw) => (kw.position || 99) <= 10).length)} on page one` : "Add rank tracking to see positions"),
+  ].join("")}</div>`;
+  const palette = ["#2f6ff0", "#16a34a", "#d99a00", "#6d4fd8", "#0d9488", "#dc2626", "#64748b", "#9cc3fb"];
+  const share = k && k.totalVolume ? `<div class="donut-row">${donut(k.groups.map((g, i) => ({ value: g.volume || 0.0001, color: palette[i % palette.length] })), num(k.totalVolume), "searches / month", 170)}<ul class="keys big">${k.groups.map((g, i) => `<li><i style="background:${palette[i % palette.length]}"></i><span class="kname">${esc(g.name)}</span><b>${num(g.volume)}</b></li>`).join("")}</ul></div>` : "";
+  const diff = (d: number | null) => d == null ? "—" : `<span class="pill ${d < 30 ? "good" : d < 60 ? "flat" : "bad"}">${d}</span>`;
+  const groupCards = k ? k.groups.map((g) => card("", g.name, "tag", "blue", `<table class="t compact"><thead><tr><th>Keyword</th><th>Monthly searches</th><th>Competition</th><th>Bid range</th><th>Difficulty</th><th>Rank</th></tr></thead><tbody>${g.keywords.map((kw) => `<tr><td>${esc(kw.keyword)}${kw.tags.length ? ` <small class="muted">${esc(kw.tags.join(" · "))}</small>` : ""}</td><td>${kw.volume == null ? "—" : num(kw.volume)}</td><td>${esc(kw.competition || "—")}</td><td>${kw.lowBid == null && kw.highBid == null ? "—" : `${money(kw.lowBid, 2)} – ${money(kw.highBid, 2)}`}</td><td>${diff(kw.difficulty)}</td><td>${kw.position == null ? "—" : `<b>#${num(kw.position, 1)}</b>`}</td></tr>`).join("")}</tbody></table>`, { extra: ` <small>(${g.keywords.length} keywords · ${num(g.volume)} searches)</small>` })).join("") : "";
+  return `${header(report, o, "Keyword Research Report", "Grouped keyword opportunities with search volume, competition and current rankings")}
+${kpis}
+${k ? `<div class="row r-5-5">${card("", "Search volume by group", "chart", "blue", share, { section: report.keywordResearch })}${card("next-card", "Recommendations", "target", "blue", list(report.recommendations, "next"))}</div>${groupCards}` : card("", "Keyword groups", "tag", "blue", "", { section: report.keywordResearch })}
+${footer(report, [report.keywordResearch, report.rankings])}`;
+}
+
 /* ------------------------------------------------------------------ document */
 const CSS = `:root{--blue:#1f6feb;--ink:#14213d;--muted:#5b6b82;--line:#e6ebf2;--green:#16a34a;--red:#dc2626;--brand:#1f6feb}
 *{box-sizing:border-box}html,body{margin:0}body{font-family:"Poppins","Segoe UI",system-ui,-apple-system,Arial,sans-serif;color:var(--ink);background:linear-gradient(160deg,#f3f7fd 0%,#eef3fa 45%,#f5f8fc 100%);-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -268,11 +329,14 @@ ol.done,ol.next{list-style:none;margin:0;padding:0;display:grid;gap:9px;font-siz
 .na{display:flex;gap:10px;align-items:flex-start;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:12px;padding:14px;color:#475569;font-size:13.5px}.na b{color:#334155;margin-right:4px}
 .note{margin:8px 0 0;font-size:11.5px;color:#64748b}.muted{color:#64748b;font-size:13.5px}
 .foot{display:grid;grid-template-columns:1fr 260px;gap:14px;margin-top:4px}.foot-main,.foot-side{display:flex;gap:12px;align-items:flex-start;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;font-size:12px;color:#334155;line-height:1.55}.foot-side{align-items:center;font-size:13px}.missing{margin-top:6px;color:#92400e}
+.page>.card{margin-bottom:14px}.src-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}.src{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#f8fafd;display:grid;gap:4px}.src-top{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:13.5px}.src small{font-size:11.5px;color:var(--muted);line-height:1.4}
+.fnd-list{display:grid;gap:10px}.fnd{display:grid;grid-template-columns:72px 1fr;gap:12px;border:1px solid var(--line);border-left:4px solid #94a3b8;border-radius:12px;padding:12px 14px;break-inside:avoid}.fnd.high{border-left-color:#dc2626;background:#fffafa}.fnd.medium{border-left-color:#d99a00;background:#fffdf6}.fnd-pr{align-self:start;justify-self:start;font-size:11.5px;font-weight:800;padding:3px 9px;border-radius:999px;background:#eef2f6;color:#475569}.fnd.high .fnd-pr{background:#fee2e2;color:#b91c1c}.fnd.medium .fnd-pr{background:#fff4d6;color:#a16207}.fnd-area{font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}.fnd h3{margin:2px 0 4px;font-size:15.5px}.fnd p{margin:2px 0;font-size:13px;color:#334155}
 @page{size:A4 portrait;margin:8mm}
 @media print{body{background:#fff}.page{width:1200px;padding:0;zoom:.6}.card,.kpi{box-shadow:none}.row{break-inside:avoid}}`;
 
 export function renderClientReportHtml(report: ClientReport, opts: Opts) {
-  const body = report.type === "ads" ? adsBody(report, opts) : seoBody(report, opts);
-  const title = `${report.client.name} — ${report.type === "ads" ? "Google Ads" : "SEO"} report ${report.period.start} to ${report.period.end}`;
+  const body = report.type === "ads" ? adsBody(report, opts) : report.type === "audit" ? auditBody(report, opts) : report.type === "keywords" ? keywordsBody(report, opts) : seoBody(report, opts);
+  const label = { ads: "Google Ads report", seo: "SEO report", audit: "Marketing audit", keywords: "Keyword research report" }[report.type];
+  const title = `${report.client.name} — ${label} ${report.period.start} to ${report.period.end}`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${esc(title)}</title><style>${CSS}</style></head><body><main class="page">${body}</main></body></html>`;
 }

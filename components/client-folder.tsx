@@ -5,7 +5,7 @@ import { CalendarDays, ClipboardCheck, ExternalLink, FileBarChart2, KeyRound, Se
 
 // Client workroom → Reports folder: every saved report, audit and keyword research for this client in
 // one place, filterable by month and day. Reports are saved here automatically when generated.
-type SavedReport = { id: string; type: "ads" | "seo"; periodStart: string; periodEnd: string; kind: string; createdAt: string; summary?: { leads?: number | null; wonRevenue?: number | null } };
+type SavedReport = { id: string; type: "ads" | "seo" | "audit" | "keywords"; periodStart: string; periodEnd: string; kind: string; createdAt: string; summary?: { leads?: number | null; wonRevenue?: number | null } };
 type AuditRun = { id: string; clientId: string; service: string; createdAt: string; period: string; status: string; summary: string; findings?: Array<{ id: string; title: string; priority: string; recommendation: string }> };
 type Keyword = { id: string; keyword: string; location: string; groupId: string; avgMonthlySearches: number | null; createdAt: string };
 type Group = { id: string; name: string };
@@ -43,7 +43,10 @@ export function ClientFolder({ clientId, clientName, auditRuns }: { clientId: st
     return [...map.values()].sort((a, b) => b.date.localeCompare(a.date));
   }, [kw]);
 
-  const dates = section === "reports" ? (reports || []).map((r) => r.createdAt) : section === "audits" ? audits.map((a) => a.createdAt) : sessions.map((s) => s.date);
+  const perf = (reports || []).filter((r) => r.type === "ads" || r.type === "seo");
+  const savedAudits = (reports || []).filter((r) => r.type === "audit");
+  const savedKw = (reports || []).filter((r) => r.type === "keywords");
+  const dates = section === "reports" ? perf.map((r) => r.createdAt) : section === "audits" ? [...audits.map((a) => a.createdAt), ...savedAudits.map((r) => r.createdAt)] : [...sessions.map((s) => s.date), ...savedKw.map((r) => r.createdAt)];
   const months = [...new Set(dates.map(month).filter(Boolean))].sort().reverse();
   const keep = (iso: string) => (!monthFilter || month(iso) === monthFilter) && (!dayFilter || day(iso) === dayFilter);
 
@@ -56,7 +59,8 @@ export function ClientFolder({ clientId, clientName, auditRuns }: { clientId: st
     } catch (reason) { setError(reason instanceof Error ? reason.message : "That report could not be opened."); }
   };
 
-  const counts = { reports: reports?.length ?? 0, audits: audits.length, keywords: sessions.length };
+  const savedRow = (r: SavedReport, label: string, badge: string) => <button key={r.id} type="button" className="cfolder-row" onClick={() => void openReport(r)}><span className={`cfolder-badge ${badge}`}>{label}</span><span className="cfolder-main"><b>{label} · {fmtDay(r.periodStart)} – {fmtDay(r.periodEnd)}</b><small>Saved {fmtDay(r.createdAt)}</small></span><ExternalLink size={15} aria-hidden="true" /></button>;
+  const counts = { reports: perf.length, audits: audits.length + savedAudits.length, keywords: sessions.length + savedKw.length };
   return <section className="cfolder" aria-label={`${clientName} reports folder`}>
     <div className="workroom-head"><div><h3>🗂 Reports folder</h3><p>Every report, audit and keyword research for {clientName}, saved automatically.</p></div></div>
     <div className="cfolder-bar">
@@ -71,24 +75,24 @@ export function ClientFolder({ clientId, clientName, auditRuns }: { clientId: st
     </div>
     {error && <p className="form-error">{error}</p>}
 
-    {section === "reports" && (reports === null ? <div className="page-loading" role="status" aria-label="Loading reports…"><i /></div> : (() => { const list = reports.filter((r) => keep(r.createdAt)); return list.length ? <div className="cfolder-list">{list.map((r) => <button key={r.id} type="button" className="cfolder-row" onClick={() => void openReport(r)}>
+    {section === "reports" && (reports === null ? <div className="page-loading" role="status" aria-label="Loading reports…"><i /></div> : (() => { const list = perf.filter((r) => keep(r.createdAt)); return list.length ? <div className="cfolder-list">{list.map((r) => <button key={r.id} type="button" className="cfolder-row" onClick={() => void openReport(r)}>
       <span className={`cfolder-badge ${r.type}`}>{r.type === "ads" ? "Google Ads" : "SEO"}</span>
       <span className="cfolder-main"><b>{r.type === "ads" ? "Google Ads report" : "SEO report"} · {fmtDay(r.periodStart)} – {fmtDay(r.periodEnd)}</b><small>Saved {fmtDay(r.createdAt)}{r.kind === "monthly" ? " · monthly (automatic)" : ""}{r.summary?.leads != null ? ` · ${r.summary.leads} leads` : ""}</small></span>
       <ExternalLink size={15} aria-hidden="true" />
-    </button>)}</div> : <p className="empty-note">{reports.length ? "No reports on that date." : "No reports yet. Reports you generate in Operations → Reports are saved here automatically."}</p>; })())}
+    </button>)}</div> : <p className="empty-note">{perf.length ? "No reports on that date." : "No reports yet. Reports you generate in Operations → Reports are saved here automatically."}</p>; })())}
 
-    {section === "audits" && (() => { const list = audits.filter((a) => keep(a.createdAt)); return list.length ? <div className="cfolder-list">{list.map((a) => <div key={a.id} className="cfolder-item">
+    {section === "audits" && (() => { const list = audits.filter((a) => keep(a.createdAt)); const saved = savedAudits.filter((r) => keep(r.createdAt)); return list.length || saved.length ? <div className="cfolder-list">{saved.map((r) => savedRow(r, "Marketing audit", "audit"))}{list.map((a) => <div key={a.id} className="cfolder-item">
       <button type="button" className="cfolder-row" onClick={() => setOpenAudit(openAudit === a.id ? "" : a.id)}>
         <span className="cfolder-badge audit">{a.service === "Full Marketing" ? "Full audit" : a.service}</span>
         <span className="cfolder-main"><b>{a.service} audit · {a.period}</b><small>{fmtDay(a.createdAt)} · {(a.findings || []).length} findings</small></span>
         <span aria-hidden="true">{openAudit === a.id ? "▾" : "▸"}</span>
       </button>
       {openAudit === a.id && <div className="cfolder-detail"><p>{a.summary}</p>{(a.findings || []).length > 0 && <ul>{(a.findings || []).map((f) => <li key={f.id}><b className={`cfolder-pri ${f.priority}`}>{f.priority}</b> {f.title}<small>{f.recommendation}</small></li>)}</ul>}</div>}
-    </div>)}</div> : <p className="empty-note">{audits.length ? "No audits on that date." : "No audits yet. Audits run in Operations → Reports → Audits appear here."}</p>; })()}
+    </div>)}</div> : <p className="empty-note">{audits.length || savedAudits.length ? "No audits on that date." : "No audits yet. Audits run in Operations → Reports → Audits appear here."}</p>; })()}
 
-    {section === "keywords" && (kw === null ? <div className="page-loading" role="status" aria-label="Loading keyword research…"><i /></div> : (() => { const list = sessions.filter((s) => keep(s.date)); return list.length ? <div className="cfolder-list">{list.map((s) => <details key={s.key} className="cfolder-item">
+    {section === "keywords" && (kw === null ? <div className="page-loading" role="status" aria-label="Loading keyword research…"><i /></div> : (() => { const list = sessions.filter((s) => keep(s.date)); const saved = savedKw.filter((r) => keep(r.createdAt)); return list.length || saved.length ? <div className="cfolder-list">{saved.map((r) => savedRow(r, "Keyword report", "kw"))}{list.map((s) => <details key={s.key} className="cfolder-item">
       <summary className="cfolder-row"><span className="cfolder-badge kw">{s.group}</span><span className="cfolder-main"><b>{s.keywords.length} keyword{s.keywords.length === 1 ? "" : "s"} · {s.group}</b><small>{fmtDay(s.date)}{s.keywords[0]?.location ? ` · ${s.keywords[0].location}` : ""}</small></span><span aria-hidden="true">▸</span></summary>
       <div className="cfolder-detail"><table className="cfolder-kw"><thead><tr><th>Keyword</th><th>Monthly searches</th></tr></thead><tbody>{s.keywords.map((k) => <tr key={k.id}><td>{k.keyword}</td><td>{k.avgMonthlySearches == null ? "—" : k.avgMonthlySearches.toLocaleString("en-IE")}</td></tr>)}</tbody></table></div>
-    </details>)}</div> : <p className="empty-note">{sessions.length ? "No keyword research on that date." : "No keyword research saved yet. Keywords saved in Operations → SEO & AI → Keywords appear here."}</p>; })())}
+    </details>)}</div> : <p className="empty-note">{sessions.length || savedKw.length ? "No keyword research on that date." : "No keyword research saved yet. Keywords saved in Operations → SEO & AI → Keywords appear here."}</p>; })())}
   </section>;
 }

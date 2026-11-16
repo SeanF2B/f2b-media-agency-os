@@ -32,9 +32,9 @@ async function context(clientId: string) {
 const validDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
 function readPeriod(url: URL | Record<string, unknown>) {
   const get = (key: string) => String(url instanceof URL ? url.searchParams.get(key) || "" : url[key] || "");
-  const type = get("type") === "ads" ? "ads" : get("type") === "seo" ? "seo" : "";
+  const type = ["ads", "seo", "audit", "keywords"].includes(get("type")) ? get("type") : "";
   const start = get("start"), end = get("end");
-  if (!type) return { error: "Choose an SEO or Google Ads report." };
+  if (!type) return { error: "Choose a report type." };
   if (!validDate(start) || !validDate(end) || start > end) return { error: "Choose a valid reporting period." };
   const today = new Date().toISOString().slice(0, 10);
   if (start > today) return { error: "The reporting period cannot start in the future." };
