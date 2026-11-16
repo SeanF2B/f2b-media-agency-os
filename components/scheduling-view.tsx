@@ -934,19 +934,19 @@ export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, c
         const hours = Array.from({ length: span / 60 + 1 }, (_, i) => from + i * 60);
         const nowM = new Date().getHours() * 60 + new Date().getMinutes();
         return <div className="sch-tl">
-          <div className="sch-tl-axis"><span /><div className="sch-tl-hours">{hours.map((h) => <em key={h} style={{ left: pct(h) }}>{String(Math.floor(h / 60)).padStart(2, "0")}:00</em>)}</div><span /></div>
+          <div className="sch-tl-axis"><span /><div className="sch-tl-hours">{hours.map((h, i) => <em key={h} className={i === 0 ? "first" : i === hours.length - 1 ? "last" : ""} style={{ left: pct(h) }}>{String(Math.floor(h / 60)).padStart(2, "0")}:00</em>)}</div><span /></div>
           {rows.map(({ p, off, windows, items }) => {
             const total = windows.reduce((n, w) => n + mins(w[1]) - mins(w[0]), 0);
             const used = items.reduce((n, b) => n + (Date.parse(b.end) - Date.parse(b.start)) / 60000, 0); const free = Math.max(0, total - used);
             const next = items.find((b) => Date.parse(b.start) > Date.now());
             const summary = off ? "Day off" : !windows.length ? "Not working" : !items.length ? "Free all day" : free ? `${Math.floor(free / 60)}h${free % 60 ? ` ${Math.round(free % 60)}m` : ""} free` : "Fully booked";
             return <div key={p.id} className={`sch-tl-row${!windows.length ? " off" : ""}`}>
-              <div className="sch-tl-who"><Avatar person={p} size={34} /><span><b>{p.name.split("|")[0].trim()}</b><small>{windows.length ? `${windows[0][0]}–${windows[windows.length - 1][1]}` : off ? "Day off" : "Not working"}{items.length ? ` · ${items.length}` : ""}</small>{next && isToday ? <small className="sch-tl-next">Next {time(next.start)} · {next.name.split(" ")[0]}</small> : null}</span></div>
+              <div className="sch-tl-who"><Avatar person={p} size={34} /><span><b>{p.name.split("|")[0].trim()}</b><small>{windows.length ? `${windows[0][0]}–${windows[windows.length - 1][1]}` : off ? "Day off" : "Not working"}{items.length ? ` · ${items.length} booking${items.length === 1 ? "" : "s"}` : ""}</small>{next && isToday ? <small className="sch-tl-next">Next {time(next.start)} · {next.name.split(" ")[0]}</small> : null}</span></div>
               <div className="sch-tl-track">
                 {hours.map((h) => <i key={h} className="sch-tl-grid" style={{ left: pct(h) }} />)}
                 {windows.map((w, i) => <i key={`w${i}`} className="sch-tl-free" style={{ left: pct(mins(w[0])), width: `calc(${pct(mins(w[1]))} - ${pct(mins(w[0]))})` }} />)}
-                {items.map((b) => { const s0 = new Date(b.start), e0 = new Date(b.end); const a0 = s0.getHours() * 60 + s0.getMinutes(), z0 = e0.getHours() * 60 + e0.getMinutes(); const cal = calById.get(b.calendarId); const wide = (z0 - a0) / span > 0.08;
-                  return <button key={b.id} type="button" className={`sch-tl-item ${b.status}${wide ? "" : " narrow"}`} style={{ left: pct(a0), width: `calc(${pct(z0)} - ${pct(a0)})`, ["--c" as string]: cal?.color || "var(--brand-primary,#2563eb)" }} title={`${time(b.start)}–${time(b.end)} · ${b.name} · ${cal?.name || ""}`} onClick={() => setDetail(b)} data-short={(b.name || "?").trim().slice(0, 1).toUpperCase()} aria-label={`${time(b.start)} ${b.name}`}>{wide ? <><b>{time(b.start)}</b><span>{b.name.split(" ")[0]}</span></> : null}</button>; })}
+                {items.map((b) => { const s0 = new Date(b.start), e0 = new Date(b.end); const a0 = s0.getHours() * 60 + s0.getMinutes(), z0 = e0.getHours() * 60 + e0.getMinutes(); const cal = calById.get(b.calendarId); const frac = (z0 - a0) / span; const label = frac >= 0.11 ? "full" : frac >= 0.05 ? "time" : "none";
+                  return <button key={b.id} type="button" className={`sch-tl-item ${b.status} lbl-${label}${Date.parse(b.end) < Date.now() && b.status !== "no_show" ? " past" : ""}`} style={{ left: pct(a0), width: `calc(${pct(z0)} - ${pct(a0)})`, ["--c" as string]: cal?.color || "var(--brand-primary,#2563eb)" }} title={`${time(b.start)}–${time(b.end)} · ${b.name} · ${cal?.name || ""}`} onClick={() => setDetail(b)} aria-label={`${time(b.start)} ${b.name}`}>{label !== "none" && <b>{time(b.start)}</b>}{label === "full" && <span>{b.name.split(" ")[0]}</span>}</button>; })}
                 {isToday && nowM > from && nowM < to && <i className="sch-tl-now" style={{ left: pct(nowM) }} />}
               </div>
               <span className={`sch-avail-pill ${!windows.length ? "off" : !items.length ? "free" : free ? "some" : "full"}`}>{summary}</span>
