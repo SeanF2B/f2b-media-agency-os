@@ -77,7 +77,7 @@ export async function unlockForCampaigns(mailboxId: string, startedAt: string) {
  * Engine pass: pull Instantly warm-up numbers (hourly), flag banned/suspended accounts as critical,
  * and unlock mailboxes for campaigns once the warm-up period is over.
  */
-export async function externalWarmupPass(ownerId: string, now: Date, sendCritical: (key: string, title: string, detail: string) => Promise<void>) {
+export async function externalWarmupPass(ownerId: string, now: Date, sendCritical: (key: string, title: string, detail: string) => Promise<unknown>) {
   const rows = (await db().prepare("SELECT id, email, host, status, health_json FROM outreach_mailboxes WHERE owner_id = ?1 AND json_extract(health_json, '$.external.provider') = 'instantly'").bind(ownerId).all<Row>()).results || [];
   if (!rows.length) return { mailboxes: 0 };
   let unlocked = 0, refreshed = 0;
