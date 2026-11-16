@@ -496,7 +496,7 @@ export async function icsFeed(db: Db, feedToken: string, workspace: WorkspaceLit
 // ---------- staff booking profiles (reviews + photos) ----------
 export type StaffReview = { id: string; author: string; rating: number; text: string; source: string; date: string };
 export type StaffPhoto = { url: string; caption: string };
-export type StaffProfile = { showReviews: boolean; showPhotos: boolean; title: string; bio: string; reviews: StaffReview[]; photos: StaffPhoto[] };
+export type StaffProfile = { showReviews: boolean; showPhotos: boolean; title: string; bio: string; reviews: StaffReview[]; photos: StaffPhoto[]; payType?: "none" | "hourly" | "commission"; payRate?: number };
 const EMPTY_PROFILE: StaffProfile = { showReviews: false, showPhotos: false, title: "", bio: "", reviews: [], photos: [] };
 const okImage = (url: string) => /^(https:\/\/|\/media\/|\/api\/marketing-public\/media)/.test(url) && url.length < 1000;
 
@@ -507,7 +507,9 @@ export function sanitizeProfile(input: unknown): StaffProfile {
     return { id: clean(v.id, 40) || `rv${i}${Date.now().toString(36)}`, author: clean(v.author, 80), rating: Math.max(1, Math.min(5, Math.round(Number(v.rating) || 5))), text: clean(v.text, 800), source: clean(v.source, 40), date: /^\d{4}-\d{2}-\d{2}$/.test(String(v.date)) ? String(v.date) : "" };
   }).filter((x) => x.author || x.text) : [];
   const photos = Array.isArray(r.photos) ? (r.photos as unknown[]).slice(0, 16).map((x) => { const v = (x || {}) as Record<string, unknown>; return { url: clean(v.url, 1000), caption: clean(v.caption, 120) }; }).filter((p) => okImage(p.url)) : [];
-  return { showReviews: Boolean(r.showReviews), showPhotos: Boolean(r.showPhotos), title: clean(r.title, 60), bio: clean(r.bio, 400), reviews, photos };
+  const payType = r.payType === "hourly" || r.payType === "commission" ? r.payType : "none";
+  const payRate = Math.max(0, Math.min(100000, Math.round((Number(r.payRate) || 0) * 100) / 100));
+  return { showReviews: Boolean(r.showReviews), showPhotos: Boolean(r.showPhotos), title: clean(r.title, 60), bio: clean(r.bio, 400), reviews, photos, payType, payRate };
 }
 
 export async function getStaffProfiles(db: Db, ownerId: string, staffIds: string[]) {

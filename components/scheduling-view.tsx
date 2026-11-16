@@ -11,7 +11,7 @@ type Window = [string, string];
 type Question = { id: string; label: string; required?: boolean; type?: "text" | "textarea" | "select"; options?: string[] };
 type Calendar = { id: string; clientId: string; name: string; slug: string; kind: "service" | "consultation"; description: string; durationMin: number; bufferBefore: number; bufferAfter: number; slotInterval: number; minNoticeMin: number; maxDaysAhead: number; dailyLimit: number; locationType: "onsite" | "phone" | "video" | "office"; locationDetail: string; price: number; currency: string; color: string; assignMode: "customer_pick" | "round_robin" | "collective"; staffIds: string[]; questions: Question[]; stageId: string; confirmationMessage: string; redirectUrl: string; active: boolean; timezone: string };
 type StaffReview = { id: string; author: string; rating: number; text: string; source: string; date: string };
-type StaffProfile = { showReviews: boolean; showPhotos: boolean; title: string; bio: string; reviews: StaffReview[]; photos: Array<{ url: string; caption: string }> };
+type StaffProfile = { showReviews: boolean; showPhotos: boolean; title: string; bio: string; reviews: StaffReview[]; photos: Array<{ url: string; caption: string }>; payType?: "none" | "hourly" | "commission"; payRate?: number };
 type Staff = { id: string; name: string; email?: string; role?: string; avatar?: string; profile?: StaffProfile | null; timezone?: string; weekly?: Partial<Record<DayKey, Window[]>>; blocked?: string[]; dailyLimit: number; google: string; feedUrl: string; canEdit: boolean };
 type Booking = { id: string; clientId: string; calendarId: string; start: string; end: string; status: "booked" | "cancelled" | "completed" | "no_show"; staffIds: string[]; contactId: string | null; name: string; email: string; phone: string; answers: Array<{ label: string; value: string }>; notes: string; source: string; channel: string; meetLink: string; createdBy: string; createdAt: string };
 type Data = { calendars: Calendar[]; bookings: Booking[]; staff: Staff[]; clients: Array<{ id: string; name: string; logo: string }>; scope: string | null; canManage: boolean; isAdmin: boolean; meId: string; googleAvailable: boolean; emailReady: boolean; publicBase: string };
@@ -960,6 +960,7 @@ export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, c
       <button type="button" className="sch-dash-wday-head" onClick={() => { setDay(d); setMode("day"); }}><small>{d.toLocaleDateString("en-IE", { weekday: "short" })}</small><b>{d.getDate()}</b>{list.length > 0 && <em>{list.length}</em>}</button>
       <div className="sch-dash-wday-body">{list.length ? list.slice(0, 6).map((b) => { const cal = calById.get(b.calendarId); return <button type="button" key={b.id} className="sch-dash-chip" style={{ ["--c" as string]: cal?.color || "#2563eb" }} onClick={() => setDetail(b)} title={`${time(b.start)} ${b.name} · ${cal?.name || ""}`}><span className="sch-chip-top"><b>{time(b.start)}</b><span className="sch-chip-avs">{b.staffIds.slice(0, 2).map((id) => <Avatar key={id} person={personOf(id)} size={20} />)}</span></span><span>{b.name}</span>{(() => { const pic = bookingPhoto(b); return pic ? <img className="sch-chip-img" src={pic} alt="" loading="lazy" onError={(ev) => { (ev.currentTarget as HTMLImageElement).style.display = "none"; }} /> : null; })()}</button>; }) : <span className="sch-dash-free">Free</span>}{list.length > 6 && <small className="iv-small">+{list.length - 6} more</small>}</div>
     </div>; })}</div>}
+    {data && <StaffHoursPanel data={data} scopeClientId={scopeClientId} sample={sample} />}
     {detail && data && <AppointmentDetail key={detail.id} data={data} scope={scopeClientId} booking={detail} onClose={() => setDetail(null)} onSaved={(msg) => { setDetail(null); void msg; setRefresh((n) => n + 1); }} />}
   </section>;
 }
@@ -1010,6 +1011,8 @@ function sampleSchedule(real: Data | null, week: Date, clientName: string, site:
       bookings.push({ id: `sample-${d}-${n}`, clientId: "", calendarId: cal.id, start: start.toISOString(), end: end.toISOString(), status: past ? (r < 0.08 ? "no_show" : r < 0.13 ? "cancelled" : "completed") : (r < 0.05 ? "cancelled" : "booked"), staffIds: [person.id], contactId: null, name: people[Math.floor(rand() * people.length)], email: "", phone: "", answers: [...where, ...(photo ? [{ label: /tattoo|ink|piercing/i.test(clientName + trade.join(" ")) ? "Photo of the design" : "Photo", value: photo }] : [])], notes: "", source: "public", channel: rand() < 0.5 ? "Google Ads" : "Google search", meetLink: "", createdBy: "", createdAt: start.toISOString() });
     }
   }
+  calendars.forEach((c) => { if (!c.price) c.price = c.durationMin >= 180 ? 320 : c.durationMin >= 90 ? 150 : c.durationMin >= 60 ? 90 : 50; });
+  staff.forEach((p, i) => { p.profile = { ...(p.profile || { showReviews: false, showPhotos: false, title: "", bio: "", reviews: [], photos: [] }), payType: i % 2 ? "hourly" : "commission", payRate: i % 2 ? 22 : 50 }; });
   return { calendars, bookings, staff, clients: real?.clients || [], scope: real?.scope ?? null, canManage: false, isAdmin: false, meId: "", googleAvailable: false, emailReady: true, publicBase: real?.publicBase || "" };
 }
 
@@ -1021,4 +1024,115 @@ export function QuickBook({ scopeClientId, prefill, onClose, onBooked }: { scope
   if (err) return <Modal title="Book appointment" onClose={onClose}><div className="iv-error" role="alert">{err}</div></Modal>;
   if (!data) return <Modal title="Book appointment" onClose={onClose}><p className="iv-small">Loading calendars…</p></Modal>;
   return <NewAppointment data={data} scope={scopeClientId} initial={{ date: ymd(new Date()), time: "", ...prefill }} onClose={onClose} onSaved={(msg) => { onBooked?.(msg); onClose(); }} onCalendarsChanged={() => undefined} />;
+}
+
+// Staff hours & earnings from appointments: pick a period (day / week / month / custom dates) and a person.
+// Earnings use each person's pay setting (hourly rate or % commission of the appointment price).
+function StaffHoursPanel({ data: base, scopeClientId, sample }: { data: Data; scopeClientId: string; sample: boolean }) {
+  const [period, setPeriod] = useState<"day" | "week" | "month" | "custom">(() => { try { const v = localStorage.getItem("f2b-staff-hours-period"); return v === "day" || v === "month" || v === "custom" ? v : "week"; } catch { return "week"; } });
+  const [anchor, setAnchor] = useState(() => new Date());
+  const [from, setFrom] = useState(() => ymd(addDays(new Date(), -30)));
+  const [to, setTo] = useState(() => ymd(new Date()));
+  const [who, setWho] = useState("");
+  const [own, setOwn] = useState<Data | null>(null);
+  const [pay, setPay] = useState<Record<string, { payType: "none" | "hourly" | "commission"; payRate: number }>>({});
+  const [editPay, setEditPay] = useState("");
+  const [cover, setCover] = useState<null | { staffId: string; to: string; from: string; until: string; dayOff: boolean }>(null);
+  const [coverMsg, setCoverMsg] = useState("");
+  const [covering, setCovering] = useState(false);
+  const [tick, setTick] = useState(0);
+  const range = useMemo(() => {
+    if (period === "custom") { const a = new Date(`${from}T00:00:00`), b = addDays(new Date(`${to}T00:00:00`), 1); return { a, b: b > a ? b : addDays(a, 1) }; }
+    if (period === "day") { const a = new Date(anchor); a.setHours(0, 0, 0, 0); return { a, b: addDays(a, 1) }; }
+    if (period === "week") { const a = mondayOf(anchor); return { a, b: addDays(a, 7) }; }
+    const a = new Date(anchor.getFullYear(), anchor.getMonth(), 1); return { a, b: new Date(anchor.getFullYear(), anchor.getMonth() + 1, 1) };
+  }, [period, anchor, from, to]);
+  // Real data: fetch exactly the chosen period (it can be further back than the dashboard loads).
+  useEffect(() => {
+    if (sample) { setOwn(null); return; }
+    let live = true;
+    api<Data>(scopeClientId, undefined, `&from=${range.a.toISOString()}&to=${range.b.toISOString()}`).then((d) => { if (live) setOwn(d); }).catch(() => undefined);
+    return () => { live = false; };
+  }, [sample, scopeClientId, range.a.getTime(), range.b.getTime(), tick]); // eslint-disable-line react-hooks/exhaustive-deps
+  const data = own || base;
+  const cal = new Map(data.calendars.map((c) => [c.id, c]));
+  const money = (n: number) => new Intl.NumberFormat("en-IE", { style: "currency", currency: data.calendars[0]?.currency || "EUR", maximumFractionDigits: 0 }).format(n);
+  const priceOf = (b: Booking) => { const a = b.answers.find((x) => /^price$/i.test(x.label))?.value || ""; const n = Number(a.replace(/[^0-9.]/g, "")); return n > 0 ? n : (cal.get(b.calendarId)?.price || 0); };
+  const payOf = (p: Staff) => pay[p.id] || { payType: p.profile?.payType || "none", payRate: p.profile?.payRate || 0 };
+  const inRange = data.bookings.filter((b) => b.status !== "cancelled" && Date.parse(b.start) >= range.a.getTime() && Date.parse(b.start) < range.b.getTime());
+  const people = data.staff.filter((p) => !who || p.id === who);
+  const rows = people.map((p) => {
+    const mine = inRange.filter((b) => b.staffIds.includes(p.id));
+    const hrs = (list: Booking[]) => list.reduce((n, b) => n + (Date.parse(b.end) - Date.parse(b.start)) / 3_600_000, 0);
+    const worked = mine.filter((b) => b.status === "completed" || (b.status === "booked" && Date.parse(b.end) < Date.now()));
+    const upcoming = mine.filter((b) => b.status === "booked" && Date.parse(b.end) >= Date.now());
+    const noShows = mine.filter((b) => b.status === "no_show").length;
+    const revenue = worked.reduce((n, b) => n + priceOf(b) / Math.max(1, b.staffIds.length), 0);
+    const pr = payOf(p); const workedH = hrs(worked);
+    const earnings = pr.payType === "hourly" ? workedH * pr.payRate : pr.payType === "commission" ? revenue * pr.payRate / 100 : null;
+    return { p, count: mine.length, workedH, upcomingH: hrs(upcoming), noShows, revenue, earnings, pr };
+  });
+  const tot = rows.reduce((t, r) => ({ h: t.h + r.workedH, u: t.u + r.upcomingH, rev: t.rev + r.revenue, earn: t.earn + (r.earnings || 0), n: t.n + r.count }), { h: 0, u: 0, rev: 0, earn: 0, n: 0 });
+  const maxH = Math.max(1, ...rows.map((r) => r.workedH + r.upcomingH));
+  const label = period === "custom" ? `${new Date(`${from}T12:00:00`).toLocaleDateString("en-IE", { day: "numeric", month: "short" })} – ${new Date(`${to}T12:00:00`).toLocaleDateString("en-IE", { day: "numeric", month: "short", year: "numeric" })}` : period === "day" ? range.a.toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short" }) : period === "week" ? `Week of ${range.a.toLocaleDateString("en-IE", { day: "numeric", month: "short" })}` : range.a.toLocaleDateString("en-IE", { month: "long", year: "numeric" });
+  const setP = (v: typeof period) => { setPeriod(v); try { localStorage.setItem("f2b-staff-hours-period", v); } catch { /* optional */ } };
+  const step = (dir: 1 | -1) => setAnchor(period === "month" ? new Date(anchor.getFullYear(), anchor.getMonth() + dir, 1) : addDays(anchor, (period === "day" ? 1 : 7) * dir));
+  const savePay = async (p: Staff, v: { payType: "none" | "hourly" | "commission"; payRate: number }) => {
+    setPay((cur) => ({ ...cur, [p.id]: v })); setEditPay("");
+    if (sample) return;
+    try { await api(scopeClientId, { action: "saveProfile", staffId: p.id, profile: { ...(p.profile || { showReviews: false, showPhotos: false, title: "", bio: "", reviews: [], photos: [] }), ...v } }); } catch { /* keeps the local value */ }
+  };
+  return <section className="sch-hours" aria-label="Staff hours and earnings">
+    <div className="sch-hours-head">
+      <div><p className="eyebrow">⏱ STAFF HOURS &amp; EARNINGS</p><h3>{label}</h3></div>
+      <div className="sch-dash-panel-tools">
+        <label className="sch-select"><Users size={14} /><select aria-label="Staff member" value={who} onChange={(e) => setWho(e.target.value)}><option value="">Everyone</option>{data.staff.map((p) => <option key={p.id} value={p.id}>{p.name.split("|")[0].trim()}</option>)}</select></label>
+        <div className="sch-seg" role="tablist" aria-label="Period">{(["day", "week", "month", "custom"] as const).map((k) => <button key={k} type="button" role="tab" aria-selected={period === k} className={period === k ? "on" : ""} onClick={() => setP(k)}>{k === "custom" ? "Dates" : k[0].toUpperCase() + k.slice(1)}</button>)}</div>
+        {period === "custom" ? <span className="sch-hours-dates"><input type="date" aria-label="From" value={from} max={to} onChange={(e) => e.target.value && setFrom(e.target.value)} /><span>→</span><input type="date" aria-label="To" value={to} min={from} onChange={(e) => e.target.value && setTo(e.target.value)} /></span>
+          : <><button type="button" className="iv-btn" aria-label="Previous" onClick={() => step(-1)}><ChevronLeft size={15} /></button><button type="button" className="iv-btn" onClick={() => setAnchor(new Date())}>Now</button><button type="button" className="iv-btn" aria-label="Next" onClick={() => step(1)}><ChevronRight size={15} /></button></>}
+      </div>
+    </div>
+    <div className="sch-hours-totals"><div><small>Hours worked</small><b>{tot.h.toFixed(1)}h</b></div><div><small>Booked ahead</small><b>{tot.u.toFixed(1)}h</b></div><div><small>Appointments</small><b>{tot.n}</b></div><div><small>Revenue</small><b>{money(tot.rev)}</b></div><div className="earn"><small>Staff earnings</small><b>{money(tot.earn)}</b></div></div>
+    {coverMsg && <p className="sch-hours-note" role="status">{coverMsg}</p>}
+    {cover && (() => { const person = data.staff.find((p) => p.id === cover.staffId); const a = new Date(`${cover.from}T00:00:00`).getTime(), z = addDays(new Date(`${cover.until}T00:00:00`), 1).getTime();
+      const affected = data.bookings.filter((b) => b.status === "booked" && b.staffIds.includes(cover.staffId) && Date.parse(b.start) >= a && Date.parse(b.start) < z);
+      const run = async () => {
+        if (!cover.to) return; setCovering(true); let moved = 0, failed = 0;
+        for (const b of affected) {
+          if (sample || b.id.startsWith("sample-")) { moved++; continue; }
+          try { await api(scopeClientId, { action: "updateBooking", id: b.id, staffIds: [...new Set(b.staffIds.map((x) => x === cover.staffId ? cover.to : x))], notify: false }); moved++; } catch { failed++; }
+        }
+        if (cover.dayOff && person && !sample) {
+          const days: string[] = []; for (let d = new Date(`${cover.from}T12:00:00`); d.getTime() < z; d = addDays(d, 1)) days.push(ymd(d));
+          try { await api(scopeClientId, { action: "saveAvailability", staffId: person.id, weekly: person.weekly || {}, blocked: [...new Set([...(person.blocked || []), ...days])], dailyLimit: person.dailyLimit || 0, timezone: person.timezone }); } catch { /* the move still stands */ }
+        }
+        const coverName = data.staff.find((p) => p.id === cover.to)?.name.split("|")[0].trim() || "cover";
+        setCoverMsg(`${coverName} now covers ${moved} appointment${moved === 1 ? "" : "s"} for ${person?.name.split("|")[0].trim()}${failed ? ` · ${failed} couldn't move (that person may be busy)` : ""}${sample ? " (sample — nothing saved)" : ""}.`);
+        setCovering(false); setCover(null); if (!sample) setTick((t) => t + 1);
+      };
+      return <div className="sch-cover" role="dialog" aria-label="Arrange cover">
+        <b>Cover for {person?.name.split("|")[0].trim()}</b>
+        <div className="sch-cover-grid">
+          <label>From<input type="date" value={cover.from} onChange={(e) => e.target.value && setCover({ ...cover, from: e.target.value, until: e.target.value > cover.until ? e.target.value : cover.until })} /></label>
+          <label>Until<input type="date" value={cover.until} min={cover.from} onChange={(e) => e.target.value && setCover({ ...cover, until: e.target.value })} /></label>
+          <label>Covered by<select value={cover.to} onChange={(e) => setCover({ ...cover, to: e.target.value })}><option value="">Choose…</option>{data.staff.filter((p) => p.id !== cover.staffId).map((p) => <option key={p.id} value={p.id}>{p.name.split("|")[0].trim()}</option>)}</select></label>
+        </div>
+        <label className="iv-check iv-small"><input type="checkbox" checked={cover.dayOff} onChange={(e) => setCover({ ...cover, dayOff: e.target.checked })} /> Mark {person?.name.split("|")[0].trim()} as off these days (no new bookings)</label>
+        <p className="iv-small">{affected.length ? `${affected.length} booked appointment${affected.length === 1 ? "" : "s"} will move to the cover person. Customers aren't emailed.` : "No booked appointments in these dates."}</p>
+        <div className="sch-cover-actions"><button type="button" className="secondary-button" onClick={() => setCover(null)}>Cancel</button><button type="button" className="primary-button" disabled={!cover.to || covering} onClick={() => void run()}>{covering ? "Moving…" : `Assign cover${affected.length ? ` (${affected.length})` : ""}`}</button></div>
+      </div>; })()}
+    <div className="sch-hours-rows">{rows.map((r) => <div key={r.p.id} className="sch-hours-row">
+      <div className="sch-tl-who"><Avatar person={r.p} size={34} /><span><b>{r.p.name.split("|")[0].trim()}</b><small>{r.count} appointment{r.count === 1 ? "" : "s"}{r.noShows ? ` · ${r.noShows} no-show${r.noShows === 1 ? "" : "s"}` : ""}</small></span></div>
+      <div className="sch-hours-bar" title={`${r.workedH.toFixed(1)}h worked · ${r.upcomingH.toFixed(1)}h booked ahead`}><i className="worked" style={{ width: `${(r.workedH / maxH) * 100}%` }} /><i className="ahead" style={{ width: `${(r.upcomingH / maxH) * 100}%` }} /><em>{r.workedH.toFixed(1)}h{r.upcomingH ? ` + ${r.upcomingH.toFixed(1)}h` : ""}</em></div>
+      <div className="sch-hours-money"><small>Revenue</small><b>{money(r.revenue)}</b></div>
+      <button type="button" className="sch-hours-cover" title={`Get someone to cover ${r.p.name.split("|")[0].trim()}'s appointments`} onClick={() => setCover({ staffId: r.p.id, to: "", from: ymd(new Date()), until: ymd(new Date()), dayOff: true })}>Cover</button>
+      <div className="sch-hours-money earn"><small>{r.pr.payType === "hourly" ? `${money(r.pr.payRate)}/h` : r.pr.payType === "commission" ? `${r.pr.payRate}% commission` : "Earnings"}</small>{editPay === r.p.id ? <PayEditor value={r.pr} onSave={(v) => void savePay(r.p, v)} onCancel={() => setEditPay("")} /> : <button type="button" className="sch-hours-pay" onClick={() => setEditPay(r.p.id)}>{r.earnings === null ? "Set pay" : money(r.earnings)}</button>}</div>
+    </div>)}{!rows.length && <p className="dh-muted">No staff to show.</p>}</div>
+  </section>;
+}
+
+function PayEditor({ value, onSave, onCancel }: { value: { payType: "none" | "hourly" | "commission"; payRate: number }; onSave: (v: { payType: "none" | "hourly" | "commission"; payRate: number }) => void; onCancel: () => void }) {
+  const [t, setT] = useState(value.payType === "none" ? "commission" : value.payType);
+  const [rate, setRate] = useState(value.payRate ? String(value.payRate) : "");
+  return <span className="sch-pay-edit"><select value={t} onChange={(e) => setT(e.target.value as "hourly" | "commission")}><option value="commission">% of price</option><option value="hourly">Per hour</option></select><input type="number" min={0} step="0.5" value={rate} placeholder={t === "hourly" ? "€/h" : "%"} onChange={(e) => setRate(e.target.value)} autoFocus /><button type="button" className="iv-btn ok" onClick={() => onSave({ payType: Number(rate) > 0 ? t : "none", payRate: Number(rate) || 0 })}>Save</button><button type="button" className="iv-btn" onClick={onCancel}>×</button></span>;
 }

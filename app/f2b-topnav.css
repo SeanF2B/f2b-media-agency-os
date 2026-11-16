@@ -2352,3 +2352,13 @@ html body .app-shell.dark-mode .full-marketing-audit { background: rgba(255,255,
 html body .app-shell .full-marketing-audit-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 html body .app-shell .full-marketing-audit-head h3 { margin: 0; font-size: 20px; }
 html body .app-shell .full-marketing-audit-head p { margin: 4px 0 0; font-size: 13.5px; opacity: .75; max-width: 70ch; }
+/* Dashboard quick actions: one tidy row, however many actions there are */
+html body .app-shell .dh-actions { display: grid !important; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important; gap: 8px !important; }
+html body .app-shell .dh-action { padding: 10px 12px !important; gap: 9px !important; min-height: 0 !important; border-radius: 12px !important; }
+html body .app-shell .dh-action .dh-action-icon { width: 32px !important; height: 32px !important; flex: none; border-radius: 9px !important; }
+html body .app-shell .dh-action > span:last-child { min-width: 0; }
+html body .app-shell .dh-action b { font-size: 13px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html body .app-shell .dh-action small { font-size: 11px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (min-width: 1300px) { html body .app-shell .dh-actions { grid-template-columns: repeat(auto-fit, minmax(0, 1fr)) !important; grid-auto-flow: column; } }
+@media (max-width: 700px) { html body .app-shell .dh-actions { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; grid-auto-flow: row; } html body .app-shell .dh-action small { display: none !important; } }
+html body .app-shell .dh-approvals { gap: 8px !important; } html body .app-shell .dh-approval { padding: 10px 12px !important; }

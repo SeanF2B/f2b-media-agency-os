@@ -373,3 +373,30 @@ html body .app-shell.dark-mode .sch-dash-panel-tools .sch-seg button.on{backgrou
 .sch-month-more{border:0;background:none;padding:0 2px;font:inherit;font-size:10.5px;font-weight:600;color:#667085;text-align:left;cursor:pointer}
 .app-shell.dark-mode .sch-month-cell{background:#1a2025;border-color:rgba(255,255,255,.06)}.app-shell.dark-mode .sch-month-chip{background:color-mix(in srgb,var(--c) 28%,#1a2025);color:#f1f5f9}.app-shell.dark-mode .sch-month-chip span{color:#cbd5e1}.app-shell.dark-mode .sch-month-date em{background:#f1f5f9;color:#111827}
 @media(max-width:760px){.sch-month-cell{min-height:64px;padding:4px}.sch-month-chip span,.sch-month-chip .sch-avatar{display:none}}
+/* Staff hours & earnings */
+.sch-hours{margin-top:16px;border-top:1px solid rgba(127,138,160,.18);padding-top:14px;display:grid;gap:10px}
+.sch-hours-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.sch-hours-head h3{margin:2px 0 0;font-size:17px}
+.sch-hours-dates{display:inline-flex;align-items:center;gap:6px;height:36px}.sch-hours-dates input{height:36px;border:1px solid #dce3e7;border-radius:10px;padding:0 8px;font:inherit;font-size:13px}
+.sch-hours-totals{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.sch-hours-totals>div{border:1px solid #e8edf1;border-radius:12px;padding:9px 12px;display:grid;gap:2px;background:#fff}
+.sch-hours-totals small{font-size:11.5px;color:#667085;font-weight:700}.sch-hours-totals b{font-size:19px}
+.sch-hours-totals .earn{background:#ecfdf3;border-color:#bbf0cf}.sch-hours-totals .earn b{color:#067647}
+.sch-hours-rows{display:grid;gap:2px}
+.sch-hours-row{display:grid;grid-template-columns:minmax(160px,220px) 1fr 90px 70px 130px;gap:14px;align-items:center;padding:8px 4px;border-radius:12px}
+.sch-hours-row:hover{background:color-mix(in srgb,var(--brand-primary,#3b82f6) 5%,transparent)}
+.sch-hours-bar{position:relative;height:26px;border-radius:8px;background:#f2f4f6;display:flex;overflow:hidden}
+.sch-hours-bar i{display:block;height:100%}.sch-hours-bar i.worked{background:var(--brand-primary,#2563eb)}.sch-hours-bar i.ahead{background:color-mix(in srgb,var(--brand-primary,#2563eb) 30%,#fff)}
+.sch-hours-bar em{position:absolute;right:8px;top:50%;transform:translateY(-50%);font-style:normal;font-size:11.5px;font-weight:800;color:#344054}
+.sch-hours-money{display:grid;text-align:right}.sch-hours-money small{font-size:10.5px;color:#98a2b3;font-weight:700}.sch-hours-money b{font-size:14px}
+.sch-hours-money.earn b,.sch-hours-pay{color:#067647}
+.sch-hours-pay{justify-self:end;border:0;background:transparent;font:inherit;font-weight:800;font-size:14px;cursor:pointer;padding:0;text-decoration:underline dotted}
+.sch-hours-cover{justify-self:end;border:1px solid #dce3e7;background:#fff;border-radius:9px;padding:5px 10px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+.sch-hours-cover:hover{border-color:var(--brand-primary,#2563eb)}
+.sch-pay-edit{display:flex;gap:4px;justify-content:flex-end;align-items:center}.sch-pay-edit select,.sch-pay-edit input{height:30px;border:1px solid #dce3e7;border-radius:8px;font:inherit;font-size:12px;padding:0 6px}.sch-pay-edit input{width:64px}
+.sch-hours-note{margin:0;font-size:12.5px;color:#067647;font-weight:700}
+.sch-cover{border:1px solid #c9d7ff;background:#f5f8ff;border-radius:14px;padding:12px 14px;display:grid;gap:8px}
+.sch-cover-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.sch-cover-grid label{display:grid;gap:4px;font-size:12px;font-weight:700;color:#475467}.sch-cover-grid input,.sch-cover-grid select{height:36px;border:1px solid #d0d7dd;border-radius:10px;padding:0 8px;font:inherit;font-size:13px;background:#fff}
+.sch-cover-actions{display:flex;gap:8px;justify-content:flex-end}
+.app-shell.dark-mode .sch-hours-totals>div,.app-shell.dark-mode .sch-hours-cover{background:#1b2227;border-color:#2f3a41}.app-shell.dark-mode .sch-hours-bar{background:#222b31}.app-shell.dark-mode .sch-cover{background:#17233a;border-color:#2c3e66}
+@media(max-width:900px){.sch-hours-totals{grid-template-columns:repeat(2,minmax(0,1fr))}.sch-hours-row{grid-template-columns:1fr auto;}.sch-hours-bar{grid-column:1/-1}.sch-cover-grid{grid-template-columns:1fr}}
