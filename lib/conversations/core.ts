@@ -17,6 +17,32 @@ export async function ensureTables() {
   await db.prepare(`CREATE TABLE IF NOT EXISTS conv_messages (id TEXT PRIMARY KEY, thread_id TEXT NOT NULL, owner_id TEXT NOT NULL, direction TEXT NOT NULL, sender TEXT NOT NULL, body TEXT NOT NULL, twilio_sid TEXT NOT NULL DEFAULT '', error TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL)`).run();
   await db.prepare(`CREATE INDEX IF NOT EXISTS conv_messages_thread ON conv_messages (thread_id, created_at)`).run();
   await db.prepare(`CREATE INDEX IF NOT EXISTS conv_threads_owner ON conv_threads (owner_id, last_at)`).run();
+  await db.prepare(`CREATE TABLE IF NOT EXISTS conv_client_bots (owner_id TEXT NOT NULL, client_id TEXT NOT NULL, data TEXT NOT NULL DEFAULT '{}', updated_at TEXT NOT NULL, PRIMARY KEY (owner_id, client_id))`).run();
+}
+
+/** What a client's AI bot knows: trained per client from its card (Clients → Train AI bot). */
+export type ClientBot = { enabled: boolean; name: string; about: string; services: string; prices: string; hours: string; area: string; team: string; faqs: string; tone: string; rules: string; bookingLink: string; handoff: string };
+export const BLANK_BOT: ClientBot = { enabled: true, name: "", about: "", services: "", prices: "", hours: "", area: "", team: "", faqs: "", tone: "Friendly and professional", rules: "", bookingLink: "", handoff: "" };
+const BOT_LIMITS: Record<keyof ClientBot, number> = { enabled: 0, name: 60, about: 2000, services: 2000, prices: 2000, hours: 600, area: 600, team: 800, faqs: 6000, tone: 200, rules: 2000, bookingLink: 400, handoff: 300 };
+export function sanitizeBot(input: unknown): ClientBot {
+  const v = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
+  const out = { ...BLANK_BOT } as Record<string, unknown>;
+  for (const k of Object.keys(BLANK_BOT) as Array<keyof ClientBot>) { if (k === "enabled") out.enabled = v.enabled !== false; else if (typeof v[k] === "string") out[k] = String(v[k]).slice(0, BOT_LIMITS[k]); }
+  return out as ClientBot;
+}
+export async function getClientBot(ownerId: string, clientId: string): Promise<ClientBot | null> {
+  if (!clientId) return null;
+  const row = await env.DB!.prepare("SELECT data FROM conv_client_bots WHERE owner_id=?1 AND client_id=?2").bind(ownerId, clientId).first<{ data: string }>().catch(() => null);
+  if (!row) return null;
+  try { return sanitizeBot(JSON.parse(row.data)); } catch { return null; }
+}
+export async function saveClientBot(ownerId: string, clientId: string, bot: ClientBot) {
+  await env.DB!.prepare("INSERT INTO conv_client_bots (owner_id, client_id, data, updated_at) VALUES (?1, ?2, ?3, ?4) ON CONFLICT(owner_id, client_id) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at").bind(ownerId, clientId, JSON.stringify(bot), new Date().toISOString()).run();
+}
+function botKnowledge(bot: ClientBot | null) {
+  if (!bot) return "";
+  const parts: Array<[string, string]> = [["About the business", bot.about], ["Services", bot.services], ["Prices", bot.prices], ["Opening hours", bot.hours], ["Area / location", bot.area], ["Team", bot.team], ["Frequently asked questions", bot.faqs], ["Booking link (share it when someone wants to book)", bot.bookingLink], ["House rules from the business", bot.rules]];
+  return parts.filter(([, v]) => v.trim()).map(([k, v]) => `${k}:\n${v.trim()}`).join("\n\n");
 }
 
 export const e164 = (value: string) => { const d = String(value || "").replace(/^whatsapp:/i, "").replace(/[^\d+]/g, ""); return d ? (d.startsWith("+") ? d : "+" + d.replace(/^00/, "")) : ""; };
@@ -94,16 +120,20 @@ export async function addMessage(ownerId: string, threadId: string, m: { directi
 /* ---------------- AI bot ---------------- */
 const outputText = (r: any) => { if (typeof r?.output_text === "string") return r.output_text.trim(); return (r?.output || []).flatMap((i: any) => i.content || []).filter((p: any) => p.type === "output_text" && typeof p.text === "string").map((p: any) => p.text).join("\n").trim(); };
 const HUMAN_RE = /\b(human|real person|speak to (?:someone|a person|somebody)|call me|ring me|agent|manager|complain|complaint|solicitor|lawyer|refund)\b/i;
-export async function botReply(ownerId: string, p: { settings: ConvSettings; config: NumberConfig; clientName: string; channel: Channel; history: Array<{ sender: string; body: string }>; }): Promise<{ text: string; handoff: boolean } | null> {
+export async function botReply(ownerId: string, p: { settings: ConvSettings; config: NumberConfig; clientName: string; channel: Channel; history: Array<{ sender: string; body: string }>; forceTest?: boolean }): Promise<{ text: string; handoff: boolean } | null> {
   const lastCustomer = [...p.history].reverse().find((m) => m.sender === "customer")?.body || "";
-  if (HUMAN_RE.test(lastCustomer)) return { text: p.settings.handoffMessage || DEFAULT_HANDOFF, handoff: true };
+  if (HUMAN_RE.test(lastCustomer)) { const b0 = await getClientBot(ownerId, p.config.clientId || ""); return { text: b0?.handoff || p.settings.handoffMessage || DEFAULT_HANDOFF, handoff: true }; }
   const provider = await resolveAiProvider(env as any, ownerId);
   const endpoint = provider ? aiEndpoint(env as any, "responses", provider) : null;
   if (!provider || !endpoint) return null;
-  const name = p.settings.botName || `${p.clientName || "the team"}'s assistant`;
+  const bot = await getClientBot(ownerId, p.config.clientId || "");
+  if (bot && !bot.enabled && !p.forceTest) return null;
+  const name = bot?.name || p.settings.botName || `${p.clientName || "the team"}'s assistant`;
   const instructions = [
     `You are ${name}, replying to customers of ${p.clientName || "the business"} by ${p.channel === "whatsapp" ? "WhatsApp" : "SMS"}.`,
     "Be warm, brief (1-3 short sentences, under 300 characters), plain text only, no markdown, at most one emoji.",
+    bot?.tone ? `Tone of voice: ${bot.tone}.` : "",
+    botKnowledge(bot) ? `What you know about ${p.clientName || "the business"} (trained by the owner):\n${botKnowledge(bot)}` : "",
     "Goal: answer simply, find out what the customer needs, and collect their name, what they need and the best time for a call back. Offer to book a call or quote.",
     "Only state facts from the business information below. Never invent prices, availability, guarantees or opening times; if you don't know, say the team will confirm.",
     "If the customer is upset, asks for a person, mentions legal/medical/emergency matters, or you cannot help, reply with a short polite message and end with the exact token [HANDOFF].",

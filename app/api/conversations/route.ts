@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { authorizeAdminOrSubAccount, respond } from "@/lib/settings-auth";
 import { aiCredentialStorageReady } from "@/lib/ai-credentials";
-import { addMessage, botReply, ensureTables, loadSettings, saveSettings, sendTwilio, twilioCredentials, type NumberConfig } from "@/lib/conversations/core";
+import { addMessage, botReply, ensureTables, getClientBot, sanitizeBot, saveClientBot, BLANK_BOT, loadSettings, saveSettings, sendTwilio, twilioCredentials, type NumberConfig } from "@/lib/conversations/core";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +45,18 @@ export async function POST(request: Request) {
       if (b.authToken && !aiCredentialStorageReady()) return respond({ error: "Secure storage needs a one-time server setup before the Auth Token can be saved." }, 503);
       await saveSettings(auth.ownerId, { accountSid: b.accountSid, authToken: b.authToken, numbers: Array.isArray(b.numbers) ? b.numbers as NumberConfig[] : undefined, botEnabled: b.botEnabled, botName: b.botName, businessInfo: b.businessInfo, botRules: b.botRules, handoffMessage: b.handoffMessage });
       return respond({ settings: (await loadSettings(auth.ownerId)).settings });
+    }
+    if (action === "bot-get" || action === "bot-save" || action === "bot-test") {
+      const clientId = String(b.clientId || "").slice(0, 100);
+      if (!clientId || (allowed && !allowed.includes(clientId))) return respond({ error: "You can't train the bot for that client." }, 403);
+      if (action === "bot-get") return respond({ bot: (await getClientBot(auth.ownerId, clientId)) || BLANK_BOT, saved: Boolean(await getClientBot(auth.ownerId, clientId)) });
+      if (action === "bot-save") { const bot = sanitizeBot(b.bot); await saveClientBot(auth.ownerId, clientId, bot); return respond({ bot }); }
+      // Test chat: same brain as the live bot, using the draft being edited (saved first so the test matches).
+      if (b.bot) await saveClientBot(auth.ownerId, clientId, sanitizeBot(b.bot));
+      const { settings } = await loadSettings(auth.ownerId);
+      const history = (Array.isArray(b.history) ? b.history : []).slice(-14).map((m: any) => ({ sender: m?.from === "customer" ? "customer" : "bot", body: String(m?.text || "").slice(0, 1000) }));
+      const r = await botReply(auth.ownerId, { settings, config: { number: "", channel: "whatsapp", clientId, label: String(b.clientName || ""), info: "" } as NumberConfig, clientName: String(b.clientName || ""), channel: "whatsapp", history, forceTest: true });
+      return r ? respond({ reply: r.text, handoff: r.handoff }) : respond({ error: "The AI couldn't reply. Check the AI key in Settings → APIs." }, 502);
     }
     const id = String(b.id || "");
     const thread = id ? await env.DB!.prepare("SELECT * FROM conv_threads WHERE id=?1 AND owner_id=?2").bind(id, auth.ownerId).first<any>() : null;
