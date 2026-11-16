@@ -72,7 +72,7 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
     const demo = sampleSchedule(realData, mondayOf(new Date()), sampleClientName, site);
     return { ...demo, canManage: realData.canManage, isAdmin: realData.isAdmin, meId: realData.meId, googleAvailable: realData.googleAvailable, bookings: demo.bookings.map((b) => sampleMoves[b.id] ? { ...b, start: sampleMoves[b.id], end: new Date(Date.parse(sampleMoves[b.id]) + Date.parse(b.end) - Date.parse(b.start)).toISOString() } : b) };
   }, [sample, realData, sampleClientName, site, sampleMoves]);
-  const [tab, setTab] = useState<"dashboard" | "calendar" | "appointments" | "calendars" | "availability">("dashboard");
+  const [tab, setTab] = useState<"dashboard" | "calendar" | "appointments" | "calendars" | "availability">("calendar"); // Scheduling opens on the calendar
   useEffect(() => {
     const fit = () => { const el = weekRef.current; if (!el) return; const top = el.getBoundingClientRect().top; const room = window.innerHeight - top - 52 - 24; setPpm(Math.max(1.05, Math.min(2.2, room / ((HOURS_TO - HOURS_FROM) * 60)))); };
     fit(); const t = window.setTimeout(fit, 250); window.addEventListener("resize", fit);
@@ -933,7 +933,7 @@ export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, c
             const next = items.find((b) => Date.parse(b.start) > Date.now());
             const summary = off ? "Day off" : !windows.length ? "Not working" : !items.length ? "Free all day" : free ? `${Math.floor(free / 60)}h${free % 60 ? ` ${Math.round(free % 60)}m` : ""} free` : "Fully booked";
             return <div key={p.id} className={`sch-tl-row${!windows.length ? " off" : ""}`}>
-              <div className="sch-tl-who"><Avatar person={p} size={34} /><span><b>{p.name.split("|")[0].trim()}</b><small>{windows.length ? `${windows[0][0]}–${windows[windows.length - 1][1]}` : off ? "Day off" : "Not working"}{items.length ? ` · ${items.length} booked · ${Math.round(used / 6) / 10}h` : ""}</small>{next && isToday ? <small className="sch-tl-next">Next {time(next.start)} · {next.name.split(" ")[0]}</small> : null}</span></div>
+              <div className="sch-tl-who"><Avatar person={p} size={34} /><span><b>{p.name.split("|")[0].trim()}</b><small>{windows.length ? `${windows[0][0]}–${windows[windows.length - 1][1]}` : off ? "Day off" : "Not working"}{items.length ? ` · ${items.length}` : ""}</small>{next && isToday ? <small className="sch-tl-next">Next {time(next.start)} · {next.name.split(" ")[0]}</small> : null}</span></div>
               <div className="sch-tl-track">
                 {hours.map((h) => <i key={h} className="sch-tl-grid" style={{ left: pct(h) }} />)}
                 {windows.map((w, i) => <i key={`w${i}`} className="sch-tl-free" style={{ left: pct(mins(w[0])), width: `calc(${pct(mins(w[1]))} - ${pct(mins(w[0]))})` }} />)}
@@ -984,7 +984,12 @@ function sampleSchedule(real: Data | null, week: Date, clientName: string, site:
     const count = day.getDay() === 6 ? 1 : 2 + Math.floor(rand() * 3);
     for (let n = 0; n < count; n++) {
       const cal = calendars[Math.floor(rand() * calendars.length)]; const person = staff[Math.floor(rand() * staff.length)];
-      const start = new Date(day); start.setHours(9 + Math.floor(rand() * 7), rand() < 0.5 ? 0 : 30, 0, 0);
+      // Starts on the half hour and always finishes within that person's working day (no sessions running past closing).
+      const win = (person.weekly?.[(["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as DayKey[])[day.getDay()]] || [["09:00", "17:30"]])[0] || ["09:00", "17:30"];
+      const toM = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+      const open = toM(win[0]), latest = Math.max(open, toM(win[1]) - cal.durationMin);
+      const startM = open + Math.floor(rand() * (Math.floor((latest - open) / 30) + 1)) * 30;
+      const start = new Date(day); start.setHours(Math.floor(startM / 60), startM % 60, 0, 0);
       const end = new Date(start.getTime() + cal.durationMin * 60_000);
       const past = end.getTime() < now; const r = rand();
       const pics = site.work?.[person.name]?.length ? site.work[person.name] : site.gallery || [];
