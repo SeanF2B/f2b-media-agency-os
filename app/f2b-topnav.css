@@ -2023,3 +2023,25 @@ html body .app-shell label:has(> svg) > input:hover, html body .app-shell label:
 html body .app-shell label:has(> svg):has(> select:focus-visible), html body .app-shell label:has(> svg):has(> input:focus-visible), html body .app-shell .sch-select:focus-within { box-shadow: 0 0 0 3px rgba(59,130,246,.16) !important; }
 html body .app-shell button:focus:not(:focus-visible), html body .app-shell select:focus:not(:focus-visible), html body .app-shell [role=button]:focus:not(:focus-visible) { outline: none !important; }
 html body .app-shell button:focus-visible, html body .app-shell [role=button]:focus-visible { outline: 2px solid rgba(59,130,246,.45) !important; outline-offset: 2px; border-radius: 10px; }
+/* Approval status: green clear, yellow waiting on you, red overloaded */
+html body .app-shell .dh-approval.clear .dh-approval-n { background: #1f8a4c; }
+html body .app-shell .dh-approval.waiting .dh-approval-n { background: #e0a100; }
+html body .app-shell .dh-approval.overload { background: #fff1f0; border-color: #f5b5ae; }
+html body .app-shell .dh-approval.overload .dh-approval-icon { color: #c0352b; }
+html body .app-shell .dh-approval.overload .dh-approval-n { background: #d92d20; animation: dh-pulse 1.6s ease-in-out infinite; }
+html body .app-shell .dh-approval.open { box-shadow: 0 0 0 3px rgba(16,24,40,.06); }
+@keyframes dh-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(217,45,32,.45); } 50% { box-shadow: 0 0 0 6px rgba(217,45,32,0); } }
+html body .app-shell .dh-appr-list { border: 1px solid #e8edf1; background: #fff; border-radius: 14px; padding: 6px 14px 10px; animation: f2b-fade-in .18s ease; }
+html body .app-shell .dh-appr-list-head { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #eef2f5; }
+html body .app-shell .dh-appr-item { display: grid; grid-template-columns: 10px minmax(0,1fr) auto; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid #f2f5f7; }
+html body .app-shell .dh-appr-item:last-child { border-bottom: 0; }
+html body .app-shell .dh-appr-dot { width: 8px; height: 8px; border-radius: 50%; background: #c4ccd4; }
+html body .app-shell .dh-appr-item.mine .dh-appr-dot { background: #e0a100; }
+html body .app-shell .dh-appr-main { display: grid; min-width: 0; } html body .app-shell .dh-appr-main b { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } html body .app-shell .dh-appr-main small { font-size: 12px; color: #667085; }
+html body .app-shell .dh-appr-acts { display: flex; gap: 6px; }
+html body .app-shell .dh-appr-acts button { height: 32px; padding: 0 12px; border-radius: 9px; font-size: 12.5px; font-weight: 700; cursor: pointer; border: 1px solid #dce3e7; background: #fff; color: #101828; }
+html body .app-shell .dh-appr-acts .dh-appr-ok { background: #1f8a4c; border-color: #1f8a4c; color: #fff; }
+html body .app-shell .dh-appr-acts .dh-appr-no { color: #b42318; }
+html body .app-shell.dark-mode .dh-appr-list { background: #1b2227; border-color: #2f3a41; }
+html body .app-shell.dark-mode .dh-approval.overload { background: #3a1f1d; border-color: #6b2f29; }
+@media (max-width: 700px) { html body .app-shell .dh-approvals { grid-template-columns: 1fr 1fr; gap: 8px; } html body .app-shell .dh-approval { padding: 10px; gap: 8px; } html body .app-shell .dh-approval-text small { display: none; } html body .app-shell .dh-appr-item { grid-template-columns: 10px minmax(0,1fr); } html body .app-shell .dh-appr-acts { grid-column: 2; } }
