@@ -1280,3 +1280,59 @@ body.f2b-dark .ai-emp-ico { background: #26313a !important; }
 body.f2b-dark .ai-emp-row { background: #1a2025 !important; border-color: #33404a !important; }
 body.f2b-dark .ai-emp-row.good { background: #15291e !important; } body.f2b-dark :is(.ai-emp-row.good b, #f2b-emp-x) { color: #6fdc9b !important; -webkit-text-fill-color: #6fdc9b !important; }
 body.f2b-dark .ai-emp-row.expense, body.f2b-dark .ai-emp-row.bad { background: #2c1a1a !important; } body.f2b-dark :is(.ai-emp-row.expense b, .ai-emp-row.bad b, #f2b-emp-x) { color: #ff9b94 !important; -webkit-text-fill-color: #ff9b94 !important; }
+/* Launcher: fixed "normal" bot colours (dark bubble, blue glowing bot) regardless of client brand */
+html body .ai-chat-launcher:has(.ai-chat-eyes) { background: radial-gradient(circle at 30% 25%, #22324a, #0f1724) !important; box-shadow: 0 10px 28px rgba(31,111,235,.35) !important; }
+html body .ai-chat-launcher:has(.ai-chat-eyes)::after { border-color: rgba(66,186,255,.45) !important; }
+html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-face { border-color: #69c5ff !important; background: rgba(66,186,255,.08) !important; }
+html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-face i { background: #42baff !important; box-shadow: 0 0 6px #28aaff !important; }
+html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-antenna, html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-antenna::before, html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-antenna::after { background: #69c5ff !important; border-color: #69c5ff !important; }
+
+/* ===== Mobile fixes ===== */
+@media (max-width: 860px) {
+  /* never let the page slide sideways; wide tab rows scroll inside themselves */
+  html, body { overflow-x: hidden; }
+  html body .app-shell .main-area { max-width: 100vw; overflow-x: clip; }
+  html body .app-shell :is(.crm-tabs, .iv-tabs, .settings-tabs, .ops-tabs, [role="tablist"]) { display: flex !important; flex-wrap: nowrap !important; overflow-x: auto !important; max-width: 100%; scrollbar-width: none; -webkit-overflow-scrolling: touch; gap: 4px; }
+  html body .app-shell :is(.crm-tabs, .iv-tabs, .settings-tabs, .ops-tabs, [role="tablist"])::-webkit-scrollbar { display: none; }
+  html body .app-shell :is(.crm-tabs, .iv-tabs, .settings-tabs, .ops-tabs, [role="tablist"]) > * { flex: none !important; white-space: nowrap; }
+  /* top-bar menu */
+  html body .app-shell.topnav-layout .tn-more { display: inline-grid !important; place-items: center; width: 36px; height: 36px; border-radius: 11px; border: 1px solid rgba(127,138,160,.3); background: transparent; font-size: 17px; cursor: pointer; color: inherit; }
+  html body .app-shell.topnav-layout .tn-right { position: relative; }
+  html body .app-shell.topnav-layout .tn-right .top-actions { display: none !important; }
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions { display: grid !important; position: absolute; top: calc(100% + 10px); right: 0; z-index: 1300; width: 230px; padding: 8px; gap: 2px; border-radius: 16px; background: #fff; border: 1px solid #e4e9ee; box-shadow: 0 18px 40px rgba(16,24,40,.2); }
+  html body.f2b-dark .app-shell.topnav-layout .tn-right.menu-open .top-actions { background: #1d2429; border-color: #33404a; }
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions > :is(button, a, label) { display: flex !important; align-items: center; gap: 10px; width: 100% !important; height: 42px !important; padding: 0 10px !important; border-radius: 10px !important; justify-content: flex-start !important; background: transparent !important; border: 0 !important; font-size: 14px; font-weight: 600; }
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions > :is(button, a):hover { background: rgba(127,138,160,.12) !important; }
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions > :is(button, a)[aria-label]:not(.theme-toggle)::after { content: attr(aria-label); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions .theme-toggle { display: flex !important; }
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions .theme-toggle span { display: inline !important; }
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions :is(.ai-assistant-quick-link, .install-app-button) { display: none !important; }
+  html body .app-shell.topnav-layout .tn-more-backdrop { position: fixed; inset: 0; z-index: 1250; }
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions, html body .app-shell.topnav-layout .tn-more { position: relative; z-index: 1301; }
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions { position: absolute; }
+  /* client logo in the top bar */
+  html body .app-shell.topnav-layout .tn-brand .tn-logo-client { display: grid !important; place-items: center; width: 58px; height: 38px; padding: 3px 5px; border-radius: 11px; background: #fff; border: 1px solid rgba(127,138,160,.25); overflow: hidden; }
+  html body .app-shell.topnav-layout .tn-brand .tn-logo-client img { width: 100% !important; height: 100% !important; max-width: none !important; object-fit: contain; }
+  /* Leads on mobile: pipeline first, minimal chrome */
+  html body .app-shell .crm-heading p, html body .app-shell .crm-heading .crm-eyebrow { display: none !important; }
+  html body .app-shell .crm-heading { display: flex !important; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px !important; }
+  html body .app-shell .crm-heading h1 { font-size: 26px !important; margin: 0 !important; }
+  html body .app-shell .crm-heading .primary-button { padding: 9px 12px !important; font-size: 13px !important; }
+  html body .app-shell .crm-tabs { padding: 4px !important; margin-bottom: 8px !important; }
+  html body .app-shell .crm-toolbar { display: flex !important; flex-wrap: wrap; gap: 8px !important; padding: 8px !important; }
+  html body .app-shell .crm-toolbar > label:first-child { flex: 1 1 100%; }
+  html body .app-shell .crm-toolbar > label > span, html body .app-shell .crm-toolbar > label { font-size: 0; }
+  html body .app-shell .crm-toolbar input, html body .app-shell .crm-toolbar select { font-size: 14px !important; }
+  html body .app-shell .crm-toolbar :is(button.secondary-button) { display: none !important; }
+  html body .app-shell .crm-kanban { display: flex !important; overflow-x: auto !important; scroll-snap-type: x mandatory; gap: 10px !important; padding-bottom: 8px; grid-template-columns: none !important; }
+  html body .app-shell .crm-kanban > .crm-stage { flex: 0 0 86vw !important; max-width: 86vw; scroll-snap-align: start; }
+  /* tasks: quick move shown on mobile */
+  html body .app-shell .task-quick-move { display: inline-block !important; height: 30px; border-radius: 9px; font-size: 12.5px; padding: 0 8px; }
+}
+html body .app-shell .task-quick-move { display: none; }
+/* Lead card: delete at the top beside edit */
+html body .app-shell .crm-opportunity .crm-card-delete-top { position: absolute; top: 8px; right: 44px; z-index: 2; width: 30px; height: 30px; display: inline-grid; place-items: center; padding: 0; border-radius: 9px; border: 1px solid #f3d0d0; background: #fff5f5; color: #c0392b; cursor: pointer; }
+html body .app-shell .crm-opportunity .crm-card-delete-top:hover { background: #fde4e4; }
+html body .app-shell .crm-opportunity .crm-card-top { padding-right: 76px !important; }
+html body.f2b-dark .app-shell .crm-opportunity .crm-card-delete-top { background: rgba(229,72,77,.12); border-color: rgba(229,72,77,.35); color: #ff9b94; }
+.tn-more { display: none; }
