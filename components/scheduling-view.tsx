@@ -750,7 +750,8 @@ export function AppointmentsDashboard({ scopeClientId, onOpen }: { scopeClientId
   const week = mondayOf(day);
   useEffect(() => {
     let live = true;
-    const from = addDays(week, -1), to = addDays(week, 8);
+    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const from = new Date(Math.min(addDays(week, -1).getTime(), monthStart.getTime())), to = new Date(Math.max(addDays(week, 8).getTime(), addDays(new Date(), 8).getTime()));
     api<Data>(scopeClientId, undefined, `&from=${from.toISOString()}&to=${to.toISOString()}`).then((d) => { if (live) { setData(d); setErr(""); } }).catch((e) => { if (live) setErr(errText(e, "Appointments couldn't load.")); });
     return () => { live = false; };
   }, [scopeClientId, ymd(week)]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -764,6 +765,18 @@ export function AppointmentsDashboard({ scopeClientId, onOpen }: { scopeClientId
   const dayList = bookings.filter((b) => ymd(new Date(b.start)) === key).sort((a, b) => a.start.localeCompare(b.start));
   const mins = (hhmm: string) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + (m || 0); };
   const dk = (["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as DayKey[])[day.getDay()];
+  const all = (data?.bookings || []).filter((b) => !staffId || b.staffIds.includes(staffId));
+  const nowMs = Date.now(), monthStartMs = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+  const todayKey = ymd(new Date());
+  const ov = {
+    today: all.filter((b) => b.status !== "cancelled" && ymd(new Date(b.start)) === todayKey).length,
+    week: all.filter((b) => b.status === "booked" && Date.parse(b.start) >= nowMs && Date.parse(b.start) < nowMs + 7 * 86_400_000).length,
+    month: all.filter((b) => b.status !== "cancelled" && Date.parse(b.start) >= monthStartMs).length,
+    done: all.filter((b) => b.status === "completed").length, noShow: all.filter((b) => b.status === "no_show").length,
+    cancelled: all.filter((b) => b.status === "cancelled" && Date.parse(b.start) >= monthStartMs).length,
+    next: all.filter((b) => b.status === "booked" && Date.parse(b.start) >= nowMs).sort((a, b) => a.start.localeCompare(b.start))[0],
+  };
+  const showRate = ov.done + ov.noShow ? Math.round((ov.done / (ov.done + ov.noShow)) * 100) : null;
   return <section className="panel sch-dash-panel" aria-label="Appointments">
     <div className="sch-dash-panel-head">
       <div><p className="eyebrow">📅 APPOINTMENTS</p><h2>{view === "day" ? (isToday ? "Today" : day.toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "short" })) : `Week of ${week.toLocaleDateString("en-IE", { day: "numeric", month: "short" })}`}</h2></div>
@@ -776,6 +789,14 @@ export function AppointmentsDashboard({ scopeClientId, onOpen }: { scopeClientId
         <button type="button" className="text-button" onClick={onOpen}>Open Scheduling ↗</button>
       </div>
     </div>
+    {data && <div className="sch-dash-overview">
+      <div><small>Today</small><b>{ov.today}</b></div>
+      <div><small>Next 7 days</small><b>{ov.week}</b></div>
+      <div><small>This month</small><b>{ov.month}</b>{ov.cancelled ? <em>{ov.cancelled} cancelled</em> : null}</div>
+      <div><small>Show-up rate</small><b>{showRate === null ? "—" : `${showRate}%`}</b></div>
+      <div className={ov.noShow ? "bad" : ""}><small>No-shows</small><b>{ov.noShow}</b></div>
+      <div className="sch-dash-next"><small>Next appointment</small>{ov.next ? <><b>{ov.next.name}</b><em>{new Date(ov.next.start).toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short" })} · {time(ov.next.start)}{ov.next.staffIds.length ? ` · ${ov.next.staffIds.map(nameOf).filter(Boolean).join(", ")}` : ""}</em></> : <b className="muted">None booked</b>}</div>
+    </div>}
     {!data ? <p className="dh-muted">Loading appointments…</p> : view === "day" ? <div className="sch-dash-day">
       <div className="sch-dash-day-list">
         <div className="sch-dash-stats"><span><b>{dayList.length}</b> booked</span><span><b>{dayList.filter((b) => Date.parse(b.start) > Date.now()).length}</b> to come</span><span><b>{dayList.filter((b) => b.status === "completed" || Date.parse(b.end) < Date.now()).length}</b> done</span></div>

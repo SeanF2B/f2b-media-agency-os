@@ -1993,3 +1993,5 @@ html body .app-shell .client-appt-toggle > span::after { content: ""; position: 
 html body .app-shell .client-appt-toggle input:checked + span { background: var(--brand-primary, #0b74b8); }
 html body .app-shell .client-appt-toggle input:checked + span::after { transform: translateX(16px); }
 html body .app-shell .client-appt-toggle input:focus-visible + span { outline: 2px solid var(--brand-secondary, #3b82f6); outline-offset: 2px; }
+html body .app-shell .ops-clients { margin-top: 6px; }
+html body .app-shell .ops-clients > .page-heading { display: none; }

@@ -240,3 +240,15 @@
 .sch-dash-free{font-size:11.5px;color:#16a34a;font-weight:700;text-align:center;padding:6px 0}
 @media(max-width:760px){.sch-dash-week{grid-template-columns:1fr}.sch-dash-wday{min-height:0;grid-template-columns:64px 1fr;grid-template-rows:none}.sch-dash-wday-head{border-bottom:0;border-right:1px solid #eef2f4}}
 .app-shell.dark-mode .sch-seg,.app-shell.dark-mode .sch-dash-wday{border-color:#3c4850}.app-shell.dark-mode .sch-dash-wday-head{border-color:#2f3a41}
+/* Dashboard Appointments panel: spacing + overview */
+.panel.sch-dash-panel{padding:20px 22px!important;border-radius:22px}
+.sch-dash-overview{display:grid;grid-template-columns:repeat(5,minmax(0,1fr)) minmax(0,1.6fr);gap:10px}
+.sch-dash-overview>div{display:grid;gap:2px;align-content:start;border:1px solid #e6ecef;border-radius:14px;padding:10px 12px;background:rgba(127,138,160,.04)}
+.sch-dash-overview small{font-size:11.5px;font-weight:700;opacity:.7}.sch-dash-overview b{font-size:22px;line-height:1.15}.sch-dash-overview em{font-style:normal;font-size:11.5px;opacity:.7}
+.sch-dash-overview .bad b{color:#dc2626}.sch-dash-overview .sch-dash-next b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sch-dash-overview .muted{opacity:.55;font-size:14px}
+@media(max-width:1100px){.sch-dash-overview{grid-template-columns:repeat(3,minmax(0,1fr))}.sch-dash-overview .sch-dash-next{grid-column:span 3}}
+@media(max-width:560px){.sch-dash-overview{grid-template-columns:repeat(2,minmax(0,1fr))}.sch-dash-overview .sch-dash-next{grid-column:span 2}}
+.sch-dash-day{border-top:1px solid #eef2f4;padding-top:14px}
+.sch-dash-week{border-top:1px solid #eef2f4;padding-top:14px}
+.sch-dash-wday{background:rgba(127,138,160,.03)}
+.app-shell.dark-mode .sch-dash-overview>div{border-color:#3c4850}.app-shell.dark-mode .sch-dash-day,.app-shell.dark-mode .sch-dash-week{border-color:#2f3a41}

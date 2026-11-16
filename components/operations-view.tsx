@@ -1,10 +1,10 @@
 "use client";
 
 import { appAlert, appConfirm, appPrompt } from "./app-dialog";
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
 import { readFocusClient, setFocusClient, useFocusClient } from "@/lib/focus-client";
 import { BrandIcon } from "./brand-icon";
-import { FileText, Globe, LayoutDashboard, Check, Link2, Mail, MapPin, Megaphone, MessageCircle, Star, Search, type LucideIcon } from "lucide-react";
+import { Briefcase, FileText, Globe, LayoutDashboard, Check, Link2, Mail, MapPin, Megaphone, MessageCircle, Star, Search, type LucideIcon } from "lucide-react";
 import { AiVisibilityPanel } from "./ai-visibility-panel";
 import { RankTrackingPanel } from "./rank-tracking-panel";
 import { SiteFormsPanel } from "./site-forms-panel";
@@ -51,8 +51,8 @@ type SiteRow = { clientId: string; backend: string; previewUrl: string; repo: st
 // Where everything lives: Overview (performance, priorities, issues) · Google Ads (campaigns, optimisation,
 // conversions) · SEO & AI (SEO, AEO/GEO, keyword research, Business Profile, backlinks, AI visibility) ·
 // Websites (sites, landing pages, forms, media) · Email (builder, AI campaigns, automations) · Reports.
-const OPS_TABS: Array<[OperationsTab, string, LucideIcon]> = [["overview", "Overview", LayoutDashboard], ["ads", "Google Ads", Megaphone], ["seo", "SEO & AI", Search], ["websites", "Websites", Globe], ["email", "Email", Mail], ["reports", "Reports", FileText]];
-export type OperationsTab = "overview" | "ads" | "seo" | "websites" | "email" | "reports" | "onboarding";
+const OPS_TABS: Array<[OperationsTab, string, LucideIcon]> = [["overview", "Overview", LayoutDashboard], ["clients", "Clients", Briefcase], ["ads", "Google Ads", Megaphone], ["seo", "SEO & AI", Search], ["websites", "Websites", Globe], ["email", "Email", Mail], ["reports", "Reports", FileText]];
+export type OperationsTab = "overview" | "clients" | "ads" | "seo" | "websites" | "email" | "reports" | "onboarding";
 type SeoMode = "keywords" | "competitors" | "ranks" | "audit" | "backlinks" | "local" | "ai";
 type SiteMode = "sites" | "forms" | "media";
 /** Older links/state used more tabs; map them onto the current areas (+ the sub-view they opened). */
@@ -87,7 +87,7 @@ function wpAdminUrl(siteUrl: string) {
   try { const url = new URL(/^https?:\/\//i.test(siteUrl) ? siteUrl : `https://${siteUrl}`); return `${url.origin}${url.pathname.replace(/\/+$/, "").replace(/\/wp-admin$/, "")}/wp-admin/`; } catch { return siteUrl; }
 }
 
-export function OperationsView({ clients, tasks, tab: rawTab, onTab, onOpenPage, onOpenWebsite, onOpenDns, onStartOnboarding, onboarding, onCreateGbpTask, onCreateCommunityTask, renderTool, automations, onStartReviews, onEditClient }: {
+export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab, onOpenPage, onOpenWebsite, onOpenDns, onStartOnboarding, onboarding, onCreateGbpTask, onCreateCommunityTask, renderTool, automations, onStartReviews, onEditClient }: { clientsView?: ReactNode; 
   onStartReviews?: (clientId: string) => string; onEditClient?: (clientId: string) => void;
   clients: OpsClient[]; tasks: OpsTask[]; tab: string; onTab: (tab: OperationsTab) => void;
   onOpenPage: (page: string, clientId?: string) => void; onOpenWebsite: (client: OpsClient) => void; onOpenDns: () => void;
@@ -165,9 +165,10 @@ export function OperationsView({ clients, tasks, tab: rawTab, onTab, onOpenPage,
     <div className="page-heading ops-heading"><div><p className="eyebrow">Agency</p><h1>Operations</h1></div>
     </div>
     <div className="ops-tabs" role="tablist" aria-label="Operations sections">
-      {OPS_TABS.filter(([key]) => !["seo", "ads", "reports"].includes(key) || renderTool).map(([key, label, Icon]) => { const on = tab === key || (key === "overview" && tab === "onboarding"); return <button type="button" role="tab" key={key} aria-selected={on} className={on ? "active" : ""} onClick={() => onTab(key)}><Icon size={16} strokeWidth={1.9} aria-hidden="true" className="ops-tab-icon" />{label}</button>; })}
+      {OPS_TABS.filter(([key]) => (key !== "clients" || clientsView) && (!["seo", "ads", "reports"].includes(key) || renderTool)).map(([key, label, Icon]) => { const on = tab === key || (key === "overview" && tab === "onboarding"); return <button type="button" role="tab" key={key} aria-selected={on} className={on ? "active" : ""} onClick={() => onTab(key)}><Icon size={16} strokeWidth={1.9} aria-hidden="true" className="ops-tab-icon" />{label}</button>; })}
     </div>
 
+    {tab === "clients" && clientsView}
     {tab === "overview" && <p className="ops-more">Also: {[["Meta Ads", "Meta Ads"], ["Proposal Studio", "Proposals"]].map(([page, label], index) => <span key={page}>{index ? " · " : ""}<button type="button" className="text-button" onClick={() => onOpenPage(page)}>{label}</button></span>)}</p>}
     {tab === "overview" && <>
       <div className="ops-summary">
