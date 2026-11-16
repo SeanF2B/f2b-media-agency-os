@@ -3,6 +3,8 @@
 import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { useEffect, useState, type CSSProperties } from "react";
 import { BrandIcon } from "./brand-icon";
+import { DataForSeoConnect } from "./dataforseo-connect";
+import type { GooglePropertyMatch } from "@/lib/google-property-match.mjs";
 
 type IntegrationStatus = "ready" | "partial" | "needs_setup" | "optional" | "not_available";
 type Integration = { id: string; name: string; group: string; status: IntegrationStatus; detail: string; mappedClients: number; mappingUnit?: string; actionLabel: string; actionPage: string; connectHref?: string; publicAccessSetupConfigured?: boolean; usage?: { status: "available" | "unavailable"; periodStart?: string; requestCount?: number; knownCostUsd?: number | null; unknownCostCount?: number; byService?: { keywordResearch: { requestCount: number; knownCostUsd: number | null; unknownCostCount: number }; competitorResearch?: { requestCount: number; knownCostUsd: number | null; unknownCostCount: number }; localMaps: { requestCount: number; knownCostUsd: number | null; unknownCostCount: number }; backlinks: { requestCount: number; knownCostUsd: number | null; unknownCostCount: number } } }; sync?: { lastAttemptAt: string | null; lastSuccessfulAt: string | null; status: string; detail: string | null; failedClients: string[]; failedAccounts?: Array<{ clientId: string; clientName: string; service: string }>; failedCount: number } };
@@ -53,7 +55,28 @@ const integrationIcons: Record<string, string> = {
   dataforseo: "🔍", pagespeed: "⚡", wordpress: "🌐", "marketing-public": "🚀", gohighlevel: "🧩", "landing-hosting": "🪄",
 };
 
-export function IntegrationsView({ onNavigate }: { onNavigate: (page: string) => void }) {
+export function IntegrationsView({ onNavigate, onApplyGoogleMatches }: { onNavigate: (page: string) => void; onApplyGoogleMatches?: (matches: GooglePropertyMatch[]) => Promise<boolean> }) {
+  const [linking, setLinking] = useState(false);
+  const [linkMessage, setLinkMessage] = useState("");
+  async function autoLinkGoogle() {
+    if (!onApplyGoogleMatches) return;
+    setLinking(true); setLinkMessage("Reading your Search Console and Analytics properties…");
+    try {
+      const response = await fetch("/api/integrations/google-matches", { cache: "no-store" });
+      const payload = await response.json() as { matches?: GooglePropertyMatch[]; searchConsoleProperties?: number; analyticsProperties?: number; notes?: string[]; error?: string };
+      if (!response.ok) throw new Error(payload.error || "Could not read your Google properties.");
+      const matches = payload.matches || [];
+      const found = `Found ${payload.searchConsoleProperties || 0} Search Console and ${payload.analyticsProperties || 0} Analytics properties.`;
+      const extra = payload.notes?.length ? ` ${payload.notes.join(" ")}` : "";
+      if (!matches.length) { setLinkMessage(`${found} No new confident matches for clients with empty fields.${extra}`); return; }
+      const lines = matches.map((m) => `• ${m.clientName}: ${[m.searchConsole && `Search Console ${m.searchConsole}`, m.analytics && `GA4 ${m.analytics}`, m.website && `website ${m.website}`].filter(Boolean).join(", ")}`).join("\n");
+      if (!(await appConfirm(`${found} Link these? Only empty fields are filled.\n\n${lines}`))) { setLinkMessage("Nothing changed."); return; }
+      const ok = await onApplyGoogleMatches(matches);
+      setLinkMessage(ok ? `Linked ${matches.length} client${matches.length === 1 ? "" : "s"}.${extra}` : "Could not save the links. Try again.");
+      if (ok) await load();
+    } catch (error) { setLinkMessage(error instanceof Error ? error.message : "Could not link Google properties."); }
+    finally { setLinking(false); }
+  }
   const [items, setItems] = useState<Integration[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
@@ -116,7 +139,8 @@ export function IntegrationsView({ onNavigate }: { onNavigate: (page: string) =>
     } finally { setSettingUpPublicAccess(false); }
   }
   return <main className="page-heading integrations-view launchpad-view">
-    <header className="launchpad-heading"><div><p className="eyebrow">🚀 WORKSPACE CONNECTIONS</p><h1>Let’s get you on the path to success</h1><p className="muted">Connect your tools and check which workspace services are ready.</p></div><button className="secondary-button" type="button" onClick={() => void load()} disabled={loading}>{loading ? "Checking…" : "↻ Refresh"}</button></header>
+    <header className="launchpad-heading"><div><p className="eyebrow">🚀 WORKSPACE CONNECTIONS</p><h1>Let’s get you on the path to success</h1><p className="muted">Connect your tools and check which workspace services are ready.</p></div><div className="launchpad-actions">{onApplyGoogleMatches && <button className="primary-button" type="button" onClick={() => void autoLinkGoogle()} disabled={linking || loading} title="Match each client to its Search Console and GA4 property using the connected Google login">{linking ? "Linking…" : "Auto-link Google properties"}</button>}<button className="secondary-button" type="button" onClick={() => void load()} disabled={loading}>{loading ? "Checking…" : "↻ Refresh"}</button></div></header>
+    {linkMessage && <p role="status" className="integrations-message launchpad-state">{linkMessage}</p>}
     {loading && <p role="status" className="integrations-message launchpad-state">Checking connection setup…</p>}
     {message && <div role="alert" className="launchpad-error"><span>{message}</span><button className="secondary-button" type="button" onClick={() => void load()} disabled={loading}>Try again</button></div>}
     {!loading && !message && (() => {
@@ -129,6 +153,7 @@ export function IntegrationsView({ onNavigate }: { onNavigate: (page: string) =>
           <div className="lp-ring" style={{ "--lp-percent": `${percent}%` } as CSSProperties}><span>{percent}%</span></div>
           <div><b>{done} of {shown.length} tools connected</b><p>{done === shown.length ? "You’re all set 🎉" : "Connect the rest to unlock reports, ads and lead sync."}</p></div>
         </section>
+        {shown.some((item) => item.id === "dataforseo" && item.status !== "ready") && <DataForSeoConnect onConnected={() => void load()} />}
         <section className="lp-grid" aria-label="Tools">{shown.map((item, index) => <article className={`lp-card status-${item.status}`} style={{ "--lp-delay": `${index * 55}ms` } as CSSProperties} key={item.id}>
           <div className="lp-icon" aria-hidden="true"><BrandIcon id={item.id} size={24} fallback={integrationIcons[item.id] || "🔗"} /></div>
           <div className="lp-body"><h3>{item.name}</h3><p>{plainHelp[item.id] || firstSentence(item.detail)}</p>{item.mappingUnit && <small className="lp-chip">{mappingSummary(item)}</small>}</div>
