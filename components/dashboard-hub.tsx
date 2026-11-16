@@ -35,6 +35,8 @@ const SAMPLE: Metrics = {
   appointments: [{ id: "s1", name: "Mary Walsh", calendar: "Kitchen survey", start: new Date(new Date().setHours(10, 0, 0, 0)).toISOString(), end: new Date(new Date().setHours(11, 0, 0, 0)).toISOString(), status: "confirmed", clientId: "", channel: "On site", staff: "Pat" }, { id: "s2", name: "John Byrne", calendar: "Roof quote", start: new Date(new Date().setHours(11, 30, 0, 0)).toISOString(), status: "confirmed", clientId: "", channel: "Phone", staff: "Mick" }, { id: "s3", name: "Aoife Kelly", calendar: "Consultation", start: new Date(new Date().setHours(14, 30, 0, 0)).toISOString(), status: "pending", clientId: "", channel: "Google Meet", staff: "Sean" }, { id: "s4", name: "Daniel Brooks", calendar: "Site visit", start: new Date(new Date().setHours(16, 0, 0, 0)).toISOString(), status: "confirmed", clientId: "", channel: "On site", staff: "Pat" }],
   emails: { total: 64, failed: 1, delivered: 63, people: 41, replies: 12, configured: true, recent: [{ to: "Mary Walsh", subject: "Your quote from Renew Electrical", at: new Date(Date.now() - 2 * 3600_000).toISOString() }, { to: "John Byrne", subject: "Booking confirmed for Thursday", at: new Date(Date.now() - 20 * 3600_000).toISOString() }, { to: "Aoife Kelly", subject: "Invoice INV-0012", at: new Date(Date.now() - 44 * 3600_000).toISOString() }] },
 };
+// Sample Google Business Profile figures (views, calls, directions, website clicks) for the "Sample data" toggle.
+const SAMPLE_GBP = { views: 3120, calls: 46, directions: 81, websiteClicks: 132, previous: { impressions: 2710, calls: 38, directions: 69, websiteClicks: 117 } } as unknown as NonNullable<NonNullable<Metrics["marketing"]>["businessProfile"]>;
 const money = (n: number, currency: string) => { try { return new Intl.NumberFormat("en-IE", { style: "currency", currency, maximumFractionDigits: 0 }).format(n); } catch { return `€${Math.round(n)}`; } };
 const money2 = (n: number, currency: string) => { try { return new Intl.NumberFormat("en-IE", { style: "currency", currency, maximumFractionDigits: 2 }).format(n); } catch { return `€${n.toFixed(2)}`; } };
 const num = (n: number) => new Intl.NumberFormat("en-IE").format(Math.round(n));
@@ -53,7 +55,7 @@ function Tile({ icon, label, value, note, tone = "", children }: { icon: ReactNo
   return <div className={`dh-tile ${tone}`}><span className="dh-tile-icon">{icon}</span><div className="dh-tile-body"><small>{label}</small><b>{value}</b>{children}{note && <em>{note}</em>}</div></div>;
 }
 
-export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate, onAddTask, onOpenTask, onReviewTask, currentStaffId = "", adsPanel, valuePanel, periodStart = "", periodEnd = "", periodLabel = "Last 30 days", focusClientId = "" }: { focusClientId?: string; periodStart?: string; periodEnd?: string; periodLabel?: string; adsPanel?: ReactNode; valuePanel?: ReactNode; scopeClientId: string; clients: HubClient[]; tasks: HubTask[]; staff: HubStaff[]; onNavigate: (page: string) => void; onAddTask: () => void; onOpenTask?: (id: string) => void; onReviewTask?: (id: string, action: "approve" | "request_changes") => void; currentStaffId?: string }) {
+export function DashboardHub({ activityPanel = null, scopeClientId, clients, tasks, staff, onNavigate, onAddTask, onOpenTask, onReviewTask, currentStaffId = "", adsPanel, valuePanel, periodStart = "", periodEnd = "", periodLabel = "Last 30 days", focusClientId = "" }: { activityPanel?: ReactNode; focusClientId?: string; periodStart?: string; periodEnd?: string; periodLabel?: string; adsPanel?: ReactNode; valuePanel?: ReactNode; scopeClientId: string; clients: HubClient[]; tasks: HubTask[]; staff: HubStaff[]; onNavigate: (page: string) => void; onAddTask: () => void; onOpenTask?: (id: string) => void; onReviewTask?: (id: string, action: "approve" | "request_changes") => void; currentStaffId?: string }) {
   const [pickedClient, setPickedClient] = useState(() => { try { return localStorage.getItem("f2b-dash-client") || ""; } catch { return ""; } });
   // Agency view defaults to all clients' Google Ads; a client can be picked for their full results.
   const clientId = scopeClientId || (clients.some((c) => c.id === focusClientId) ? focusClientId : (clients.find((c) => c.googleAdsAccountId) || clients[0])?.id || ""); void pickedClient; void setPickedClient;
@@ -169,11 +171,11 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
           <div className="dh-gsc-col"><h3 className="dh-sub">Top searches</h3>{(m.gsc.queries || []).map((q) => <div key={q.query} className="dh-gsc-row"><span title={q.query}>{q.query}</span><b>{num(q.clicks)}</b><small>{q.position != null ? `#${q.position}` : ""}</small></div>)}</div>
           <div className="dh-gsc-col"><h3 className="dh-sub">🔥 Trending searches</h3>{(m.gsc.trending || []).length ? (m.gsc.trending || []).map((q) => <div key={q.query} className="dh-gsc-row"><span title={q.query}>{q.query}</span><b className="good">▲ {num(q.change)}</b><small>{num(q.impressions)} seen</small></div>) : <p className="dh-muted">No rising searches vs the previous month.</p>}</div>
         </div>}
-        {(() => { const bp = m.businessProfile; const tp = m.trustpilot; return <>
+        {(() => { const bp = sample ? SAMPLE_GBP : m.businessProfile; const tp = sample ? { status: "ok", rating: 4.8, total: 63 } as typeof m.trustpilot : m.trustpilot; const gR = sample ? { total: 214, averageRating: 4.9 } : gReviews; return <>
           <h3 className="dh-sub">Reviews &amp; Google Business</h3>
           <div className="dh-reviews">
-            <div className="dh-review"><BrandIcon id="business-profile" size={22} fallback={null} /><span><b>{gReviews?.averageRating != null ? `${gReviews.averageRating.toFixed(1)} ★` : "—"}</b><small>{gReviews?.total != null ? `${num(gReviews.total)} Google reviews` : "Google reviews · connect Business Profile"}</small></span></div>
-            <div className="dh-review"><BrandIcon id="facebook" size={22} fallback={null} /><span><b>—</b><small>Facebook reviews · connect the Facebook Page</small></span></div>
+            <div className="dh-review"><BrandIcon id="business-profile" size={22} fallback={null} /><span><b>{gR?.averageRating != null ? `${gR.averageRating.toFixed(1)} ★` : "—"}</b><small>{gR?.total != null ? `${num(gR.total)} Google reviews` : "Google reviews · connect Business Profile"}</small></span></div>
+            <div className="dh-review"><BrandIcon id="facebook" size={22} fallback={null} /><span><b>{sample ? "4.7 ★" : "—"}</b><small>{sample ? "88 Facebook reviews" : "Facebook reviews · connect the Facebook Page"}</small></span></div>
             <div className="dh-review"><BrandIcon id="trustpilot" size={22} fallback={null} /><span><b>{tp?.status === "ok" && tp.rating != null ? `${tp.rating.toFixed(1)} ★` : "—"}</b><small>{tp?.status === "ok" ? `${num(tp.total || 0)} Trustpilot reviews` : tp?.status === "not_found" ? "Not on Trustpilot yet" : tp?.status === "no_website" ? "Trustpilot · add the website" : "Trustpilot"}</small></span></div>
           </div>
           <div className="dh-tiles dh-gbp">
@@ -206,6 +208,7 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
     </section>
 
     {adsPanel && <div className="dh-ads-wrap">{adsPanel}</div>}
+    {activityPanel}
     <div className="dh-grid">
 
       <section className="panel dh-panel dh-email"><div className="dh-head"><div><p className="eyebrow"><Mail size={12} /> {periodLabel.toUpperCase()}</p><h2>Emails &amp; health</h2></div><button type="button" className="text-button" onClick={() => onNavigate("Conversations")}>Open inbox →</button></div>
