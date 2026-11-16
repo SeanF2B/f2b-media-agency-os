@@ -1,7 +1,8 @@
 "use client";
 
 import "./crm-automations.css";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { readFocusClient, useFocusClient } from "@/lib/focus-client";
 import { Bell, Copy, Mail, Plus, ShieldAlert, Trash2, Zap } from "lucide-react";
 import { AutomationBuilder } from "@/components/crm-automation-builder";
 import { nodeSummary, triggerLabel, type AutomationNode } from "@/lib/crm-automations/model";
@@ -21,7 +22,12 @@ export function CrmAutomationsView({ clientId }: { clientId?: string | null }) {
   const controlled = clientId !== undefined;
   const [localScope, setLocalScope] = useState("");
   const scope = controlled ? clientId || "" : localScope;
-  const [data, setData] = useState<Payload | null>(null);
+  const [rawData, setData] = useState<Payload | null>(null);
+  // Agency view: when a client is picked in the top bar, show only that client's automations
+  // (no refetch, the list just updates). Agency-level automations always show.
+  const [focusClient, setFocusClientState] = useState(() => controlled && clientId ? "" : readFocusClient());
+  useFocusClient(setFocusClientState, !scope);
+  const data = useMemo(() => !rawData || scope || !focusClient ? rawData : { ...rawData, others: (rawData.others || []).filter((item) => item.scopeId === focusClient), formRules: (rawData.formRules || []).filter((form) => form.clientId === focusClient) }, [rawData, scope, focusClient]);
   const [error, setError] = useState("");
   const [openId, setOpenId] = useState("");
   const [openScope, setOpenScope] = useState<string | null>(null);
@@ -36,7 +42,7 @@ export function CrmAutomationsView({ clientId }: { clientId?: string | null }) {
     if (!response.ok) { setError(payload.error || "Could not load automations."); return; }
     setError(""); setData(payload);
   }, [scope]);
-  useEffect(() => { setData(null); setOpenId(""); void load(); }, [load]);
+  useEffect(() => { setOpenId(""); void load(); }, [load]);
   useEffect(() => { if (!toast) return; const timer = setTimeout(() => setToast(""), 4200); return () => clearTimeout(timer); }, [toast]);
 
   const post = async (body: Record<string, unknown>, scopeOverride?: string) => {

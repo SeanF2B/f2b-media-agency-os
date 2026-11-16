@@ -189,10 +189,10 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
 
     {tab === "seo" && renderTool && selected && <>
       <div className="ops-subbar">{seg(seoMode, setSeoMode, [["keywords", "Keywords"], ["competitors", "Competitors"], ["ranks", "Rankings"], ["audit", "Site audit"], ["backlinks", "Backlinks"], ["local", "Business Profile"], ["ai", "AI visibility"]], "SEO and AI sections")}</div>
-      {!["local", "ai"].includes(seoMode) && <div className="ops-embed" key={`seo-${seoMode}-${selected.id}`}>{seoMode === "ranks" ? <RankTrackingPanel clientId={selected.id} clientName={selected.name} defaultLocation={seoLocation} /> : renderTool(seoMode === "competitors" ? "seo-competitors" : seoMode === "audit" ? "seo-audit" : seoMode === "backlinks" ? "seo-backlinks" : "seo-keywords", selected.id)}</div>}
+      {!["local", "ai"].includes(seoMode) && <div className="ops-embed" key={`seo-${seoMode}`}>{seoMode === "ranks" ? <RankTrackingPanel clientId={selected.id} clientName={selected.name} defaultLocation={seoLocation} /> : renderTool(seoMode === "competitors" ? "seo-competitors" : seoMode === "audit" ? "seo-audit" : seoMode === "backlinks" ? "seo-backlinks" : "seo-keywords", selected.id)}</div>}
     </>}
-    {tab === "email" && emailClient && <Suspense fallback={<div className="page-loading" role="status" aria-label="Loading email…"><i /></div>}><EmailMarketingView key={`${emailClient.id || "agency"}-${emailStart}`} initialMode={emailStart} clientId={emailClient.id} clientName={emailClient.name} clientLogo={emailClient.logo} clientColor={emailClient.color} automations={automations} /></Suspense>}
-    {tab === "ads" && renderTool && selected && <div className="ops-embed" key={`ads-${selected.id}`}>{renderTool("ads", selected.id)}</div>}
+    {tab === "email" && emailClient && <Suspense fallback={<div className="page-loading" role="status" aria-label="Loading email…"><i /></div>}><EmailMarketingView key={emailStart} initialMode={emailStart} clientId={emailClient.id} clientName={emailClient.name} clientLogo={emailClient.logo} clientColor={emailClient.color} automations={automations} /></Suspense>}
+    {tab === "ads" && renderTool && selected && <div className="ops-embed">{renderTool("ads", selected.id)}</div>}
     {tab === "reports" && renderTool && selected && <>
       <div className="ops-subbar">{seg(reportMode, setReportMode, [["reports", "Client reports"], ["audits", "Audits"]], "Reports sections")}</div>
       <div className="ops-embed" key={`rep-${reportMode}-${selected.id}`}>{renderTool(reportMode, selected.id)}</div>

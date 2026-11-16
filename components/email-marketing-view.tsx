@@ -107,14 +107,32 @@ function EmailBuilder({ doc, onChange, clientId, extra }: { doc: Doc; onChange: 
 /* ---------------- Main view ---------------- */
 export function EmailMarketingView({ clientId, clientName, clientLogo, clientColor, automations, initialMode = "campaigns" }: { clientId: string; clientName: string; clientLogo?: string; clientColor?: string; automations?: React.ReactNode; initialMode?: "campaigns" | "builder" | "automations" | "system" }) {
   const [mode, setMode] = useState<"campaigns" | "builder" | "automations" | "system">(initialMode === "automations" && !automations ? "campaigns" : initialMode);
-  const [data, setData] = useState<{ templates: Template[]; campaigns: Campaign[]; sending: boolean; me: string } | null>(null);
+  type Data = { templates: Template[]; campaigns: Campaign[]; sending: boolean; me: string };
   const [error, setError] = useState("");
+  const names = useRef(new Map<string, { name: string; style: EmailStyle }>());
   const baseStyle = useMemo<EmailStyle>(() => ({ ...DEFAULT_STYLE, brand: /^#[0-9a-f]{6}$/i.test(clientColor || "") ? clientColor! : DEFAULT_STYLE.brand, logo: /^https?:/.test(clientLogo || "") ? clientLogo : "" }), [clientColor, clientLogo]);
+  names.current.set(clientId, { name: clientName, style: baseStyle });
+  // Switching client never blanks the screen: each client's data is cached, the last view stays up
+  // (slightly dimmed) until the new client's data arrives, then the fields update in place.
+  const cache = useRef(new Map<string, Data>());
+  const [data, setData] = useState<Data | null>(() => cache.current.get(clientId) || null);
+  const [loadedFor, setLoadedFor] = useState(clientId);
   const load = useCallback(async () => {
     setError("");
-    try { const response = await fetch(`/api/email-marketing?clientId=${encodeURIComponent(clientId)}`, { cache: "no-store" }); const json = await response.json().catch(() => ({})) as typeof data & { error?: string }; if (!response.ok) throw new Error(json?.error || "Email couldn’t load."); setData(json); } catch (reason) { setError(reason instanceof Error ? reason.message : "Email couldn’t load."); setData({ templates: [], campaigns: [], sending: false, me: "" }); }
+    const cached = cache.current.get(clientId);
+    if (cached) { setData(cached); setLoadedFor(clientId); }
+    try {
+      const response = await fetch(`/api/email-marketing?clientId=${encodeURIComponent(clientId)}`, { cache: "no-store" });
+      const json = await response.json().catch(() => ({})) as Data & { error?: string };
+      if (!response.ok) throw new Error(json?.error || "Email couldn’t load.");
+      cache.current.set(clientId, json); setData(json); setLoadedFor(clientId);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Email couldn’t load."); setData((current) => current || { templates: [], campaigns: [], sending: false, me: "" }); setLoadedFor(clientId); }
   }, [clientId]);
-  useEffect(() => { setData(null); void load(); }, [load]);
+  useEffect(() => { void load(); }, [load]);
+  const stale = loadedFor !== clientId;
+  // While the next client loads, keep showing the last client's panel (dimmed) instead of a blank screen.
+  const shownId = stale ? loadedFor : clientId;
+  const shown = names.current.get(shownId) || { name: clientName, style: baseStyle };
 
   return <div className="em">
     <div className="ops-subbar em-subbar">
@@ -125,8 +143,10 @@ export function EmailMarketingView({ clientId, clientName, clientLogo, clientCol
     {mode === "automations" && automations}
     {mode === "system" && <SystemEmailsView />}
     {(mode === "campaigns" || mode === "builder") && !data && <div className="page-loading" role="status" aria-label="Loading email…"><i /></div>}
-    {mode === "builder" && data && <TemplatesPane key={clientId} clientId={clientId} clientName={clientName} templates={data.templates} baseStyle={baseStyle} me={data.me} onChanged={load} />}
-    {mode === "campaigns" && data && <CampaignsPane key={clientId} clientId={clientId} clientName={clientName} campaigns={data.campaigns} templates={data.templates} baseStyle={baseStyle} me={data.me} sending={data.sending} onChanged={load} />}
+    {(mode === "builder" || mode === "campaigns") && data && <div className={`em-pane${stale ? " em-stale" : ""}`} aria-busy={stale}>
+      {mode === "builder" && <TemplatesPane key={shownId} clientId={shownId} clientName={shown.name} templates={data.templates} baseStyle={shown.style} me={data.me} onChanged={load} />}
+      {mode === "campaigns" && <CampaignsPane key={shownId} clientId={shownId} clientName={shown.name} campaigns={data.campaigns} templates={data.templates} baseStyle={shown.style} me={data.me} sending={data.sending} onChanged={load} />}
+    </div>}
   </div>;
 }
 
