@@ -1381,3 +1381,8 @@ html body .app-shell .cv-back { display: none; }
   html body .app-shell.topnav-layout .tn-right.menu-open .top-actions .activity-quick-trigger::after { content: "Recent activity" !important; }
   html body .app-shell.topnav-layout .tn-right.menu-open .top-actions .profile-trigger::after { content: "Profile" !important; }
 }
+/* Launcher: always a dark background with the blue bot (light and dark mode) */
+html body .ai-chat-launcher:has(.ai-chat-eyes), html body.f2b-dark .ai-chat-launcher:has(.ai-chat-eyes) { background: radial-gradient(circle at 30% 25%, #1f2a3a, #0d141f) !important; box-shadow: 0 8px 24px rgba(13,20,31,.35) !important; }
+html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-face { border-color: #42b4ff !important; }
+html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-face i { background: #42b4ff !important; box-shadow: 0 0 6px rgba(66,180,255,.85) !important; }
+html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-antenna, html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-antenna::before, html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-antenna::after { background: #42b4ff !important; border-color: #42b4ff !important; }
