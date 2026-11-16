@@ -1705,3 +1705,11 @@ html body .app-shell .tt-mobile-status { display: none; }
 /* Dashboard: remove duplicates of the new sections (tasks list, team list) */
 html body .app-shell .dh ~ * .panel.task-panel, html body .app-shell .dh ~ .panel.task-panel { display: none !important; }
 html body .app-shell .dh ~ .agency-directory-panel .directory-team-section, html body .app-shell .dh ~ * .directory-team-section { display: none !important; }
+/* Dashboard: sample-data switch sits in the greeting row, no empty gap */
+html body .app-shell .dh { position: relative; }
+html body .app-shell .dh > .dh-sample-toggle { position: absolute; top: -58px; right: 0; margin: 0 !important; z-index: 2; }
+@media (max-width: 860px) { html body .app-shell .dh > .dh-sample-toggle { position: static; justify-self: end; } }
+/* Page headers never push buttons off screen */
+html body .app-shell :is(.page-heading, .task-page-heading) { flex-wrap: wrap !important; gap: 12px; }
+html body .app-shell .task-heading-actions { display: flex !important; flex-wrap: wrap !important; justify-content: flex-end; gap: 8px; min-width: 0; max-width: 100%; }
+html body .app-shell .main-area { max-width: 100%; overflow-x: clip; }
