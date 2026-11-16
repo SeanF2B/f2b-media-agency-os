@@ -854,23 +854,24 @@ export function StaffSchedulingPanel({ staffId, staffName = "", scope = "" }: { 
 export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, clientName = "" }: { scopeClientId: string; onOpen: () => void; sample?: boolean; clientName?: string }) {
   const [realData, setData] = useState<Data | null>(null);
   const [err, setErr] = useState("");
-  const [view, setView] = useState<"day" | "week">(() => { try { return localStorage.getItem("f2b-dash-appt-view") === "week" ? "week" : "day"; } catch { return "day"; } });
+  const [view, setView] = useState<"day" | "week" | "month">(() => { try { const v = localStorage.getItem("f2b-dash-appt-view"); return v === "week" || v === "month" ? v : "day"; } catch { return "day"; } });
   const [staffId, setStaffId] = useState("");
   const [day, setDay] = useState(() => new Date());
   const week = mondayOf(day);
+  const monthFirst = new Date(day.getFullYear(), day.getMonth(), 1); const gridStart = mondayOf(monthFirst); // month view: 6 weeks from the Monday on/before the 1st
   const [refresh, setRefresh] = useState(0);
   useEffect(() => {
     let live = true;
     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const from = new Date(Math.min(addDays(week, -1).getTime(), monthStart.getTime())), to = new Date(Math.max(addDays(week, 8).getTime(), addDays(new Date(), 8).getTime()));
+    const from = new Date(Math.min(addDays(week, -1).getTime(), monthStart.getTime(), addDays(gridStart, -1).getTime())), to = new Date(Math.max(addDays(week, 8).getTime(), addDays(new Date(), 8).getTime(), addDays(gridStart, 43).getTime()));
     api<Data>(scopeClientId, undefined, `&from=${from.toISOString()}&to=${to.toISOString()}`).then((d) => { if (live) { setData(d); setErr(""); } }).catch((e) => { if (live) setErr(errText(e, "Appointments couldn't load.")); });
     return () => { live = false; };
-  }, [scopeClientId, ymd(week), refresh]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [scopeClientId, ymd(week), ymd(gridStart), refresh]); // eslint-disable-line react-hooks/exhaustive-deps
   const [detail, setDetail] = useState<Booking | null>(null);
   const site = useSiteSample(scopeClientId, sample);
   const data = useMemo(() => sample ? sampleSchedule(realData, mondayOf(new Date()), clientName, site) : realData, [sample, realData, clientName, site]); // eslint-disable-line react-hooks/exhaustive-deps
   if (err && !realData && !sample) return null; // no Scheduling access: hide quietly
-  const setMode = (m: "day" | "week") => { setView(m); try { localStorage.setItem("f2b-dash-appt-view", m); } catch { /* optional */ } };
+  const setMode = (m: "day" | "week" | "month") => { setView(m); try { localStorage.setItem("f2b-dash-appt-view", m); } catch { /* optional */ } };
   const bookings = (data?.bookings || []).filter((b) => b.status !== "cancelled" && (!staffId || b.staffIds.includes(staffId)));
   const staff = (data?.staff || []).filter((p) => !staffId || p.id === staffId);
   const calById = new Map((data?.calendars || []).map((c) => [c.id, c]));
@@ -886,21 +887,22 @@ export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, c
   const ov = {
     today: all.filter((b) => b.status !== "cancelled" && ymd(new Date(b.start)) === todayKey).length,
     week: all.filter((b) => b.status === "booked" && Date.parse(b.start) >= nowMs && Date.parse(b.start) < nowMs + 7 * 86_400_000).length,
-    month: all.filter((b) => b.status !== "cancelled" && Date.parse(b.start) >= monthStartMs).length,
+    month: all.filter((b) => b.status !== "cancelled" && Date.parse(b.start) >= monthStartMs && Date.parse(b.start) < new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).getTime()).length,
     done: all.filter((b) => b.status === "completed").length, noShow: all.filter((b) => b.status === "no_show").length,
-    cancelled: all.filter((b) => b.status === "cancelled" && Date.parse(b.start) >= monthStartMs).length,
+    cancelled: all.filter((b) => b.status === "cancelled" && Date.parse(b.start) >= monthStartMs && Date.parse(b.start) < new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).getTime()).length,
     next: all.filter((b) => b.status === "booked" && Date.parse(b.start) >= nowMs).sort((a, b) => a.start.localeCompare(b.start))[0],
   };
+  const step = (dir: 1 | -1) => setDay(view === "month" ? new Date(day.getFullYear(), day.getMonth() + dir, 1) : addDays(day, (view === "day" ? 1 : 7) * dir));
   const showRate = ov.done + ov.noShow ? Math.round((ov.done / (ov.done + ov.noShow)) * 100) : null;
   return <section className="panel sch-dash-panel" aria-label="Appointments">
     <div className="sch-dash-panel-head">
-      <div><p className="eyebrow">📅 APPOINTMENTS{sample && <span className="sch-sample-tag">Sample data</span>}</p><h2>{view === "day" ? (isToday ? "Today" : day.toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "short" })) : `Week of ${week.toLocaleDateString("en-IE", { day: "numeric", month: "short" })}`}</h2></div>
+      <div><p className="eyebrow">📅 APPOINTMENTS{sample && <span className="sch-sample-tag">Sample data</span>}</p><h2>{view === "day" ? (isToday ? "Today" : day.toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "short" })) : view === "month" ? monthFirst.toLocaleDateString("en-IE", { month: "long", year: "numeric" }) : `Week of ${week.toLocaleDateString("en-IE", { day: "numeric", month: "short" })}`}</h2></div>
       <div className="sch-dash-panel-tools">
         <label className="sch-select"><Users size={14} /><select aria-label="Staff member" value={staffId} onChange={(e) => setStaffId(e.target.value)}><option value="">Everyone</option>{(data?.staff || []).map((p) => <option key={p.id} value={p.id}>{p.name.split("|")[0].trim()}</option>)}</select></label>
-        <div className="sch-seg" role="tablist" aria-label="View"><button type="button" role="tab" aria-selected={view === "day"} className={view === "day" ? "on" : ""} onClick={() => setMode("day")}>Day</button><button type="button" role="tab" aria-selected={view === "week"} className={view === "week" ? "on" : ""} onClick={() => setMode("week")}>Week</button></div>
-        <button type="button" className="iv-btn" aria-label="Previous" onClick={() => setDay(addDays(day, view === "day" ? -1 : -7))}><ChevronLeft size={15} /></button>
-        <button type="button" className="iv-btn" disabled={isToday} onClick={() => setDay(new Date())}>Today</button>
-        <button type="button" className="iv-btn" aria-label="Next" onClick={() => setDay(addDays(day, view === "day" ? 1 : 7))}><ChevronRight size={15} /></button>
+        <div className="sch-seg" role="tablist" aria-label="View"><button type="button" role="tab" aria-selected={view === "day"} className={view === "day" ? "on" : ""} onClick={() => setMode("day")}>Day</button><button type="button" role="tab" aria-selected={view === "week"} className={view === "week" ? "on" : ""} onClick={() => setMode("week")}>Week</button><button type="button" role="tab" aria-selected={view === "month"} className={view === "month" ? "on" : ""} onClick={() => setMode("month")}>Month</button></div>
+        <button type="button" className="iv-btn" aria-label="Previous" onClick={() => step(-1)}><ChevronLeft size={15} /></button>
+        <button type="button" className="iv-btn" disabled={isToday && view !== "month"} onClick={() => setDay(new Date())}>Today</button>
+        <button type="button" className="iv-btn" aria-label="Next" onClick={() => step(1)}><ChevronRight size={15} /></button>
         <button type="button" className="text-button" onClick={onOpen}>Open Scheduling ↗</button>
       </div>
     </div>
@@ -944,6 +946,14 @@ export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, c
               <span className={`sch-avail-pill ${!windows.length ? "off" : !items.length ? "free" : free ? "some" : "full"}`}>{summary}</span>
             </div>; })}
         </div>; })()}
+    </div> : view === "month" ? <div className="sch-dash-month">
+      {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((w) => <small key={w} className="sch-month-dow">{w}</small>)}
+      {Array.from({ length: 42 }, (_, i) => addDays(gridStart, i)).map((d) => { const k = ymd(d); const list = bookings.filter((b) => ymd(new Date(b.start)) === k).sort((a, b) => a.start.localeCompare(b.start)); const other = d.getMonth() !== monthFirst.getMonth();
+        return <div key={k} className={`sch-month-cell${other ? " other" : ""}${k === todayKey ? " today" : ""}`}>
+          <button type="button" className="sch-month-date" onClick={() => { setDay(d); setMode("day"); }} aria-label={`Open ${d.toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "long" })}`}><b>{d.getDate()}</b>{list.length > 0 && <em>{list.length}</em>}</button>
+          {list.slice(0, 3).map((b) => { const cal = calById.get(b.calendarId); return <button type="button" key={b.id} className={`sch-month-chip ${b.status}`} style={{ ["--c" as string]: cal?.color || "#2563eb" }} onClick={() => setDetail(b)} title={`${time(b.start)} ${b.name} · ${cal?.name || ""}${b.staffIds.length ? ` · ${b.staffIds.map(nameOf).filter(Boolean).join(", ")}` : ""}`}>{b.staffIds[0] ? <Avatar person={personOf(b.staffIds[0])} size={16} /> : null}<b>{time(b.start)}</b><span>{b.name.split(" ")[0]}</span></button>; })}
+          {list.length > 3 && <button type="button" className="sch-month-more" onClick={() => { setDay(d); setMode("day"); }}>+{list.length - 3} more</button>}
+        </div>; })}
     </div> : <div className="sch-dash-week">{Array.from({ length: 7 }, (_, i) => addDays(week, i)).map((d) => { const k = ymd(d); const list = bookings.filter((b) => ymd(new Date(b.start)) === k).sort((a, b) => a.start.localeCompare(b.start)); return <div key={k} className={`sch-dash-wday${k === ymd(new Date()) ? " today" : ""}`}>
       <button type="button" className="sch-dash-wday-head" onClick={() => { setDay(d); setMode("day"); }}><small>{d.toLocaleDateString("en-IE", { weekday: "short" })}</small><b>{d.getDate()}</b>{list.length > 0 && <em>{list.length}</em>}</button>
       <div className="sch-dash-wday-body">{list.length ? list.slice(0, 6).map((b) => { const cal = calById.get(b.calendarId); return <button type="button" key={b.id} className="sch-dash-chip" style={{ ["--c" as string]: cal?.color || "#2563eb" }} onClick={() => setDetail(b)} title={`${time(b.start)} ${b.name} · ${cal?.name || ""}`}><span className="sch-chip-top"><b>{time(b.start)}</b><span className="sch-chip-avs">{b.staffIds.slice(0, 2).map((id) => <Avatar key={id} person={personOf(id)} size={20} />)}</span></span><span>{b.name}</span>{(() => { const pic = bookingPhoto(b); return pic ? <img className="sch-chip-img" src={pic} alt="" loading="lazy" onError={(ev) => { (ev.currentTarget as HTMLImageElement).style.display = "none"; }} /> : null; })()}</button>; }) : <span className="sch-dash-free">Free</span>}{list.length > 6 && <small className="iv-small">+{list.length - 6} more</small>}</div>
@@ -979,7 +989,7 @@ function sampleSchedule(real: Data | null, week: Date, clientName: string, site:
   const now = Date.now();
   let seed = Number(ymd(week).replace(/-/g, "")) % 9973;
   const rand = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
-  for (let d = -35; d < 14; d++) {
+  for (let d = -35; d < 49; d++) {
     const day = addDays(week, d); if (day.getDay() === 0) continue;
     const count = day.getDay() === 6 ? 1 : 2 + Math.floor(rand() * 3);
     for (let n = 0; n < count; n++) {

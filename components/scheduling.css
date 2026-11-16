@@ -357,3 +357,19 @@ html body .app-shell.dark-mode .sch-dash-panel-tools .sch-seg button.on{backgrou
 /* Short bookings on the staff timeline: always show the start time (never an empty box) */
 .sch-tl-item.narrow{min-width:46px;padding:0 5px;justify-content:center}
 .sch-tl-item.narrow b{font-size:10px}
+/* Dashboard appointments: month view */
+.sch-dash-month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin-top:6px}
+.sch-month-dow{text-align:center;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#667085;padding:2px 0}
+.sch-month-cell{min-height:104px;display:flex;flex-direction:column;gap:3px;padding:6px;border-radius:12px;background:color-mix(in srgb,#fff 70%,transparent);border:1px solid rgba(15,23,42,.06);min-width:0}
+.sch-month-cell.other{opacity:.45}
+.sch-month-cell.today{border-color:var(--brand-primary,#111827);box-shadow:0 0 0 1px var(--brand-primary,#111827) inset}
+.sch-month-date{display:flex;align-items:center;justify-content:space-between;border:0;background:none;padding:0 2px 2px;font:inherit;cursor:pointer;color:inherit}
+.sch-month-date b{font-size:13px}.sch-month-date em{font-style:normal;font-size:10px;font-weight:700;min-width:17px;height:17px;border-radius:9px;display:grid;place-items:center;background:#111827;color:#fff;padding:0 4px}
+.sch-month-chip{display:flex;align-items:center;gap:4px;width:100%;min-width:0;border:0;border-left:3px solid var(--c);border-radius:6px;background:color-mix(in srgb,var(--c) 14%,#fff);padding:2px 5px;font:inherit;font-size:11px;line-height:1.3;color:#0f172a;cursor:pointer;text-align:left;transition:transform .12s,box-shadow .12s}
+.sch-month-chip:hover{transform:translateY(-1px);box-shadow:0 3px 10px color-mix(in srgb,var(--c) 30%,transparent)}
+.sch-month-chip b{font-size:10.5px;flex-shrink:0}.sch-month-chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#475467}
+.sch-month-chip .sch-avatar{flex-shrink:0}
+.sch-month-chip.completed{opacity:.7}.sch-month-chip.no_show{background:#fee2e2;border-left-color:#dc2626}
+.sch-month-more{border:0;background:none;padding:0 2px;font:inherit;font-size:10.5px;font-weight:600;color:#667085;text-align:left;cursor:pointer}
+.app-shell.dark-mode .sch-month-cell{background:#1a2025;border-color:rgba(255,255,255,.06)}.app-shell.dark-mode .sch-month-chip{background:color-mix(in srgb,var(--c) 28%,#1a2025);color:#f1f5f9}.app-shell.dark-mode .sch-month-chip span{color:#cbd5e1}.app-shell.dark-mode .sch-month-date em{background:#f1f5f9;color:#111827}
+@media(max-width:760px){.sch-month-cell{min-height:64px;padding:4px}.sch-month-chip span,.sch-month-chip .sch-avatar{display:none}}
