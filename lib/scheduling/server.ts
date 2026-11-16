@@ -23,7 +23,7 @@ export type GoogleOps = {
 export type Deps = { db: Db; sendEmail?: (mail: Mail) => Promise<void>; google?: GoogleOps; baseUrl: string; now?: () => number };
 
 export type StaffLite = { id: string; name: string; email?: string; role?: string; avatar?: string; isBot?: boolean; title?: string };
-export type ClientLite = { id: string; name: string; logo?: string; phone?: string; email?: string; branding?: { primary?: string; secondary?: string } };
+export type ClientLite = { id: string; name: string; seoServices?: string[]; seoLocations?: string[]; website?: string; logo?: string; phone?: string; email?: string; branding?: { primary?: string; secondary?: string } };
 export type WorkspaceLite = { ownerId: string; staff: StaffLite[]; clients: ClientLite[]; agencyName?: string };
 
 export type BookingRow = {

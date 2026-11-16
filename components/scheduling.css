@@ -275,3 +275,9 @@ html body .app-shell.dark-mode .sch-dash-panel-tools .sch-seg button.on{backgrou
 .sch-block .sch-block-avs{position:absolute;top:4px;right:4px}
 .sch-block{position:absolute}
 .app-shell.dark-mode .sch-chip-avs .sch-avatar,.app-shell.dark-mode .sch-dash-avs .sch-avatar,.app-shell.dark-mode .sch-block-avs .sch-avatar{box-shadow:0 0 0 2px #1b2227}
+/* Drag to reschedule */
+.sch-block.draggable{cursor:grab}.sch-block.draggable:active{cursor:grabbing}
+.sch-block.dragging{opacity:.45}
+.sch-drop-hint{position:absolute;left:3px;right:3px;height:2px;background:var(--brand-primary,#2563eb);border-radius:2px;pointer-events:none;z-index:6}
+.sch-drop-hint b{position:absolute;left:0;top:-11px;font-style:normal;font-size:10.5px;font-weight:800;background:var(--brand-primary,#2563eb);color:#fff;border-radius:6px;padding:1px 6px}
+.sch-sample-switch{margin-right:4px}

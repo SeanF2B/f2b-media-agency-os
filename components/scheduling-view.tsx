@@ -60,7 +60,17 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
     fit(); const t = window.setTimeout(fit, 250); window.addEventListener("resize", fit);
     return () => { window.clearTimeout(t); window.removeEventListener("resize", fit); };
   });
-  const [data, setData] = useState<Data | null>(null);
+  const [realData, setData] = useState<Data | null>(null);
+  const [sample, setSampleState] = useState(() => { try { return localStorage.getItem("f2b-dash-sample") === "1"; } catch { return false; } });
+  const setSample = (on: boolean) => { setSampleState(on); try { localStorage.setItem("f2b-dash-sample", on ? "1" : "0"); } catch { /* optional */ } };
+  const [sampleMoves, setSampleMoves] = useState<Record<string, string>>({});
+  const site = useSiteSample(scopeClientId, sample);
+  const sampleClientName = realData?.clients.find((c) => c.id === scopeClientId)?.name || "";
+  const data = useMemo(() => {
+    if (!sample || !realData) return realData;
+    const demo = sampleSchedule(realData, mondayOf(new Date()), sampleClientName, site);
+    return { ...demo, canManage: realData.canManage, isAdmin: realData.isAdmin, meId: realData.meId, googleAvailable: realData.googleAvailable, bookings: demo.bookings.map((b) => sampleMoves[b.id] ? { ...b, start: sampleMoves[b.id], end: new Date(Date.parse(sampleMoves[b.id]) + Date.parse(b.end) - Date.parse(b.start)).toISOString() } : b) };
+  }, [sample, realData, sampleClientName, site, sampleMoves]);
   const [tab, setTab] = useState<"dashboard" | "calendar" | "appointments" | "calendars" | "availability">("dashboard");
   const [dashDate, setDashDate] = useState(() => new Date());
   const [week, setWeek] = useState(() => mondayOf(new Date()));
@@ -76,6 +86,18 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
   const [editAvail, setEditAvail] = useState<Staff | null>(null);
   const [editProfile, setEditProfile] = useState<Staff | null>(null);
   const [listMode, setListMode] = useState<"upcoming" | "past" | "cancelled">("upcoming");
+  const dragRef = useRef<{ id: string; grabMin: number } | null>(null);
+  const [dropHint, setDropHint] = useState<{ day: string; min: number } | null>(null);
+  const moveBooking = async (b: Booking, dayKey: string, minOfDay: number) => {
+    const start = new Date(`${dayKey}T00:00:00`); start.setMinutes(minOfDay);
+    if (start.toISOString() === new Date(b.start).toISOString()) return;
+    const dur = Date.parse(b.end) - Date.parse(b.start);
+    if (b.id.startsWith("sample-")) { setSampleMoves((m) => ({ ...m, [b.id]: start.toISOString() })); setNote(`Sample: moved ${b.name} to ${time(start.toISOString())} (not saved).`); return; }
+    setData((d) => d ? { ...d, bookings: d.bookings.map((x) => x.id === b.id ? { ...x, start: start.toISOString(), end: new Date(start.getTime() + dur).toISOString() } : x) } : d);
+    try { await api(scopeClientId, { action: "updateBooking", id: b.id, start: start.toISOString() }); setNote(`Moved ${b.name} to ${start.toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short" })} at ${time(start.toISOString())}.`); }
+    catch (e) { setError(errText(e, "Couldn't move that appointment.")); }
+    void load();
+  };
 
   const load = useCallback(async () => {
     try {
@@ -121,8 +143,9 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
 
   return <section className="sch" aria-label="Scheduling">
     <header className="iv-head"><div><p className="eyebrow">SCHEDULING</p><h1>Appointments &amp; bookings</h1><p>Service calendars, consultations and staff availability, synced with Google Calendar and Apple / Outlook.</p></div>
-      <div className="iv-head-actions">{data.canManage && <button type="button" className="secondary-button" onClick={() => setEditCal(blankCalendar(data))}><Plus size={15} /> New booking calendar</button>}<button type="button" className="primary-button" onClick={() => setNewAppt({ date: ymd(new Date()), time: "" })}><Plus size={15} /> New appointment</button></div></header>
+      <div className="iv-head-actions"><label className={`task-ai-toggle dh-sample-toggle sch-sample-switch ${sample ? "is-on" : ""}`} title="Show demo appointments (nothing is saved)"><input type="checkbox" role="switch" checked={sample} onChange={(e) => setSample(e.target.checked)} /><span className="task-ai-toggle-track" aria-hidden="true"><span className="task-ai-toggle-thumb" /></span><b>Sample data</b></label>{data.canManage && <button type="button" className="secondary-button" onClick={() => setEditCal(blankCalendar(data))}><Plus size={15} /> New booking calendar</button>}<button type="button" className="primary-button" onClick={() => setNewAppt({ date: ymd(new Date()), time: "" })}><Plus size={15} /> New appointment</button></div></header>
     {error && <div className="iv-error" role="alert">{error}</div>}{note && <div className="iv-note" role="status">{note}</div>}
+    {sample && <div className="dh-sample-banner">Showing sample appointments{site.services.length ? ` built from ${sampleClientName || "the client"}’s website` : ""} — drag, open and demo freely; nothing is saved. Turn off “Sample data” for real bookings.</div>}
     {!data.emailReady && <div className="iv-warn">Email isn't set up on the server, so confirmations and reminders won't send yet. Bookings still save.</div>}
 
     <AiBar scope={scopeClientId} data={data} onCalendar={(c) => setEditCal(c)} onCreateCalendar={async (c) => Boolean(await act({ action: "saveCalendar", calendar: c }, `“${c.name}” created. Copy its booking link from Booking calendars.`))} onAppointment={(a) => setNewAppt(a)} onHours={async (hours) => { for (const h of hours) { const person = data.staff.find((x) => x.id === h.staffId); await act({ action: "saveAvailability", staffId: h.staffId, weekly: h.weekly, blocked: [...new Set([...(person?.blocked || []), ...h.daysOff])], dailyLimit: h.dailyLimit || person?.dailyLimit || 0, timezone: person?.timezone || "Europe/Dublin" }); } setNote("Working hours updated."); setTab("availability"); }} />
@@ -186,11 +209,20 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
         {days.map((d) => { const key = ymd(d); const dayBookings = visible.filter((b) => ymd(new Date(b.start)) === key);
           return <div key={key} className={`sch-day${key === todayKey ? " today" : ""}`}>
             <div className="sch-day-head"><small>{d.toLocaleDateString("en-IE", { weekday: "short" })}</small><b>{d.getDate()}</b></div>
-            <div className="sch-day-body" onClick={(e) => { if (e.target !== e.currentTarget) return; const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect(); const mins = Math.floor(((e.clientY - rect.top) / PX_PER_MIN) / 30) * 30 + HOURS_FROM * 60; setNewAppt({ date: key, time: `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}` }); }} title="Click an empty time to add an appointment">
+            <div className="sch-day-body"
+              onDragOver={(e) => { if (!dragRef.current) return; e.preventDefault(); e.dataTransfer.dropEffect = "move"; const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect(); const m = Math.max(HOURS_FROM * 60, Math.min(HOURS_TO * 60 - 15, Math.round(((e.clientY - rect.top) / PX_PER_MIN - dragRef.current.grabMin) / 15) * 15 + HOURS_FROM * 60)); if (!dropHint || dropHint.day !== key || dropHint.min !== m) setDropHint({ day: key, min: m }); }}
+              onDragLeave={(e) => { if (e.currentTarget === e.target) setDropHint(null); }}
+              onDrop={(e) => { e.preventDefault(); const drag = dragRef.current; dragRef.current = null; const hint = dropHint; setDropHint(null); const b = drag && data?.bookings.find((x) => x.id === drag.id); if (b && hint) void moveBooking(b, hint.day, hint.min); }}
+              onClick={(e) => { if (e.target !== e.currentTarget) return; const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect(); const mins = Math.floor(((e.clientY - rect.top) / PX_PER_MIN) / 30) * 30 + HOURS_FROM * 60; setNewAppt({ date: key, time: `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}` }); }} title="Click an empty time to add an appointment">
               {Array.from({ length: HOURS_TO - HOURS_FROM }, (_, i) => <i key={i} className="sch-line" style={{ top: i * 60 * PX_PER_MIN }} />)}
               {key === todayKey && (() => { const n = new Date(); const m = n.getHours() * 60 + n.getMinutes() - HOURS_FROM * 60; return m > 0 && m < (HOURS_TO - HOURS_FROM) * 60 ? <i className="sch-now" style={{ top: m * PX_PER_MIN }} /> : null; })()}
+              {dropHint?.day === key && <i className="sch-drop-hint" style={{ top: (dropHint.min - HOURS_FROM * 60) * PX_PER_MIN }}><b>{String(Math.floor(dropHint.min / 60)).padStart(2, "0")}:{String(dropHint.min % 60).padStart(2, "0")}</b></i>}
               {dayBookings.map((b) => { const s = new Date(b.start), e = new Date(b.end); const top = Math.max(0, (s.getHours() * 60 + s.getMinutes() - HOURS_FROM * 60) * PX_PER_MIN); const height = Math.max(22, ((e.getTime() - s.getTime()) / 60000) * PX_PER_MIN - 2); const cal = calById.get(b.calendarId);
-                return <button key={b.id} type="button" className={`sch-block ${b.status}`} style={{ top, height, ["--c" as string]: cal?.color || "#2563eb" }} onClick={() => setDetail(b)} title={`${time(b.start)} ${cal?.name || ""} · ${b.name}`}>
+                const canDrag = b.status === "booked" && (data?.canManage || b.staffIds.includes(data?.meId || ""));
+                return <button key={b.id} type="button" className={`sch-block ${b.status}${canDrag ? " draggable" : ""}`} style={{ top, height, ["--c" as string]: cal?.color || "#2563eb" }} draggable={canDrag}
+                  onDragStart={(ev) => { const r = (ev.currentTarget as HTMLElement).getBoundingClientRect(); dragRef.current = { id: b.id, grabMin: (ev.clientY - r.top) / PX_PER_MIN }; ev.dataTransfer.effectAllowed = "move"; ev.dataTransfer.setData("text/plain", b.id); (ev.currentTarget as HTMLElement).classList.add("dragging"); }}
+                  onDragEnd={(ev) => { (ev.currentTarget as HTMLElement).classList.remove("dragging"); dragRef.current = null; setDropHint(null); }}
+                  onClick={() => setDetail(b)} title={`${time(b.start)} ${cal?.name || ""} · ${b.name}`}>
                   <span className="sch-block-avs">{b.staffIds.slice(0, 3).map((id) => <Avatar key={id} person={staffById.get(id) || { name: "?" }} size={20} />)}</span><b>{time(b.start)} {b.name}</b><span>{cal?.name}</span><em>{b.staffIds.map((id) => staffById.get(id)?.name.split(" ")[0]).filter(Boolean).join(", ")}</em></button>; })}
             </div></div>; })}
       </div>
@@ -243,7 +275,7 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
       {onAddStaff && <button type="button" className="iv-card sch-staff sch-add-staff" onClick={onAddStaff}><span className="sch-add-plus">＋</span><b>Add staff</b><small>Invite a team member, then connect their calendar</small></button>}
     </div>}
 
-    {newAppt && <NewAppointment data={data} scope={scopeClientId} initial={newAppt} onClose={() => setNewAppt(null)} onSaved={async (msg) => { setNewAppt(null); setNote(msg); await load(); }} onCalendarsChanged={() => void load()} />}
+    {newAppt && realData && <NewAppointment data={realData} scope={scopeClientId} initial={newAppt} onClose={() => setNewAppt(null)} onSaved={async (msg) => { setNewAppt(null); setNote(msg); await load(); }} onCalendarsChanged={() => void load()} />}
     {catchUpOpen && !detail && !newAppt && <CatchUp data={data} scope={scopeClientId} onClose={() => setCatchUpOpen(false)} onChanged={() => void load()} />}
     {detail && <AppointmentDetail key={detail.id} data={data} scope={scopeClientId} booking={detail} onClose={() => setDetail(null)} onSaved={async (msg) => { setDetail(null); setNote(msg); await load(); }} />}
     {editCal && <CalendarEditor data={data} value={editCal} busy={busy} onClose={() => setEditCal(null)} onSave={async (cal) => { const out = await act({ action: "saveCalendar", calendar: cal }, cal.id ? "Booking calendar saved." : "Booking calendar created. Copy its link or embed code to start taking bookings."); if (out) setEditCal(null); }} onDelete={editCal.id ? async () => { if (!(await appConfirm("Delete this booking calendar? Its booking link will stop working."))) return; const out = await act({ action: "deleteCalendar", id: editCal.id }, "Booking calendar deleted."); if (out) setEditCal(null); } : undefined} />}
@@ -444,7 +476,7 @@ function AppointmentDetail({ data, scope, booking, onClose, onSaved }: { data: D
   const live = booking.status === "booked";
   const send = async (body: Record<string, unknown>, msg: string) => {
     setBusy(true); setErr("");
-    try { await api(scope, { action: "updateBooking", id: booking.id, ...body }); onSaved(msg); }
+    try { if (booking.id.startsWith("sample-")) { onSaved("Sample appointment — nothing was saved (turn off Sample data to make real changes)."); return; } await api(scope, { action: "updateBooking", id: booking.id, ...body }); onSaved(msg); }
     catch (e) { setErr(errText(e, "Couldn't update this appointment.")); }
     finally { setBusy(false); }
   };
@@ -760,7 +792,8 @@ export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, c
     api<Data>(scopeClientId, undefined, `&from=${from.toISOString()}&to=${to.toISOString()}`).then((d) => { if (live) { setData(d); setErr(""); } }).catch((e) => { if (live) setErr(errText(e, "Appointments couldn't load.")); });
     return () => { live = false; };
   }, [scopeClientId, ymd(week)]); // eslint-disable-line react-hooks/exhaustive-deps
-  const data = useMemo(() => sample ? sampleSchedule(realData, week, clientName) : realData, [sample, realData, ymd(week), clientName]); // eslint-disable-line react-hooks/exhaustive-deps
+  const site = useSiteSample(scopeClientId, sample);
+  const data = useMemo(() => sample ? sampleSchedule(realData, mondayOf(new Date()), clientName, site) : realData, [sample, realData, clientName, site]); // eslint-disable-line react-hooks/exhaustive-deps
   if (err && !realData && !sample) return null; // no Scheduling access: hide quietly
   const setMode = (m: "day" | "week") => { setView(m); try { localStorage.setItem("f2b-dash-appt-view", m); } catch { /* optional */ } };
   const bookings = (data?.bookings || []).filter((b) => b.status !== "cancelled" && (!staffId || b.staffIds.includes(staffId)));
@@ -826,10 +859,24 @@ export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, c
 }
 
 // Demo schedule for the Dashboard "Sample data" toggle (never saved). Uses the account's real team when there is one.
-function sampleSchedule(real: Data | null, week: Date, clientName: string): Data {
+type SiteSample = { services: string[]; locations: string[]; team: string[] };
+const EMPTY_SITE: SiteSample = { services: [], locations: [], team: [] };
+// The client's real services, areas and team (from their profile + website) to make demo data look like their business.
+function useSiteSample(scope: string, enabled: boolean): SiteSample {
+  const [site, setSite] = useState<SiteSample>(EMPTY_SITE);
+  useEffect(() => {
+    if (!enabled || !scope) { setSite(EMPTY_SITE); return; }
+    let live = true;
+    fetch(`/api/scheduling?clientId=${encodeURIComponent(scope)}&view=site`, { credentials: "same-origin" }).then((r) => r.ok ? r.json() : EMPTY_SITE).then((v: SiteSample) => { if (live) setSite({ services: v.services || [], locations: v.locations || [], team: v.team || [] }); }).catch(() => undefined);
+    return () => { live = false; };
+  }, [scope, enabled]);
+  return site;
+}
+function sampleSchedule(real: Data | null, week: Date, clientName: string, site: SiteSample = EMPTY_SITE): Data {
   const fallbackStaff: Staff[] = [["s1", "Aoife Murphy", "Senior consultant"], ["s2", "Ciarán Walsh", "Technician"], ["s3", "Niamh Byrne", "Bookings"]].map(([id, name, role]) => ({ id, name, role, dailyLimit: 0, google: "", feedUrl: "", canEdit: false, weekly: { mon: [["09:00", "17:30"]], tue: [["09:00", "17:30"]], wed: [["09:00", "17:30"]], thu: [["09:00", "17:30"]], fri: [["09:00", "16:00"]] } as Partial<Record<DayKey, Window[]>>, blocked: [] }));
-  const staff = (real?.staff.length ? real.staff : fallbackStaff).slice(0, 6).map((p) => ({ ...p, weekly: p.weekly && Object.keys(p.weekly).length ? p.weekly : fallbackStaff[0].weekly }));
-  const trade = /roof/i.test(clientName) ? ["Roof survey", "Repair quote", "Gutter check"] : /interior|kitchen|design/i.test(clientName) ? ["Design consultation", "Site measure", "Showroom visit"] : /ink|tattoo/i.test(clientName) ? ["Tattoo consultation", "Session", "Touch-up"] : ["Consultation", "Site visit", "Follow-up call"];
+  const siteStaff: Staff[] = site.team.map((name, i) => ({ ...fallbackStaff[0], id: `site-staff-${i}`, name, role: "" }));
+  const staff = (real?.staff.length ? real.staff : siteStaff.length ? siteStaff : fallbackStaff).slice(0, 6).map((p) => ({ ...p, weekly: p.weekly && Object.keys(p.weekly).length ? p.weekly : fallbackStaff[0].weekly }));
+  const trade = site.services.length >= 2 ? site.services.slice(0, 3) : /roof/i.test(clientName) ? ["Roof survey", "Repair quote", "Gutter check"] : /interior|kitchen|design/i.test(clientName) ? ["Design consultation", "Site measure", "Showroom visit"] : /ink|tattoo/i.test(clientName) ? ["Tattoo consultation", "Session", "Touch-up"] : ["Consultation", "Site visit", "Follow-up call"];
   const colours = ["#2563eb", "#16a34a", "#d97706"];
   const calendars = trade.map((name, i) => ({ id: `sample-cal-${i}`, clientId: "", name, slug: `sample-${i}`, kind: i === 0 ? "consultation" : "service", description: "", durationMin: i === 2 ? 30 : 60, bufferBefore: 0, bufferAfter: 15, slotInterval: 30, minNoticeMin: 0, maxDaysAhead: 60, dailyLimit: 0, locationType: "onsite", locationDetail: "", price: 0, currency: "EUR", color: colours[i], assignMode: "customer_pick", staffIds: staff.map((p) => p.id), questions: [], stageId: "", confirmationMessage: "", redirectUrl: "", active: true, timezone: "Europe/Dublin" } as Calendar));
   const people = ["Mary Burke", "Tom Walsh", "Sinéad Kelly", "John Doyle", "Emma Ryan", "Patrick Nolan", "Orla Gallagher", "Dave Kennedy", "Ciara Moran", "Liam O'Brien", "Grace Lynch", "Seán Fitzgerald"];
@@ -845,7 +892,7 @@ function sampleSchedule(real: Data | null, week: Date, clientName: string): Data
       const start = new Date(day); start.setHours(9 + Math.floor(rand() * 7), rand() < 0.5 ? 0 : 30, 0, 0);
       const end = new Date(start.getTime() + cal.durationMin * 60_000);
       const past = end.getTime() < now; const r = rand();
-      bookings.push({ id: `sample-${d}-${n}`, clientId: "", calendarId: cal.id, start: start.toISOString(), end: end.toISOString(), status: past ? (r < 0.08 ? "no_show" : r < 0.13 ? "cancelled" : "completed") : (r < 0.05 ? "cancelled" : "booked"), staffIds: [person.id], contactId: null, name: people[Math.floor(rand() * people.length)], email: "", phone: "", answers: [], notes: "", source: "public", channel: rand() < 0.5 ? "Google Ads" : "Google search", meetLink: "", createdBy: "", createdAt: start.toISOString() });
+      bookings.push({ id: `sample-${d}-${n}`, clientId: "", calendarId: cal.id, start: start.toISOString(), end: end.toISOString(), status: past ? (r < 0.08 ? "no_show" : r < 0.13 ? "cancelled" : "completed") : (r < 0.05 ? "cancelled" : "booked"), staffIds: [person.id], contactId: null, name: people[Math.floor(rand() * people.length)], email: "", phone: "", answers: site.locations.length && !/tattoo|ink|piercing/i.test(clientName) ? [{ label: "Location", value: site.locations[Math.floor(rand() * site.locations.length)] }] : [], notes: "", source: "public", channel: rand() < 0.5 ? "Google Ads" : "Google search", meetLink: "", createdBy: "", createdAt: start.toISOString() });
     }
   }
   return { calendars, bookings, staff, clients: real?.clients || [], scope: real?.scope ?? null, canManage: false, isAdmin: false, meId: "", googleAvailable: false, emailReady: true, publicBase: real?.publicBase || "" };

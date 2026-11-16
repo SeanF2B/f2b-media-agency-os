@@ -59,6 +59,12 @@ export async function GET(request: Request) {
       return startGoogleConnect(request, connect);
     }
     const view = url.searchParams.get("view") || "";
+    if (view === "site") {
+      // Demo data helper: the client's own services, areas and team names, from their profile and website.
+      const client = ctx.ws.clients.find((c) => c.id === (str(url.searchParams.get("clientId"), 80) || ctx.scope));
+      if (!client) return json({ services: [], locations: [], team: [] });
+      return json(await siteSampleFor(client));
+    }
     if (view === "calendars") return json({ calendars: (await listCalendars(db, ctx.ws.ownerId, ctx.scope)).map((c) => ({ id: c.id, name: c.name, clientId: c.clientId })) });
     if (view === "slots") {
       const cal = await getCalendar(db, ctx.ws.ownerId, str(url.searchParams.get("calendarId"), 80));
@@ -338,5 +344,38 @@ async function suggest(ctx: Ctx) {
   }
   suggestCache.set(key, { at: Date.now(), value });
   if (suggestCache.size > 200) suggestCache.delete(suggestCache.keys().next().value as string);
+  return value;
+}
+
+// ---- Sample-data helper: read the client's website once (cached) for service names, areas and team names.
+const siteCache = new Map<string, { at: number; value: { services: string[]; locations: string[]; team: string[] } }>();
+const SERVICE_WORDS = /(repair|install|replace|clean|survey|inspect|consult|design|fit|fitting|quote|service|maintenance|roof|gutter|chimney|kitchen|bathroom|tattoo|piercing|treatment|massage|facial|cut|colour|color|lesson|session|assessment|check|removal|painting|plaster|tiling|flooring|electrical|plumbing|heating|boiler|solar|window|door|garden|landscap|fencing|driveway|extension|renovat|cosmetic|whitening|implant|physio|therapy|training|coaching|valuation|viewing|measure)/i;
+const SKIP_WORDS = /^(home|about|about us|contact|contact us|blog|news|faq|faqs|gallery|reviews|testimonials|privacy|terms|cookie|careers|login|menu|services|our services|get a quote|call now|read more|learn more|book now|see more|view all)$/i;
+async function siteSampleFor(client: { id: string; name: string; website?: string; seoServices?: string[]; seoLocations?: string[] }) {
+  const cleanList = (list: unknown) => (Array.isArray(list) ? list : []).map((x) => String(x || "").trim()).filter(Boolean);
+  const services = cleanList(client.seoServices), locations = cleanList(client.seoLocations);
+  const base = { services: services.slice(0, 6), locations: locations.slice(0, 6), team: [] as string[] };
+  let site = String(client.website || "").trim();
+  if (!site) return base;
+  if (!/^https?:\/\//i.test(site)) site = `https://${site}`;
+  const hit = siteCache.get(site); if (hit && Date.now() - hit.at < 6 * 3600_000) return hit.value;
+  let value = base;
+  try {
+    const res = await fetch(site, { headers: { "user-agent": "Mozilla/5.0 (F2B Agency OS sample data)" }, signal: AbortSignal.timeout(6000), redirect: "follow" });
+    const html = res.ok ? (await res.text()).slice(0, 600_000) : "";
+    const text = (h: string) => h.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&#0?39;|&rsquo;/g, "'").replace(/&[a-z#0-9]+;/gi, " ").replace(/\s+/g, " ").trim();
+    const found: string[] = [];
+    for (const m of html.matchAll(/<(a|h2|h3|h4|li)\b[^>]*>([\s\S]{1,200}?)<\/\1>/gi)) {
+      const t = text(m[2]); if (t.length < 4 || t.length > 40 || SKIP_WORDS.test(t) || /[@|©]|\d{5,}|http/i.test(t)) continue;
+      const href = /href="([^"]+)"/i.exec(m[0])?.[1] || "";
+      if (SERVICE_WORDS.test(t) || /\/services?\//i.test(href)) found.push(t.replace(/\b\w/g, (c) => c.toUpperCase()));
+    }
+    const team: string[] = [];
+    const teamBlock = /(meet (the|our) team|our team|the team)[\s\S]{0,4000}/i.exec(html)?.[0] || "";
+    for (const m of teamBlock.matchAll(/<(h3|h4|h5|strong)\b[^>]*>([\s\S]{1,80}?)<\/\1>/gi)) { const t = text(m[2]); if (/^[A-Z][a-zà-ú'’-]+( [A-Z][a-zà-ú'’-]+){1,2}$/.test(t)) team.push(t); }
+    const areas = [...new Set([...html.matchAll(/\b(?:in|across|serving|covering)\s+((?:Co\.\s)?[A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/g)].map((m) => m[1]).filter((a) => !/^(The|Our|Your|Ireland|Business|Touch)$/.test(a)))];
+    value = { services: [...new Set([...services, ...found])].slice(0, 6), locations: [...new Set([...locations, ...areas])].slice(0, 6), team: [...new Set(team)].slice(0, 5) };
+  } catch { /* site unreachable: fall back to the profile */ }
+  siteCache.set(site, { at: Date.now(), value });
   return value;
 }

@@ -14,6 +14,8 @@ export async function loadSchedulingWorkspace(): Promise<(WorkspaceLite & { staf
       'agencyName', json_extract(data, '$.settings.branding.name'),
       'clients', json(COALESCE((SELECT json_group_array(json_object('id', json_extract(value, '$.id'), 'name', json_extract(value, '$.name'), 'status', json_extract(value, '$.status'), 'phone', json_extract(value, '$.phone'), 'email', json_extract(value, '$.email'),
         'logo', CASE WHEN length(COALESCE(json_extract(value, '$.logo'), '')) > 150000 THEN '' ELSE json_extract(value, '$.logo') END,
+        'seoServices', json(COALESCE(json_extract(value, '$.seoServices'), '[]')), 'seoLocations', json(COALESCE(json_extract(value, '$.seoLocations'), '[]')),
+        'website', COALESCE(json_extract(value, '$.website'), json_extract(value, '$.wordpressSiteUrl'), json_extract(value, '$.codexUrl'), ''),
         'branding', json_object('primary', json_extract(value, '$.branding.primary'), 'secondary', json_extract(value, '$.branding.secondary')))) FROM json_each(data, '$.clients')), '[]')),
       'staff', json(COALESCE((SELECT json_group_array(json_object('id', json_extract(value, '$.id'), 'name', json_extract(value, '$.name'), 'email', json_extract(value, '$.email'), 'role', json_extract(value, '$.role'), 'isBot', json_extract(value, '$.isBot'), 'staffType', json_extract(value, '$.staffType'),
         'avatar', CASE WHEN length(COALESCE(json_extract(value, '$.avatar'), '')) > 120000 THEN '' ELSE json_extract(value, '$.avatar') END,
