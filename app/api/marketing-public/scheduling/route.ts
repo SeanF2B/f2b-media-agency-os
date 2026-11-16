@@ -6,7 +6,7 @@
 // POST {action:"book"|"cancel"|"reschedule"}
 import { env } from "cloudflare:workers";
 import { loadSchedulingWorkspace, schedulingDeps } from "@/lib/scheduling/context";
-import { SchedulingError, availableSlots, cancelBooking, createBooking, getBookingByToken, getCalendar, getCalendarBySlug, icsFeed, updateBooking, bookingView } from "@/lib/scheduling/server";
+import { SchedulingError, getStaffProfiles, publicProfile, availableSlots, cancelBooking, createBooking, getBookingByToken, getCalendar, getCalendarBySlug, icsFeed, updateBooking, bookingView } from "@/lib/scheduling/server";
 import { chooseStaff, locationLabel, utcToLocal } from "@/lib/scheduling/core";
 
 export const dynamic = "force-dynamic";
@@ -36,12 +36,14 @@ async function publicInfo(slug: string) {
   return { cal, ws, client };
 }
 
-function publicCalendar(info: NonNullable<Awaited<ReturnType<typeof publicInfo>>>) {
+async function publicCalendar(info: NonNullable<Awaited<ReturnType<typeof publicInfo>>>) {
   const { cal, ws, client } = info;
+  const profiles = await getStaffProfiles(env.DB as never, cal.ownerId, cal.staffIds).catch(() => ({} as Record<string, never>));
+  const img = (u?: string) => /^(https:|data:image\/|\/media\/)/.test(u || "") ? u : "";
   const settingsStaff = ws.staff.filter((s) => cal.staffIds.includes(s.id));
   return {
     calendar: { slug: cal.slug, name: cal.name, kind: cal.kind, description: cal.description, durationMin: cal.durationMin, location: locationLabel(cal.locationType, cal.locationType === "onsite" ? "" : cal.locationDetail), price: cal.price, currency: cal.currency, color: cal.color, assignMode: cal.assignMode, questions: cal.questions, timezone: cal.timezone, maxDaysAhead: cal.maxDaysAhead, redirectUrl: cal.redirectUrl, confirmationMessage: cal.confirmationMessage },
-    staff: cal.assignMode === "collective" ? settingsStaff.map((s) => ({ id: s.id, name: s.name, avatar: /^(https:|data:image\/)/.test(s.avatar || "") ? s.avatar : "" })) : settingsStaff.map((s) => ({ id: s.id, name: s.name, avatar: /^(https:|data:image\/)/.test(s.avatar || "") ? s.avatar : "", title: s.role && !/owner|admin|manager|user/i.test(s.role) ? s.role : "" })),
+    staff: settingsStaff.map((s) => { const p = publicProfile(profiles[s.id]); return { id: s.id, name: s.name.split("|")[0].trim(), avatar: img(s.avatar), title: p?.title || (s.name.includes("|") ? s.name.split("|")[1].trim() : ""), profile: p }; }),
     business: { name: client?.name || ws.agencyName || "F2B Media", logo: client?.logo && /^(https:|data:image\/)/.test(client.logo) ? client.logo : "", color: client?.branding?.primary && /^#[0-9a-f]{6}$/i.test(client.branding.primary) ? client.branding.primary : cal.color, phone: client?.phone || "" },
   };
 }
@@ -64,7 +66,7 @@ export async function GET(request: Request) {
       const info = cal ? await publicInfo(cal.slug) : null;
       const ws = info?.ws || await loadSchedulingWorkspace();
       const b = bookingView(row);
-      return json({ booking: { status: b.status, start: b.start, end: b.end, name: b.name, staff: b.staffIds.map((id) => ws?.staff.find((s) => s.id === id)?.name).filter(Boolean), meetLink: b.meetLink, canChange: b.status === "booked" && Date.parse(b.start) > Date.now() + 60 * 60_000 }, ...(info ? publicCalendar(info) : { calendar: cal ? { slug: cal.slug, name: cal.name, timezone: cal.timezone } : null }) });
+      return json({ booking: { status: b.status, start: b.start, end: b.end, name: b.name, staff: b.staffIds.map((id) => ws?.staff.find((s) => s.id === id)?.name).filter(Boolean), meetLink: b.meetLink, canChange: b.status === "booked" && Date.parse(b.start) > Date.now() + 60 * 60_000 }, ...(info ? await publicCalendar(info) : { calendar: cal ? { slug: cal.slug, name: cal.name, timezone: cal.timezone } : null }) });
     }
     const info = await publicInfo(str(url.searchParams.get("cal"), 64));
     if (!info) return fail("This booking page isn't available.", 404);
@@ -75,7 +77,7 @@ export async function GET(request: Request) {
       const slots = await availableSlots(schedulingDeps(request), info.cal, { fromDate: date, days: Math.min(14, Math.max(1, Number(url.searchParams.get("days")) || 7)), staffId: staffId && info.cal.staffIds.includes(staffId) ? staffId : undefined, excludeBookingId: undefined });
       return json({ slots: slots.map((s) => ({ start: s.start, staffIds: s.staffIds })) });
     }
-    return json(publicCalendar(info));
+    return json(await publicCalendar(info));
   } catch (error) {
     console.error("Public scheduling GET", error);
     return fail(error instanceof SchedulingError ? error.message : "Bookings are unavailable right now. Please try again shortly.", error instanceof SchedulingError ? error.status : 500);

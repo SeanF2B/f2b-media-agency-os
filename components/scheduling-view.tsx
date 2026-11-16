@@ -9,7 +9,9 @@ type DayKey = "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
 type Window = [string, string];
 type Question = { id: string; label: string; required?: boolean; type?: "text" | "textarea" | "select"; options?: string[] };
 type Calendar = { id: string; clientId: string; name: string; slug: string; kind: "service" | "consultation"; description: string; durationMin: number; bufferBefore: number; bufferAfter: number; slotInterval: number; minNoticeMin: number; maxDaysAhead: number; dailyLimit: number; locationType: "onsite" | "phone" | "video" | "office"; locationDetail: string; price: number; currency: string; color: string; assignMode: "customer_pick" | "round_robin" | "collective"; staffIds: string[]; questions: Question[]; stageId: string; confirmationMessage: string; redirectUrl: string; active: boolean; timezone: string };
-type Staff = { id: string; name: string; email?: string; role?: string; avatar?: string; timezone?: string; weekly?: Partial<Record<DayKey, Window[]>>; blocked?: string[]; dailyLimit: number; google: string; feedUrl: string; canEdit: boolean };
+type StaffReview = { id: string; author: string; rating: number; text: string; source: string; date: string };
+type StaffProfile = { showReviews: boolean; showPhotos: boolean; title: string; bio: string; reviews: StaffReview[]; photos: Array<{ url: string; caption: string }> };
+type Staff = { id: string; name: string; email?: string; role?: string; avatar?: string; profile?: StaffProfile | null; timezone?: string; weekly?: Partial<Record<DayKey, Window[]>>; blocked?: string[]; dailyLimit: number; google: string; feedUrl: string; canEdit: boolean };
 type Booking = { id: string; clientId: string; calendarId: string; start: string; end: string; status: "booked" | "cancelled" | "completed" | "no_show"; staffIds: string[]; contactId: string | null; name: string; email: string; phone: string; answers: Array<{ label: string; value: string }>; notes: string; source: string; channel: string; meetLink: string; createdBy: string; createdAt: string };
 type Data = { calendars: Calendar[]; bookings: Booking[]; staff: Staff[]; clients: Array<{ id: string; name: string; logo: string }>; scope: string | null; canManage: boolean; isAdmin: boolean; meId: string; googleAvailable: boolean; emailReady: boolean; publicBase: string };
 type Slot = { start: string; end: string; staffIds: string[] };
@@ -70,6 +72,7 @@ export function SchedulingView({ scopeClientId, onAddStaff }: { scopeClientId: s
   const [detail, setDetail] = useState<Booking | null>(null);
   const [editCal, setEditCal] = useState<Partial<Calendar> | null>(null);
   const [editAvail, setEditAvail] = useState<Staff | null>(null);
+  const [editProfile, setEditProfile] = useState<Staff | null>(null);
   const [listMode, setListMode] = useState<"upcoming" | "past" | "cancelled">("upcoming");
 
   const load = useCallback(async () => {
@@ -155,7 +158,20 @@ export function SchedulingView({ scopeClientId, onAddStaff }: { scopeClientId: s
         </div>
         <div className="iv-card sch-dash-staff-card">
           <div className="sch-dash-head"><h3>Staff availability</h3><span className="iv-small">{dashDate.toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short" })}</span></div>
-          <div className="sch-dash-staff-grid">{data.staff.map((st) => { const slots = staffSlots(st); return <div key={st.id} className="sch-dash-person"><div className="sch-dash-person-top"><Avatar person={st} size={34} /><div><b>{st.name.split("|")[0].trim()}</b><small>{st.role}</small></div></div>{slots.length ? slots.map((sl, i) => sl.state === "off" ? <div key={i} className="sch-slot off"><span>Day off</span></div> : <div key={i} className={`sch-slot ${sl.state}`} title={sl.who || ""}><span>{sl.from} – {sl.to}</span><em>{sl.state === "booked" ? "Booked" : "Available"}</em></div>) : <div className="sch-slot off"><span>Not working</span></div>}</div>; })}</div>
+          <div className="sch-avail-list">{data.staff.map((st) => {
+            const slots = staffSlots(st);
+            const off = !slots.length || slots[0].state === "off";
+            const working = slots.filter((x) => x.state !== "off");
+            const dayStart = working.length ? mins(working[0].from) : 0, dayEnd = working.length ? mins(working[working.length - 1].to) : 1;
+            const freeMins = working.filter((x) => x.state === "free").reduce((n, x) => n + mins(x.to) - mins(x.from), 0);
+            const bookedCount = working.filter((x) => x.state === "booked").length;
+            const summary = off ? (slots[0]?.state === "off" ? "Day off" : "Not working") : !bookedCount ? "Free all day" : freeMins ? `${Math.floor(freeMins / 60)}h${freeMins % 60 ? ` ${freeMins % 60}m` : ""} free` : "Fully booked";
+            return <div key={st.id} className={`sch-avail-row${off ? " off" : ""}`}>
+              <Avatar person={st} size={32} />
+              <div className="sch-avail-name"><b>{st.name.split("|")[0].trim()}</b><small>{working.length ? `${working[0].from}–${working[working.length - 1].to}` : st.role}</small></div>
+              <div className="sch-avail-track" aria-hidden="true">{working.map((x, i) => <i key={i} className={x.state} title={x.state === "booked" ? `${x.from}–${x.to} · ${x.who || "Booked"}` : `${x.from}–${x.to} free`} style={{ left: `${((mins(x.from) - dayStart) / Math.max(1, dayEnd - dayStart)) * 100}%`, width: `${((mins(x.to) - mins(x.from)) / Math.max(1, dayEnd - dayStart)) * 100}%` }} />)}</div>
+              <span className={`sch-avail-pill ${off ? "off" : !bookedCount ? "free" : freeMins ? "some" : "full"}`}>{summary}</span>
+            </div>; })}</div>
         </div>
       </div>;
     })()}
@@ -214,7 +230,8 @@ export function SchedulingView({ scopeClientId, onAddStaff }: { scopeClientId: s
             <div><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="4" fill="#fff" stroke="#e11d48" strokeWidth="1.6" /><rect x="3" y="4" width="18" height="5" rx="2" fill="#e11d48" /><text x="12" y="18" textAnchor="middle" fontSize="8" fontWeight="700" fill="#111">31</text></svg><span>Apple / Outlook calendar feed</span>
               {s.canEdit && (s.feedUrl ? <><button type="button" className="iv-btn" onClick={() => { void navigator.clipboard?.writeText(s.feedUrl); setNote("Feed link copied. On iPhone: Settings → Calendar → Accounts → Add Account → Other → Add Subscribed Calendar, then paste. On Mac: Calendar → File → New Calendar Subscription. In Outlook: Add calendar → Subscribe from web."); }}>Copy link</button><button type="button" className="iv-btn" title="Make a new private link (the old one stops working)" onClick={() => void act({ action: "rotateFeed", staffId: s.id }, "New private feed link created. Re-subscribe with the new link.")}><RefreshCw size={12} /></button></> : <button type="button" className="iv-btn" onClick={() => void act({ action: "createFeed", staffId: s.id }, "Private feed link ready. Click Copy link.")}>Create link</button>)}</div>
           </div>
-          {(s.canEdit || data.canManage) && <div className="iv-actions"><button type="button" className="iv-btn" onClick={() => setEditAvail(s)}><Clock size={13} /> Edit hours &amp; days off</button></div>}
+          {s.profile && (s.profile.reviews.length > 0 || s.profile.photos.length > 0) && <div className="sch-profile-sum">{s.profile.reviews.length > 0 && <span className={s.profile.showReviews ? "" : "muted"}>★ {(s.profile.reviews.reduce((n, r) => n + r.rating, 0) / s.profile.reviews.length).toFixed(1)} · {s.profile.reviews.length} review{s.profile.reviews.length === 1 ? "" : "s"}{s.profile.showReviews ? "" : " (hidden)"}</span>}{s.profile.photos.length > 0 && <span className={s.profile.showPhotos ? "" : "muted"}>{s.profile.photos.length} photo{s.profile.photos.length === 1 ? "" : "s"}{s.profile.showPhotos ? "" : " (hidden)"}</span>}</div>}
+          {(s.canEdit || data.canManage) && <div className="iv-actions"><button type="button" className="iv-btn" onClick={() => setEditAvail(s)}><Clock size={13} /> Edit hours &amp; days off</button><button type="button" className="iv-btn" onClick={() => setEditProfile(s)}>★ Reviews &amp; photos</button></div>}
         </div>; })}
       {onAddStaff && <button type="button" className="iv-card sch-staff sch-add-staff" onClick={onAddStaff}><span className="sch-add-plus">＋</span><b>Add staff</b><small>Invite a team member, then connect their calendar</small></button>}
     </div>}
@@ -223,6 +240,7 @@ export function SchedulingView({ scopeClientId, onAddStaff }: { scopeClientId: s
     {catchUpOpen && !detail && !newAppt && <CatchUp data={data} scope={scopeClientId} onClose={() => setCatchUpOpen(false)} onChanged={() => void load()} />}
     {detail && <AppointmentDetail key={detail.id} data={data} scope={scopeClientId} booking={detail} onClose={() => setDetail(null)} onSaved={async (msg) => { setDetail(null); setNote(msg); await load(); }} />}
     {editCal && <CalendarEditor data={data} value={editCal} busy={busy} onClose={() => setEditCal(null)} onSave={async (cal) => { const out = await act({ action: "saveCalendar", calendar: cal }, cal.id ? "Booking calendar saved." : "Booking calendar created. Copy its link or embed code to start taking bookings."); if (out) setEditCal(null); }} onDelete={editCal.id ? async () => { if (!(await appConfirm("Delete this booking calendar? Its booking link will stop working."))) return; const out = await act({ action: "deleteCalendar", id: editCal.id }, "Booking calendar deleted."); if (out) setEditCal(null); } : undefined} />}
+    {editProfile && <Modal title={`${editProfile.name.split("|")[0].trim()}: booking profile`} wide onClose={() => { setEditProfile(null); void load(); }} footer={<button type="button" className="primary-button" onClick={() => { setEditProfile(null); void load(); }}>Done</button>}><StaffShowcaseEditor staffId={editProfile.id} scope={scopeClientId} /></Modal>}
     {editAvail && <AvailabilityEditor staff={editAvail} busy={busy} onClose={() => setEditAvail(null)} onSave={async (v) => { const out = await act({ action: "saveAvailability", staffId: editAvail.id, ...v }, `${editAvail.name}'s availability saved.`); if (out) setEditAvail(null); }} />}
   </section>;
 }
@@ -565,5 +583,84 @@ function CatchUp({ data, scope, onClose, onChanged }: { data: Data; scope: strin
       <button type="button" className="sch-linkbtn" onClick={() => setDone((d) => [...d, b.id])}>Skip</button>
     </div>
     <small className="iv-small">No-shows and completed visits can trigger your Automations (e.g. a review request).</small>
+  </div>;
+}
+
+/** Reviews + photos customers see on the booking page. Used in the Team staff form and in Scheduling. Saves automatically. */
+export function StaffShowcaseEditor({ staffId, scope = "" }: { staffId: string; scope?: string }) {
+  const [p, setP] = useState<StaffProfile | null>(null);
+  const [status, setStatus] = useState("");
+  const [paste, setPaste] = useState("");
+  const [showPaste, setShowPaste] = useState(false);
+  const [uploading, setUploading] = useState(0);
+  const [draft, setDraft] = useState<StaffReview>({ id: "", author: "", rating: 5, text: "", source: "Google", date: "" });
+  const dirty = useState(0);
+  useEffect(() => {
+    if (!staffId) return;
+    let live = true;
+    api<{ profile: StaffProfile | null }>(scope, { action: "getProfile", staffId }).then((r) => { if (live) setP(r.profile || { showReviews: false, showPhotos: false, title: "", bio: "", reviews: [], photos: [] }); }).catch((e) => { if (live) setStatus(errText(e, "Couldn't load the profile.")); });
+    return () => { live = false; };
+  }, [staffId, scope]);
+  useEffect(() => {
+    if (!p || !dirty[0]) return;
+    setStatus("Saving…");
+    const t = window.setTimeout(() => { api(scope, { action: "saveProfile", staffId, profile: p }).then(() => setStatus("Saved ✓")).catch((e) => setStatus(errText(e, "Couldn't save."))); }, 700);
+    return () => window.clearTimeout(t);
+  }, [p]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!staffId) return <div className="sch-showcase"><div className="sch-showcase-head"><b>Booking profile</b></div><p className="iv-small">Save this person first, then you can add reviews and photos customers see when booking.</p></div>;
+  if (!p) return <div className="sch-showcase"><p className="iv-small">{status || "Loading booking profile…"}</p></div>;
+  const update = (patch: Partial<StaffProfile>) => { dirty[1](dirty[0] + 1); setP({ ...p, ...patch }); };
+  const addReview = () => { if (!draft.author.trim() && !draft.text.trim()) return; update({ reviews: [{ ...draft, id: `rv${Date.now().toString(36)}` }, ...p.reviews] }); setDraft({ id: "", author: "", rating: 5, text: "", source: draft.source, date: "" }); };
+  const importPaste = () => {
+    // One review per line: Name | stars | review text | source (optional)
+    const rows = paste.split(/\n+/).map((l) => l.trim()).filter(Boolean).map((line, i) => {
+      const parts = line.split(/\s*[|\t]\s*/);
+      const stars = Number((parts[1] || "").replace(/[^\d.]/g, "")) || (line.match(/★/g) || []).length || 5;
+      return { id: `rv${Date.now().toString(36)}${i}`, author: parts[0] || "Customer", rating: Math.max(1, Math.min(5, Math.round(stars))), text: parts.slice(2, parts.length > 3 ? -1 : undefined).join(" ") || (parts.length === 1 ? "" : ""), source: parts.length > 3 ? parts[parts.length - 1] : "Google", date: "" };
+    });
+    if (rows.length) update({ reviews: [...rows, ...p.reviews].slice(0, 60), showReviews: true });
+    setPaste(""); setShowPaste(false);
+  };
+  const upload = async (files: FileList | null) => {
+    if (!files?.length) return;
+    const list = [...files].filter((f) => f.type.startsWith("image/")).slice(0, 16 - p.photos.length);
+    setUploading(list.length);
+    const added: Array<{ url: string; caption: string }> = [];
+    for (const file of list) {
+      try {
+        const q = new URLSearchParams({ scope: scope || "agency", folder: "Staff photos", name: file.name.slice(0, 120) });
+        const res = await fetch(`/api/media-library?${q}`, { method: "PUT", headers: { "Content-Type": file.type || "application/octet-stream" }, body: file });
+        const out = await res.json().catch(() => ({})) as { item?: { url: string }; error?: string };
+        if (!res.ok || !out.item?.url) throw new Error(out.error || "Upload failed");
+        added.push({ url: out.item.url, caption: "" });
+      } catch (e) { setStatus(errText(e, "A photo couldn't be uploaded.")); }
+      setUploading((n) => n - 1);
+    }
+    if (added.length) update({ photos: [...p.photos, ...added], showPhotos: true });
+  };
+  const avg = p.reviews.length ? (p.reviews.reduce((n, r) => n + r.rating, 0) / p.reviews.length).toFixed(1) : "";
+  return <div className="sch-showcase">
+    <div className="sch-showcase-head"><b>Booking profile</b><small>What customers see when picking who to book</small><span className="sch-showcase-status">{status}</span></div>
+    <div className="iv-grid"><Field label="Job title on booking page"><input value={p.title} onChange={(e) => update({ title: e.target.value })} maxLength={60} placeholder="e.g. Senior roofer" /></Field><Field label="Short intro (optional)"><input value={p.bio} onChange={(e) => update({ bio: e.target.value })} maxLength={400} placeholder="15 years fixing roofs across Galway" /></Field></div>
+    <div className="sch-toggles">
+      <label className="sch-toggle"><input type="checkbox" checked={p.showReviews} onChange={(e) => update({ showReviews: e.target.checked })} /><span /> <b>Show reviews</b>{avg && <small>★ {avg} · {p.reviews.length}</small>}</label>
+      <label className="sch-toggle"><input type="checkbox" checked={p.showPhotos} onChange={(e) => update({ showPhotos: e.target.checked })} /><span /> <b>Show photos</b>{p.photos.length > 0 && <small>{p.photos.length}</small>}</label>
+    </div>
+    {p.showReviews && <div className="sch-showcase-block">
+      <div className="sch-review-add">
+        <input value={draft.author} onChange={(e) => setDraft({ ...draft, author: e.target.value })} placeholder="Customer name" maxLength={80} aria-label="Reviewer name" />
+        <select value={draft.rating} onChange={(e) => setDraft({ ...draft, rating: Number(e.target.value) })} aria-label="Stars">{[5, 4, 3, 2, 1].map((n) => <option key={n} value={n}>{"★".repeat(n)}</option>)}</select>
+        <select value={draft.source} onChange={(e) => setDraft({ ...draft, source: e.target.value })} aria-label="Where the review is from">{["Google", "Facebook", "Trustpilot", "Checkatrade", "Website", "Other"].map((x) => <option key={x}>{x}</option>)}</select>
+        <textarea value={draft.text} onChange={(e) => setDraft({ ...draft, text: e.target.value })} placeholder="What they said" rows={2} maxLength={800} aria-label="Review text" />
+        <div className="sch-inline"><button type="button" className="iv-btn" onClick={addReview} disabled={!draft.author.trim() && !draft.text.trim()}><Plus size={13} /> Add review</button><button type="button" className="sch-linkbtn" onClick={() => setShowPaste(!showPaste)}>Paste lots at once</button></div>
+      </div>
+      {showPaste && <div className="sch-paste"><textarea value={paste} onChange={(e) => setPaste(e.target.value)} rows={5} placeholder={"One per line:  Name | stars | review | source\nMary Burke | 5 | Pat fixed our leak the same day | Google\nTom Walsh | 5 | Brilliant job on the chimney"} /><button type="button" className="iv-btn" onClick={importPaste} disabled={!paste.trim()}>Import reviews</button></div>}
+      {p.reviews.length > 0 && <ul className="sch-reviews">{p.reviews.map((r) => <li key={r.id}><div><b>{r.author || "Customer"}</b> <span className="sch-stars">{"★".repeat(r.rating)}<i>{"★".repeat(5 - r.rating)}</i></span>{r.source && <small>{r.source}</small>}</div>{r.text && <p>{r.text}</p>}<button type="button" className="iv-x" aria-label="Remove review" onClick={() => update({ reviews: p.reviews.filter((x) => x.id !== r.id) })}>✕</button></li>)}</ul>}
+    </div>}
+    {p.showPhotos && <div className="sch-showcase-block">
+      <div className="sch-photos">{p.photos.map((ph, i) => <figure key={ph.url + i}><img src={ph.url} alt={ph.caption || ""} loading="lazy" /><input value={ph.caption} onChange={(e) => update({ photos: p.photos.map((x, j) => j === i ? { ...x, caption: e.target.value } : x) })} placeholder="Caption" maxLength={120} aria-label="Photo caption" /><button type="button" className="iv-x" aria-label="Remove photo" onClick={() => update({ photos: p.photos.filter((_, j) => j !== i) })}>✕</button></figure>)}
+        {p.photos.length < 16 && <label className="sch-photo-add"><input type="file" accept="image/*" multiple onChange={(e) => { void upload(e.target.files); e.target.value = ""; }} />{uploading ? `Uploading ${uploading}…` : <><Plus size={18} /><span>Add photos</span></>}</label>}</div>
+      <small className="iv-small">Photos are saved to the Media Library (Staff photos folder).</small>
+    </div>}
   </div>;
 }

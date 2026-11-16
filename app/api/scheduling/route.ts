@@ -7,7 +7,7 @@ import { aiConfigured, aiEndpoint, aiHeaders, aiModel, getAiProvider, resolveAiP
 import { sanitizeCalendar, sanitizeWeekly } from "@/lib/scheduling/core";
 import {
   SchedulingError, availableSlots, createBooking, deleteCalendar, getBooking, getCalendar, getStaffSettings, listBookings, listCalendars,
-  saveCalendar, saveStaffSettings, staffFeedToken, updateBooking,
+  saveCalendar, saveStaffSettings, staffFeedToken, updateBooking, getStaffProfiles, saveStaffProfile,
 } from "@/lib/scheduling/server";
 
 export const dynamic = "force-dynamic";
@@ -66,11 +66,11 @@ export async function GET(request: Request) {
     const [calendars, bookings] = await Promise.all([listCalendars(db, ctx.ws.ownerId, ctx.scope), listBookings(db, ctx.ws.ownerId, ctx.scope, new Date(from).toISOString(), new Date(to).toISOString())]);
     const deps = schedulingDeps(request);
     const staffIds = ctx.staff.map((s) => s.id);
-    const [settings, google] = await Promise.all([getStaffSettings(db, ctx.ws.ownerId, staffIds), deps.google ? deps.google.connected(ctx.ws.ownerId, staffIds) : Promise.resolve({} as Record<string, string>)]);
+    const [settings, google, profiles] = await Promise.all([getStaffSettings(db, ctx.ws.ownerId, staffIds), deps.google ? deps.google.connected(ctx.ws.ownerId, staffIds) : Promise.resolve({} as Record<string, string>), getStaffProfiles(db, ctx.ws.ownerId, staffIds)]);
     const mine = (id: string) => ctx.admin || ctx.me?.id === id;
     const staff = ctx.staff.map((s) => {
       const av = settings.find((x) => x.staffId === s.id);
-      return { ...s, timezone: av?.timezone, weekly: av?.weekly, blocked: av?.blocked, dailyLimit: av?.dailyLimit || 0, google: google[s.id] || "", feedUrl: mine(s.id) && av?.icsToken ? `${deps.baseUrl}/api/marketing-public/scheduling?ics=${av.icsToken}` : "", canEdit: mine(s.id) };
+      return { ...s, timezone: av?.timezone, weekly: av?.weekly, blocked: av?.blocked, dailyLimit: av?.dailyLimit || 0, google: google[s.id] || "", profile: profiles[s.id] || null, feedUrl: mine(s.id) && av?.icsToken ? `${deps.baseUrl}/api/marketing-public/scheduling?ics=${av.icsToken}` : "", canEdit: mine(s.id) };
     });
     const clients = (ctx.scope === null ? ctx.ws.clients : ctx.ws.clients.filter((c) => c.id === ctx.scope)).map((c) => ({ id: c.id, name: c.name, logo: c.logo || "" }));
     return json({ calendars, bookings, staff, clients, scope: ctx.scope, canManage: ctx.canManage, isAdmin: ctx.admin, meId: ctx.me?.id || "", googleAvailable: googleSchedulingAvailable(), emailReady: Boolean(deps.sendEmail), publicBase: `${deps.baseUrl}/f/book/` });
@@ -111,6 +111,16 @@ export async function POST(request: Request) {
         const staffId = str(body.staffId, 120);
         if (!ctx.staff.some((s) => s.id === staffId) || !(ctx.admin || ctx.canManage || ctx.me?.id === staffId)) return fail("You can only change your own availability.", 403);
         return json({ availability: await saveStaffSettings(db, ownerId, staffId, body) });
+      }
+      case "getProfile": {
+        const staffId = str(body.staffId, 120);
+        if (!ctx.ws.staff.some((s) => s.id === staffId)) return fail("Team member not found.", 404);
+        return json({ profile: (await getStaffProfiles(db, ownerId, [staffId]))[staffId] || null });
+      }
+      case "saveProfile": {
+        const staffId = str(body.staffId, 120);
+        if (!ctx.ws.staff.some((s) => s.id === staffId) || !(ctx.admin || ctx.canManage || ctx.me?.id === staffId)) return fail("You can only change your own booking profile.", 403);
+        return json({ profile: await saveStaffProfile(db, ownerId, staffId, body.profile) });
       }
       case "rotateFeed": case "createFeed": {
         const staffId = str(body.staffId, 120);

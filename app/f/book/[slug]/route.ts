@@ -33,6 +33,13 @@ input:focus,textarea:focus,select:focus{outline:2px solid color-mix(in srgb,var(
 .done{padding:34px 22px;text-align:center}.tick{width:64px;height:64px;border-radius:50%;background:color-mix(in srgb,var(--brand) 14%,#fff);color:var(--brand);display:grid;place-items:center;margin:0 auto 14px;font-size:32px}
 .summary{background:var(--bg);border-radius:14px;padding:12px 14px;font-size:14px;margin-bottom:4px}.foot{text-align:center;color:var(--muted);font-size:12px;margin-top:14px}
 .skeleton{padding:40px;text-align:center;color:var(--muted)}
+.rate{display:block;margin-top:4px;font-size:12px;font-weight:700;color:#b45309}
+.profile{margin-top:14px;border:1px solid var(--line);border-radius:16px;padding:14px;display:grid;gap:10px;background:var(--bg)}
+.profile-top{display:flex;gap:10px;align-items:center}.profile-top>div:last-child{display:grid}.profile-top small{color:var(--muted);font-size:12px}
+.av.sm{width:46px;height:46px;margin:0;font-size:16px}.bio{margin:0;color:#334155;font-size:14px;line-height:1.5}
+.photos{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}.photos a{flex:0 0 auto}.photos img{width:120px;height:90px;object-fit:cover;border-radius:10px;display:block}
+.reviews{display:grid;gap:8px}.review{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px}.review>div{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.review small{color:var(--muted);font-size:11px}.review p{margin:6px 0 0;font-size:14px;line-height:1.5;color:#334155}
+.stars{color:#f59e0b;letter-spacing:1px;font-size:13px}.more{border:0;background:none;color:var(--brand);font:inherit;font-weight:700;cursor:pointer;justify-self:start;padding:0}
 </style></head><body><div class="wrap"><div class="card" id="app"><div class="skeleton">Loading…</div></div><div class="foot">Secure booking · powered by F2B Media</div></div>
 <script>
 (function(){
@@ -60,8 +67,9 @@ function render(){app.innerHTML="";var i=state.info;if(!i){app.appendChild(h("di
  var c=i.calendar;
  if(c.assignMode==="customer_pick"&&i.staff.length>1){var s=h("div",{class:"step"},[h("h2",{text:"1. Who would you like?"})]);var g=h("div",{class:"staff"});
   g.appendChild(h("button",{type:"button",class:"who"+(state.staffId===""?" on":""),on:{click:function(){pickStaff("")}}},[h("div",{class:"av",text:"★"}),h("b",{text:"Anyone available"}),h("small",{text:"Most times"})]));
-  i.staff.forEach(function(p){g.appendChild(h("button",{type:"button",class:"who"+(state.staffId===p.id?" on":""),on:{click:function(){pickStaff(p.id)}}},[h("div",{class:"av"},[p.avatar?h("img",{src:p.avatar,alt:""}):document.createTextNode(initials(p.name))]),h("b",{text:p.name}),p.title?h("small",{text:p.title}):null]))});
-  s.appendChild(g);app.appendChild(s)}
+  i.staff.forEach(function(p){var pr=p.profile;g.appendChild(h("button",{type:"button",class:"who"+(state.staffId===p.id?" on":""),on:{click:function(){pickStaff(p.id)}}},[h("div",{class:"av"},[p.avatar?h("img",{src:p.avatar,alt:""}):document.createTextNode(initials(p.name))]),h("b",{text:p.name}),p.title?h("small",{text:p.title}):null,pr&&pr.reviewCount?h("span",{class:"rate",text:"★ "+pr.rating.toFixed(1)+" · "+pr.reviewCount+" review"+(pr.reviewCount===1?"":"s")}):null]))});
+  s.appendChild(g);var chosen=i.staff.filter(function(p){return p.id===state.staffId})[0];if(chosen&&chosen.profile)s.appendChild(profilePanel(chosen));app.appendChild(s)}
+ else if(i.staff.length===1&&i.staff[0].profile){app.appendChild(h("div",{class:"step"},[profilePanel(i.staff[0])]))}
  else if(c.assignMode==="collective"&&i.staff.length){app.appendChild(h("div",{class:"step"},[h("div",{class:"muted",text:"You'll meet with "+i.staff.map(function(p){return p.name}).join(", ")+"."})]))}
  var n=(c.assignMode==="customer_pick"&&i.staff.length>1)?2:1;
  var step=h("div",{class:"step"},[h("h2",{text:n+". Pick a day"})]);
@@ -75,6 +83,13 @@ function render(){app.innerHTML="";var i=state.info;if(!i){app.appendChild(h("di
  if(state.slot){app.appendChild(MANAGE?renderReschedule(n+2):renderForm(n+2))}
  if(state.error)app.appendChild(h("div",{class:"step"},[h("div",{class:"err",text:state.error})]));
  resize()}
+function stars(n){return "★★★★★".slice(0,n)+"☆☆☆☆☆".slice(0,5-n)}
+function profilePanel(p){var pr=p.profile,box=h("div",{class:"profile"});
+ box.appendChild(h("div",{class:"profile-top"},[h("div",{class:"av sm"},[p.avatar?h("img",{src:p.avatar,alt:""}):document.createTextNode(initials(p.name))]),h("div",{},[h("b",{text:p.name}),pr.title?h("small",{text:pr.title}):null,pr.reviewCount?h("span",{class:"rate",text:"★ "+pr.rating.toFixed(1)+" from "+pr.reviewCount+" review"+(pr.reviewCount===1?"":"s")}):null])]));
+ if(pr.bio)box.appendChild(h("p",{class:"bio",text:pr.bio}));
+ if(pr.photos&&pr.photos.length){var strip=h("div",{class:"photos"});pr.photos.forEach(function(ph){strip.appendChild(h("a",{href:ph.url,target:"_blank",rel:"noopener",title:ph.caption||""},[h("img",{src:ph.url,alt:ph.caption||("Work by "+p.name),loading:"lazy"})]))});box.appendChild(strip)}
+ if(pr.reviews&&pr.reviews.length){var list=h("div",{class:"reviews"});var shown=state.allReviews?pr.reviews:pr.reviews.slice(0,3);shown.forEach(function(r){list.appendChild(h("div",{class:"review"},[h("div",{},[h("b",{text:r.author||"Customer"}),h("span",{class:"stars",text:stars(r.rating)}),r.source?h("small",{text:r.source}):null]),r.text?h("p",{text:r.text}):null]))});box.appendChild(list);if(pr.reviews.length>3&&!state.allReviews)box.appendChild(h("button",{type:"button",class:"more",on:{click:function(){state.allReviews=true;render()}},text:"Show all "+pr.reviews.length+" reviews"}))}
+ return box}
 function pickStaff(id){state.staffId=id;state.slot=null;state.slots={};loadSlots()}
 function renderForm(n){var c=state.info.calendar;var f=h("form",{id:"details",on:{submit:submit}});
  f.appendChild(h("div",{class:"summary",text:"📅 "+fmt(state.slot.start,{weekday:"long",day:"numeric",month:"long",hour:"2-digit",minute:"2-digit"})}));
