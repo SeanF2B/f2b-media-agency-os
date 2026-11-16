@@ -464,7 +464,7 @@ ${sorted.map((group, index) => `<section class="page"><div class="running">${esc
       const response = await fetch("/api/seo/saved-keywords", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId: client.id, ...body }) });
       const json = await response.json().catch(() => ({})) as SavedKeywordData & { message?: string; error?: string };
       if (!response.ok) throw new Error(json.error || "That change couldn’t be saved.");
-      setSaved({ groups: json.groups, keywords: json.keywords, tags: json.tags }); setSavedMsg(json.message || "");
+      setSaved({ groups: json.groups, keywords: json.keywords, tags: json.tags }); setSavedMsg(json.message ? `${json.message}${body.action === "save" || body.action === "createGroup" ? " Saved to this client’s Saved keywords tab (above)." : ""}` : "");
       return true;
     } catch (reason) { setSavedMsg(reason instanceof Error ? reason.message : "That change couldn’t be saved."); return false; }
     finally { setSavedBusy(false); }

@@ -182,17 +182,26 @@ export function SetupWizard({ kind, clientId, clientName, onOpenTab, onEditClien
     } catch (e) { setError(e instanceof Error ? e.message : "AI couldn’t draft this step."); }
     finally { setBusy(""); }
   };
-  const fillBrief = async () => {
+  const autoFilled = useRef("");
+  // Pull what's missing automatically when Setup opens: client record + the client's own site.
+  useEffect(() => {
+    if (!draft || autoFilled.current === clientId) return;
+    autoFilled.current = clientId;
+    if (!draft.brief.website.trim() || !draft.brief.services.trim() || !draft.brief.locations.trim() || !draft.brief.landingPages.trim()) void fillBrief(true);
+  }, [draft, clientId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [briefNote, setBriefNote] = useState("");
+  const fillBrief = async (auto = false) => {
     if (!draft) return;
     setBusy("brief"); setError("");
     try {
       const response = await fetch("/api/setup-drafts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "brief", kind, clientId, brief: draft.brief }) });
-      const json = await response.json().catch(() => ({})) as { suggestions?: Partial<SetupBrief>; error?: string };
+      const json = await response.json().catch(() => ({})) as { suggestions?: Partial<SetupBrief>; sources?: { pages: number; homepage: boolean }; error?: string };
       if (!response.ok || !json.suggestions) throw new Error(json.error || "AI couldn’t fill the gaps.");
+      setBriefNote(`AI pulled these from ${[json.sources?.pages ? `${json.sources.pages} site pages` : "", json.sources?.homepage ? "the live homepage" : "", "the client record"].filter(Boolean).join(", ")}. Check and edit anything that’s off.`);
       const patch: Partial<SetupBrief> = {};
       for (const [k, v] of Object.entries(json.suggestions)) if (v && !String(draft.brief[k as keyof SetupBrief] || "").trim()) patch[k as keyof SetupBrief] = v;
       setBrief(patch);
-    } catch (e) { setError(e instanceof Error ? e.message : "AI couldn’t fill the gaps."); }
+    } catch (e) { if (!auto) setError(e instanceof Error ? e.message : "AI couldn’t fill the gaps."); else setBriefNote("Couldn’t pull the details automatically. Fill them in or try “AI: fill the gaps”."); }
     finally { setBusy(""); }
   };
   const exportCsv = () => {
@@ -221,12 +230,13 @@ export function SetupWizard({ kind, clientId, clientName, onOpenTab, onEditClien
     </div>
 
     <section className={`sw-brief ${briefOpen ? "open" : ""}`}>
-      <button type="button" className="sw-brief-head" onClick={() => setBriefOpen((o) => !o)} aria-expanded={briefOpen}>{briefOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}<b>Business details</b><span>{missing.length ? `${missing.length} needed: ${missing.join(", ")}` : `${draft.brief.services.split(",").filter(Boolean).length} services · ${draft.brief.locations || "no areas"}`}</span></button>
+      <button type="button" className="sw-brief-head" onClick={() => setBriefOpen((o) => !o)} aria-expanded={briefOpen}>{briefOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}<b>Business details</b><span>{busy === "brief" ? "AI is pulling the details from the client’s site…" : missing.length ? `${missing.length} needed: ${missing.join(", ")}` : `${draft.brief.services.split(",").filter(Boolean).length} services · ${draft.brief.locations || "no areas"}`}</span></button>
       {briefOpen && <div className="sw-brief-body">
         <div className="sw-brief-grid">
           {([["website", "Website"], ["services", "Services (comma-separated)"], ["locations", "Areas served"], ["audience", "Ideal customer"], ["landingPages", "Landing pages (one per line)"], ["notes", "Anything else (offers, proof points, what to avoid)"]] as Array<[keyof SetupBrief, string]>).map(([key, label]) => <label key={key} className={key === "landingPages" || key === "notes" ? "wide" : ""}><span>{label}{(["website", "services", "locations"] as string[]).includes(key) && !draft.brief[key].trim() && <em>Needed</em>}</span>{key === "landingPages" || key === "notes" ? <textarea rows={3} value={draft.brief[key]} onChange={(e) => setBrief({ [key]: e.target.value })} /> : <input value={draft.brief[key]} onChange={(e) => setBrief({ [key]: e.target.value })} />}</label>)}
         </div>
-        <div className="sw-row"><button type="button" className="secondary-button" disabled={busy === "brief"} onClick={() => void fillBrief()}><Wand2 size={15} /> {busy === "brief" ? "Filling…" : "AI: fill the gaps"}</button>{!draft.brief.website && onEditClient && <button type="button" className="text-button" onClick={onEditClient}>Add client website</button>}<small>Saved with this setup only; your client record isn’t changed.</small></div>
+        <div className="sw-row"><button type="button" className="secondary-button" disabled={busy === "brief"} onClick={() => void fillBrief()}><Wand2 size={15} /> {busy === "brief" ? "Pulling details…" : "AI: fill the gaps"}</button>{!draft.brief.website && onEditClient && <button type="button" className="text-button" onClick={onEditClient}>Add client website</button>}<small>Saved with this setup only; your client record isn’t changed.</small></div>
+        {briefNote && <p className="sw-note"><Sparkles size={13} /> {briefNote}</p>}
       </div>}
     </section>
 
