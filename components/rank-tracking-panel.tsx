@@ -18,12 +18,13 @@ export function RankTrackingPanel({ clientId, clientName, defaultLocation }: { c
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [filter, setFilter] = useState("");
+  const [ready, setReady] = useState(true);
   const call = async (body: Record<string, unknown>) => {
     const response = await fetch("/api/seo/rank-tracking", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId, ...body }) });
     const json = await response.json().catch(() => ({})) as { error?: string; status?: string; message?: string; keywords?: Tracked[]; costUsd?: number; checked?: number; added?: number };
     return { response, json };
   };
-  useEffect(() => { fetch(`/api/seo/rank-tracking?clientId=${encodeURIComponent(clientId)}`, { cache: "no-store" }).then((r) => r.json()).then((json: { keywords?: Tracked[]; clientHost?: string }) => { setRows(json.keywords || []); setHost(json.clientHost || ""); }).catch(() => undefined); }, [clientId]);
+  useEffect(() => { fetch(`/api/seo/rank-tracking?clientId=${encodeURIComponent(clientId)}`, { cache: "no-store" }).then((r) => r.json()).then((json: { keywords?: Tracked[]; clientHost?: string; ready?: boolean }) => { setRows(json.keywords || []); setHost(json.clientHost || ""); setReady(json.ready !== false); }).catch(() => undefined); }, [clientId]);
   const add = async () => {
     setBusy(true); setMsg("");
     const { response, json } = await call({ action: "add", keywords: input.split(/[\n,]/), location, device, group });
@@ -33,6 +34,8 @@ export function RankTrackingPanel({ clientId, clientName, defaultLocation }: { c
   };
   const check = async (ids?: string[]) => {
     setBusy(true); setMsg("");
+    // One click: anything typed in the box is added first, then checked.
+    if (!ids && input.trim()) { const added = await call({ action: "add", keywords: input.split(/[\n,]/), location, device, group }); if (!added.response.ok) { setBusy(false); setMsg(added.json.error || "Couldn’t add keywords."); return; } setRows(added.json.keywords || []); setInput(""); }
     const comp = competitors.split(",").map((item) => item.trim()).filter(Boolean);
     let { response, json } = await call({ action: "check", ids, competitors: comp });
     if (response.status === 409 && json.status === "confirmation_required") {
@@ -55,13 +58,14 @@ export function RankTrackingPanel({ clientId, clientName, defaultLocation }: { c
   };
 
   return <div className="rank">
+    {(!ready || !host) && <div className="rank-setup" role="status">{!ready && <p>🔌 <b>DataForSEO isn’t connected.</b> Add a key named “DataForSEO” (value <code>login:password</code>) in Settings → APIs, then “Check rankings” will work.</p>}{!host && <p>🌐 <b>{clientName} has no website saved.</b> Add it in the client profile so positions can be matched to their site.</p>}</div>}
     <div className="aiv-form">
       <label className="aiv-wide"><span>Keywords to track (one per line or comma-separated)</span><textarea rows={2} value={input} onChange={(event) => setInput(event.target.value)} placeholder="roof repair galway, roofers near me" /></label>
       <label><span>Location (DataForSEO name, e.g. Galway,Ireland)</span><input value={location} onChange={(event) => setLocation(event.target.value)} /></label>
       <label><span>Device</span><select value={device} onChange={(event) => setDevice(event.target.value)}><option value="desktop">Desktop</option><option value="mobile">Mobile</option></select></label>
       <label><span>Group (optional)</span><input value={group} onChange={(event) => setGroup(event.target.value)} placeholder="Services, Areas…" /></label>
       <label><span>Competitor websites to compare</span><input value={competitors} onChange={(event) => setCompetitors(event.target.value)} placeholder="competitor.ie, other.ie" /></label>
-      <span className="rank-actions"><button type="button" className="secondary-button" disabled={busy || !input.trim()} onClick={() => void add()}>Add keywords</button><button type="button" className="primary-button" disabled={busy || !rows.length} onClick={() => void check()}>{busy ? "Working…" : "Check rankings"}</button>{rows.length > 0 && <button type="button" className="text-button" onClick={exportCsv}>Export CSV</button>}</span>
+      <span className="rank-actions"><button type="button" className="secondary-button" disabled={busy || !input.trim()} onClick={() => void add()}>Add keywords</button><button type="button" className="primary-button" disabled={busy || (!rows.length && !input.trim())} onClick={() => void check()}>{busy ? "Working…" : "Check rankings"}</button>{rows.length > 0 && <button type="button" className="text-button" onClick={exportCsv}>Export CSV</button>}</span>
     </div>
     {msg && <p className="ops-notice" role="status">{msg}</p>}
     <p className="muted aiv-note">Live Google positions for {host || "the client’s website"} from DataForSEO, per location and device. This is separate from Search Console’s average position. Each keyword is checked at most once a day; up to 50 keywords per client.</p>
