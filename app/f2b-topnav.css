@@ -1623,3 +1623,5 @@ html body .app-shell .tt-table tbody tr.tt-row:nth-child(odd) td { background: r
 html body .app-shell .tt-table tbody tr.tt-row:nth-child(even) td { background: transparent; }
 html body .app-shell .tt-table tbody tr.tt-row:hover td { background: color-mix(in srgb, var(--brand-primary, #1f6feb) 8%, transparent) !important; }
 html body .app-shell .tt-row:last-child td:first-child, html body .app-shell .tt-row:last-child td:last-child { border-radius: 0 !important; }
+/* Task group toggle: no box on hover/focus/click */
+html body .app-shell :is(.tt-group-toggle, .tt-group-toggle:hover, .tt-group-toggle:focus, .tt-group-toggle:active, .tt-group-toggle:focus-visible, #f2b-tt-tg) { border: 0 !important; outline: 0 !important; box-shadow: none !important; background: transparent !important; transform: none !important; padding: 0 !important; }
