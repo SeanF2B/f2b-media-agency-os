@@ -1207,3 +1207,9 @@ html body .app-shell .tt-quick-add { width: 26px; height: 26px; border-radius: 9
 html body .app-shell .tt-quick-add:hover { opacity: 1; transform: scale(1.08); background: var(--brand-primary, #1f6feb); color: #fff; border-color: transparent; }
 html body .app-shell .tt-row:last-child td:first-child { border-bottom-left-radius: 14px; }
 html body .app-shell .tt-row:last-child td:last-child { border-bottom-right-radius: 14px; }
+/* Chat widget: the blinking AI bot (same as the mobile logo) */
+html body .ai-chat-eyes { display: grid; place-items: center; width: 100%; height: 100%; border-radius: inherit; background: color-mix(in srgb, var(--brand-primary, #3b82f6) 14%, #fff); }
+html body.f2b-dark .ai-chat-eyes { background: #1d2733; }
+html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-icon { transform: scale(2.1); }
+html body .ai-chat-eyes .ai-eyes-face i { animation: tn-bot-blink 2.6s ease-in-out infinite; }
+html body .ai-chat-eyes .ai-eyes-face i:nth-child(2) { animation-delay: .08s; }
