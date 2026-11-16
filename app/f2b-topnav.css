@@ -2578,3 +2578,6 @@ html body .app-shell .pipeline-card.is-compact .task-pending-chip { margin: 0 0 
 html body .app-shell .pipeline-card.is-compact .pipeline-card-details > summary { padding: 4px 0 !important; gap: 10px !important; align-items: center; }
 html body .app-shell .pipeline-card.is-compact .task-client-mark { flex: none; border-radius: 10px; }
 html body .app-shell .pipeline-card.is-compact .task-card-open-button { margin-right: 0; flex: none; }
+
+/* Reports → Keywords: research/pick tool above the report builder */
+html body .app-shell .ops-kw-picker { margin-bottom: 16px; }

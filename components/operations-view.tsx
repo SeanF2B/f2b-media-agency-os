@@ -247,6 +247,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
 
     {tab === "reports" && renderTool && selected && <>
       <div className="ops-subbar">{seg(reportMode, setReportMode, [["reports", "Client reports"], ["audits", "Audits"], ["report-keywords", "Keywords"]], "Reports sections")}</div>
+      {reportMode === "report-keywords" && <div className="ops-embed ops-kw-picker" key={`rep-kwpick-${selected.id}`}>{renderTool("seo-keywords", selected.id)}</div>}
       <div className="ops-embed" key={`rep-${reportMode}-${selected.id}`}>{renderTool(reportMode, selected.id)}</div>
     </>}
     {tab === "seo" && seoMode === "ai" && selected && <>
