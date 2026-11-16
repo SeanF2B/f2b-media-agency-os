@@ -2290,3 +2290,34 @@ html body .app-shell .ops-template-card header { display: grid; gap: 4px; }
 html body .app-shell .ops-template-card small { opacity: .7; font-size: 12px; }
 html body .app-shell .ops-template-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 html body .app-shell .ops-template-actions select { padding: 6px 8px; border-radius: 9px; border: 1px solid var(--f2b-border, #d9dee3); font: inherit; font-size: 13px; background: transparent; color: inherit; }
+/* Client workroom → Reports folder */
+html body .app-shell .cfolder { display: grid; gap: 10px; }
+html body .app-shell .cfolder-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+html body .app-shell .cfolder-tabs { display: inline-flex; gap: 3px; padding: 3px; border-radius: 11px; background: color-mix(in srgb, currentColor 6%, transparent); }
+html body .app-shell .cfolder-tabs button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; color: inherit; font: inherit; font-size: 13px; font-weight: 700; padding: 5px 11px; border-radius: 8px; cursor: pointer; }
+html body .app-shell .cfolder-tabs button i { font-style: normal; font-size: 11px; opacity: .7; }
+html body .app-shell .cfolder-tabs button.on { background: var(--brand-primary, #0b74b8); color: #fff; }
+html body .app-shell .cfolder-filters { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+html body .app-shell .cfolder-filters label { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--f2b-border, #d9dee3); border-radius: 9px; padding: 0 8px; background: var(--f2b-white, #fff); }
+html body .app-shell.dark-mode .cfolder-filters label { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.14); }
+html body .app-shell .cfolder-filters :is(select, input) { border: 0 !important; background: transparent !important; color: inherit; font: inherit; font-size: 13px; padding: 6px 2px !important; box-shadow: none !important; }
+html body .app-shell .cfolder-list { display: grid; gap: 6px; }
+html body .app-shell .cfolder-item { border: 1px solid var(--f2b-border, #d9dee3); border-radius: 12px; overflow: hidden; }
+html body .app-shell .cfolder-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 9px 12px; border: 1px solid var(--f2b-border, #d9dee3); border-radius: 12px; background: var(--f2b-white, #fff); color: inherit; font: inherit; cursor: pointer; list-style: none; }
+html body .app-shell .cfolder-item .cfolder-row { border: 0; border-radius: 0; }
+html body .app-shell.dark-mode .cfolder-row { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.14); }
+html body .app-shell .cfolder-row::-webkit-details-marker { display: none; }
+html body .app-shell .cfolder-main { flex: 1; min-width: 0; display: grid; }
+html body .app-shell .cfolder-main small { opacity: .7; font-size: 12px; }
+html body .app-shell .cfolder-badge { flex: none; font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 999px; background: #eef1f4; color: #344054; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html body .app-shell .cfolder-badge.ads { background: #e0f2fe; color: #075985; }
+html body .app-shell .cfolder-badge.seo { background: #dcfae6; color: #067647; }
+html body .app-shell .cfolder-badge.audit { background: #fef0c7; color: #93370d; }
+html body .app-shell .cfolder-badge.kw { background: #ede9fe; color: #5b21b6; }
+html body .app-shell .cfolder-detail { padding: 8px 14px 12px; font-size: 13.5px; }
+html body .app-shell .cfolder-detail ul { margin: 6px 0 0; padding-left: 16px; display: grid; gap: 6px; }
+html body .app-shell .cfolder-detail li small { display: block; opacity: .75; }
+html body .app-shell .cfolder-pri { text-transform: uppercase; font-size: 10px; margin-right: 4px; }
+html body .app-shell .cfolder-pri.high { color: #b42318; }
+html body .app-shell .cfolder-kw { width: 100%; border-collapse: collapse; font-size: 13px; }
+html body .app-shell .cfolder-kw th, html body .app-shell .cfolder-kw td { text-align: left; padding: 4px 6px; border-bottom: 1px solid rgba(127,138,160,.18); }

@@ -53,6 +53,8 @@ export function ClientReportsView({ clientId, clientName }: { clientId: string; 
       const response = await fetch(`/api/client-reports?${query}&format=html`, { cache: "no-store" });
       if (!response.ok) { const payload = await response.json().catch(() => ({})) as { error?: string }; throw new Error(payload.error || "The report could not be generated."); }
       setHtml(await response.text()); setLoadedAt(new Date().toISOString());
+      // Every generated report is filed in the client's Reports folder automatically (once per type and period).
+      if (!quiet) autoSaveRef.current?.();
     } catch (reason) { if (!quiet) setError(reason instanceof Error ? reason.message : "The report could not be generated."); }
     finally { if (!quiet) setBusy(false); }
   }, [query]);
@@ -65,13 +67,15 @@ export function ClientReportsView({ clientId, clientName }: { clientId: string; 
 
   const download = () => { const win = frame.current?.contentWindow; if (!win) return; win.focus(); win.print(); };
   const openTab = (content = html) => { const win = window.open("", "_blank"); if (!win) { setError("Allow pop-ups for this site to open the report."); return; } win.document.open(); win.document.write(content.replace("</body>", `<button onclick="print()" style="position:fixed;top:14px;right:14px;padding:10px 16px;border:0;border-radius:10px;background:#1f6feb;color:#fff;font:600 14px system-ui;cursor:pointer;z-index:9" class="no-print">Download PDF</button><style>@media print{.no-print{display:none}}</style></body>`)); win.document.close(); };
-  const save = async () => {
+  const autoSaveRef = useRef<(() => void) | null>(null);
+  autoSaveRef.current = () => { if (!history.some((item) => item.type === type && item.periodStart === range.start && item.periodEnd === range.end)) void save(true); };
+  const save = async (auto = false) => {
     setSaving(true); setError("");
     try {
       const response = await fetch("/api/client-reports", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId, type, start: range.start, end: range.end }) });
       const payload = await response.json() as { error?: string; reports?: Saved[] };
       if (!response.ok) throw new Error(payload.error || "The report could not be saved.");
-      setHistory(payload.reports || []); setNotice("Saved to this client's report history.");
+      setHistory(payload.reports || []); setNotice(auto ? "Saved to this client's Reports folder." : "Saved to this client's report history.");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "The report could not be saved."); }
     finally { setSaving(false); }
   };
