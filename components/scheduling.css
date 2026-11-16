@@ -319,3 +319,27 @@ html body .app-shell.dark-mode .sch-dash-panel-tools .sch-seg button.on{backgrou
 .sch-lb-close{position:absolute;top:18px;right:18px;width:40px;height:40px;border-radius:50%;border:0;background:rgba(255,255,255,.15);color:#fff;font-size:22px;cursor:pointer}
 .sch-lb-nav{position:absolute;top:50%;transform:translateY(-50%);width:46px;height:46px;border-radius:50%;border:0;background:rgba(255,255,255,.15);color:#fff;font-size:28px;cursor:pointer}
 .sch-lb-nav.prev{left:18px}.sch-lb-nav.next{right:18px}
+/* Staff timeline (dashboard day view) */
+.sch-tl{display:grid;gap:2px}
+.sch-tl-axis,.sch-tl-row{display:grid;grid-template-columns:minmax(150px,210px) 1fr 96px;gap:14px;align-items:center}
+.sch-tl-hours{position:relative;height:18px}
+.sch-tl-hours em{position:absolute;top:0;transform:translateX(-50%);font-style:normal;font-size:10.5px;font-weight:700;color:#98a2b3;white-space:nowrap}
+.sch-tl-row{padding:8px 4px;border-radius:12px;transition:background .14s}
+.sch-tl-row:hover{background:color-mix(in srgb,var(--brand-primary,#3b82f6) 5%,transparent)}
+.sch-tl-who{display:flex;align-items:center;gap:10px;min-width:0}
+.sch-tl-who>span{display:grid;min-width:0}
+.sch-tl-who b{font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sch-tl-who small{font-size:11.5px;color:#7b8a93;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sch-tl-who .sch-tl-next{color:var(--brand-primary,#2563eb);font-weight:700}
+.sch-tl-track{position:relative;height:34px;border-radius:10px;background:#f2f4f6;overflow:hidden}
+.sch-tl-grid{position:absolute;top:0;bottom:0;width:1px;background:rgba(127,138,160,.18)}
+.sch-tl-free{position:absolute;top:0;bottom:0;background:#e8f8ee}
+.sch-tl-item{position:absolute;top:4px;bottom:4px;border:0;border-radius:7px;background:color-mix(in srgb,var(--c) 22%,#fff);border-left:3px solid var(--c);color:#0f172a;font:inherit;font-size:11px;display:flex;align-items:center;gap:5px;padding:0 6px;overflow:hidden;white-space:nowrap;cursor:pointer;transition:transform .12s,box-shadow .12s}
+.sch-tl-item:hover{transform:translateY(-1px);box-shadow:0 4px 12px color-mix(in srgb,var(--c) 35%,transparent);z-index:2}
+.sch-tl-item b{font-size:10.5px}.sch-tl-item span{overflow:hidden;text-overflow:ellipsis;color:#475467}
+.sch-tl-item.cancelled{opacity:.4;text-decoration:line-through}.sch-tl-item.completed{opacity:.7}.sch-tl-item.no_show{background:#fee2e2;border-left-color:#dc2626}
+.sch-tl-now{position:absolute;top:-2px;bottom:-2px;width:2px;background:#ef4444;border-radius:2px;z-index:3}
+.sch-tl-row.off .sch-tl-track{background:repeating-linear-gradient(45deg,#f1f5f9,#f1f5f9 5px,#e7edf1 5px,#e7edf1 10px)}
+.sch-tl-row .sch-avail-pill{justify-self:end}
+.app-shell.dark-mode .sch-tl-track{background:#222b31}.app-shell.dark-mode .sch-tl-free{background:#16302a}.app-shell.dark-mode .sch-tl-item{background:color-mix(in srgb,var(--c) 30%,#1a2025);color:#f1f5f9}.app-shell.dark-mode .sch-tl-item span{color:#cbd5e1}
+@media(max-width:760px){.sch-tl-axis{display:none}.sch-tl-row{grid-template-columns:1fr auto}.sch-tl-track{grid-column:1/-1;order:3}}

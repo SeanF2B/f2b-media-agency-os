@@ -911,15 +911,33 @@ export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, c
         <div className="sch-dash-stats"><span><b>{dayList.length}</b> booked</span><span><b>{dayList.filter((b) => Date.parse(b.start) > Date.now()).length}</b> to come</span><span><b>{dayList.filter((b) => b.status === "completed" || Date.parse(b.end) < Date.now()).length}</b> done</span></div>
         {dayList.length ? <ul className="sch-dash-list">{dayList.map((b) => { const cal = calById.get(b.calendarId); return <li key={b.id} onClick={() => setDetail(b)}><time>{time(b.start)}</time>{b.staffIds.length ? <span className="sch-dash-avs">{b.staffIds.slice(0, 2).map((id) => <Avatar key={id} person={personOf(id)} size={30} />)}</span> : <span className="sch-dash-av" style={{ ["--c" as string]: cal?.color || "#2563eb" }}>{(b.name || "?").slice(0, 1).toUpperCase()}</span>}<span className="sch-dash-who"><b>{b.name}</b><small>{cal?.name || ""}{b.staffIds.length ? ` · ${b.staffIds.map(nameOf).filter(Boolean).join(", ")}` : ""}</small></span>{bookingPhoto(b) ? <img className="sch-dash-thumb" src={bookingPhoto(b)} alt="" loading="lazy" /> : null}</li>; })}</ul> : <p className="dh-muted">Nothing booked{isToday ? " today" : " this day"}.</p>}
       </div>
-      <div className="sch-avail-list">{staff.map((p) => {
-        const off = p.blocked?.includes(key); const windows = off ? [] : p.weekly?.[dk] || [];
-        const booked = dayList.filter((b) => b.staffIds.includes(p.id)).map((b) => { const s0 = new Date(b.start), e0 = new Date(b.end); return [s0.getHours() * 60 + s0.getMinutes(), e0.getHours() * 60 + e0.getMinutes()] as const; });
-        const start = windows.length ? mins(windows[0][0]) : 0, end = windows.length ? mins(windows[windows.length - 1][1]) : 1;
-        const total = windows.reduce((n, w) => n + mins(w[1]) - mins(w[0]), 0), used = booked.reduce((n, [a, z]) => n + Math.max(0, Math.min(z, end) - Math.max(a, start)), 0), free = Math.max(0, total - used);
-        const summary = off ? "Day off" : !windows.length ? "Not working" : !booked.length ? "Free all day" : free ? `${Math.floor(free / 60)}h${free % 60 ? ` ${free % 60}m` : ""} free` : "Fully booked";
-        return <div key={p.id} className={`sch-avail-row${!windows.length ? " off" : ""}`}><Avatar person={p} size={32} /><div className="sch-avail-name"><b>{p.name.split("|")[0].trim()}</b><small>{windows.length ? `${windows[0][0]}–${windows[windows.length - 1][1]}` : p.role}</small></div>
-          <div className="sch-avail-track" aria-hidden="true">{windows.map((w, i) => <i key={`w${i}`} className="free" style={{ left: `${((mins(w[0]) - start) / Math.max(1, end - start)) * 100}%`, width: `${((mins(w[1]) - mins(w[0])) / Math.max(1, end - start)) * 100}%` }} />)}{booked.map(([a, z], i) => <i key={`b${i}`} className="booked" style={{ left: `${((Math.max(a, start) - start) / Math.max(1, end - start)) * 100}%`, width: `${((Math.min(z, end) - Math.max(a, start)) / Math.max(1, end - start)) * 100}%` }} />)}</div>
-          <span className={`sch-avail-pill ${!windows.length ? "off" : !booked.length ? "free" : free ? "some" : "full"}`}>{summary}</span></div>; })}</div>
+      {(() => { // Staff timeline: shared hour axis, each booking drawn on its own row
+        const rows = staff.map((p) => { const off = p.blocked?.includes(key); const windows = off ? [] : p.weekly?.[dk] || []; const items = dayList.filter((b) => b.staffIds.includes(p.id)); return { p, off, windows, items }; });
+        const starts = rows.flatMap((r) => r.windows.map((w) => mins(w[0]))).concat(dayList.map((b) => { const d = new Date(b.start); return d.getHours() * 60 + d.getMinutes(); }));
+        const ends = rows.flatMap((r) => r.windows.map((w) => mins(w[1]))).concat(dayList.map((b) => { const d = new Date(b.end); return d.getHours() * 60 + d.getMinutes(); }));
+        const from = Math.floor((starts.length ? Math.min(...starts) : 540) / 60) * 60, to = Math.ceil((ends.length ? Math.max(...ends) : 1050) / 60) * 60;
+        const span = Math.max(60, to - from); const pct = (m: number) => `${Math.max(0, Math.min(100, ((m - from) / span) * 100))}%`;
+        const hours = Array.from({ length: span / 60 + 1 }, (_, i) => from + i * 60);
+        const nowM = new Date().getHours() * 60 + new Date().getMinutes();
+        return <div className="sch-tl">
+          <div className="sch-tl-axis"><span /><div className="sch-tl-hours">{hours.map((h) => <em key={h} style={{ left: pct(h) }}>{String(Math.floor(h / 60)).padStart(2, "0")}:00</em>)}</div><span /></div>
+          {rows.map(({ p, off, windows, items }) => {
+            const total = windows.reduce((n, w) => n + mins(w[1]) - mins(w[0]), 0);
+            const used = items.reduce((n, b) => n + (Date.parse(b.end) - Date.parse(b.start)) / 60000, 0); const free = Math.max(0, total - used);
+            const next = items.find((b) => Date.parse(b.start) > Date.now());
+            const summary = off ? "Day off" : !windows.length ? "Not working" : !items.length ? "Free all day" : free ? `${Math.floor(free / 60)}h${free % 60 ? ` ${Math.round(free % 60)}m` : ""} free` : "Fully booked";
+            return <div key={p.id} className={`sch-tl-row${!windows.length ? " off" : ""}`}>
+              <div className="sch-tl-who"><Avatar person={p} size={34} /><span><b>{p.name.split("|")[0].trim()}</b><small>{windows.length ? `${windows[0][0]}–${windows[windows.length - 1][1]}` : off ? "Day off" : "Not working"}{items.length ? ` · ${items.length} booked · ${Math.round(used / 6) / 10}h` : ""}</small>{next && isToday ? <small className="sch-tl-next">Next {time(next.start)} · {next.name.split(" ")[0]}</small> : null}</span></div>
+              <div className="sch-tl-track">
+                {hours.map((h) => <i key={h} className="sch-tl-grid" style={{ left: pct(h) }} />)}
+                {windows.map((w, i) => <i key={`w${i}`} className="sch-tl-free" style={{ left: pct(mins(w[0])), width: `calc(${pct(mins(w[1]))} - ${pct(mins(w[0]))})` }} />)}
+                {items.map((b) => { const s0 = new Date(b.start), e0 = new Date(b.end); const a0 = s0.getHours() * 60 + s0.getMinutes(), z0 = e0.getHours() * 60 + e0.getMinutes(); const cal = calById.get(b.calendarId); const wide = (z0 - a0) / span > 0.1;
+                  return <button key={b.id} type="button" className={`sch-tl-item ${b.status}`} style={{ left: pct(a0), width: `calc(${pct(z0)} - ${pct(a0)})`, ["--c" as string]: cal?.color || "var(--brand-primary,#2563eb)" }} title={`${time(b.start)}–${time(b.end)} · ${b.name} · ${cal?.name || ""}`} onClick={() => setDetail(b)}>{wide ? <><b>{time(b.start)}</b><span>{b.name.split(" ")[0]}</span></> : null}</button>; })}
+                {isToday && nowM > from && nowM < to && <i className="sch-tl-now" style={{ left: pct(nowM) }} />}
+              </div>
+              <span className={`sch-avail-pill ${!windows.length ? "off" : !items.length ? "free" : free ? "some" : "full"}`}>{summary}</span>
+            </div>; })}
+        </div>; })()}
     </div> : <div className="sch-dash-week">{Array.from({ length: 7 }, (_, i) => addDays(week, i)).map((d) => { const k = ymd(d); const list = bookings.filter((b) => ymd(new Date(b.start)) === k).sort((a, b) => a.start.localeCompare(b.start)); return <div key={k} className={`sch-dash-wday${k === ymd(new Date()) ? " today" : ""}`}>
       <button type="button" className="sch-dash-wday-head" onClick={() => { setDay(d); setMode("day"); }}><small>{d.toLocaleDateString("en-IE", { weekday: "short" })}</small><b>{d.getDate()}</b>{list.length > 0 && <em>{list.length}</em>}</button>
       <div className="sch-dash-wday-body">{list.length ? list.slice(0, 6).map((b) => { const cal = calById.get(b.calendarId); return <button type="button" key={b.id} className="sch-dash-chip" style={{ ["--c" as string]: cal?.color || "#2563eb" }} onClick={() => setDetail(b)} title={`${time(b.start)} ${b.name} · ${cal?.name || ""}`}><span className="sch-chip-top"><b>{time(b.start)}</b><span className="sch-chip-avs">{b.staffIds.slice(0, 2).map((id) => <Avatar key={id} person={personOf(id)} size={20} />)}</span></span><span>{b.name}</span>{(() => { const pic = bookingPhoto(b); return pic ? <img className="sch-chip-img" src={pic} alt="" loading="lazy" onError={(ev) => { (ev.currentTarget as HTMLImageElement).style.display = "none"; }} /> : null; })()}</button>; }) : <span className="sch-dash-free">Free</span>}{list.length > 6 && <small className="iv-small">+{list.length - 6} more</small>}</div>
