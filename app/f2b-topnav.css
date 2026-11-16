@@ -1646,3 +1646,24 @@ html body .app-shell :is(.tt-group-toggle, .tt-group-toggle:hover, .tt-group-tog
   html body .app-shell .pipeline-toolbar { flex-wrap: wrap !important; max-width: 100%; }
   html body .app-shell .pipeline-toolbar select { max-width: 100% !important; }
 }
+/* ===== Mobile: straight to the point on every section ===== */
+@media (max-width: 860px) {
+  /* page headers: title + main action on one line, no eyebrow/description */
+  html body .app-shell :is(.page-heading, .welcome-row, .crm-heading, .iv-head, .activity-page-heading) :is(.eyebrow, p.muted, .muted, .crm-eyebrow) { display: none !important; }
+  html body .app-shell :is(.page-heading, .iv-head) > div:first-child > p:not(.eyebrow) { display: none !important; }
+  html body .app-shell :is(.page-heading, .welcome-row, .iv-head) { display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: space-between; gap: 10px; flex-wrap: nowrap !important; margin-bottom: 10px !important; }
+  html body .app-shell :is(.page-heading, .welcome-row, .iv-head) h1 { font-size: 26px !important; line-height: 1.1; margin: 0 !important; }
+  html body .app-shell :is(.page-heading, .iv-head) :is(.primary-button) { padding: 9px 12px !important; font-size: 13px !important; white-space: nowrap; }
+  /* Tasks: hide secondary header buttons, compact toggles */
+  html body .app-shell .task-heading-actions { display: flex !important; gap: 6px; flex-wrap: nowrap; }
+  html body .app-shell .task-heading-actions .task-sound-toggle { display: none !important; }
+  html body .app-shell .task-view-switch-row { display: flex !important; flex-wrap: nowrap !important; gap: 8px !important; }
+  html body .app-shell .task-view-switch-row > label { flex: 1 1 0; min-width: 0; padding: 8px 10px !important; margin: 0 !important; }
+  html body .app-shell .pipeline-toolbar > div:first-child { display: none !important; }
+  html body .app-shell .pipeline-toolbar { padding: 8px !important; gap: 6px !important; }
+  html body .app-shell .pipeline-toolbar label > span { display: none !important; }
+  html body .app-shell .pipeline-toolbar label { flex: 1 1 45%; }
+  html body .app-shell .pipeline-toolbar select { width: 100% !important; max-width: none !important; }
+  /* generic: hide long helper paragraphs under section headers */
+  html body .app-shell :is(.panel-heading, .lead-section-heading, .iv-card-head) > div > p { display: none !important; }
+}
