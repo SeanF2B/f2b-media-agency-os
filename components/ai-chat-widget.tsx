@@ -119,7 +119,7 @@ export function AiChatWidget({ page, pageName, clientId, avatar, enabled, onComm
     if (seen) return;
     const timer = window.setTimeout(() => {
       try { window.localStorage.setItem("f2b-ai-intro", "1"); } catch { /* ignore */ }
-      setToast({ text: "Hi, I’m your AI assistant 👋 I can add leads, tasks and expenses for you, and show you around. Want a quick tour of the CRM?", action: { label: "Show me", run: () => startTour("CRM") } });
+      setToast({ text: "Hey boss 👋 I’m your AI assistant. Quick tour?", action: { label: "Show me", run: () => startTour("CRM") } });
     }, 2500);
     return () => window.clearTimeout(timer);
   }, [enabled]);
@@ -149,17 +149,35 @@ export function AiChatWidget({ page, pageName, clientId, avatar, enabled, onComm
   }, [enabled, clientId]);
 
   // When the page changes, the open chat says where we are.
-  useEffect(() => { if (open) { say(`You’re on ${label}. ${TOURS[page] ? "Want a quick tour of this page?" : "What would you like to do here?"}`, TOURS[page] ? [{ label: `Tour ${label}`, run: () => startTour(page) }] : undefined); recommendHere(); } }, [page]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (open) { setMessages([]); window.setTimeout(() => openChat(true), 0); } }, [page]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" }); }, [messages, open]);
 
   const openWithSuggestions = (list: Suggestion[]) => {
     setToast(null); setOpen(true);
     say(list.length ? "Here’s what I’d do next. Tap one to create the task:" : "Nothing waiting right now. 🎉", list.slice(0, 6).map((item) => ({ label: item.title, run: () => onSuggestion(item) })));
   };
-  const openChat = () => {
+  const openChat = (force = false) => {
     setToast(null); setOpen(true);
-    if (!messages.length) say(`Hi! I’m your AI assistant. You’re on ${label} — I can add leads, tasks, expenses and clients, open any section, or give you a tour.`, [...(TOURS[page] ? [{ label: `Tour ${label}`, run: () => startTour(page) }] : [{ label: "Tour the CRM", run: () => startTour("CRM") }]), { label: "Raise a support ticket", run: openTicket }, ...(suggestions.length ? [{ label: `Everything waiting (${suggestions.length})`, run: () => openWithSuggestions(suggestions) }] : [])]);
-    recommendHere();
+    if (messages.length && !force) return;
+    // Short, page-aware hello with the next useful actions.
+    const here = forPage(suggestions, page);
+    const people = here.filter((item) => /lead|conversation|reply|follow/i.test(`${item.source || ""} ${item.title}`));
+    const nameOf = (item: Suggestion) => item.title.replace(/^(follow up( with)?|reply to|call|contact)\s+/i, "").replace(/\s*[·:-].*$/, "").trim();
+    const line: Record<string, string> = {
+      Overview: suggestions.length ? `${suggestions.length} thing${suggestions.length === 1 ? "" : "s"} waiting today.` : "All quiet today.",
+      CRM: people.length ? `${people.length} lead${people.length === 1 ? "" : "s"} could use a follow-up.` : "Pipeline’s up to date.",
+      Conversations: people.length ? `${people.length} conversation${people.length === 1 ? "" : "s"} waiting on you.` : "Inbox is clear.",
+      Tasks: here.length ? `${here.length} task idea${here.length === 1 ? "" : "s"} from approvals and messages.` : "Nothing urgent on tasks.",
+      Bookkeeping: "Log an expense or a receipt?",
+      Scheduling: "Want to book something in?",
+      "Lead Factory": "Find new businesses to contact?",
+    };
+    const actions: NonNullable<Msg["actions"]> = [];
+    for (const item of people.slice(0, 2)) { const who = nameOf(item); if (who) actions.push({ label: `📅 Book ${who} in`, run: () => { onNavigate("Scheduling"); setOpen(false); } }); }
+    for (const item of here.filter((x) => !people.includes(x)).slice(0, 3 - actions.length)) actions.push({ label: item.title, run: () => onSuggestion(item) });
+    if (!actions.length && page === "Overview" && suggestions.length) actions.push({ label: `See all ${suggestions.length}`, run: () => openWithSuggestions(suggestions) });
+    if (!actions.length && PAGE_HELP[page]) actions.push(...PAGE_HELP[page].slice(0, 2).map((text) => ({ label: text, run: () => void ask(text) })));
+    say(`Hey boss 👋 ${line[page] || `What can I do on ${label}?`}`, actions.slice(0, 3));
   };
 
   // Recommendations for the page you're on.
