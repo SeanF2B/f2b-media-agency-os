@@ -1727,3 +1727,8 @@ html { scrollbar-gutter: stable; overflow-y: scroll; }
   html body .app-shell.topnav-layout .tn-nav { justify-self: center; }
   html body .app-shell.topnav-layout .tn-right { justify-self: end; }
 }
+/* Contacts smart-list tabs: clean rounded pills */
+html body .app-shell .cm-lists { display: flex !important; flex-wrap: wrap; gap: 6px; align-items: center; border: 0 !important; background: transparent !important; padding: 0 !important; }
+html body .app-shell .cm-lists > button, html body .app-shell .cm-lists > span > button { height: 32px !important; padding: 0 14px !important; border-radius: 999px !important; border: 1px solid rgba(127,138,160,.3) !important; background: transparent !important; box-shadow: none !important; font-size: 13px !important; font-weight: 600 !important; color: inherit !important; }
+html body .app-shell .cm-lists > button.active, html body .app-shell .cm-lists > span > button.active { background: var(--brand-primary, #0b74b8) !important; border-color: transparent !important; color: #fff !important; -webkit-text-fill-color: #fff !important; }
+html body .app-shell .cm-lists > button:last-child { border-style: dashed !important; }
