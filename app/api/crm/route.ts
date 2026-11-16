@@ -145,7 +145,18 @@ export async function GET(request: Request) {
       const rows = await db.prepare("SELECT s.category, o.currency, COUNT(*) AS total, SUM(o.value) AS value FROM crm_opportunities o JOIN crm_pipeline_stages s ON s.id=o.stage_id AND s.owner_id=o.owner_id JOIN crm_pipelines p ON p.id=o.pipeline_id AND p.owner_id=o.owner_id WHERE o.owner_id=?1 AND p.archived=0 AND s.category IN ('open','won') AND (?5='1' OR COALESCE(p.client_id,'')=?2) AND (?3='' OR o.created_at>=?3) AND (?4='' OR o.created_at<=?4) GROUP BY s.category, o.currency").bind(ownerId, scopeClient, fromDate, toDate, allClients).all<{ category: string; currency: string; total: number; value: number }>();
       const groups = (rows.results || []).map((row) => ({ category: row.category, currency: clean(row.currency, 3) || "EUR", count: Number(row.total) || 0, value: Number(row.value) || 0 }));
       const stageRows = await db.prepare(`SELECT s.name, s.category, s.position, o.currency, COUNT(o.id) AS total, COALESCE(SUM(o.value),0) AS value FROM crm_pipeline_stages s JOIN crm_pipelines p ON p.id=s.pipeline_id AND p.owner_id=s.owner_id LEFT JOIN crm_opportunities o ON o.stage_id=s.id AND o.owner_id=s.owner_id AND (?3='' OR o.created_at>=?3) AND (?4='' OR o.created_at<=?4) WHERE s.owner_id=?1 AND p.archived=0 AND (?5='1' OR COALESCE(p.client_id,'')=?2) GROUP BY ${allClients ? "s.category, s.name" : "s.id"}, o.currency ORDER BY ${allClients ? "MIN(s.position)" : "p.created_at, s.position"}`).bind(ownerId, scopeClient, fromDate, toDate, allClients).all<{ name: string; category: string; position: number; currency: string | null; total: number; value: number }>();
-      const stages = (stageRows.results || []).map((row) => ({ name: String(row.name), category: String(row.category), currency: clean(row.currency, 3) || "EUR", count: Number(row.total) || 0, value: Number(row.value) || 0 }));
+      // One entry per stage name: the same stage in several pipelines (or "Proposal Sent" vs "Proposal sent",
+      // or empty stages with no currency) is merged, so the strip shows the real counts in pipeline order.
+      const stageMap = new Map<string, { name: string; category: string; currency: string; count: number; value: number }>();
+      for (const row of stageRows.results || []) {
+        const name = String(row.name || "").trim(); if (!name) continue;
+        const key = `${String(row.category)}|${name.toLowerCase().replace(/\s+/g, " ")}`;
+        const item = stageMap.get(key) || { name, category: String(row.category), currency: "", count: 0, value: 0 };
+        item.count += Number(row.total) || 0; item.value += Number(row.value) || 0;
+        if (!item.currency && row.currency) item.currency = clean(row.currency, 3);
+        stageMap.set(key, item);
+      }
+      const stages = [...stageMap.values()].map((item) => ({ ...item, currency: item.currency || "EUR" }));
       // Where leads come from: opportunity count and value per source, split into open / won / lost.
       const sourceRows = await db.prepare("SELECT COALESCE(NULLIF(TRIM(o.source),''),'Unknown') AS source, s.category, COUNT(*) AS total, COALESCE(SUM(o.value),0) AS value FROM crm_opportunities o JOIN crm_pipeline_stages s ON s.id=o.stage_id AND s.owner_id=o.owner_id JOIN crm_pipelines p ON p.id=o.pipeline_id AND p.owner_id=o.owner_id WHERE o.owner_id=?1 AND p.archived=0 AND (?5='1' OR COALESCE(p.client_id,'')=?2) AND (?3='' OR o.created_at>=?3) AND (?4='' OR o.created_at<=?4) GROUP BY 1, s.category").bind(ownerId, scopeClient, fromDate, toDate, allClients).all<{ source: string; category: string; total: number; value: number }>();
       const sourceMap = new Map<string, { source: string; count: number; value: number; won: number; wonValue: number; open: number }>();
