@@ -48,9 +48,13 @@ Legend: ✅ in the game · 🔗 opens the existing screen inside the game · ⏳
 
 ## Gameplay
 
+- **Progression:** Headquarters starts as a run-down shopfront (boarded window, cracks, weeds) and the office inside starts on cardboard boxes with cobwebs, stains and a flickering bulb; upgrades turn it into offices and finally a glass skyscraper. Each trade gets its own props outside HQ (roofing ladders and tiles, cable drums, barber pole, tooth sign, etc.).
+- **Lead generation (agency only):** Leo (Lead Factory) and Olive (Outreach) sit in their own department inside HQ.
+- **Receipt Rush:** after a Tax Man raid, tap the receipts in 9 seconds to win back up to what he took (once per raid). A demo raid is in Quick actions.
+- **Guided tour:** voiced walkthrough (UK English voice where available) on first visit, or any time from the ? button.
 - **Art:** Clash-of-Clans-style isometric island in the account's brand colours and logo. Each department is a tappable building (Headquarters → upgrades, Reception → leads, Accounts → invoices/books, Calendar tower → scheduling, Workshop → tasks, Sales → pipeline, Billboard → marketing). Characters are adult, human figures in role-based clothing with one neutral stylised tone (no skin tones). Departments live inside Headquarters: tap HQ or any staff member to open *Inside HQ*, a room per department with its status and buttons into the real CRM screens.
 - **The Tax Man (villain):** any expense left 7 days without a receipt triggers a raid — he marches in and steals up to 15 coins per expense (once each, never below zero). Attaching the receipt still earns +50.
-- **Lead farm:** every open lead is a crop that grows with its pipeline stage, wilts when neglected and ripens when the job is won. New leads queue outside reception, longest wait first, getting impatient → bored → fed up.
+- **Deal yard:** every open lead is a building plot that goes up stage by stage (stakes → foundations → scaffolding → walls → finished office when won); stalled deals get a warning cone. New leads queue outside reception, longest wait first, getting impatient → bored → fed up.
 - **Town life:** AI agents walk around while running tasks and snooze (z z z) while scheduled; staff with work in progress walk between buildings; leads further down the pipeline visit Sales or the Calendar tower. The Tax Man knocks when this month's expenses are missing receipts. Long grass grows while work piles up.
 
 - **Employees** (one AI, six personalities): Rosie (reception), Sam (sales), Ada (accounts), Pete (projects), Mia (marketing), Cal (calendar). The most urgent one walks over with a line built from real counts and 2–4 options (open a screen, show the most urgent item, let AI prepare, remind me later).
@@ -61,7 +65,7 @@ Legend: ✅ in the game · 🔗 opens the existing screen inside the game · ⏳
 - **In-game booking:** on a lead card, *Book an appointment* shows real free slots from Scheduling; confirming uses the existing `book` action (availability re-checked, optional customer confirmation).
 - **Progression:** XP → levels (L2 = 100 XP, L5 = 1,000, L10 = 4,500). Stages: Startup → Established (L5) → Expanding (L10) → Growing (L15) → Market leader (L20) → Empire (L30) → Legend (L50). Levels unlock Headquarters tiers, which you then build with coins. Upgrades are never removed.
 - **Health:** working-day aware (weekends don't count as waiting). Neglect desaturates the scene and piles up paperwork; finishing work brings it back.
-- **Modes:** Manual (recommend), Copilot (prepare for approval — default), Autopilot (paused by default; only rules switched on in Automations). Every in-game action and AI draft is in the action history.
+- **Modes:** Manual (recommend) and Copilot (prepare for approval — default). There is no autonomous mode: every real action is shown first and only runs when approved. Every in-game action and AI draft is in the action history.
 - **Accessibility:** everything is clickable without walking, keyboard focus on customers, reduced-motion toggle (and respects the OS setting), sounds on by default with a mute button (browsers may hold the first sound until the first tap), solid-white pop-ups.
 - **Demo scenario:** a clearly labelled demo (five driveway leads, a draft invoice, a receipt, a project task) runs entirely in the browser, touches no data, and walks through to a level-5 HQ upgrade.
 

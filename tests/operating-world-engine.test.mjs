@@ -72,6 +72,7 @@ test("briefing reflects real data and never invents activity", () => {
   assert.equal(b[0].employee, "receptionist"); assert.equal(b[0].count, 5); assert.equal(b[0].mood, "panicked");
   assert.match(b[0].line, /five|\b5\b/i);
   assert.ok(b[0].options.some((o) => o.label === "Let AI prepare all responses"));
+  assert.ok(b.every((a) => a.options.some((o) => o.dismiss)));
   assert.equal(b[0].options.find((o) => o.label === "Show the most urgent lead").focusId, "1");
   // Same data, same day → same words (no random flicker).
   assert.equal(briefing(snap({ leads: [lead("1")] }))[0].line, briefing(snap({ leads: [lead("1")] }))[0].line);

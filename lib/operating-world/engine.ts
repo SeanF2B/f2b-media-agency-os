@@ -138,12 +138,12 @@ export type UpgradeTier = { tier: number; name: string; price: number; minLevel:
 export type UpgradeTrack = { id: string; name: string; group: "business" | "interior" | "lifestyle"; tiers: UpgradeTier[] };
 export const UPGRADES: UpgradeTrack[] = [
   { id: "hq", group: "business", name: "Headquarters", tiers: [
-    { tier: 1, name: "Established office", price: 500, minLevel: 5, perk: "Second floor and a bigger footprint" },
+    { tier: 1, name: "Refurbished shopfront", price: 300, minLevel: 3, perk: "No more boarded windows — a proper office" },
     { tier: 2, name: "Expanding business", price: 1500, minLevel: 10, perk: "Third floor" },
     { tier: 3, name: "Growing company", price: 3000, minLevel: 15, perk: "Fourth floor" },
-    { tier: 4, name: "Market leader tower", price: 6000, minLevel: 20, perk: "Fifth floor" },
-    { tier: 5, name: "Business empire", price: 12000, minLevel: 30, perk: "Sixth floor" },
-    { tier: 6, name: "Industry legend", price: 25000, minLevel: 50, perk: "Seventh floor — the skyline is yours" } ] },
+    { tier: 4, name: "Glass office tower", price: 6000, minLevel: 20, perk: "Your first skyscraper" },
+    { tier: 5, name: "Skyscraper", price: 12000, minLevel: 30, perk: "Taller tower with a rooftop helipad view" },
+    { tier: 6, name: "Landmark tower", price: 25000, minLevel: 50, perk: "The tallest building on the skyline" } ] },
   { id: "reception", group: "business", name: "Reception", tiers: [
     { tier: 1, name: "Polished desk", price: 80, minLevel: 1, perk: "A proper front desk for Rosie" },
     { tier: 2, name: "Waiting lounge", price: 250, minLevel: 3, perk: "Sofas and plants for waiting customers" },
@@ -190,6 +190,18 @@ export const UPGRADES: UpgradeTrack[] = [
     { tier: 1, name: "Corner desk", price: 200, minLevel: 2, perk: "A desk of your own" },
     { tier: 2, name: "Glass office", price: 900, minLevel: 7, perk: "Glass walls and a meeting table" },
     { tier: 3, name: "Executive suite", price: 3500, minLevel: 15, perk: "Sofa, bar cart and a skyline view" } ] },
+  { id: "flooring", group: "interior", name: "Flooring", tiers: [
+    { tier: 1, name: "Oak boards", price: 200, minLevel: 2, perk: "Warm wooden floors" },
+    { tier: 2, name: "Polished marble", price: 900, minLevel: 8, perk: "Gleaming marble tiles" },
+    { tier: 3, name: "Black & gold", price: 3000, minLevel: 16, perk: "Dark stone with gold inlay" } ] },
+  { id: "artwork", group: "interior", name: "Artwork", tiers: [
+    { tier: 1, name: "Framed prints", price: 120, minLevel: 2, perk: "Prints on the walls" },
+    { tier: 2, name: "Gallery canvases", price: 700, minLevel: 7, perk: "Bold canvases with gold frames" },
+    { tier: 3, name: "Gold sculpture", price: 2500, minLevel: 14, perk: "A statement sculpture in the lobby" } ] },
+  { id: "meeting", group: "interior", name: "Meeting room", tiers: [
+    { tier: 1, name: "Meeting table", price: 250, minLevel: 3, perk: "A table for client meetings" },
+    { tier: 2, name: "Boardroom", price: 1200, minLevel: 9, perk: "Long walnut table, six chairs" },
+    { tier: 3, name: "Presentation suite", price: 3200, minLevel: 15, perk: "Big screen for pitches" } ] },
   { id: "home", group: "lifestyle", name: "Your home", tiers: [
     { tier: 1, name: "Cottage", price: 400, minLevel: 3, perk: "A cosy place to come home to" },
     { tier: 2, name: "Villa", price: 2500, minLevel: 12, perk: "Two storeys and a balcony" },
@@ -203,6 +215,25 @@ export const UPGRADES: UpgradeTrack[] = [
     { tier: 2, name: "SUV", price: 700, minLevel: 5, perk: "Room for the whole crew" },
     { tier: 3, name: "Sports car", price: 1800, minLevel: 9, perk: "Low, fast and shiny" },
     { tier: 4, name: "Supercar", price: 5000, minLevel: 16, perk: "Gold wheels. Obviously." } ] },
+  { id: "academy", group: "business", name: "Training academy", tiers: [
+    { tier: 1, name: "Training room", price: 600, minLevel: 5, perk: "Somewhere to train new starters" },
+    { tier: 2, name: "Training academy", price: 2200, minLevel: 12, perk: "A proper academy building" } ] },
+  { id: "branch", group: "business", name: "Second branch", tiers: [
+    { tier: 1, name: "Satellite office", price: 1500, minLevel: 7, perk: "A second location on the map" },
+    { tier: 2, name: "Regional branch", price: 4500, minLevel: 14, perk: "A bigger second office" },
+    { tier: 3, name: "Branch tower", price: 12000, minLevel: 25, perk: "A tower of your own across town" } ] },
+  { id: "rental", group: "lifestyle", name: "Rental property", tiers: [
+    { tier: 1, name: "Buy-to-let flat", price: 800, minLevel: 4, perk: "Your first rental on the island" },
+    { tier: 2, name: "Family house", price: 2400, minLevel: 9, perk: "A bigger rental" },
+    { tier: 3, name: "Apartment block", price: 7000, minLevel: 16, perk: "A whole block of rentals" } ] },
+  { id: "sidehustle", group: "lifestyle", name: "Side hustle", tiers: [
+    { tier: 1, name: "Food truck", price: 500, minLevel: 3, perk: "A second stream of income (in the game)" },
+    { tier: 2, name: "Online shop", price: 1800, minLevel: 8, perk: "A shopfront for your side business" },
+    { tier: 3, name: "Franchise", price: 6000, minLevel: 15, perk: "Your brand, in other towns" } ] },
+  { id: "offshore", group: "lifestyle", name: "Offshore account", tiers: [
+    { tier: 1, name: "Savings safe", price: 400, minLevel: 3, perk: "Somewhere for your coins to sit (virtual only)" },
+    { tier: 2, name: "Investment vault", price: 1500, minLevel: 8, perk: "A proper vault" },
+    { tier: 3, name: "Island vault", price: 5000, minLevel: 14, perk: "Palm trees included" } ] },
   { id: "air", group: "lifestyle", name: "Air travel", tiers: [
     { tier: 1, name: "Helipad", price: 900, minLevel: 8, perk: "Somewhere to land" },
     { tier: 2, name: "Helicopter", price: 3000, minLevel: 14, perk: "Rotors spinning on the pad" },
@@ -306,8 +337,8 @@ export const EMPLOYEES: Record<EmployeeId, { name: string; title: string; colour
   calendar: { name: "Cal", title: "Calendar assistant", colour: "#2a6f97" },
 };
 /** Where an option takes the owner. Every panel opens an EXISTING CRM screen inside the game. */
-export type PanelKind = "leads" | "contacts" | "conversations" | "scheduling" | "invoicing" | "books" | "expense" | "tasks" | "task" | "lead-replies" | "lead-detail";
-export type BriefingOption = { label: string; panel?: PanelKind; focusId?: string; snooze?: boolean };
+export type PanelKind = "leads" | "contacts" | "conversations" | "scheduling" | "invoicing" | "books" | "expense" | "tasks" | "task" | "lead-replies" | "lead-detail" | "lead-factory" | "outreach";
+export type BriefingOption = { label: string; panel?: PanelKind; focusId?: string; snooze?: boolean; dismiss?: boolean };
 export type Approach = { id: string; employee: EmployeeId; urgency: number; mood: "panicked" | "concerned" | "cheerful" | "calm"; line: string; detail: string; count: number; options: BriefingOption[] };
 
 /** Small deterministic hash so dialogue varies by day but never randomly between refreshes. */
@@ -330,7 +361,7 @@ export function briefing(snap: OwSnapshot): Approach[] {
       : pick([`Boss, ${say(n)} fresh lead${n === 1 ? " just" : "s just"} came in.`, `New enquiry alert! ${cap(plural(n, "lead"))} waiting for a hello.`], seed + n);
     out.push({ id: "leads", employee: "receptionist", urgency: panic ? 100 : 70, mood: panic ? "panicked" : "concerned", count: n, line,
       detail: w ? `${plural(w, "lead")} waiting over 24 working hours. Oldest: ${s.waitingLeads[0].name || s.waitingLeads[0].title}.` : `Oldest: ${s.freshLeads[0].name || s.freshLeads[0].title}.`,
-      options: [{ label: "Sort them out", panel: "leads" }, { label: "Show the most urgent lead", panel: "lead-detail", focusId: s.freshLeads[0].id }, { label: "Let AI prepare all responses", panel: "lead-replies" }, { label: "Remind me later", snooze: true }] });
+      options: [{ label: "Let AI prepare all responses", panel: "lead-replies" }, { label: "Show the most urgent lead", panel: "lead-detail", focusId: s.freshLeads[0].id }, { label: "Open the pipeline", panel: "leads" }, { label: "Remind me later", snooze: true }] });
   }
   if (snap.sources.conversations && s.unreadThreads.length) {
     const n = s.unreadThreads.length;
@@ -384,6 +415,7 @@ export function briefing(snap: OwSnapshot): Approach[] {
     if (t === 0) out.push({ id: "quiet", employee: "calendar", urgency: 20, mood: "calm", count: 0, line: pick(["Tomorrow's looking quiet. Shall we fill the diary?", "Nothing booked for tomorrow yet, boss."], seed + "q"), detail: `${plural(s.bookingsToday.length, "appointment")} today.`, options: [{ label: "Open the calendar", panel: "scheduling" }, { label: "All good", snooze: true }] });
     else out.push({ id: "tomorrow", employee: "calendar", urgency: 15, mood: "cheerful", count: t, line: `${cap(plural(t, "appointment"))} in the diary for tomorrow!`, detail: s.bookingsTomorrow.slice(0, 3).map((b) => `${b.name} at ${b.startAt.slice(11, 16)}`).join(", "), options: [{ label: "View calendar", panel: "scheduling" }, { label: "Great", snooze: true }] });
   }
+  for (const a of out) a.options.push({ label: "Not relevant", dismiss: true });
   return out.sort((a, b) => b.urgency - a.urgency);
 }
 

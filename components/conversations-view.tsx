@@ -32,6 +32,14 @@ export function ConversationsView({ scopeClientId, clients }: { scopeClientId: s
   const [busy, setBusy] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  // Fit the inbox to the window so the reply box is always visible without scrolling the page.
+  const gridRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const fit = () => { const el = gridRef.current; if (!el || window.innerWidth <= 700) { if (el) el.style.height = ""; return; } const top = el.getBoundingClientRect().top + window.scrollY; const footer = document.querySelector(".f2b-mobile-tabs, .tn-mobile-footer") as HTMLElement | null; const room = window.innerHeight - (top - window.scrollY) - 16 - (footer && footer.offsetHeight && getComputedStyle(footer).display !== "none" ? footer.offsetHeight : 0); el.style.height = `${Math.max(380, room)}px`; };
+    fit(); const t = window.setTimeout(fit, 300);
+    window.addEventListener("resize", fit);
+    return () => { window.clearTimeout(t); window.removeEventListener("resize", fit); };
+  });
   const clientName = (id: string) => clients.find((c) => c.id === id)?.name || "";
 
   const loadThreads = useCallback(async () => {
@@ -61,7 +69,7 @@ export function ConversationsView({ scopeClientId, clients }: { scopeClientId: s
       <button type="button" className="secondary-button" onClick={() => setSettingsOpen(true)}>⚙️ Conversation settings</button></header>
     {error && <div className="cv-error" role="alert">{error}</div>}
     {loading ? <div className="empty-state" role="status">Loading conversations…</div> : <>{!configured && <div className="cv-banner">💬 Emails the system sends show here already. To also text and WhatsApp customers, <button type="button" className="text-button" onClick={() => setSettingsOpen(true)}>connect Twilio</button>.</div>}
-    <div className="cv-grid">
+    <div className="cv-grid" ref={gridRef}>
       <aside className="cv-list" aria-label="Conversation list">
         <div className="cv-filters" role="tablist">{([["all", "Open"], ["unread", `Unread${unread ? ` (${unread})` : ""}`]] as const).map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={filter === k} className={filter === k ? "on" : ""} onClick={() => setFilter(k)}>{l}</button>)}<button type="button" role="tab" aria-selected={filter === "notifications"} className={`cv-bell ${filter === "notifications" ? "on" : ""}`} onClick={() => setFilter("notifications")} aria-label={`Notifications${notes ? ` (${notes})` : ""}`} title="Notifications"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>{notes ? <b>{notes > 99 ? "99+" : notes}</b> : null}</button></div>
         <div className="cv-rows">{shown.length === 0 ? <p className="cv-none">{threads.length === 0 ? "Nothing yet. Emails the system sends, and customer texts, show up here." : filter === "notifications" ? "No notifications yet. Lead alerts and other emails the system sends will show here." : "Nothing here."}</p> : shown.map((t) => <button type="button" key={t.id} className={`cv-row ${activeId === t.id ? "on" : ""} ${t.unread ? "unread" : ""}`} onClick={() => setActiveId(t.id)}>

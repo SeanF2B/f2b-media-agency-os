@@ -432,3 +432,142 @@ html:has(.ow-panel) .toast { z-index: 95; }
 .ow-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(0,0,0,.2); }
 .ow-plate-in { cursor: pointer; }
 .ow-plate-in:hover rect { fill: #111827; }
+.ow-root .ow-exit svg, .ow-root button svg { width: 16px; height: 16px; flex: 0 0 auto; }
+.ow-root .ow-hud-actions button svg { width: 18px; height: 18px; }
+.ow-root .ow-exit { padding: 8px 14px; font-size: 13px; }
+
+/* ═════════ Full-screen game ═════════ */
+html.f2b-world, html.f2b-world body { overflow: hidden !important; height: 100%; }
+html.f2b-world .page-content { max-width: none !important; padding: 0 !important; }
+.ow-root.ow-full { position: fixed; left: 0; right: 0; bottom: 0; top: 86px; gap: 0; z-index: 5; display: block; }
+.ow-full .ow-demo-banner { position: absolute; top: 130px; left: 50%; transform: translateX(-50%); z-index: 25; }
+.ow-full .ow-hud { position: absolute; top: 10px; left: 14px; right: 14px; z-index: 20; background: rgba(255,255,255,.88); backdrop-filter: blur(14px); }
+.ow-full .ow-command { position: absolute; top: 74px; left: 14px; width: min(620px, calc(100% - 28px)); z-index: 20; background: rgba(255,255,255,.9); backdrop-filter: blur(12px); }
+.ow-full .ow-answer { position: absolute; top: 122px; left: 14px; width: min(620px, calc(100% - 28px)); z-index: 21; }
+.ow-full .ow-layout { position: absolute; inset: 0; display: block; }
+.ow-full .ow-stage { position: absolute; inset: 0; border-radius: 0; box-shadow: none; background: linear-gradient(#a5c8dc, #e8f0f4); }
+.ow-full .ow-stage-wrap { width: 100%; height: 100%; max-width: none; aspect-ratio: auto; margin: 0; }
+.ow-full .ow-stage-wrap > svg { padding: 104px 0 min(22vh, 190px); box-sizing: border-box; }
+.ow-full .ow-interior-wrap { background: #1f2328; }
+.ow-full .ow-dialogue, .ow-full .ow-dept-panel { position: absolute; left: 0; right: 0; bottom: 14px; margin: 0 auto; width: min(980px, calc(100% - 28px)); max-height: min(34vh, 300px); overflow: auto; z-index: 15; background: rgba(255,255,255,.95); backdrop-filter: blur(14px); }
+.ow-full .ow-dept-feed li:nth-child(n+4) { display: none; }
+.ow-full .ow-side { position: absolute; top: 122px; right: 14px; bottom: 14px; width: 320px; overflow: auto; z-index: 18; transform: translateX(calc(100% + 32px)); transition: transform .45s var(--ow-spring); }
+.ow-full.side-open .ow-side { transform: none; }
+.ow-full .ow-exit { top: 124px; }
+.ow-full .ow-room-tag { top: 128px; }
+.ow-hud-actions button.on { background: #111827 !important; color: #fff !important; }
+.ow-bubble-fo { overflow: visible; pointer-events: none; }
+.ow-bubble-box { width: 260px; height: 110px; display: flex; align-items: flex-end; justify-content: center; }
+.ow-bubble-box .ow-bubble { position: relative; transform: none; left: auto; top: auto; animation: ow-rise .3s var(--ow-spring) both; }
+@media (max-width: 760px) { .ow-full .ow-command { top: 120px; } .ow-full .ow-stage-wrap > svg { padding-top: 160px; } }
+.ow-plot { cursor: pointer; }
+.ow-plot-body { transition: transform .3s var(--ow-spring); transform-box: fill-box; transform-origin: 50% 100%; }
+.ow-plot:hover .ow-plot-body { transform: translateY(-3px) scale(1.08); }
+.ow-plot.ripe .ow-plot-body { animation: ow-float-soft 2.6s ease-in-out infinite; }
+.ow-plot.stalled .ow-plot-body { filter: saturate(.4); }
+.ow-flicker { animation: ow-flicker 3.2s steps(1) infinite; }
+@keyframes ow-flicker { 0%, 18%, 22%, 60%, 64%, 100% { opacity: 1; } 20%, 62% { opacity: .25; } }
+.ow-bean.slouch .ow-bean-body { transform: rotate(4deg) translateY(1px); animation: none !important; transform-box: fill-box; transform-origin: 50% 100%; }
+.ow-hint { margin: 0; padding: 8px 12px; border-radius: 10px; background: #fef3c7; color: #78350f; font-size: 13px; }
+.ow-hint b { color: #78350f; }
+
+/* Receipt Rush */
+.ow-game { position: fixed; inset: 0; z-index: 3700; background: rgba(15,23,42,.55); backdrop-filter: blur(2px); }
+.ow-game-card { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(420px, 92vw); padding: 22px; border-radius: 20px; background: #fff; color: #111827; display: grid; gap: 10px; text-align: center; box-shadow: 0 30px 80px rgba(0,0,0,.4); animation: ow-rise .4s var(--ow-spring, ease) both; }
+.ow-game-card b { font-size: 22px; color: #111827; } .ow-game-card p { margin: 0; color: #374151; }
+.ow-game-hud { position: absolute; top: 100px; left: 50%; transform: translateX(-50%); display: flex; gap: 14px; padding: 8px 16px; border-radius: 999px; background: #111827; color: #fff; font-weight: 800; }
+.ow-receipt { position: absolute; transform: translate(-50%, -50%); background: transparent !important; box-shadow: none !important; padding: 0 !important; border: 0 !important; animation: ow-receipt-in .25s var(--ow-spring, ease) both; filter: drop-shadow(0 6px 10px rgba(0,0,0,.35)); }
+.ow-receipt.got { animation: ow-receipt-got .35s ease forwards; }
+@keyframes ow-receipt-in { from { transform: translate(-50%, -50%) scale(.3) rotate(-20deg); opacity: 0; } }
+@keyframes ow-receipt-got { to { transform: translate(-50%, -120%) scale(1.4); opacity: 0; } }
+
+/* Guided tour */
+.ow-tour { position: fixed; inset: 0; z-index: 3800; }
+.ow-tour-dim { position: absolute; inset: 0; background: rgba(15,23,42,.55); }
+.ow-tour-spot { position: absolute; border-radius: 14px; box-shadow: 0 0 0 9999px rgba(15,23,42,.58); outline: 3px solid #fff; transition: all .45s cubic-bezier(.34,1.36,.64,1); pointer-events: none; }
+.ow-tour-card { position: absolute; width: min(380px, 92vw); padding: 16px; border-radius: 18px; background: #fff; color: #111827; display: grid; gap: 6px; box-shadow: 0 24px 60px rgba(0,0,0,.35); transition: left .45s ease, top .45s ease; }
+.ow-tour-card small { color: #6b7280; font-weight: 700; } .ow-tour-card b { font-size: 17px; color: #111827; } .ow-tour-card p { margin: 0 0 6px; color: #374151; }
+.ow-full .ow-interior-wrap > svg { padding: 100px 0 min(33vh, 300px); }
+.ow-full .ow-dept-panel { max-height: min(31vh, 290px); }
+
+/* Portraits */
+.ow-portrait { flex: 0 0 auto; display: inline-grid; place-items: center; border-radius: 50%; overflow: hidden; box-shadow: inset 0 0 0 2px rgba(255,255,255,.7), 0 2px 6px rgba(0,0,0,.15); }
+.ow-portrait svg { display: block; transform: translateY(4%); }
+.ow-portrait .ow-bean-body { animation: none !important; }
+
+/* Calmer motion: no pulsing badges or bobbing alerts */
+.ow-badge, .ow-alert { animation: none !important; }
+.ow-tour-spot { transition: left .35s ease, top .35s ease, width .35s ease, height .35s ease !important; }
+.ow-tour-card { transition: left .35s ease, top .35s ease !important; }
+.ow-bean-body { animation-duration: 6s !important; }
+.ow-spot:hover .ow-spot-body { transform: translateY(-2px); }
+.ow-root button.ow-btn-main { background: var(--ow-secondary) !important; color: #fff !important; }
+.ow-root button.ow-btn-dismiss { color: #b91c1c !important; border-color: #fecaca !important; background: #fff !important; }
+.ow-root .ow-dialogue .ow-options button:not(.ow-btn-main):not(.ow-btn-dismiss) { background: #fff !important; color: #111827 !important; border: 1px solid #d1d5db !important; }
+.ow-ideas { display: grid; gap: 6px; }
+.ow-ideas ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ow-ideas li { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 12px; background: #f0f9ff; border: 1px solid #bae6fd; color: #0c4a6e; font-size: 13px; animation: ow-rise .35s var(--ow-smooth) both; }
+.ow-ideas li span { flex: 1; color: #0c4a6e; }
+.ow-ideas li button { padding: 6px 10px !important; font-size: 12px !important; }
+
+/* ═════════ Stability: no hover-lift loops, calm scene ═════════ */
+.ow-spot:hover .ow-spot-body, .ow-spot:focus-visible .ow-spot-body { transform: none !important; }
+.ow-plot:hover .ow-plot-body, .ow-crop:hover .ow-crop-body, .ow-coin-bubble:hover .ow-coin-bob { transform: none !important; }
+.ow-stage .ow-bean-body, .ow-water, .ow-tree circle, .ow-grass-tuft, .ow-crop-body, .ow-clock-hand, .ow-coin-sign, .ow-flowers *, .ow-sparkle, .ow-splash, .ow-led, .ow-zone.on, .ow-screen, .ow-flag path { animation: none !important; }
+.ow-spot:hover .ow-spot-body { filter: brightness(1.06) drop-shadow(0 0 4px rgba(255,255,255,.85)); }
+.ow-walker, .walker .ow-bean-body { animation: none !important; }
+.ow-full .ow-stage-wrap > svg { padding: 96px 0 min(22vh, 180px); }
+
+/* ═════════ Cleaner panels, close buttons, onboarding chip ═════════ */
+.ow-dialogue, .ow-dept-panel, .ow-card-modal, .ow-walk, .ow-levelup { animation: ow-fade .2s ease-out both; }
+@keyframes ow-fade { from { opacity: 0; } }
+.ow-dept-feed li { animation: none; }
+.ow-close { position: absolute; top: 10px; right: 10px; width: 30px; height: 30px; padding: 0; display: grid; place-items: center; border-radius: 999px; }
+.ow-dept-head { padding-right: 36px; }
+.ow-dialogue { padding-right: 46px; }
+.ow-dialogue .ow-next { right: 10px; bottom: 10px; top: auto; }
+.ow-brief-pill { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 15; padding: 10px 18px; border-radius: 999px; border: 0; background: #111827; color: #fff; font-weight: 700; font-size: 13px; box-shadow: 0 8px 22px rgba(15,23,42,.25); cursor: pointer; }
+.ow-next-unlock { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: rgba(255,255,255,.9); color: #44403c; font-size: 12px; font-weight: 700; white-space: nowrap; }
+@media (max-width: 900px) { .ow-next-unlock { display: none; } }
+.ow-full .ow-dept-panel { max-height: min(30vh, 260px); }
+
+/* ═════════ Build mode ═════════ */
+.ow-build-bar { position: absolute; top: 104px; left: 50%; transform: translateX(-50%); z-index: 16; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; width: min(900px, calc(100% - 28px)); padding: 10px 14px; border-radius: 14px; background: rgba(255,255,255,.95); box-shadow: 0 8px 24px rgba(15,23,42,.18); font-size: 13px; color: #111827; }
+.ow-build-bar > span { color: #57534e; flex: 1; min-width: 200px; }
+.ow-build-items { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; order: 3; }
+.ow-build-items button { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 999px; font-size: 12px; }
+svg.ow-carrying { cursor: crosshair; }
+
+/* ═════════ Tidy, Sims-style tags and characters ═════════ */
+.ow-tag { cursor: pointer; filter: drop-shadow(0 2px 4px rgba(15,23,42,.18)); }
+.ow-tag text { font-family: inherit; letter-spacing: .1px; }
+.ow-tag:hover rect { stroke: rgba(15,23,42,.35); }
+.ow-stage .ow-person-adult .ow-bean-body > * { stroke: rgba(15,23,42,.22); stroke-width: .45; paint-order: stroke; }
+.ow-stage .ow-person-adult { filter: drop-shadow(0 1px 1.5px rgba(15,23,42,.18)); }
+.ow-hq-sign { filter: drop-shadow(0 3px 5px rgba(15,23,42,.25)); }
+
+/* ═════════ Compact department panel (no scrolling) + encounters + dev ═════════ */
+.ow-full .ow-dept-panel { max-height: none; overflow: visible; padding: 12px 14px; gap: 8px; width: min(860px, calc(100% - 28px)); }
+.ow-dept-panel .ow-dept-head p { font-size: 15px; }
+.ow-dept-stats { gap: 6px; }
+.ow-dept-stats > div { padding: 6px 10px; }
+.ow-dept-stats b { font-size: 16px; }
+.ow-dept-stats small { font-size: 11px; }
+.ow-dept-panel .ow-dept-feed { max-height: 64px; overflow: hidden; }
+.ow-dept-panel .ow-dept-feed li:nth-child(n+3) { display: none; }
+.ow-dept-panel > p, .ow-dept-panel .ow-hint { font-size: 12px; padding: 6px 10px; margin: 0; }
+.ow-dept:focus, .ow-dept:focus-visible, .ow-tag:focus, .ow-spot:focus { outline: none; }
+.ow-encounter, .ow-enc-menu, .ow-dev { width: min(520px, 94vw); display: grid; gap: 12px; }
+.ow-enc-head { display: flex; gap: 12px; align-items: center; } .ow-enc-head h3 { margin: 2px 0 0; font-size: 18px; } .ow-enc-head small { color: #78716c; }
+.ow-enc-text { margin: 0; font-size: 15px; line-height: 1.45; }
+.ow-enc-choices { display: grid; gap: 8px; } .ow-enc-choices button { text-align: left; padding: 11px 14px; border-radius: 12px; font-weight: 600; }
+.ow-enc-result { display: grid; gap: 8px; padding: 14px; border-radius: 14px; background: #f5f5f4; } .ow-enc-result.s3 { background: #ecfdf5; } .ow-enc-result.s0 { background: #fef2f2; }
+.ow-enc-result p { margin: 0; }
+.ow-stars span { font-size: 22px; color: #d6d3d1; margin-right: 2px; } .ow-stars span.on { color: #f59e0b; }
+.ow-enc-list { display: grid; gap: 6px; } .ow-enc-list button { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 12px; text-align: left; } .ow-enc-list button span:nth-of-type(1), .ow-enc-list button > span:not(.ow-enc-tax) { flex: 1; font-weight: 600; }
+.ow-enc-tax { font-size: 20px; width: 28px; text-align: center; }
+.ow-enc-prompt { position: fixed; right: 18px; bottom: 18px; z-index: 3400; display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 16px; background: #111827; color: #fff; box-shadow: 0 14px 34px rgba(0,0,0,.35); animation: ow-fade .25s ease-out both; }
+.ow-enc-prompt div { display: grid; } .ow-enc-prompt span { font-size: 13px; opacity: .85; } .ow-enc-prompt .ghost { color: #fff; border-color: rgba(255,255,255,.3); background: transparent; }
+.ow-dev h4, .ow-enc-menu h4 { margin: 4px 0 0; font-size: 13px; }
+.ow-hud-actions button { position: relative; }
+.ow-hud-actions button i.ow-strike, .ow-strike { position: absolute; right: auto; bottom: auto; min-width: 0; padding: 0; font-size: 0; border: 0; box-shadow: none; left: 50%; top: 50%; width: 22px; height: 2px; background: #ef4444; transform: translate(-50%, -50%) rotate(-45deg); border-radius: 2px; }
