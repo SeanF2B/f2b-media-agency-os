@@ -80,6 +80,15 @@ CREATE TABLE IF NOT EXISTS sched_google_connections (
   PRIMARY KEY (owner_id, staff_id)
 );
 
+-- Booking-page profile per staff member: reviews and work photos customers see before picking who to book.
+CREATE TABLE IF NOT EXISTS sched_staff_profiles (
+  owner_id TEXT NOT NULL,
+  staff_id TEXT NOT NULL,
+  profile TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (owner_id, staff_id)
+);
+
 CREATE TABLE IF NOT EXISTS sched_reminders (
   booking_id TEXT NOT NULL,
   kind TEXT NOT NULL,
