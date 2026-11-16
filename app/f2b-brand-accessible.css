@@ -9587,3 +9587,7 @@ html body.f2b-dark .f2b-on-light:is(input, textarea, #f2b-white-text-override)::
 .filing-warn p { display: flex; gap: 6px; align-items: center; margin: 0 0 6px; }
 .filing-warn ul { margin: 0 0 0 18px; padding: 0; }
 @media (max-width: 720px) { .filing-summary { grid-template-columns: 1fr 1fr; } .filing-rec { grid-template-columns: 1fr auto; } }
+
+/* Lead Factory saved lists: country flag beside the date */
+.lead-list-head span .lead-flag { display: inline-block; vertical-align: -2px; margin-right: 6px; border-radius: 2px; box-shadow: 0 0 0 1px #0000001f; overflow: hidden; }
+.lead-flag-text { font-size: 9px; font-weight: 800; padding: 1px 3px; background: #eef2f5; color: #1f2a33; }
