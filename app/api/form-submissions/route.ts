@@ -5,6 +5,11 @@ import { ensureFormSubmissionLog } from "@/lib/form-submission-log";
 export const dynamic = "force-dynamic";
 const reply = (error: string, status = 400) => Response.json({ error }, { status, headers: { "Cache-Control": "no-store" } });
 
+// Forms merged into another in Operations → Forms (keep in sync with app/api/site-forms).
+const MERGED_FORMS: Record<string, string> = {
+  "site:a93e6dbd-0d34-46ec-ba5a-6be474d15882:contact": "site:a93e6dbd-0d34-46ec-ba5a-6be474d15882:quote",
+  "site:24e59da5-e0c9-4620-9424-db227dc5c4d0:book-a-consultation": "site:24e59da5-e0c9-4620-9424-db227dc5c4d0:interior-design",
+};
 type Row = { id: string; client_id: string; source: string; form_key: string; form_name: string; page_url: string; page_path: string; name: string; email: string; phone: string; message: string; contact_id: string; created_at: string };
 
 async function context() {
@@ -47,7 +52,7 @@ export async function GET(request: Request) {
   const where = (skip: "client" | "form" | "page" | "", from = start, to = end) => {
     const parts = ["owner_id = ?", "created_at >= ?", "created_at < ?"]; const binds: unknown[] = [ownerId, from, to];
     if (clientId !== null && skip !== "client") { parts.push("client_id = ?"); binds.push(clientId); }
-    if (form && skip !== "form") { parts.push("form_key = ?"); binds.push(form); }
+    if (form && skip !== "form") { const keys = [form, ...Object.entries(MERGED_FORMS).filter(([, to]) => to === form).map(([from]) => from)]; parts.push(`form_key IN (${keys.map(() => "?").join(",")})`); binds.push(...keys); }
     if (pagePath && skip !== "page") { parts.push("page_path = ?"); binds.push(pagePath); }
     if (search) { parts.push("(lower(name) LIKE ? OR email LIKE ? OR phone LIKE ? OR lower(message) LIKE ?)"); const like = `%${search.replace(/[%_]/g, "")}%`; binds.push(like, like, like, like); }
     return { sql: parts.join(" AND "), binds };

@@ -5,6 +5,7 @@ import { buildClientReport } from "@/lib/client-report-data";
 import { listBookings } from "@/lib/scheduling/server";
 import { metaAdsConnectionExists, readDirectMetaAdsInsights } from "@/lib/meta-ads-direct";
 import { summarizeMetaAdsTotals } from "@/lib/meta-ads-performance";
+import { getGoogleAdsCallStats } from "@/lib/google-ads-direct";
 
 // Dashboard tiles: marketing results for one client (from the same cached reads as client reports),
 // upcoming appointments and emails the system sent. One request per dashboard load.
@@ -91,8 +92,18 @@ export async function GET(request: Request) {
     const chatgpt = ai?.platforms.find((p) => p.platform === "chatgpt");
     const leadsNow = seo?.attribution.status === "ok" ? Object.values(seo.attribution.data!.allChannels || {}).reduce((a, b) => a + (Number(b) || 0), 0) : null;
     const meta = await metaFor([clientId]);
+    // Paid vs organic split: leads by channel from CRM attribution, ad calls from Google Ads.
+    const channels = seo?.attribution.status === "ok" ? seo.attribution.data!.allChannels as Record<string, number> : null;
+    const accountId = String((workspace.clients || []).find((c) => c.id === clientId)?.googleAdsAccountId || "").replace(/\D/g, "");
+    const adCalls = accountId ? await getGoogleAdsCallStats(ownerId, accountId, period).catch(() => null) : null;
+    const split = {
+      organic: { clicks: traffic && /click/i.test(traffic.metric) ? traffic.current : null, visits: traffic && !/click/i.test(traffic.metric) ? traffic.current : null, calls: biz?.calls ?? null, leads: channels ? Number(channels.seo || 0) : null },
+      paid: { clicks: adsData ? adsData.current.clicks : null, calls: adCalls ? (adCalls.calls ?? null) : null, callConversions: adCalls?.callConversions ?? null, leads: channels ? Number(channels.google_ads || 0) : null, conversions: adsData ? adsData.current.conversions : null },
+      otherLeads: channels ? Number(channels.other || 0) + Number(channels.unknown || 0) : null,
+      notes: { organic: why(seo?.traffic) || (biz ? "" : why(seo?.business)), paid: accountId ? why(ads?.ads) : "No Google Ads account linked" },
+    };
     return {
-      ...meta,
+      ...meta, split,
       currency: seo?.client.currency || ads?.client.currency || "EUR",
       visits: traffic ? { value: traffic.current, previous: traffic.previous, metric: traffic.metric } : null, visitsNote: why(seo?.traffic),
       ...adsBlock(adsData ? adsData.current : null, adsData?.previous || null), adsNote: why(ads?.ads),

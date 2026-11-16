@@ -25,6 +25,11 @@ async function context() {
   return { db: env.DB, ownerId: String(ws.ownerId || ""), clients: ws.clients || [], email: user.email };
 }
 
+// One form per client: these forms are shown merged into another (their submissions count there too).
+const FORM_ALIASES: Record<string, string> = {
+  "site:a93e6dbd-0d34-46ec-ba5a-6be474d15882:contact": "site:a93e6dbd-0d34-46ec-ba5a-6be474d15882:quote", // Pro Roofers: contact → Free quote form
+  "site:24e59da5-e0c9-4620-9424-db227dc5c4d0:book-a-consultation": "site:24e59da5-e0c9-4620-9424-db227dc5c4d0:interior-design", // Red Island: consultation → Interior design
+};
 type Row = { id: string; client_id: string; form_key: string; name: string; site: string; definition: string; settings: string; updated_at: string; updated_by: string };
 const shape = (r: Row) => ({ id: r.id, clientId: r.client_id, formKey: r.form_key, name: r.name, site: r.site, definition: parseJson<FormDefinition>(r.definition, emptyDefinition()), settings: parseJson<FormSettings>(r.settings, defaultSettings()), updatedAt: r.updated_at, updatedBy: r.updated_by });
 
@@ -48,8 +53,14 @@ export async function GET(request: Request) {
     db.prepare("SELECT * FROM site_forms WHERE owner_id=?1 ORDER BY name LIMIT 500").bind(ownerId),
     db.prepare("SELECT client_id, form_key, MAX(form_name) AS name, MAX(page_url) AS page, COUNT(*) AS n, MAX(created_at) AS last, SUM(CASE WHEN created_at >= ?3 THEN 1 ELSE 0 END) AS n30 FROM form_submission_log WHERE owner_id=?1 AND created_at >= ?2 AND client_id <> '' GROUP BY form_key LIMIT 500").bind(ownerId, since, new Date(Date.now() - 30 * 86_400_000).toISOString()),
   ]);
-  const registered = ((forms.results || []) as Row[]).map(shape);
-  const statRows = (stats.results || []) as Array<{ client_id: string; form_key: string; name: string; page: string; n: number; last: string; n30: number }>;
+  const registered = ((forms.results || []) as Row[]).map(shape).filter((f) => !FORM_ALIASES[f.formKey]);
+  const statRows: Array<{ client_id: string; form_key: string; name: string; page: string; n: number; last: string; n30: number }> = [];
+  for (const raw of (stats.results || []) as Array<{ client_id: string; form_key: string; name: string; page: string; n: number; last: string; n30: number }>) {
+    const key = FORM_ALIASES[raw.form_key] || raw.form_key;
+    const hit = statRows.find((row) => row.form_key === key);
+    if (!hit) { statRows.push({ ...raw, form_key: key, name: key === raw.form_key ? raw.name : "" }); continue; }
+    hit.n += raw.n; hit.n30 += raw.n30; if (raw.last > hit.last) hit.last = raw.last; if (key === raw.form_key) hit.name = raw.name || hit.name;
+  }
   const byKey = new Map(statRows.map((s) => [s.form_key, s]));
   const known = new Set(registered.map((f) => f.formKey));
   const hostOf = (raw: string) => { try { return new URL(/^https?:/.test(raw) ? raw : `https://${raw}`).hostname.replace(/^www\./, ""); } catch { return ""; } };

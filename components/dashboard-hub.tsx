@@ -8,10 +8,11 @@ type HubClient = { id: string; name: string; logo?: string; googleAdsAccountId?:
 type HubStaff = { id: string; name: string; isBot?: boolean };
 type Stat = { value: number; previous: number | null } | null;
 type Marketing = {
-  currency: string; visits: (Stat & { metric?: string }) | null; visitsNote: string; adSpend: Stat; adClicks: Stat; impressions?: Stat; conversions?: Stat; cpc?: Stat; costPerConversion?: Stat; adsNote: string; meta?: { spend: number; impressions: number; clicks: number; leads: number; cpc: number | null; costPerLead: number | null; accounts: number; linkedAccounts: number } | null; metaNote?: string; scope?: string; accounts?: number; linkedAccounts?: number; calls: Stat; profileClicks: Stat; businessNote: string; leads: Stat;
+  currency: string; visits: (Stat & { metric?: string }) | null; visitsNote: string; adSpend: Stat; adClicks: Stat; impressions?: Stat; conversions?: Stat; cpc?: Stat; costPerConversion?: Stat; adsNote: string; split?: Split; meta?: { spend: number; impressions: number; clicks: number; leads: number; cpc: number | null; costPerLead: number | null; accounts: number; linkedAccounts: number } | null; metaNote?: string; scope?: string; accounts?: number; linkedAccounts?: number; calls: Stat; profileClicks: Stat; businessNote: string; leads: Stat;
   google: { position: number | null; previous: number | null; tracked: number; top3: number } | null; rankNote: string;
   chatgpt: { share: number; previous: number | null; prompts: number; mentioned: number } | null; aiNote: string; bing: null; bingNote: string;
 };
+type Split = { organic: { clicks: number | null; visits: number | null; calls: number | null; leads: number | null }; paid: { clicks: number | null; calls: number | null; callConversions: number | null; leads: number | null; conversions: number | null }; otherLeads: number | null; notes: { organic: string; paid: string } };
 type Metrics = { clientId: string; marketing: Marketing | null; appointments: Array<{ id: string; name: string; start: string; clientId: string; channel: string }>; emails: { total: number; recent: Array<{ to: string; subject: string; at: string }> } };
 
 const CACHE_MS = 15 * 60_000;
@@ -42,7 +43,7 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
   const [showAi, setShowAi] = useState(() => { try { return localStorage.getItem("f2b-dash-ai") !== "0"; } catch { return true; } });
 
   useEffect(() => {
-    const key = `f2b-dash-metrics:${clientId}`;
+    const key = `f2b-dash-metrics-v2:${clientId}`;
     try { const cached = JSON.parse(sessionStorage.getItem(key) || "null") as { at: number; data: Metrics } | null; if (cached && Date.now() - cached.at < CACHE_MS) { setMetrics(cached.data); return; } } catch { /* no cache */ }
     let live = true; setLoading(true);
     fetch(`/api/dashboard-metrics?clientId=${encodeURIComponent(clientId)}`).then((r) => r.ok ? r.json() as Promise<Metrics> : null).then((data) => { if (!live || !data) return; setMetrics(data); try { sessionStorage.setItem(key, JSON.stringify({ at: Date.now(), data })); } catch { /* full */ } }).catch(() => undefined).finally(() => { if (live) setLoading(false); });
@@ -76,12 +77,25 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
         {!scopeClientId && clients.length > 0 && <label className="dh-client"><span>Client</span><select value={clientId} onChange={(e) => { setPickedClient(e.target.value); try { localStorage.setItem("f2b-dash-client", e.target.value); } catch { /* ignore */ } }}>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>}
       </div>
       {loading && !m ? <p className="dh-muted">Loading results…</p> : !m ? <p className="dh-muted">Results appear here once a client is chosen and you can view reports.</p> : <>
-        <div className="dh-tiles">
-          <Tile icon={<BrandIcon id="ga4" size={22} fallback={<BarChart3 size={18} />} />} label={`Website visits${m.visits?.metric ? ` · ${m.visits.metric}` : ""}`} value={m.visits ? num(m.visits.value) : "—"} note={m.visits ? "" : m.visitsNote} tone={m.visits && m.visits.previous != null && m.visits.value > m.visits.previous ? "good" : ""}><Delta now={m.visits?.value} before={m.visits?.previous} /></Tile>
-          <Tile icon={<Phone size={18} />} label="Calls from Google" value={m.calls ? num(m.calls.value) : "—"} note={m.calls ? "" : m.businessNote} tone={m.calls && m.calls.value > 0 ? "good" : ""}><Delta now={m.calls?.value} before={m.calls?.previous} /></Tile>
-          <Tile icon={<BrandIcon id="business-profile" size={22} fallback={<MousePointerClick size={18} />} />} label="Profile website clicks" value={m.profileClicks ? num(m.profileClicks.value) : "—"} note={m.profileClicks ? "" : m.businessNote}><Delta now={m.profileClicks?.value} before={m.profileClicks?.previous} /></Tile>
-          <Tile icon={<UserPlus size={18} />} label="Leads generated" value={m.leads ? num(m.leads.value) : "—"} tone={m.leads && m.leads.value > 0 ? "good" : ""} />
-        </div>
+        {(() => { const sp = m.split; const v = (x: number | null | undefined) => x == null ? "—" : num(x);
+          const Row = ({ icon, label, value, good }: { icon: ReactNode; label: string; value: string; good?: boolean }) => <div className={`dh-split-row ${good ? "good" : ""}`}><span className="dh-split-ico">{icon}</span><span>{label}</span><b>{value}</b></div>;
+          return <div className="dh-split">
+            <div className="dh-split-col"><div className="dh-split-head"><BrandIcon id="google" size={20} fallback={null} /><b>Organic</b><small>Google search & Maps (free)</small></div>
+              <Row icon={<MousePointerClick size={15} />} label={sp?.organic.clicks != null ? "Search clicks" : "Website visits"} value={v(sp?.organic.clicks ?? sp?.organic.visits)} good={(sp?.organic.clicks ?? sp?.organic.visits ?? 0) > 0} />
+              <Row icon={<Phone size={15} />} label="Calls (Business Profile)" value={v(sp?.organic.calls)} good={(sp?.organic.calls || 0) > 0} />
+              <Row icon={<BrandIcon id="business-profile" size={15} fallback={<MousePointerClick size={15} />} />} label="Profile website clicks" value={v(m.profileClicks?.value)} good={(m.profileClicks?.value || 0) > 0} />
+              <Row icon={<UserPlus size={15} />} label="Leads" value={v(sp?.organic.leads)} good={(sp?.organic.leads || 0) > 0} />
+              {sp?.notes.organic && <em className="dh-split-note">{sp.notes.organic}</em>}
+            </div>
+            <div className="dh-split-col"><div className="dh-split-head"><BrandIcon id="google-ads" size={20} fallback={null} /><b>Google Ads</b><small>Paid search</small></div>
+              <Row icon={<MousePointerClick size={15} />} label="Ad clicks" value={v(sp?.paid.clicks)} good={(sp?.paid.clicks || 0) > 0} />
+              <Row icon={<Phone size={15} />} label={sp?.paid.callConversions ? "Calls from ads (call conversions)" : "Calls from ads"} value={v(sp?.paid.calls ?? sp?.paid.callConversions)} good={(sp?.paid.calls || 0) > 0} />
+              <Row icon={<CheckCircle2 size={15} />} label="Conversions" value={v(sp?.paid.conversions)} good={(sp?.paid.conversions || 0) > 0} />
+              <Row icon={<UserPlus size={15} />} label="Leads in CRM" value={v(sp?.paid.leads)} good={(sp?.paid.leads || 0) > 0} />
+              {sp?.notes.paid && <em className="dh-split-note">{sp.notes.paid}</em>}
+            </div>
+            <div className="dh-split-total"><UserPlus size={16} /><span>All leads · 30 days</span><b>{v(m.leads?.value)}</b>{sp?.otherLeads ? <small>{sp.otherLeads} from other or unknown sources</small> : null}</div>
+          </div>; })()}
         {m.scope !== "all" && <><h3 className="dh-sub">Where you show up</h3>
         <div className="dh-ranks">
           <div className="dh-rank"><div className="dh-rank-logos"><BrandIcon id="google" size={24} fallback={<span>G</span>} /><span className="dh-rank-also" title="Chrome and Safari use Google search"><BrandIcon id="chrome" size={14} fallback={null} /><BrandIcon id="safari" size={14} fallback={null} /></span></div><small>Google · Chrome & Safari</small><b>{m.google?.position != null ? `#${m.google.position}` : "—"}</b>{m.google ? <em>avg of {m.google.tracked} keywords · {m.google.top3} in top 3 <Delta now={m.google.position} before={m.google.previous} lowerIsBetter suffix="" /></em> : <em>{m.rankNote || "Not tracked yet"}</em>}</div>
