@@ -1154,3 +1154,22 @@ html body .app-shell .lead-find-help { margin-top: 10px; font-size: 12.5px; opac
 html body .app-shell .lead-find-help summary { cursor: pointer; font-weight: 600; width: fit-content; }
 html body .app-shell .lead-find-help p { margin: 6px 0 0; max-width: 760px; }
 @media (max-width: 700px) { html body .app-shell .lead-find-spacer { display: none; } html body .app-shell .lead-find-row > * { flex: 1 1 auto; } }
+/* Dashboard: organic vs Google Ads split */
+html body .app-shell .dh-split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+html body .app-shell .dh-split-col { border: 1px solid #e8edf1; border-radius: 14px; padding: 12px 14px; background: #fff; display: grid; gap: 4px; align-content: start; }
+html body .app-shell .dh-split-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+html body .app-shell .dh-split-head b { font-size: 15px; } html body .app-shell .dh-split-head small { color: #667085; font-size: 12px; }
+html body .app-shell .dh-split-row { display: grid; grid-template-columns: 26px 1fr auto; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 10px; font-size: 13.5px; }
+html body .app-shell .dh-split-row b { font-size: 18px; }
+html body .app-shell .dh-split-row.good { background: #effaf3; } html body .app-shell .dh-split-row.good b { color: #157a43; }
+html body .app-shell .dh-split-ico { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: #f2f4f7; color: #475467; }
+html body .app-shell .dh-split-note { font-style: normal; font-size: 11.5px; color: #8a96a3; margin-top: 4px; }
+html body .app-shell .dh-split-total { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 12px; background: #f7f9fb; border: 1px solid #e8edf1; font-size: 13.5px; }
+html body .app-shell .dh-split-total b { font-size: 20px; margin-left: auto; } html body .app-shell .dh-split-total small { color: #667085; }
+@media (max-width: 800px) { html body .app-shell .dh-split { grid-template-columns: 1fr; } }
+body.f2b-dark .app-shell .dh-split-col, body.f2b-dark .app-shell .dh-split-total { background: #1a2025 !important; border-color: #33404a !important; }
+body.f2b-dark .app-shell .dh-split-ico { background: #252e35 !important; color: #c3ccd4 !important; }
+body.f2b-dark .app-shell .dh-split-row.good { background: #15291e !important; }
+body.f2b-dark :is(.app-shell .dh-split-row b, .app-shell .dh-split-head b, .app-shell .dh-split-total b, .app-shell .dh-split-row span, .app-shell .dh-split-total span, #f2b-dh-y) { color: #f2f4f7 !important; -webkit-text-fill-color: #f2f4f7 !important; }
+body.f2b-dark :is(.app-shell .dh-split-row.good b, #f2b-dh-y) { color: #6fdc9b !important; -webkit-text-fill-color: #6fdc9b !important; }
+body.f2b-dark :is(.app-shell .dh-split-head small, .app-shell .dh-split-note, .app-shell .dh-split-total small, #f2b-dh-y) { color: #a8b3bd !important; -webkit-text-fill-color: #a8b3bd !important; }
