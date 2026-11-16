@@ -1746,3 +1746,9 @@ html body .ai-chat-peek .ai-eyes-face { border-color: #42b4ff !important; } html
 html body .ai-chat-peek .ai-eyes-antenna, html body .ai-chat-peek .ai-eyes-antenna::before, html body .ai-chat-peek .ai-eyes-antenna::after { background: #42b4ff !important; border-color: #42b4ff !important; }
 /* Top bar: client logo tile matches the picker height */
 @media (min-width: 861px) { html body .app-shell.topnav-layout .tn-brand .tn-logo-client { height: 42px !important; width: auto !important; max-width: 120px; padding: 4px 8px !important; border-radius: 12px !important; display: grid; place-items: center; } html body .app-shell.topnav-layout .tn-brand .tn-logo-client img { height: 34px !important; width: auto !important; max-width: 104px !important; object-fit: contain; } }
+/* Smooth, consistent fade-in for content on every page (opacity only, so floating menus inside are unaffected) */
+@keyframes f2b-fade-in { from { opacity: 0; } to { opacity: 1; } }
+html body .app-shell .main-area :is(.panel, .iv-card, .studio-panel, .crm-workspace, .task-table-view, .page-heading, .welcome-row, .dh-actions, .dh-approvals, .dh-panel, .dh-ads-wrap, .metric-grid, .crm-kanban, .crm-stage, .crm-opportunity, .tt-row, .tt-group, .sch-dash, .sch-week-card, .cv-grid, .iv-tabs, .crm-tabs, [role="tabpanel"]) { animation: f2b-fade-in .35s ease-out both; }
+html body .app-shell .main-area .crm-opportunity, html body .app-shell .main-area .tt-row { animation-duration: .25s; }
+html body :is(.crm-modal, .modal, .app-dialog, .ai-chat-panel, .ai-chat-toast, .cp-menu-float) { animation: f2b-fade-in .2s ease-out both; }
+@media (prefers-reduced-motion: reduce) { html body .app-shell .main-area *, html body :is(.crm-modal, .modal, .ai-chat-panel) { animation: none !important; } }
