@@ -1191,3 +1191,19 @@ body.f2b-dark .app-shell .overview-stage-ring text { fill: #f2f4f7; }
 body.f2b-dark :is(.app-shell .overview-stage-ring b, .app-shell .overview-stage-ring span, #f2b-ring-x) { color: #f2f4f7 !important; -webkit-text-fill-color: #f2f4f7 !important; }
 body.f2b-dark :is(.app-shell .overview-stage-ring.won b, #f2b-ring-x) { color: #6fdc9b !important; -webkit-text-fill-color: #6fdc9b !important; }
 body.f2b-dark :is(.app-shell .overview-stage-ring em, #f2b-ring-x) { color: #a8b3bd !important; -webkit-text-fill-color: #a8b3bd !important; }
+/* Task table: rounded, roomier, no straight accent lines; status ring + quick add per company */
+html body .app-shell .tt-row td:first-child { box-shadow: none !important; }
+html body .app-shell .tt-table td { padding: 8px 14px !important; height: 46px; }
+html body .app-shell .tt-table th { padding: 12px 14px !important; }
+html body .app-shell .tt-table td:first-child, html body .app-shell .tt-table th:first-child { padding-left: 18px !important; }
+html body .app-shell .tt-table td:last-child, html body .app-shell .tt-table th:last-child { padding-right: 18px !important; }
+html body .app-shell .tt-group td { padding-top: 14px !important; padding-bottom: 8px !important; border-bottom: 0 !important; }
+html body .app-shell .tt-group-bar { display: none !important; }
+html body .app-shell .tt-group-line { display: flex; align-items: center; gap: 10px; }
+html body .app-shell .tt-group-ring { display: inline-flex; align-items: center; gap: 6px; }
+html body .app-shell .tt-group-ring small { display: inline-flex; gap: 4px; }
+html body .app-shell .tt-group-ring small i { font-style: normal; font-size: 10.5px; font-weight: 700; color: #fff; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; display: inline-grid; place-items: center; }
+html body .app-shell .tt-quick-add { width: 26px; height: 26px; border-radius: 999px; border: 1px dashed rgba(127,138,160,.6); background: transparent; color: inherit; cursor: pointer; font-size: 15px; line-height: 1; display: inline-grid; place-items: center; opacity: .75; transition: opacity .15s, transform .15s, background .15s; }
+html body .app-shell .tt-quick-add:hover { opacity: 1; transform: scale(1.08); background: var(--brand-primary, #1f6feb); color: #fff; border-color: transparent; }
+html body .app-shell .tt-row:last-child td:first-child { border-bottom-left-radius: 14px; }
+html body .app-shell .tt-row:last-child td:last-child { border-bottom-right-radius: 14px; }
