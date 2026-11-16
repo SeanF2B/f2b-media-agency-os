@@ -56,7 +56,8 @@ export async function GET(request: Request) {
   const period = readPeriod(url);
   if ("error" in period) return reply({ error: period.error }, 400);
   try {
-    const report = await buildClientReport(ctx.db, ctx.workspace as never, url.searchParams.get("clientId") || "", period.type, { start: period.start, end: period.end });
+    const keywordGroups = (url.searchParams.get("groups") || "").split(",").map((v) => v.trim().slice(0, 80)).filter(Boolean).slice(0, 50);
+    const report = await buildClientReport(ctx.db, ctx.workspace as never, url.searchParams.get("clientId") || "", period.type, { start: period.start, end: period.end }, { keywordGroups });
     if (url.searchParams.get("format") === "html") return new Response(renderClientReportHtml(report, { origin, agencyIconUrl: resolveAgencyLogoUrl(origin) }), { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-store", "X-Robots-Tag": "noindex" } });
     return reply({ report });
   } catch (error) { return reply({ error: error instanceof Error ? error.message : "The report could not be built." }, 500); }
@@ -70,7 +71,7 @@ export async function POST(request: Request) {
   const period = readPeriod(body);
   if ("error" in period) return reply({ error: period.error }, 400);
   try {
-    const saved = await saveClientReport(ctx.db, env.BUCKET as never, ctx.workspace as never, String(body.clientId), period.type, { start: period.start, end: period.end }, "manual", new URL(request.url).origin);
+    const saved = await saveClientReport(ctx.db, env.BUCKET as never, ctx.workspace as never, String(body.clientId), period.type, { start: period.start, end: period.end }, "manual", new URL(request.url).origin, { keywordGroups: (Array.isArray(body.groups) ? body.groups : []).map((v: unknown) => String(v).slice(0, 80)).filter(Boolean).slice(0, 50) });
     return reply({ ok: true, id: saved.id, reports: await listClientReports(ctx.db, ctx.ownerId, String(body.clientId)) });
   } catch (error) { return reply({ error: error instanceof Error ? error.message : "The report could not be saved." }, 500); }
 }

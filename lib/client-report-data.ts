@@ -271,7 +271,7 @@ export type AuditFinding = { priority: "high" | "medium" | "low"; area: string; 
 export type ResearchKeyword = { keyword: string; volume: number | null; competition: string | null; lowBid: number | null; highBid: number | null; difficulty: number | null; tags: string[]; location: string; position: number | null };
 export type KeywordResearchData = { total: number; totalVolume: number; groups: Array<{ name: string; keywords: ResearchKeyword[]; volume: number }> };
 
-async function keywordResearch(db: D1Database, ownerId: string, client: Client, ranks?: Section<RankingsData>): Promise<Section<KeywordResearchData>> {
+async function keywordResearch(db: D1Database, ownerId: string, client: Client, ranks?: Section<RankingsData>, onlyGroups?: string[]): Promise<Section<KeywordResearchData>> {
   try {
     const [groupsRes, rowsRes] = await db.batch([
       db.prepare("SELECT id, name FROM seo_keyword_groups WHERE owner_id = ?1 AND client_id = ?2 ORDER BY sort_order, name").bind(ownerId, client.id),
@@ -279,6 +279,12 @@ async function keywordResearch(db: D1Database, ownerId: string, client: Client, 
     ]);
     const groups = (groupsRes.results || []) as Array<{ id: string; name: string }>;
     const rows = (rowsRes.results || []) as Array<{ keyword: string; location: string; group_id: string | null; tags: string; avg_monthly_searches: number | null; competition: string | null; low_bid: number | null; high_bid: number | null; difficulty: number | null; updated_at: string }>;
+    if (onlyGroups?.length) {
+      // Only the groups picked in Reports → Keywords ("ungrouped" = keywords not in any group).
+      const keep = new Set(onlyGroups);
+      for (let i = rows.length - 1; i >= 0; i--) { const g = rows[i].group_id; if (!(g ? keep.has(g) : keep.has("ungrouped"))) rows.splice(i, 1); }
+      for (let i = groups.length - 1; i >= 0; i--) if (!keep.has(groups[i].id)) groups.splice(i, 1);
+    }
     if (!rows.length) return off("not_connected", "No saved keywords for this client yet. Save keywords in SEO → Keywords, then generate this report.");
     const pos = new Map((ranks?.data?.keywords || []).map((k) => [k.keyword.toLowerCase(), k.position]));
     const toKw = (r: (typeof rows)[number]): ResearchKeyword => ({ keyword: r.keyword, volume: r.avg_monthly_searches, competition: r.competition, lowBid: r.low_bid, highBid: r.high_bid, difficulty: r.difficulty, tags: (() => { try { return JSON.parse(r.tags) as string[]; } catch { return []; } })(), location: r.location, position: pos.get(r.keyword.toLowerCase()) ?? null });
@@ -292,7 +298,7 @@ async function keywordResearch(db: D1Database, ownerId: string, client: Client, 
   } catch { return off("not_connected", "No saved keywords for this client yet. Save keywords in SEO → Keywords, then generate this report."); }
 }
 
-export async function buildClientReport(db: D1Database, workspace: Workspace, clientId: string, type: ReportType, period: Window): Promise<ClientReport> {
+export async function buildClientReport(db: D1Database, workspace: Workspace, clientId: string, type: ReportType, period: Window, options: { keywordGroups?: string[] } = {}): Promise<ClientReport> {
   const ownerId = String(workspace.ownerId || "");
   const client = (workspace.clients || []).find((item) => item.id === clientId);
   if (!client) throw new Error("Choose a client in this workspace.");
@@ -313,7 +319,7 @@ export async function buildClientReport(db: D1Database, workspace: Workspace, cl
   }
   else if (type === "keywords") {
     report.rankings = await rankings(db, ownerId, client, period, comparison);
-    report.keywordResearch = await keywordResearch(db, ownerId, client, report.rankings);
+    report.keywordResearch = await keywordResearch(db, ownerId, client, report.rankings, options.keywordGroups);
   } else {
     [report.traffic, report.rankings, report.backlinks, report.competitors, report.business, report.aiVisibility] = await Promise.all([
       organicTraffic(db, ownerId, client, period, comparison), rankings(db, ownerId, client, period, comparison), backlinks(db, ownerId, client, period, comparison),

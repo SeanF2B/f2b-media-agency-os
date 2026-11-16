@@ -18,9 +18,9 @@ export function ensureReportArchive(db: D1Database) {
 type Bucket = { put(key: string, value: string, options?: Record<string, unknown>): Promise<unknown>; get(key: string): Promise<{ text(): Promise<string> } | null> } | undefined;
 type ArchiveWorkspace = { ownerId?: string; clients?: Array<{ id: string; name: string; status?: string; googleAdsAccountId?: string; googleAnalyticsAccountId?: string; googleSearchConsoleAccountId?: string; googleBusinessProfileLocationId?: string; services?: Array<{ name?: string }>; seoServices?: string[] }> };
 
-export async function saveClientReport(db: D1Database, bucket: Bucket, workspace: ArchiveWorkspace, clientId: string, type: ReportType, period: { start: string; end: string }, kind: "monthly" | "manual", origin = APP_ORIGIN) {
+export async function saveClientReport(db: D1Database, bucket: Bucket, workspace: ArchiveWorkspace, clientId: string, type: ReportType, period: { start: string; end: string }, kind: "monthly" | "manual", origin = APP_ORIGIN, options: { keywordGroups?: string[] } = {}) {
   await ensureReportArchive(db);
-  const report = await buildClientReport(db, workspace as never, clientId, type, period);
+  const report = await buildClientReport(db, workspace as never, clientId, type, period, options);
   const html = renderClientReportHtml(report, { origin, agencyIconUrl: resolveAgencyLogoUrl(origin) });
   const ownerId = String(workspace.ownerId || "");
   const id = crypto.randomUUID();

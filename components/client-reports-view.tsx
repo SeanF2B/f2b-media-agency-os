@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ReportGeneratingAnimation } from "./report-generating-animation";
+import { KeywordReportBuilder } from "./keyword-report-builder";
 
 type ReportType = "ads" | "seo" | "audit" | "audit-ads" | "audit-website" | "keywords";
 export type ReportsMode = "reports" | "audits" | "keywords";
@@ -38,7 +39,7 @@ const META: Record<ReportType, { name: string; short: string; desc: string }> = 
 const MODE: Record<ReportsMode, { types: ReportType[]; title: string; intro: string; savedTitle: string; savedSub: string; empty: string }> = {
   reports: { types: ["ads", "seo"], title: "Performance reports", intro: "Branded SEO and Google Ads reports for", savedTitle: "Saved reports", savedSub: "Monthly reports are saved automatically on the 1st of each month for clients with Google Ads or SEO services.", empty: "No saved reports" },
   audits: { types: ["audit-website", "audit-ads", "audit"], title: "Marketing audits", intro: "Pick an audit — website, Google Ads or the full marketing audit — branded for", savedTitle: "Saved audits", savedSub: "Every audit you generate is filed in this client's Reports folder automatically.", empty: "No saved audits" },
-  keywords: { types: ["keywords"], title: "Keyword research", intro: "A branded keyword report from the saved keyword groups for", savedTitle: "Saved keyword reports", savedSub: "Every keyword report you generate is filed in this client's Reports folder automatically. Manage keywords in SEO → Keywords.", empty: "No saved keyword reports" },
+  keywords: { types: ["keywords"], title: "Keyword research", intro: "Find keywords, group them, and turn the groups into a branded report for", savedTitle: "Saved keyword reports", savedSub: "Every keyword report you generate is filed in this client's Reports folder automatically.", empty: "No saved keyword reports" },
 };
 const AUTO_REFRESH_MS = 15 * 60_000;
 
@@ -61,9 +62,11 @@ export function ClientReportsView({ clientId, clientName, mode = "reports" }: { 
   const [html, setHtml] = useState(""); const [loadedAt, setLoadedAt] = useState(""); const [busy, setBusy] = useState(false); const [saving, setSaving] = useState(false);
   const [error, setError] = useState(""); const [notice, setNotice] = useState(""); const [live, setLive] = useState(true);
   const [history, setHistory] = useState<Saved[]>([]);
+  const [groups, setGroups] = useState<string[]>([]);
+  useEffect(() => { setGroups([]); }, [clientId]);
   const frame = useRef<HTMLIFrameElement>(null);
   const range = useMemo(() => rangeFor(preset, from, to), [preset, from, to]);
-  const query = useMemo(() => new URLSearchParams({ clientId, type, start: range.start, end: range.end }).toString(), [clientId, type, range]);
+  const query = useMemo(() => new URLSearchParams({ clientId, type, start: range.start, end: range.end, ...(mode === "keywords" && groups.length ? { groups: groups.join(",") } : {}) }).toString(), [clientId, type, range, mode, groups]);
 
   const loadHistory = useCallback(async () => {
     try { const response = await fetch(`/api/client-reports?clientId=${encodeURIComponent(clientId)}&history=1`, { cache: "no-store" }); const payload = await response.json() as { reports?: Saved[] }; if (response.ok) setHistory((payload.reports || []).filter((item) => cfg.types.includes(item.type))); } catch { /* history is optional */ }
@@ -95,7 +98,7 @@ export function ClientReportsView({ clientId, clientName, mode = "reports" }: { 
   const save = async (auto = false) => {
     setSaving(true); setError("");
     try {
-      const response = await fetch("/api/client-reports", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId, type, start: range.start, end: range.end }) });
+      const response = await fetch("/api/client-reports", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId, type, start: range.start, end: range.end, ...(mode === "keywords" ? { groups } : {}) }) });
       const payload = await response.json() as { error?: string; reports?: Saved[] };
       if (!response.ok) throw new Error(payload.error || "The report could not be saved.");
       setHistory((payload.reports || []).filter((item) => cfg.types.includes(item.type))); setNotice(auto ? "Saved to this client's Reports folder." : "Saved to this client's report history.");
@@ -113,14 +116,15 @@ export function ClientReportsView({ clientId, clientName, mode = "reports" }: { 
       <header className="crv-head">
         <div><h2>{cfg.title}</h2><p>{cfg.intro} <b>{clientName}</b>, built from connected data and real CRM leads. Missing sources are shown as unavailable, never as zero.</p></div>
       </header>
-      <div className={`crv-types ${cfg.types.length === 1 ? "single" : ""}`} role="radiogroup" aria-label="Report type">
+      {mode === "keywords" && <KeywordReportBuilder key={clientId} clientId={clientId} clientName={clientName} picked={groups} onPicked={(ids) => { setGroups(ids); setHtml(""); }} />}
+      {mode !== "keywords" && <div className={`crv-types ${cfg.types.length === 1 ? "single" : ""}`} role="radiogroup" aria-label="Report type">
         {cfg.types.map((value) => <button key={value} type="button" role="radio" aria-checked={type === value} className={`crv-type ${type === value ? "on" : ""}`} onClick={() => { setType(value); setHtml(""); }}><TypeMark type={value} /><span><b>{META[value].name}</b><small>{META[value].desc}</small></span></button>)}
-      </div>
+      </div>}
       <div className="crv-controls">
         <label className="crv-field"><span>Period</span><select value={preset} onChange={(event) => { setPreset(event.target.value as Preset); setHtml(""); }}>{PRESETS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         {preset === "custom" && <><label className="crv-field"><span>From</span><input type="date" value={from} max={to || undefined} onChange={(event) => { setFrom(event.target.value); setHtml(""); }} /></label><label className="crv-field"><span>To</span><input type="date" value={to} min={from || undefined} onChange={(event) => { setTo(event.target.value); setHtml(""); }} /></label></>}
         <span className="crv-range">{fmtDate(range.start)} – {fmtDate(range.end)} · compared with the period before</span>
-        <button type="button" className="primary-button crv-go" disabled={busy || (preset === "custom" && (!from || !to))} onClick={() => void generate()}>{busy ? "Generating…" : html ? "Regenerate" : "Generate preview"}</button>
+        <button type="button" className="primary-button crv-go" disabled={busy || (preset === "custom" && (!from || !to)) || (mode === "keywords" && !groups.length)} onClick={() => void generate()}>{busy ? "Generating…" : html ? "Regenerate" : "Generate preview"}</button>
       </div>
       {error && <p className="error-text" role="alert">{error}</p>}
       {notice && <p className="crv-notice" role="status">{notice}</p>}
