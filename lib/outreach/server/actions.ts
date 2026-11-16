@@ -12,12 +12,13 @@ import { canRemoveSuppression } from "@/lib/outreach/reply-handling.mjs";
 import { buildPlaybookContext, buildCopywriterMessages, correctionFromEdit, parseJsonReply, KINDS } from "@/lib/outreach/playbook.mjs";
 import { buildMessage, newMessageId, replySubject } from "@/lib/outreach/mime.mjs";
 import { rampProgress, dailyAllowance } from "@/lib/outreach/ramp.mjs";
+import { DOMAIN_BLOCKLISTS, interpretBlocklist, buildDeliverabilityReport } from "@/lib/outreach/deliverability-report.mjs";
 import { monthlyCosts } from "@/lib/outreach/costs.mjs";
 import { newPlacementToken, seedAuthorizeUrl } from "@/lib/outreach/placement.mjs";
 import { templateVariables } from "@/lib/outreach/personalise.mjs";
 import { aiText, openRouterMonthUsd } from "./ai";
 import { mailHost, verifyHost, type HostName } from "./hosts";
-import { checkDomainAuth, planAndApply, rollbackChange } from "./dns";
+import { checkDomainAuth, dohA, planAndApply, rollbackChange } from "./dns";
 import { audit, cloudflareAccountId, cloudflareToken, db, ensureOutreachSchema, getSettings, listConnections, nowIso, parseJson, purchasesEnabled, removeConnection, saveConnection, saveSettings, telegramConfig, todayUtc, uuid, type OutreachSettings } from "./store";
 
 type Row = Record<string, any>;
@@ -99,7 +100,7 @@ export async function loadState(ctx: Ctx, query: URLSearchParams) {
     mailboxes: mailboxes.map((mailbox) => {
       const health = parseJson<Row>(mailbox.health_json, {});
       const allowance = dailyAllowance({ rampStartedAt: mailbox.ramp_started_at, targetDaily: mailbox.target_daily, domainRegisteredAt: domainMap[mailbox.domain]?.registered_at || null, healthBand: health.band || "grey", sentToday: todayCounts[mailbox.id] || 0 });
-      return { id: mailbox.id, email: mailbox.email, domain: mailbox.domain, host: mailbox.host, displayName: mailbox.display_name, firstName: mailbox.first_name || String(mailbox.display_name || "").split(" ")[0] || "", lastName: mailbox.last_name || String(mailbox.display_name || "").split(" ").slice(1).join(" "), photo: mailbox.photo_data || "", profileSyncedAt: mailbox.profile_synced_at, group: mailbox.group_label, tags: parseJson<string[]>(mailbox.tags_json, []), clientId: mailbox.client_id, status: mailbox.status, pausedReason: mailbox.paused_reason, targetDaily: mailbox.target_daily, sentToday: todayCounts[mailbox.id] || 0, limitToday: allowance.limit, rampPhase: allowance.phase, rampReason: allowance.reason, rampProgress: rampProgress({ rampStartedAt: mailbox.ramp_started_at, targetDaily: mailbox.target_daily }), health, monthlyCostCents: mailbox.monthly_cost_cents, renewsAt: mailbox.renews_at, campaigns: campaigns.filter((campaign) => parseJson<string[]>(campaign.mailbox_ids_json, []).includes(mailbox.id)).map((campaign) => ({ id: campaign.id, name: campaign.name })) };
+      return { id: mailbox.id, email: mailbox.email, domain: mailbox.domain, host: mailbox.host, displayName: mailbox.display_name, firstName: mailbox.first_name || String(mailbox.display_name || "").split(" ")[0] || "", lastName: mailbox.last_name || String(mailbox.display_name || "").split(" ").slice(1).join(" "), photo: mailbox.photo_data || "", profileSyncedAt: mailbox.profile_synced_at, warmupPending: Boolean(health.warmupRequestedAt) && !["ramping", "active"].includes(mailbox.status), authMissing: (parseJson<Row>(domainMap[mailbox.domain]?.last_check_json, {}).details || []) as string[], group: mailbox.group_label, tags: parseJson<string[]>(mailbox.tags_json, []), clientId: mailbox.client_id, status: mailbox.status, pausedReason: mailbox.paused_reason, targetDaily: mailbox.target_daily, sentToday: todayCounts[mailbox.id] || 0, limitToday: allowance.limit, rampPhase: allowance.phase, rampReason: allowance.reason, rampProgress: rampProgress({ rampStartedAt: mailbox.ramp_started_at, targetDaily: mailbox.target_daily }), health, monthlyCostCents: mailbox.monthly_cost_cents, renewsAt: mailbox.renews_at, campaigns: campaigns.filter((campaign) => parseJson<string[]>(campaign.mailbox_ids_json, []).includes(mailbox.id)).map((campaign) => ({ id: campaign.id, name: campaign.name })) };
     }),
     domains: domains.map((domain) => ({ id: domain.id, domain: domain.domain, host: domain.mail_host, protected: Boolean(domain.protected), check: parseJson<Row>(domain.last_check_json, {}), expiresAt: domain.expires_at, annualCostCents: domain.annual_cost_cents, dmarcStage: domain.dmarc_stage })),
     campaigns: campaigns.map((campaign) => ({
@@ -124,6 +125,24 @@ export async function runAction(ctx: Ctx, body: Row): Promise<Row> {
   if (!handler) throw new ActionError("Unknown action.");
   return handler(ctx, body);
 }
+
+/** Plans (and optionally applies) the mail DNS a domain needs: MX, SPF include, DMARC. Protected domains are never changed. */
+async function repairDomainDns(ctx: Ctx, domain: string, apply: boolean, reason: string) {
+  const row = await db().prepare("SELECT mail_host FROM outreach_domains WHERE owner_id = ?1 AND domain = ?2").bind(ctx.ownerId, domain).first<Row>();
+  if (!row || !["microsoft", "google"].includes(row.mail_host)) throw new ActionError("Domain not found or not on a connected mail host.", 404);
+  const host = await mailHost(ctx.ownerId, row.mail_host);
+  const settings = await getSettings(ctx.ownerId);
+  const service = await host.serviceRecords(domain);
+  const desired = { mx: service.filter((record) => record.type === "MX").map((record) => ({ host: record.content, priority: record.priority ?? 0 })), spfIncludes: [host.spfInclude], dmarc: { policy: "none" as const, rua: settings.dmarcReportEmail || undefined } };
+  const result = await planAndApply(ctx.ownerId, { domain, desired, apply, actor: ctx.actor, reason });
+  if (apply) await audit(ctx.ownerId, ctx.actor, "dns-apply", domain, { applied: result.applied });
+  return result;
+}
+
+const DKIM_HELP: Record<string, string> = {
+  google: "Switch on DKIM in Google Admin → Apps → Google Workspace → Gmail → Authenticate email → Generate new record, then Start authentication. Outreach keeps checking and starts warm-up once it's live.",
+  microsoft: "Switch on DKIM in Microsoft Defender → Email & collaboration → Policies → Email authentication settings → DKIM (or run the bulk script from Domains). Outreach keeps checking and starts warm-up once it's live.",
+};
 
 const HANDLERS: Record<string, (ctx: Ctx, body: Row) => Promise<Row>> = {
   async "save-settings"(ctx, body) {
@@ -249,14 +268,92 @@ const HANDLERS: Record<string, (ctx: Ctx, body: Row) => Promise<Row>> = {
     const settings = await getSettings(ctx.ownerId);
     const database = db();
     const now = nowIso();
+    // Outreach may manage DNS only for a dedicated outreach domain, never your main business domain.
+    const primaryDomain = (ctx.actor.split("@")[1] || "").toLowerCase();
+    const manage = body.manageDns === true && domain !== primaryDomain;
     await database.batch([
-      database.prepare("INSERT INTO outreach_domains (id, owner_id, domain, mail_host, protected, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6) ON CONFLICT(owner_id, domain) DO NOTHING").bind(uuid(), ctx.ownerId, domain, host, body.protected === false ? 0 : 1, now),
+      database.prepare("INSERT INTO outreach_domains (id, owner_id, domain, mail_host, protected, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6) ON CONFLICT(owner_id, domain) DO NOTHING").bind(uuid(), ctx.ownerId, domain, host, manage ? 0 : 1, now),
       database.prepare("INSERT INTO outreach_mailboxes (id, owner_id, email, domain, host, host_user_id, display_name, group_label, status, target_daily, monthly_cost_cents, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?3, ?6, ?7, 'setup', ?8, ?9, ?10, ?10) ON CONFLICT(owner_id, email) DO NOTHING")
         .bind(uuid(), ctx.ownerId, email, domain, host, str(body.displayName, 80) || email.split("@")[0], str(body.group, 60), Math.min(settings.defaultTargetDaily, Number(body.targetDaily) || settings.defaultTargetDaily), settings.seatPriceCents[host] ?? null, now),
     ]);
     const check = await checkDomainAuth(ctx.ownerId, domain, host, adapter.dkimSelectors);
     await audit(ctx.ownerId, ctx.actor, "connect-existing-mailbox", email, { domain, auth: check.allPass });
-    return { ok: true, check };
+    return { ok: true, check, protected: !manage, primaryDomain: domain === primaryDomain };
+  },
+  async "warmup-auto"(ctx, body) {
+    // One click: check authentication, repair what Outreach is allowed to repair, start the ramp the
+    // moment everything passes (the engine re-checks every few minutes), and say plainly what's left.
+    const ids = (Array.isArray(body.ids) ? body.ids : []).map((value: unknown) => str(value, 60)).filter(Boolean).slice(0, 200);
+    if (!ids.length) throw new ActionError("Select at least one mailbox.");
+    const database = db();
+    const rows = (await database.prepare(`SELECT m.id, m.email, m.domain, m.host, m.status, d.protected, d.mail_host FROM outreach_mailboxes m LEFT JOIN outreach_domains d ON d.owner_id = m.owner_id AND d.domain = m.domain WHERE m.owner_id = ?1 AND m.id IN (${placeholders(ids.length, 2)})`).bind(ctx.ownerId, ...ids).all<Row>()).results || [];
+    const checked = new Map<string, Row>();
+    const repaired = new Map<string, { applied: string[]; error?: string }>();
+    const results: Array<{ email: string; state: "started" | "already" | "fixing" | "needs-you"; message: string }> = [];
+    const now = nowIso();
+    for (const row of rows) {
+      if (["ramping", "active"].includes(row.status)) { results.push({ email: row.email, state: "already", message: "Already warming." }); continue; }
+      const host = String(row.mail_host || row.host) as HostName;
+      const selectors = host === "google" ? ["google"] : ["selector1", "selector2"];
+      if (!checked.has(row.domain)) checked.set(row.domain, await checkDomainAuth(ctx.ownerId, row.domain, host as never, selectors));
+      let check = checked.get(row.domain)!;
+      if (!check.allPass && !row.protected && !repaired.has(row.domain)) {
+        try {
+          const fix = await repairDomainDns(ctx, row.domain, true, "One-click warm-up");
+          repaired.set(row.domain, { applied: fix.applied });
+          if (fix.applied.length) { check = await checkDomainAuth(ctx.ownerId, row.domain, host as never, selectors); checked.set(row.domain, check); }
+        } catch (error) { repaired.set(row.domain, { applied: [], error: error instanceof Error ? error.message : "DNS couldn't be updated." }); }
+      }
+      if (check.allPass) {
+        await database.prepare("UPDATE outreach_mailboxes SET status = 'ramping', ramp_started_at = COALESCE(ramp_started_at, ?3), paused_reason = '', health_json = json_remove(COALESCE(NULLIF(health_json, ''), '{}'), '$.warmupRequestedAt'), updated_at = ?3 WHERE owner_id = ?1 AND id = ?2").bind(ctx.ownerId, row.id, now).run();
+        results.push({ email: row.email, state: "started", message: "Warm-up started." });
+        continue;
+      }
+      // Remember the request; the engine starts warm-up by itself once the records pass.
+      await database.prepare("UPDATE outreach_mailboxes SET health_json = json_set(COALESCE(NULLIF(health_json, ''), '{}'), '$.warmupRequestedAt', ?3), updated_at = ?3 WHERE owner_id = ?1 AND id = ?2").bind(ctx.ownerId, row.id, now).run();
+      const repair = repaired.get(row.domain);
+      const left: string[] = [];
+      const details = (check.details || []) as string[];
+      if (row.protected && (check.spf !== "pass" || check.dmarc !== "pass" || check.mx !== "pass")) left.push(`${row.domain} is protected, so Outreach won't change its DNS. ${details.filter((detail) => !/DKIM/.test(detail)).join(" ")} Turn off protection in Domains to let Outreach fix it, or add the records yourself.`);
+      else if (repair?.error) left.push(repair.error);
+      if (check.dkim !== "pass") left.push(DKIM_HELP[host] || "Publish DKIM for this domain.");
+      const fixedNote = repair?.applied.length ? `Added/updated ${repair.applied.length} DNS record${repair.applied.length === 1 ? "" : "s"}. ` : "";
+      results.push(left.length
+        ? { email: row.email, state: "needs-you", message: `${fixedNote}${left.join(" ")}` }
+        : { email: row.email, state: "fixing", message: `${fixedNote}Waiting for DNS to update — warm-up starts automatically when SPF, DKIM and DMARC pass.` });
+    }
+    await audit(ctx.ownerId, ctx.actor, "warmup-auto", `${rows.length} mailbox(es)`, { results: results.map((item) => `${item.email}:${item.state}`) });
+    return { results };
+  },
+  async "deliverability-report"(ctx, body) {
+    const database = db();
+    const mailbox = await database.prepare("SELECT m.*, d.last_check_json, d.registered_at FROM outreach_mailboxes m LEFT JOIN outreach_domains d ON d.owner_id = m.owner_id AND d.domain = m.domain WHERE m.owner_id = ?1 AND m.id = ?2").bind(ctx.ownerId, str(body.id, 60)).first<Row>();
+    if (!mailbox) throw new ActionError("Mailbox not found.", 404);
+    const days = 30;
+    const since = new Date(Date.now() - days * 86_400_000).toISOString();
+    const [day, replies, tests, dmarcTxt] = await Promise.all([
+      database.prepare("SELECT COALESCE(SUM(sent),0) AS sent, COALESCE(SUM(bounced),0) AS bounced, COALESCE(SUM(complaints),0) AS complaints FROM outreach_mailbox_days WHERE mailbox_id = ?1 AND day >= ?2").bind(mailbox.id, since.slice(0, 10)).first<Row>(),
+      database.prepare("SELECT COUNT(*) AS replies, SUM(CASE WHEN label IN ('positive','meeting-booked') THEN 1 ELSE 0 END) AS positive, SUM(CASE WHEN label = 'unsubscribe' THEN 1 ELSE 0 END) AS unsubscribes, SUM(CASE WHEN label = 'spam' THEN 1 ELSE 0 END) AS spam FROM outreach_replies WHERE owner_id = ?1 AND mailbox_id = ?2 AND received_at >= ?3 AND label NOT IN ('bounce','out-of-office')").bind(ctx.ownerId, mailbox.id, since).first<Row>(),
+      database.prepare("SELECT completed_at, inbox_rate, results_json FROM outreach_placement_tests WHERE owner_id = ?1 AND mailbox_id = ?2 AND status = 'done' ORDER BY completed_at DESC LIMIT 3").bind(ctx.ownerId, mailbox.id).all<Row>(),
+      fetch(`https://dns.google/resolve?name=${encodeURIComponent(`_dmarc.${mailbox.domain}`)}&type=TXT`, { headers: { Accept: "application/dns-json" } }).then((response) => response.json() as Promise<{ Answer?: Array<{ data: string }> }>).catch(() => ({ Answer: [] as Array<{ data: string }> })),
+    ]);
+    const blocklists = await Promise.all(DOMAIN_BLOCKLISTS.map(async (list) => {
+      try { return interpretBlocklist(list, await dohA(`${mailbox.domain}.${list.zone}`)); } catch (error) { return interpretBlocklist(list, null, error); }
+    }));
+    const auth = parseJson<Row>(mailbox.last_check_json, {});
+    const dmarcRecord = (dmarcTxt.Answer || []).map((answer) => String(answer.data).replace(/"/g, "")).find((value) => /v=DMARC1/i.test(value)) || "";
+    const health = parseJson<Row>(mailbox.health_json, {});
+    const allowance = dailyAllowance({ rampStartedAt: mailbox.ramp_started_at, targetDaily: mailbox.target_daily, domainRegisteredAt: mailbox.registered_at || null, healthBand: health.band || "grey", sentToday: 0 });
+    const report = buildDeliverabilityReport({
+      mailbox: { email: mailbox.email, status: mailbox.status, band: health.band, limitToday: allowance.limit, rampDay: mailbox.ramp_started_at ? Math.floor((Date.now() - Date.parse(mailbox.ramp_started_at)) / 86_400_000) + 1 : null, pausedReason: mailbox.paused_reason },
+      auth: { ...auth, dmarcPolicy: /p=(\w+)/i.exec(dmarcRecord)?.[1]?.toLowerCase() },
+      blocklists,
+      stats: { days, sent: Number(day?.sent || 0), bounced: Number(day?.bounced || 0), complaints: Number(day?.complaints || 0) + Number(replies?.spam || 0), unsubscribes: Number(replies?.unsubscribes || 0), replies: Number(replies?.replies || 0), positive: Number(replies?.positive || 0) },
+      placement: (tests.results || []).map((test) => ({ completedAt: test.completed_at, inboxRate: test.inbox_rate, results: parseJson(test.results_json, []) })),
+      postmaster: health.postmaster || null,
+      adaptive: health.adaptive || [],
+    });
+    return { email: mailbox.email, domain: mailbox.domain, generatedAt: nowIso(), dmarcRecord, ...report };
   },
   async "mailbox-profile"(ctx, body) {
     // The sender's real name and photo, pushed to the mailbox account so Outlook / Gmail show them.
@@ -305,16 +402,7 @@ const HANDLERS: Record<string, (ctx: Ctx, body: Row) => Promise<Row>> = {
     return { ok: true };
   },
   async "dns-plan"(ctx, body) {
-    const domain = str(body.domain, 253).toLowerCase();
-    const row = await db().prepare("SELECT mail_host FROM outreach_domains WHERE owner_id = ?1 AND domain = ?2").bind(ctx.ownerId, domain).first<Row>();
-    if (!row || !["microsoft", "google"].includes(row.mail_host)) throw new ActionError("Domain not found or not on a connected mail host.", 404);
-    const host = await mailHost(ctx.ownerId, row.mail_host);
-    const settings = await getSettings(ctx.ownerId);
-    const service = await host.serviceRecords(domain);
-    const desired = { mx: service.filter((record) => record.type === "MX").map((record) => ({ host: record.content, priority: record.priority ?? 0 })), spfIncludes: [host.spfInclude], dmarc: { policy: "none" as const, rua: settings.dmarcReportEmail || undefined } };
-    const result = await planAndApply(ctx.ownerId, { domain, desired, apply: body.apply === true, actor: ctx.actor, reason: "Repair from Infrastructure" });
-    if (body.apply === true) await audit(ctx.ownerId, ctx.actor, "dns-apply", domain, { applied: result.applied });
-    return result;
+    return repairDomainDns(ctx, str(body.domain, 253).toLowerCase(), body.apply === true, "Repair from Infrastructure");
   },
   async "dns-history"(ctx, body) {
     const domain = str(body.domain, 253).toLowerCase();

@@ -95,6 +95,14 @@ export async function rollbackChange(ownerId: string, changeId: string, actor: s
   await db().prepare("UPDATE outreach_dns_changes SET rolled_back_by = ?3 WHERE owner_id = ?1 AND id = ?2").bind(ownerId, changeId, id).run();
 }
 
+/** A-record lookup used for DNS blocklists (NXDOMAIN → []). */
+export async function dohA(name: string): Promise<string[]> {
+  const response = await fetch(`https://dns.google/resolve?name=${encodeURIComponent(name)}&type=A`, { headers: { Accept: "application/dns-json" }, signal: AbortSignal.timeout(8000) });
+  if (!response.ok) throw new Error(`Public DNS lookup failed for ${name}.`);
+  const body = await response.json() as { Status?: number; Answer?: Array<{ type: number; data: string }> };
+  return (body.Answer || []).filter((answer) => answer.type === 1).map((answer) => answer.data);
+}
+
 async function doh(name: string, type: "TXT" | "MX" | "CNAME"): Promise<string[]> {
   const response = await fetch(`https://dns.google/resolve?name=${encodeURIComponent(name)}&type=${type}`, { headers: { Accept: "application/dns-json" }, signal: AbortSignal.timeout(8000) });
   if (!response.ok) throw new Error(`Public DNS lookup failed for ${name}.`);

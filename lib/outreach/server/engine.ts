@@ -24,7 +24,7 @@ import { aiText } from "./ai";
 import { mailHost, mailboxPassword, type HostName, type InboundMessage } from "./hosts";
 import { checkDomainAuth, ensureZone, planAndApply, findZone } from "./dns";
 import { signUnsubscribe } from "./unsubscribe";
-import { alertOnce, cloudflareAccountId, cloudflareToken, db, ensureOutreachSchema, getSettings, nowIso, parseJson, purchasesEnabled, telegramConfig, todayUtc, uuid, type OutreachSettings } from "./store";
+import { alertOnce, audit, cloudflareAccountId, cloudflareToken, db, ensureOutreachSchema, getSettings, nowIso, parseJson, purchasesEnabled, telegramConfig, todayUtc, uuid, type OutreachSettings } from "./store";
 
 type Row = Record<string, any>;
 const placeholders = (count: number, start = 1) => Array.from({ length: count }, (_, index) => `?${index + start}`).join(", ");
@@ -42,6 +42,7 @@ export async function processOutreach(now = new Date()): Promise<Record<string, 
   await run("provisioning", () => runProvisioning(ownerId, settings, now));
   await run("placement", () => checkPlacementTests(ownerId, now));
   if (now.getUTCMinutes() < 5) await run("health", () => healthPass(ownerId, settings, now));
+  await run("warmups", () => pendingWarmups(ownerId, now));
   await run("auth", () => authChecks(ownerId, now));
   return report;
 }
@@ -414,6 +415,32 @@ async function healthPass(ownerId: string, settings: OutreachSettings, now: Date
     }
   }
   return { scored: mailboxes.length, paused };
+}
+
+/** Mailboxes where you clicked the flame while DNS was still failing: re-check every ~10 minutes and start the ramp once SPF, DKIM and DMARC pass. */
+async function pendingWarmups(ownerId: string, now: Date) {
+  const database = db();
+  const rows = (await database.prepare("SELECT m.id, m.email, m.domain, m.host, m.health_json, d.mail_host, d.last_checked_at, d.last_check_json FROM outreach_mailboxes m LEFT JOIN outreach_domains d ON d.owner_id = m.owner_id AND d.domain = m.domain WHERE m.owner_id = ?1 AND m.status IN ('setup', 'error') AND json_extract(m.health_json, '$.warmupRequestedAt') IS NOT NULL LIMIT 10").bind(ownerId).all<Row>()).results || [];
+  const checked = new Map<string, boolean>();
+  let started = 0;
+  for (const row of rows) {
+    const requestedAt = Date.parse(String(parseJson<Row>(row.health_json, {}).warmupRequestedAt || ""));
+    if (Number.isFinite(requestedAt) && now.getTime() - requestedAt > 7 * DAY) {
+      await database.prepare("UPDATE outreach_mailboxes SET health_json = json_remove(health_json, '$.warmupRequestedAt'), paused_reason = 'Warm-up request expired: DNS never passed. Click the flame to try again.', updated_at = ?2 WHERE id = ?1").bind(row.id, nowIso()).run();
+      continue;
+    }
+    if (!checked.has(row.domain)) {
+      const fresh = row.last_checked_at && now.getTime() - Date.parse(row.last_checked_at) < 9 * 60_000;
+      const host = String(row.mail_host || row.host);
+      const result = fresh ? parseJson<Row>(row.last_check_json, {}) : await checkDomainAuth(ownerId, row.domain, host as never, host === "google" ? ["google"] : ["selector1", "selector2"]).catch(() => null);
+      checked.set(row.domain, Boolean(result?.allPass));
+    }
+    if (!checked.get(row.domain)) continue;
+    await database.prepare("UPDATE outreach_mailboxes SET status = 'ramping', ramp_started_at = COALESCE(ramp_started_at, ?2), paused_reason = '', health_json = json_remove(health_json, '$.warmupRequestedAt'), updated_at = ?2 WHERE id = ?1").bind(row.id, nowIso()).run();
+    await audit(ownerId, "engine", "warmup-auto-started", row.email, { reason: "DNS now passes" });
+    started += 1;
+  }
+  return { started };
 }
 
 async function authChecks(ownerId: string, now: Date) {

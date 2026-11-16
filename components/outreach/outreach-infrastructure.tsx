@@ -1,15 +1,16 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Camera, CheckCircle2, CircleDashed, Copy, Flame, Globe, Loader2, Lock, Mail, Plus, RefreshCw, Search, ShieldCheck, Sparkles, Trash2, Undo2, X, XCircle } from "lucide-react";
+import { Activity, AlertTriangle, Camera, CheckCircle2, CircleDashed, Copy, Flame, Globe, Loader2, Lock, Mail, Plus, RefreshCw, Search, ShieldCheck, Sparkles, Trash2, Undo2, X, XCircle } from "lucide-react";
 import { money, outreachAction, pct, ago, type Health, type Mailbox, type OutreachState } from "./outreach-api";
+import type { DeliverabilityReport } from "@/lib/outreach/deliverability-report.mjs";
 
 type Act = <T>(action: string, body?: Record<string, unknown>, success?: string) => Promise<T | null>;
 
 // ============================ small visuals ============================
 /** Warm-up flame: size and glow follow the real ramp position; only animates while ramping. */
-export function FlameMeter({ progress, active }: { progress: number; active: boolean }) {
+export function FlameMeter({ progress, active, waiting = false }: { progress: number; active: boolean; waiting?: boolean }) {
   const level = Math.max(0, Math.min(1, progress));
-  return <span className={`ox-flame ${active ? "live" : ""} ${level >= 1 ? "full" : ""}`} style={{ ["--lvl" as string]: String(0.45 + level * 0.55) }} title={active ? `Warming up · ${Math.round(level * 100)}%` : level >= 1 ? "Fully warmed" : "Not warming"} aria-label={active ? `Warming up ${Math.round(level * 100)} percent` : "Warm-up off"}>
+  return <span className={`ox-flame ${active ? "live" : ""} ${waiting ? "waiting" : ""} ${level >= 1 ? "full" : ""}`} style={{ ["--lvl" as string]: String(0.45 + level * 0.55) }} title={active ? `Warming up · ${Math.round(level * 100)}%` : level >= 1 ? "Fully warmed" : "Not warming"} aria-label={active ? `Warming up ${Math.round(level * 100)} percent` : "Warm-up off"}>
     <Flame size={18} aria-hidden="true" />
   </span>;
 }
@@ -112,8 +113,54 @@ function SenderDrawer({ mailbox, act, onClose }: { mailbox: Mailbox; act: Act; o
   </aside></div>;
 }
 
+type WarmupResult = { email: string; state: "started" | "already" | "fixing" | "needs-you"; message: string };
+
+/** What one click on the flame did, mailbox by mailbox — and anything that genuinely needs you. */
+function WarmupResults({ results, onClose }: { results: WarmupResult[]; onClose: () => void }) {
+  const icon = (state: WarmupResult["state"]) => state === "started" || state === "already" ? <Flame size={16} className="ox-good-text" /> : state === "fixing" ? <Loader2 size={16} className="ox-spin" /> : <AlertTriangle size={16} className="ox-warn-text" />;
+  return <div className="ox-drawer-backdrop" onClick={onClose}><aside className="ox-drawer" role="dialog" aria-label="Warm-up" onClick={(event) => event.stopPropagation()}>
+    <header><h2>Warm-up</h2><button type="button" className="ox-icon" onClick={onClose} aria-label="Close"><X size={16} /></button></header>
+    <ul className="ox-warm-results">{results.map((item) => <li key={item.email} className={item.state}>{icon(item.state)}<span><b>{item.email}</b><small>{item.message}</small></span></li>)}</ul>
+    {results.some((item) => item.state === "fixing" || item.state === "needs-you") && <p className="ox-muted">You can close this. Outreach re-checks DNS every few minutes and starts warm-up on its own once everything passes.</p>}
+    <div className="ox-row-end"><button type="button" className="primary-button" onClick={onClose}>Done</button></div>
+  </aside></div>;
+}
+
+/** Deliverability & spam report for one mailbox — all from real checks and our own send records. */
+function ReportDrawer({ mailbox, onClose }: { mailbox: Mailbox; onClose: () => void }) {
+  const [report, setReport] = useState<(DeliverabilityReport & { generatedAt: string; domain: string; dmarcRecord: string }) | null>(null);
+  const [error, setError] = useState("");
+  const load = () => { setReport(null); setError(""); outreachAction<DeliverabilityReport & { generatedAt: string; domain: string; dmarcRecord: string }>("deliverability-report", { id: mailbox.id }).then(setReport).catch((reason) => setError(reason instanceof Error ? reason.message : "Couldn't build the report.")); };
+  useEffect(load, [mailbox.id]);
+  const stateIcon = (state: string) => state === "pass" || state === "clear" ? <CheckCircle2 size={14} /> : state === "unknown" ? <CircleDashed size={14} /> : <XCircle size={14} />;
+  return <div className="ox-drawer-backdrop" onClick={onClose}><aside className="ox-drawer wide ox-report" role="dialog" aria-label={`Deliverability report for ${mailbox.email}`} onClick={(event) => event.stopPropagation()}>
+    <header><h2>Deliverability report</h2><div className="ox-row"><button type="button" className="ox-icon" onClick={load} aria-label="Refresh"><RefreshCw size={15} /></button><button type="button" className="ox-icon" onClick={onClose} aria-label="Close"><X size={16} /></button></div></header>
+    <p className="ox-muted">{mailbox.email}{report ? ` · checked ${ago(report.generatedAt)}` : ""}</p>
+    {error && <p className="ox-warn-text"><AlertTriangle size={14} /> {error}</p>}
+    {!report && !error && <div className="ox-empty-small"><Loader2 size={16} className="ox-spin" /> Checking DNS, blocklists and sending history…</div>}
+    {report && <>
+      <div className={`ox-verdict ${report.verdict}`}><Activity size={18} /><b>{report.headline}</b></div>
+      <section><h3>Spam & engagement · last 30 days</h3><div className="ox-rate-grid">{report.rates.map((item) => <div key={item.key} className={`ox-rate ${item.tone || ""}`}><span>{item.label}</span><strong>{item.value}</strong></div>)}</div></section>
+      <section><h3>Authentication</h3><div className="ox-auth-row">{report.auth.map((item) => <span key={item.key} className={`ox-auth ${item.state}`}>{stateIcon(item.state)} {item.label}</span>)}</div>{report.dmarcRecord && <code className="ox-dmarc">{report.dmarcRecord}</code>}</section>
+      <section><h3>Domain blocklists</h3><ul className="ox-bl">{report.blocklists.map((item) => <li key={item.id} className={item.state}>{stateIcon(item.state)} <b>{item.name}</b> <small>{item.note}</small></li>)}</ul></section>
+      <section><h3>Inbox placement</h3>{report.placement ? <><p><b>{pct(report.placement.inboxRate)}</b> reached the inbox · {ago(report.placement.completedAt)}</p><ul className="ox-bl">{report.placement.results.map((item, index) => <li key={index} className={item.placement === "inbox" ? "clear" : item.placement === "missing" ? "unknown" : "listed"}>{stateIcon(item.placement === "inbox" ? "clear" : item.placement === "missing" ? "unknown" : "listed")} <b>{item.provider}</b> <small>{item.placement}</small></li>)}</ul></> : <p className="ox-muted">No test yet. Connect free test inboxes under Placement and run one.</p>}</section>
+      <section><h3>Sending speed</h3><p>{report.throttle.limitToday ?? "—"} emails allowed today{report.throttle.rampDay ? ` · warm-up day ${report.throttle.rampDay}` : ""} · safety band <span className={`ox-status ${report.throttle.band === "green" ? "active" : report.throttle.band === "red" ? "error" : "paused"}`}>{report.throttle.band}</span></p><small className="ox-muted">Volume rises only while these signals stay healthy, slows on amber and stops on red.</small></section>
+      {report.findings.length > 0 && <section><h3>What we found</h3><ul className="ox-findings">{report.findings.map((item, index) => <li key={index} className={item.tone}>{item.text}</li>)}</ul></section>}
+      {report.actions.length > 0 && <section><h3>What to do</h3><ol className="ox-actions">{report.actions.map((item) => <li key={item}>{item}</li>)}</ol></section>}
+    </>}
+  </aside></div>;
+}
+
 function MailboxTable({ state, act }: { state: OutreachState; act: Act }) {
   const [editing, setEditing] = useState<Mailbox | null>(null);
+  const [reportFor, setReportFor] = useState<Mailbox | null>(null);
+  const [warmResults, setWarmResults] = useState<WarmupResult[] | null>(null);
+  const warm = async (ids: string[]) => {
+    const result = await act<{ results: WarmupResult[] }>("warmup-auto", { ids });
+    if (!result) return;
+    const allStarted = result.results.every((item) => item.state === "started" || item.state === "already");
+    if (!allStarted || result.results.length > 1) setWarmResults(result.results);
+  };
   const [selected, setSelected] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [groupBy, setGroupBy] = useState<"domain" | "group">("domain");
@@ -122,13 +169,13 @@ function MailboxTable({ state, act }: { state: OutreachState; act: Act }) {
   const rows = state.mailboxes.filter((mailbox) => !query || `${mailbox.email} ${mailbox.group} ${mailbox.tags.join(" ")}`.toLowerCase().includes(query.toLowerCase()));
   const groups = useMemo(() => { const map = new Map<string, Mailbox[]>(); for (const mailbox of rows) { const key = (groupBy === "domain" ? mailbox.domain : mailbox.group) || "Ungrouped"; map.set(key, [...(map.get(key) || []), mailbox]); } return [...map.entries()]; }, [rows, groupBy]);
   const all = selected.length === rows.length && rows.length > 0;
-  const bulk = async (op: string, extra?: string) => { const result = await act<{ started?: number; blocked?: string[] }>("mailboxes-bulk", { ids: selected, op, value: extra }, op === "warmup-start" ? "Warm-up started" : "Updated"); if (result?.blocked?.length) alert(`Not started — authentication isn't verified yet for: ${result.blocked.join(", ")}`); setPrompt(null); setValue(""); };
+  const bulk = async (op: string, extra?: string) => { await act("mailboxes-bulk", { ids: selected, op, value: extra }, "Updated"); setPrompt(null); setValue(""); };
   if (!state.mailboxes.length) return <div className="ox-empty"><Mail size={28} /><h3>No mailboxes yet</h3><p>Use <b>Add mailboxes</b> to set up domains and inboxes automatically, or connect an existing mailbox to try the full workflow with one inbox.</p></div>;
   return <div className="ox-stack">
     <div className="ox-filters"><label className="ox-search"><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search mailboxes, groups, tags" aria-label="Search mailboxes" /></label><div className="ox-seg">{(["domain", "group"] as const).map((key) => <button key={key} type="button" className={groupBy === key ? "on" : ""} onClick={() => setGroupBy(key)}>By {key}</button>)}</div></div>
     {selected.length > 0 && <div className="ox-bulk" role="toolbar" aria-label="Bulk actions">
       <b>{selected.length} selected</b>
-      <button type="button" className="ox-fire" onClick={() => void bulk("warmup-start")}><Flame size={15} /> Start warm-up</button>
+      <button type="button" className="ox-fire" onClick={() => void warm(selected)}><Flame size={15} /> Start warm-up</button>
       <button type="button" onClick={() => void bulk("pause")}>Pause</button>
       <button type="button" onClick={() => void bulk("resume")}>Resume</button>
       <button type="button" onClick={() => setPrompt({ op: "assign", label: "Assign to campaign" })}>Assign to campaign</button>
@@ -138,18 +185,21 @@ function MailboxTable({ state, act }: { state: OutreachState; act: Act }) {
       <button type="button" className="ox-icon" onClick={() => setSelected([])} aria-label="Clear selection"><X size={15} /></button>
       {prompt && <span className="ox-bulk-prompt">{prompt.op === "assign" ? <select autoFocus value={value} onChange={(event) => setValue(event.target.value)} aria-label="Campaign"><option value="">Choose…</option>{state.campaigns.map((campaign) => <option key={campaign.id} value={campaign.id}>{campaign.name}</option>)}</select> : <input autoFocus value={value} onChange={(event) => setValue(event.target.value)} placeholder={prompt.label} aria-label={prompt.label} />}<button type="button" className="primary-button" disabled={!value} onClick={() => void bulk(prompt.op, value)}>Apply</button></span>}
     </div>}
-    <div className="ox-table-wrap"><table className="ox-table ox-mailboxes"><thead><tr><th><input type="checkbox" aria-label="Select all" checked={all} onChange={() => setSelected(all ? [] : rows.map((mailbox) => mailbox.id))} /></th><th>Mailbox</th><th>Warm-up</th><th>Today</th><th>Health</th><th>Campaigns</th><th>Cost / mo</th></tr></thead>
-      {groups.map(([group, items]) => <tbody key={group}><tr className="ox-group"><td colSpan={7}>{group} <small>{items.length}</small></td></tr>{items.map((mailbox) => <tr key={mailbox.id} className={selected.includes(mailbox.id) ? "sel" : ""}>
+    <div className="ox-table-wrap"><table className="ox-table ox-mailboxes"><thead><tr><th><input type="checkbox" aria-label="Select all" checked={all} onChange={() => setSelected(all ? [] : rows.map((mailbox) => mailbox.id))} /></th><th>Mailbox</th><th>Warm-up</th><th>Today</th><th>Health</th><th>Report</th><th>Campaigns</th><th>Cost / mo</th></tr></thead>
+      {groups.map(([group, items]) => <tbody key={group}><tr className="ox-group"><td colSpan={8}>{group} <small>{items.length}</small></td></tr>{items.map((mailbox) => <tr key={mailbox.id} className={selected.includes(mailbox.id) ? "sel" : ""}>
         <td><input type="checkbox" aria-label={`Select ${mailbox.email}`} checked={selected.includes(mailbox.id)} onChange={() => setSelected(selected.includes(mailbox.id) ? selected.filter((id) => id !== mailbox.id) : [...selected, mailbox.id])} /></td>
         <td><button type="button" className="ox-sender" onClick={() => setEditing(mailbox)} title="Edit sender name and photo"><SenderAvatar mailbox={mailbox} /><span><b>{mailbox.displayName || mailbox.email}</b><small>{mailbox.email}</small></span></button><small>{mailbox.host === "google" ? "Google" : "Microsoft"} · <span className={`ox-status ${mailbox.status}`}>{mailbox.status}</span>{mailbox.tags.map((tag) => <span key={tag} className="ox-tag">{tag}</span>)}</small>{mailbox.pausedReason && <small className="ox-warn-text">{mailbox.pausedReason}</small>}</td>
-        <td><button type="button" className="ox-flame-btn" onClick={() => void act("mailboxes-bulk", { ids: [mailbox.id], op: mailbox.status === "ramping" ? "warmup-pause" : "warmup-start" }, mailbox.status === "ramping" ? "Warm-up paused" : "Warm-up started")} title={mailbox.rampReason}><FlameMeter progress={mailbox.rampProgress} active={mailbox.status === "ramping"} /><small>{mailbox.status === "ramping" ? `${Math.round(mailbox.rampProgress * 100)}%` : mailbox.rampProgress >= 1 ? "Warm" : "Start"}</small></button></td>
+        <td><button type="button" className="ox-flame-btn" onClick={() => void (mailbox.status === "ramping" ? act("mailboxes-bulk", { ids: [mailbox.id], op: "warmup-pause" }, "Warm-up paused") : warm([mailbox.id]))} title={mailbox.warmupPending ? `Waiting for DNS — starts automatically. ${mailbox.authMissing.join(" ")}` : mailbox.status === "ramping" ? "Click to pause warm-up" : "Click to warm up — Outreach fixes the DNS and starts when it passes"}><FlameMeter progress={mailbox.rampProgress} active={mailbox.status === "ramping"} waiting={mailbox.warmupPending} />{mailbox.warmupPending ? <small>Waiting for DNS…</small> : <small>{mailbox.status === "ramping" ? `${Math.round(mailbox.rampProgress * 100)}%` : mailbox.rampProgress >= 1 ? "Warm" : "Start"}</small>}</button></td>
         <td><span className="ox-meter" aria-label={`${mailbox.sentToday} of ${mailbox.limitToday} sent today`}><span style={{ width: `${mailbox.limitToday ? Math.min(100, (mailbox.sentToday / mailbox.limitToday) * 100) : 0}%` }} /></span><small>{mailbox.sentToday}/{mailbox.limitToday}</small></td>
         <td><HealthPill health={mailbox.health} /></td>
+        <td><button type="button" className="ox-link" onClick={() => setReportFor(mailbox)}><Activity size={14} /> Report</button></td>
         <td>{mailbox.campaigns.map((campaign) => campaign.name).join(", ") || <span className="ox-muted">—</span>}</td>
         <td>{money(mailbox.monthlyCostCents)}</td>
       </tr>)}</tbody>)}
     </table></div>
     {editing && <SenderDrawer mailbox={editing} act={act} onClose={() => setEditing(null)} />}
+    {reportFor && <ReportDrawer mailbox={reportFor} onClose={() => setReportFor(null)} />}
+    {warmResults && <WarmupResults results={warmResults} onClose={() => setWarmResults(null)} />}
   </div>;
 }
 
@@ -206,7 +256,7 @@ function Provisioning({ state, act, reload }: { state: OutreachState; act: Act; 
   const [review, setReview] = useState<any>(null);
   const [approve, setApprove] = useState(false);
   const [busy, setBusy] = useState("");
-  const [existing, setExisting] = useState({ email: "", displayName: "" });
+  const [existing, setExisting] = useState({ email: "", displayName: "", manageDns: true });
   useEffect(() => { setIdentities((current) => Array.from({ length: perDomain }, (_, index) => current[index] || { firstName: "", lastName: "", local: "" })); }, [perDomain]);
   const order = () => ({ host, domains: [...Object.values(picked).map((offer) => ({ domain: offer.domain, buy: offer.buy, registrationCents: offer.registrationCents, renewalCents: offer.renewalCents, currency: offer.currency })), ...owned.split(/[\s,]+/).map((domain) => domain.trim().toLowerCase()).filter(Boolean).map((domain) => ({ domain, buy: false }))], inboxesPerDomain: perDomain, identities: identities.map((identity) => ({ ...identity, local: identity.local || identity.firstName.toLowerCase() })), group });
   const hostConnected = state.connections.some((connection) => connection.provider === host && connection.status === "ok");
@@ -215,9 +265,11 @@ function Provisioning({ state, act, reload }: { state: OutreachState; act: Act; 
     <div className="ox-seg" role="group">{([["new", "New domains & mailboxes"], ["existing", "Connect an existing mailbox"]] as const).map(([key, label]) => <button key={key} type="button" className={mode === key ? "on" : ""} onClick={() => setMode(key)}>{label}</button>)}</div>
     <div className="ox-seg" role="group" aria-label="Mail host">{(["microsoft", "google"] as const).map((key) => <button key={key} type="button" className={host === key ? "on" : ""} onClick={() => setHost(key)}>{key === "microsoft" ? "Microsoft 365" : "Google Workspace"}{state.connections.some((connection) => connection.provider === key && connection.status === "ok") ? " ✓" : ""}</button>)}</div>
     {!hostConnected && <p className="ox-warn-text"><AlertTriangle size={14} /> Connect {host === "microsoft" ? "Microsoft 365" : "Google Workspace"} in Settings (⚙︎ top right) first.</p>}
-    {mode === "existing" ? <div className="ox-panel"><h3>Try the whole workflow with one mailbox</h3><p className="ox-muted">Uses a mailbox that already exists in your connected account. Its domain is marked protected, so automation never touches that domain's DNS.</p>
+    {mode === "existing" ? <div className="ox-panel"><h3>Try the whole workflow with one mailbox</h3><p className="ox-muted">Uses a mailbox that already exists in your connected account. Then click its flame: Outreach fixes the domain's email DNS and starts warm-up as soon as it passes.</p>
       <div className="ox-grid2"><label className="ox-field">Mailbox email<input value={existing.email} onChange={(event) => setExisting({ ...existing, email: event.target.value })} placeholder="you@yourdomain.com" /></label><label className="ox-field">Sender name<input value={existing.displayName} onChange={(event) => setExisting({ ...existing, displayName: event.target.value })} placeholder="Sean Kelly" /></label></div>
-      <button type="button" className="primary-button" disabled={!hostConnected || !existing.email} onClick={() => void act("connect-existing-mailbox", { host, ...existing, protected: true, targetDaily: 10 }, "Mailbox connected — authentication checked")}>Connect mailbox</button></div> : <>
+      <button type="button" className="primary-button" disabled={!hostConnected || !existing.email} onClick={() => void act("connect-existing-mailbox", { host, ...existing, targetDaily: 10 }, "Mailbox connected — authentication checked")}>Connect mailbox</button>
+      <label className="ox-check"><input type="checkbox" checked={existing.manageDns} onChange={(event) => setExisting({ ...existing, manageDns: event.target.checked })} /> Let Outreach manage this domain's email DNS (SPF, DMARC, MX on Cloudflare)</label>
+      <small className="ox-muted">Use a dedicated outreach domain. Your main business domain is always protected and never changed.</small></div> : <>
       <div className="ox-panel"><h3>1 · Domains</h3>
         <div className="ox-row"><input value={business} onChange={(event) => setBusiness(event.target.value)} placeholder="Business name, e.g. F2B Media" aria-label="Business name" /><button type="button" className="primary-button" disabled={!business || busy === "suggest"} onClick={async () => { setBusy("suggest"); const result = await act<{ offers: Offer[] }>("domains-suggest", { businessName: business }); setBusy(""); if (result) setOffers(result.offers); }}>{busy === "suggest" ? <Loader2 className="ox-spin" size={15} /> : <Sparkles size={15} />} Suggest domains</button></div>
         {offers.length > 0 && <div className="ox-offers">{offers.map((offer) => { const on = Boolean(picked[offer.domain]); return <button key={offer.domain} type="button" disabled={!offer.available} className={on ? "on" : ""} onClick={() => setPicked((current) => { const next = { ...current }; if (on) delete next[offer.domain]; else next[offer.domain] = { ...offer, buy: true }; return next; })}><b>{offer.domain}</b><small>{offer.available ? `${money(offer.registrationCents, offer.currency)} first year · ${money(offer.renewalCents, offer.currency)}/yr` : "Taken"}</small>{on && <CheckCircle2 size={15} />}</button>; })}</div>}
