@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 const DEFAULT_STEPS = ["Gathering details…", "Connecting to your data sources…", "Reading performance data…", "Matching CRM leads and deals…", "Building charts…", "Checking every figure…", "Finalising your report…"];
 
-export type GeneratingVariant = "report" | "payslip" | "accountant";
+export type GeneratingVariant = "report" | "payslip" | "accountant" | "leads";
 
 /** €, £ or $ from the business's tax country (IE / GB / US); falls back to the currency code. */
 export function currencySymbolFor(country?: string, currency?: string) {
@@ -81,9 +81,27 @@ function AccountantArt({ symbol }: { symbol: string }) {
   </>;
 }
 
+// Lead generation: pins drop on a map under a sweeping magnifier while business cards get qualified (tick) or skipped (cross).
+function LeadsArt() {
+  const pins: Array<[number, number]> = [[70, 70], [104, 96], [86, 128], [128, 62], [138, 118], [62, 108]];
+  return <Monitor>
+    <rect x="50" y="34" width="110" height="118" rx="6" className="rga-map" />
+    <path d="M50 88 C80 80 110 104 160 92 M96 34 C92 70 112 110 104 152 M50 132 C90 122 120 140 160 130" className="rga-road" />
+    <path d="M128 34 C130 60 150 72 160 70" className="rga-road thin" />
+    {pins.map(([x, y], i) => <g key={i} className="rga-pin" style={{ animationDelay: `${i * 0.4}s` }}><path d={`M${x} ${y} c-5 -7 -7 -10 -7 -13 a7 7 0 0 1 14 0 c0 3 -2 6 -7 13z`} className={i % 3 === 2 ? "rga-pin-off" : "rga-pin-on"} /><circle cx={x} cy={y - 13} r="2.6" fill="#fff" /></g>)}
+    <g className="rga-scan"><circle cx="78" cy="84" r="17" className="rga-lens" /><circle cx="78" cy="84" r="17" className="rga-lens-rim" /><rect x="90" y="96" width="7" height="20" rx="3.5" transform="rotate(-42 93 106)" className="rga-handle" /></g>
+    {[0, 1, 2, 3].map((i) => { const y = 38 + i * 28, ok = i !== 2; return <g key={i} className="rga-lead" style={{ animationDelay: `${i * 0.6}s` }}>
+      <rect x="170" y={y} width="98" height="22" rx="5" className="rga-tile" />
+      <circle cx="182" cy={y + 11} r="6" className={ok ? "rga-avatar" : "rga-avatar off"} />
+      <rect x="193" y={y + 6} width="42" height="4" rx="2" className="rga-ink" /><rect x="193" y={y + 13} width="30" height="3.5" rx="1.75" className="rga-chip" />
+      <g className="rga-verdict" style={{ animationDelay: `${0.4 + i * 0.6}s` }}><circle cx="257" cy={y + 11} r="6.5" className={ok ? "rga-tick-bg" : "rga-cross-bg"} />{ok ? <path d={`M${253.5} ${y + 11} l2.4 2.4 l4.4 -5`} className="rga-tick-mark" /> : <path d={`M${254.5} ${y + 8.5} l5 5 M${259.5} ${y + 8.5} l-5 5`} className="rga-tick-mark" />}</g>
+    </g>; })}
+  </Monitor>;
+}
+
 /** Animated "at work" scene shown while something generates. `report` = charts on a computer (default),
  *  `payslip` = payslip + currency coin, `accountant` = receipts being checked and a calculator. */
-export function ReportGeneratingAnimation({ steps = DEFAULT_STEPS, title = "Generating your report", variant = "report", symbol = "€" }: { steps?: string[]; title?: string; variant?: GeneratingVariant; symbol?: string }) {
+export function ReportGeneratingAnimation({ steps = DEFAULT_STEPS, title = "Generating your report", variant = "report", symbol = "€", liveStep, progress, children }: { steps?: string[]; title?: string; variant?: GeneratingVariant; symbol?: string; liveStep?: string; progress?: number | null; children?: React.ReactNode }) {
   const [index, setIndex] = useState(0);
   useEffect(() => {
     setIndex(0);
@@ -97,14 +115,15 @@ export function ReportGeneratingAnimation({ steps = DEFAULT_STEPS, title = "Gene
           <linearGradient id="rga-screen" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="#f5f9ff" /><stop offset="1" stopColor="#e8f0fe" /></linearGradient>
           <linearGradient id="rga-area" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="#2f6ff0" stopOpacity=".35" /><stop offset="1" stopColor="#2f6ff0" stopOpacity="0" /></linearGradient>
         </defs>
-        {variant === "payslip" ? <PayslipArt symbol={symbol} /> : variant === "accountant" ? <AccountantArt symbol={symbol} /> : <ReportArt />}
+        {variant === "payslip" ? <PayslipArt symbol={symbol} /> : variant === "accountant" ? <AccountantArt symbol={symbol} /> : variant === "leads" ? <LeadsArt /> : <ReportArt />}
         <path d="M296 30 l3 7 7 3 -7 3 -3 7 -3 -7 -7 -3 7 -3z" className="rga-spark" />
         <path d="M22 90 l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2z" className="rga-spark s2" />
       </svg>
       <div className="rga-text">
         <b>{title}</b>
-        <span key={index} className="rga-step">{steps[index]}</span>
-        <div className="rga-progress" aria-hidden="true"><i style={{ width: `${Math.round(((index + 1) / steps.length) * 100)}%` }} /></div>
+        <span key={liveStep ?? index} className="rga-step">{liveStep || steps[index]}</span>
+        <div className="rga-progress" aria-hidden="true"><i style={{ width: `${Math.round((progress != null ? Math.max(0.04, Math.min(1, progress)) : (index + 1) / steps.length) * 100)}%` }} /></div>
+        {children}
       </div>
     </div>
   );
