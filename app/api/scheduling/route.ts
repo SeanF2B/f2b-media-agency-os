@@ -414,9 +414,11 @@ async function siteSampleFor(client: { id: string; name: string; email?: string;
       if (SERVICE_WORDS.test(t) || /\/services?\//i.test(href)) found.push(nice(t));
     }
     // Team: the home page plus the site's artists / team page, names with their photos.
-    const teamHref = [...html.matchAll(/<a\b[^>]*href="([^"#]+)"[^>]*>([\s\S]{0,120}?)<\/a>/gi)].find((m) => /\/(artists?|team|our-team|meet-the-team|staff|people|about)(\/|$|\.)/i.test(m[1]) || /^(artists?|our artists|team|our team|meet the team|staff)$/i.test(text(m[2])))?.[1];
-    debugInfo.teamHref = teamHref || ""; debugInfo.home = home.url; debugInfo.links = [...html.matchAll(/href="([^"#]+)"/gi)].map((m) => m[1]).filter((h) => !/\.(css|js|png|jpe?g|webp|svg|ico)(\?|$)/i.test(h)).slice(0, 60);
+    const hrefs = [...html.matchAll(/href="([^"#]+)"/gi)].map((m) => m[1]);
+    const teamHref = hrefs.find((h) => /\/(meet-the-team|our-team|the-team|team|artists?|our-artists|staff|people)(\/|$|\?)/i.test(h)) || hrefs.find((h) => /\/about(-us)?(\/|$)/i.test(h));
+    debugInfo.teamHref = teamHref || "";
     const pages = [html]; if (teamHref) { const abs = new URL(teamHref, home.url).href; if (new URL(abs).host === new URL(home.url).host) pages.push((await get(abs)).html); }
+    if (pages[1]) debugInfo.heads = [...pages[1].matchAll(/<(h1|h2|h3|h4|h5|h6|strong|figcaption)\b[^>]*>([\s\S]{1,140}?)<\/\1>/gi)].map((m) => text(m[2])).filter(Boolean).slice(0, 40), debugInfo.imgs = [...pages[1].matchAll(/<img\b[^>]*>/gi)].map((m) => m[0].slice(0, 220)).slice(0, 12);
     const NAME = /^([A-Z][A-Za-zÀ-ÿ'’.-]{1,20}( [A-Z][A-Za-zÀ-ÿ'’.-]{1,20}){0,2}|[A-Z]{2,4})$/;
     const notName = /^(Home|About|Contact|Book|Booking|Gallery|Shop|Blog|News|Reviews?|Services?|Prices?|Pricing|Faqs?|Team|Artists?|Our Team|Our Artists|Meet|Menu|Aftercare|Piercing|Piercings|Tattoo|Tattoos|Read More|Learn More|Instagram|Facebook|Tiktok|Email|Phone|Call|Opening Hours|Location|Find Us|Privacy|Terms|Cookie|Get In Touch|Follow Us|Studio|Welcome|Testimonials|Portfolio|Styles|View|Ireland|England|Birmingham|Dublin|Galway|Cork|London|Uk|Ie|Faq)$/i;
     const team: string[] = []; const photos: Record<string, string> = {};
