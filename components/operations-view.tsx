@@ -9,6 +9,7 @@ import { Briefcase, FileText, Globe, Check, Link2, Mail, MapPin, Megaphone, Mess
 import { AiVisibilityPanel } from "./ai-visibility-panel";
 import { RankTrackingPanel } from "./rank-tracking-panel";
 import { SiteFormsPanel } from "./site-forms-panel";
+import { SetupWizard } from "./setup-wizard";
 const SocialPlanner = lazy(() => import("./social-planner").then((module) => ({ default: module.SocialPlanner })));
 const EmailMarketingView = lazy(() => import("./email-marketing-view").then((module) => ({ default: module.EmailMarketingView })));
 
@@ -53,7 +54,17 @@ type SiteRow = { clientId: string; backend: string; previewUrl: string; repo: st
 // Websites (sites, landing pages, forms, media) · Email (builder, AI campaigns, automations) · Reports.
 const OPS_TABS: Array<[OperationsTab, string, LucideIcon]> = [["clients", "Clients", Briefcase], ["ads", "Google Ads", Megaphone], ["seo", "SEO & AI", Search], ["websites", "Websites", Globe], ["email", "Email", Mail], ["reports", "Reports", FileText]];
 export type OperationsTab = "overview" | "clients" | "ads" | "seo" | "websites" | "email" | "reports" | "onboarding";
-type SeoMode = "keywords" | "competitors" | "ranks" | "audit" | "backlinks" | "local" | "ai";
+type SeoMode = "overview" | "audit" | "local" | "ai" | "keywords" | "ranks" | "content" | "competitors" | "backlinks" | "setup";
+// SEO main tabs; Rankings, Site audit, Business Profile and AI visibility live inside the relevant tab.
+const SEO_MAIN: Array<{ key: string; label: string; views: Array<[SeoMode, string]> }> = [
+  { key: "overview", label: "Overview", views: [["overview", "Performance"], ["audit", "Site audit"], ["local", "Business Profile"], ["ai", "AI visibility"]] },
+  { key: "keywords", label: "Keywords", views: [["keywords", "Research"], ["ranks", "Rankings"]] },
+  { key: "content", label: "Content", views: [["content", "Content"]] },
+  { key: "competitors", label: "Competitors", views: [["competitors", "Competitors"]] },
+  { key: "backlinks", label: "Backlinks", views: [["backlinks", "Backlinks"]] },
+  { key: "setup", label: "Setup", views: [["setup", "Setup"]] },
+];
+const seoMainOf = (mode: SeoMode) => SEO_MAIN.find((group) => group.views.some(([key]) => key === mode)) || SEO_MAIN[0];
 type SiteMode = "sites" | "landing" | "forms" | "surveys" | "submissions" | "templates" | "media" | "settings";
 /** Older links/state used more tabs; map them onto the current areas (+ the sub-view they opened). */
 export function normalizeOpsTab(value: string): { tab: OperationsTab; sub?: string } {
@@ -93,7 +104,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
   onOpenPage: (page: string, clientId?: string) => void; onOpenWebsite: (client: OpsClient) => void; onOpenDns: () => void;
   onStartOnboarding?: (clientId: string) => void; onboarding?: React.ReactNode; automations?: React.ReactNode; hasLeadFactory?: boolean;
   onCreateGbpTask?: (clientId: string) => string; onCreateCommunityTask?: (clientId: string, results: CommunityResult[]) => string;
-  renderTool?: (tool: "keywords" | "seo-keywords" | "seo-competitors" | "seo-backlinks" | "seo-audit" | "audits" | "reports" | "media" | "ads" | "site-settings" | "landing" | "surveys" | "submissions", clientId: string) => React.ReactNode;
+  renderTool?: (tool: "keywords" | "seo-keywords" | "seo-overview" | "seo-content" | "seo-competitors" | "seo-backlinks" | "seo-audit" | "audits" | "reports" | "media" | "ads" | "site-settings" | "landing" | "surveys" | "submissions", clientId: string) => React.ReactNode;
 }) {
   const [toolClientId, setToolClientIdState] = useState(() => { try { return window.localStorage.getItem("f2b-ops-client") || ""; } catch { return ""; } });
   useFocusClient((id) => { if (id) setToolClientIdState(id); });
@@ -102,7 +113,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
   const [workroom, setWorkroom] = useState(false); // client workroom (full client profile) open inside the Clients tab
   const [siteMode, setSiteMode] = useState<SiteMode>("sites");
   const [reportMode, setReportMode] = useState<"audits" | "reports">("reports");
-  const [seoMode, setSeoMode] = useState<SeoMode>("keywords");
+  const [seoMode, setSeoMode] = useState<SeoMode>("overview");
   const [emailStart, setEmailStart] = useState<"campaigns" | "automations" | "system">("campaigns");
   // Old links (e.g. "forms", "local", "automations") land on the right section inside the new tabs.
   useEffect(() => {
@@ -212,9 +223,17 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
 
     {tab === "onboarding" && <><button type="button" className="text-button ops-back" onClick={() => onTab("clients")}>← Back to clients</button>{onboarding}</>}
 
+    {(tab === "seo" || tab === "ads") && selected && (() => { const site = hostOf(selected.website || selected.wordpressSiteUrl); const chips: Array<[string, boolean]> = tab === "ads" ? [["Google Ads account", Boolean(selected.googleAdsAccountId)], ["Website", Boolean(site)]] : [["Website", Boolean(site)], ["Search Console", Boolean(selected.googleSearchConsoleAccountId)], ["Analytics", Boolean(selected.googleAnalyticsAccountId)], ["Business Profile", Boolean(selected.googleBusinessProfileLocationId || selected.googleBusinessProfileAccountId)]]; return <div className="ops-client-strip">
+      <span className="ops-client">{selected.logo ? <img src={selected.logo} alt="" /> : <i style={{ background: selected.color || "#d9dee3" }} />}<b>{selected.name}</b></span>
+      {site ? <a href={`https://${site}`} target="_blank" rel="noreferrer" className="ops-strip-site">{site}</a> : onEditClient && <button type="button" className="text-button" onClick={() => onEditClient(selected.id)}>Add client website</button>}
+      <span className="ops-strip-chips">{chips.map(([label, ok]) => <span key={label} className={ok ? "ok" : "missing"} title={ok ? `${label} connected` : `${label} not connected`}>{ok ? "✓" : "○"} {label}</span>)}</span>
+      {chips.some(([, ok]) => !ok) && <button type="button" className="text-button" onClick={() => onOpenPage("Integrations", selected.id)}>Connect ↗</button>}
+    </div>; })()}
     {tab === "seo" && renderTool && selected && <>
-      <div className="ops-subbar">{seg(seoMode, setSeoMode, [["keywords", "Keywords"], ["competitors", "Competitors"], ["ranks", "Rankings"], ["audit", "Site audit"], ["backlinks", "Backlinks"], ["local", "Business Profile"], ["ai", "AI visibility"]], "SEO and AI sections")}</div>
-      {!["local", "ai"].includes(seoMode) && <div className="ops-embed" key={`seo-${seoMode}`}>{seoMode === "ranks" ? <RankTrackingPanel clientId={selected.id} clientName={selected.name} defaultLocation={seoLocation} /> : renderTool(seoMode === "competitors" ? "seo-competitors" : seoMode === "audit" ? "seo-audit" : seoMode === "backlinks" ? "seo-backlinks" : "seo-keywords", selected.id)}</div>}
+      <div className="ops-subbar">{seg(seoMainOf(seoMode).key, (key: string) => setSeoMode(SEO_MAIN.find((group) => group.key === key)!.views[0][0]), SEO_MAIN.map((group) => [group.key, group.label] as [string, string]), "SEO sections")}</div>
+      {seoMainOf(seoMode).views.length > 1 && <div className="ops-forms-toggle">{seg(seoMode, setSeoMode, seoMainOf(seoMode).views, "View")}</div>}
+      {!["local", "ai", "setup"].includes(seoMode) && <div className="ops-embed" key={`seo-${seoMode}`}>{seoMode === "ranks" ? <RankTrackingPanel clientId={selected.id} clientName={selected.name} defaultLocation={seoLocation} /> : renderTool(seoMode === "competitors" ? "seo-competitors" : seoMode === "audit" ? "seo-audit" : seoMode === "backlinks" ? "seo-backlinks" : seoMode === "overview" ? "seo-overview" : seoMode === "content" ? "seo-content" : "seo-keywords", selected.id)}</div>}
+      {seoMode === "setup" && <SetupWizard key={`seo-setup-${selected.id}`} kind="seo" clientId={selected.id} clientName={selected.name} onOpenTab={(target) => setSeoMode(target as SeoMode)} onEditClient={onEditClient ? () => onEditClient(selected.id) : undefined} />}
     </>}
     {tab === "email" && emailClient && <Suspense fallback={<div className="page-loading" role="status" aria-label="Loading email…"><i /></div>}><EmailMarketingView key={emailStart} initialMode={emailStart} clientId={emailClient.id} clientName={emailClient.name} clientLogo={emailClient.logo} clientColor={emailClient.color} automations={automations} /></Suspense>}
     {tab === "ads" && renderTool && selected && <div className="ops-embed">{renderTool("ads", selected.id)}</div>}
