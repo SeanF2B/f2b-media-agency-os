@@ -4,11 +4,11 @@ import { BarChart3, BookOpen, CalendarPlus, CheckCircle2, ClipboardList, Image a
 import { BrandIcon } from "./brand-icon";
 
 type HubTask = { id: string; clientId: string; title: string; status: string; assigneeId: string; due?: string; dueAt?: string; completedAt?: string; service?: string };
-type HubClient = { id: string; name: string; logo?: string };
+type HubClient = { id: string; name: string; logo?: string; googleAdsAccountId?: string };
 type HubStaff = { id: string; name: string; isBot?: boolean };
 type Stat = { value: number; previous: number | null } | null;
 type Marketing = {
-  currency: string; visits: (Stat & { metric?: string }) | null; visitsNote: string; adSpend: Stat; adClicks: Stat; adsNote: string; calls: Stat; profileClicks: Stat; businessNote: string; leads: Stat;
+  currency: string; visits: (Stat & { metric?: string }) | null; visitsNote: string; adSpend: Stat; adClicks: Stat; impressions?: Stat; conversions?: Stat; cpc?: Stat; costPerConversion?: Stat; adsNote: string; meta?: { spend: number; impressions: number; clicks: number; leads: number; cpc: number | null; costPerLead: number | null; accounts: number; linkedAccounts: number } | null; metaNote?: string; scope?: string; accounts?: number; linkedAccounts?: number; calls: Stat; profileClicks: Stat; businessNote: string; leads: Stat;
   google: { position: number | null; previous: number | null; tracked: number; top3: number } | null; rankNote: string;
   chatgpt: { share: number; previous: number | null; prompts: number; mentioned: number } | null; aiNote: string; bing: null; bingNote: string;
 };
@@ -16,6 +16,7 @@ type Metrics = { clientId: string; marketing: Marketing | null; appointments: Ar
 
 const CACHE_MS = 15 * 60_000;
 const money = (n: number, currency: string) => { try { return new Intl.NumberFormat("en-IE", { style: "currency", currency, maximumFractionDigits: 0 }).format(n); } catch { return `€${Math.round(n)}`; } };
+const money2 = (n: number, currency: string) => { try { return new Intl.NumberFormat("en-IE", { style: "currency", currency, maximumFractionDigits: 2 }).format(n); } catch { return `€${n.toFixed(2)}`; } };
 const num = (n: number) => new Intl.NumberFormat("en-IE").format(Math.round(n));
 const when = (iso?: string) => { if (!iso) return ""; const d = new Date(iso.length === 10 ? `${iso}T12:00:00` : iso); if (Number.isNaN(d.getTime())) return ""; const today = new Date(); const diff = Math.round((new Date(d.toDateString()).getTime() - new Date(today.toDateString()).getTime()) / 86_400_000); const time = iso.length > 10 ? ` · ${d.toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit" })}` : ""; return (diff === 0 ? "Today" : diff === 1 ? "Tomorrow" : diff === -1 ? "Yesterday" : d.toLocaleDateString("en-IE", { day: "numeric", month: "short" })) + time; };
 
@@ -34,7 +35,8 @@ function Tile({ icon, label, value, note, tone = "", children }: { icon: ReactNo
 
 export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate, onAddTask, onOpenTask }: { scopeClientId: string; clients: HubClient[]; tasks: HubTask[]; staff: HubStaff[]; onNavigate: (page: string) => void; onAddTask: () => void; onOpenTask?: (id: string) => void }) {
   const [pickedClient, setPickedClient] = useState(() => { try { return localStorage.getItem("f2b-dash-client") || ""; } catch { return ""; } });
-  const clientId = scopeClientId || (clients.some((c) => c.id === pickedClient) ? pickedClient : clients[0]?.id || "");
+  // Agency view defaults to all clients' Google Ads; a client can be picked for their full results.
+  const clientId = scopeClientId || (pickedClient === "all" || clients.some((c) => c.id === pickedClient) ? pickedClient || "all" : "all");
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(false);
   const [showAi, setShowAi] = useState(() => { try { return localStorage.getItem("f2b-dash-ai") !== "0"; } catch { return true; } });
@@ -70,23 +72,39 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
 
     <section className="panel dh-panel" aria-label="Website and marketing results">
       <div className="dh-head"><div><p className="eyebrow">📈 MARKETING · LAST 30 DAYS</p><h2>Website & search results</h2></div>
-        {!scopeClientId && clients.length > 1 && <label className="dh-client"><span>Client</span><select value={clientId} onChange={(e) => { setPickedClient(e.target.value); try { localStorage.setItem("f2b-dash-client", e.target.value); } catch { /* ignore */ } }}>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>}
+        {!scopeClientId && clients.length > 0 && <label className="dh-client"><span>Client</span><select value={clientId} onChange={(e) => { setPickedClient(e.target.value); try { localStorage.setItem("f2b-dash-client", e.target.value); } catch { /* ignore */ } }}><option value="all">All clients · Google Ads</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}{c.googleAdsAccountId ? " · Ads" : ""}</option>)}</select></label>}
       </div>
       {loading && !m ? <p className="dh-muted">Loading results…</p> : !m ? <p className="dh-muted">Results appear here once a client is chosen and you can view reports.</p> : <>
         <div className="dh-tiles">
           <Tile icon={<BrandIcon id="ga4" size={22} fallback={<BarChart3 size={18} />} />} label={`Website visits${m.visits?.metric ? ` · ${m.visits.metric}` : ""}`} value={m.visits ? num(m.visits.value) : "—"} note={m.visits ? "" : m.visitsNote} tone={m.visits && m.visits.previous != null && m.visits.value > m.visits.previous ? "good" : ""}><Delta now={m.visits?.value} before={m.visits?.previous} /></Tile>
-          <Tile icon={<BrandIcon id="google-ads" size={22} fallback={<BarChart3 size={18} />} />} label="Google Ads spend" value={m.adSpend ? money(m.adSpend.value, cur) : "—"} note={m.adSpend ? "Expense" : m.adsNote} tone="expense" />
-          <Tile icon={<MousePointerClick size={18} />} label="Ad clicks" value={m.adClicks ? num(m.adClicks.value) : "—"} note={m.adClicks ? "" : m.adsNote} tone={m.adClicks && m.adClicks.previous != null && m.adClicks.value > m.adClicks.previous ? "good" : ""}><Delta now={m.adClicks?.value} before={m.adClicks?.previous} /></Tile>
           <Tile icon={<Phone size={18} />} label="Calls from Google" value={m.calls ? num(m.calls.value) : "—"} note={m.calls ? "" : m.businessNote} tone={m.calls && m.calls.value > 0 ? "good" : ""}><Delta now={m.calls?.value} before={m.calls?.previous} /></Tile>
           <Tile icon={<BrandIcon id="business-profile" size={22} fallback={<MousePointerClick size={18} />} />} label="Profile website clicks" value={m.profileClicks ? num(m.profileClicks.value) : "—"} note={m.profileClicks ? "" : m.businessNote}><Delta now={m.profileClicks?.value} before={m.profileClicks?.previous} /></Tile>
           <Tile icon={<UserPlus size={18} />} label="Leads generated" value={m.leads ? num(m.leads.value) : "—"} tone={m.leads && m.leads.value > 0 ? "good" : ""} />
         </div>
-        <h3 className="dh-sub">Where you show up</h3>
+        <h3 className="dh-sub"><BrandIcon id="google-ads" size={16} fallback={null} /> Google Ads{m.scope === "all" && m.linkedAccounts ? ` · ${m.accounts || 0} of ${m.linkedAccounts} accounts` : ""}</h3>
+        <div className="dh-tiles">
+          <Tile icon={<BrandIcon id="google-ads" size={22} fallback={<BarChart3 size={18} />} />} label="Ad spend" value={m.adSpend ? money(m.adSpend.value, cur) : "—"} note={m.adSpend ? "Expense" : m.adsNote} tone="expense" />
+          <Tile icon={<MousePointerClick size={18} />} label="Clicks" value={m.adClicks ? num(m.adClicks.value) : "—"} tone={m.adClicks && m.adClicks.previous != null && m.adClicks.value > m.adClicks.previous ? "good" : ""}><Delta now={m.adClicks?.value} before={m.adClicks?.previous} /></Tile>
+          <Tile icon={<BarChart3 size={18} />} label="Impressions" value={m.impressions ? num(m.impressions.value) : "—"}><Delta now={m.impressions?.value} before={m.impressions?.previous} /></Tile>
+          <Tile icon={<span className="dh-cur">€</span>} label="Avg. CPC" value={m.cpc ? money2(m.cpc.value, cur) : "—"}><Delta now={m.cpc?.value} before={m.cpc?.previous} lowerIsBetter /></Tile>
+          <Tile icon={<CheckCircle2 size={18} />} label="Conversions" value={m.conversions ? num(m.conversions.value) : "—"} tone={m.conversions && m.conversions.value > 0 ? "good" : ""}><Delta now={m.conversions?.value} before={m.conversions?.previous} /></Tile>
+          <Tile icon={<UserPlus size={18} />} label="Cost per conversion" value={m.costPerConversion ? money2(m.costPerConversion.value, cur) : "—"}><Delta now={m.costPerConversion?.value} before={m.costPerConversion?.previous} lowerIsBetter /></Tile>
+        </div>
+        <h3 className="dh-sub"><BrandIcon id="meta-ads" size={16} fallback={null} /> Meta Ads{m.meta && m.scope === "all" ? ` · ${m.meta.accounts} of ${m.meta.linkedAccounts} accounts` : ""}</h3>
+        {m.meta ? <div className="dh-tiles">
+          <Tile icon={<BrandIcon id="meta-ads" size={22} fallback={<BarChart3 size={18} />} />} label="Ad spend" value={money(m.meta.spend, cur)} note="Expense" tone="expense" />
+          <Tile icon={<MousePointerClick size={18} />} label="Clicks" value={num(m.meta.clicks)} />
+          <Tile icon={<BarChart3 size={18} />} label="Impressions" value={num(m.meta.impressions)} />
+          <Tile icon={<span className="dh-cur">€</span>} label="Avg. CPC" value={m.meta.cpc != null ? money2(m.meta.cpc, cur) : "—"} />
+          <Tile icon={<UserPlus size={18} />} label="Leads" value={num(m.meta.leads)} tone={m.meta.leads > 0 ? "good" : ""} />
+          <Tile icon={<CheckCircle2 size={18} />} label="Cost per lead" value={m.meta.costPerLead != null ? money2(m.meta.costPerLead, cur) : "—"} />
+        </div> : <p className="dh-muted">{m.metaNote || "No Meta Ads data"}</p>}
+        {m.scope !== "all" && <><h3 className="dh-sub">Where you show up</h3>
         <div className="dh-ranks">
           <div className="dh-rank"><div className="dh-rank-logos"><BrandIcon id="google" size={24} fallback={<span>G</span>} /><span className="dh-rank-also" title="Chrome and Safari use Google search"><BrandIcon id="chrome" size={14} fallback={null} /><BrandIcon id="safari" size={14} fallback={null} /></span></div><small>Google · Chrome & Safari</small><b>{m.google?.position != null ? `#${m.google.position}` : "—"}</b>{m.google ? <em>avg of {m.google.tracked} keywords · {m.google.top3} in top 3 <Delta now={m.google.position} before={m.google.previous} lowerIsBetter suffix="" /></em> : <em>{m.rankNote || "Not tracked yet"}</em>}</div>
           <div className="dh-rank"><div className="dh-rank-logos"><BrandIcon id="bing" size={24} fallback={<span>b</span>} /><span className="dh-rank-also" title="Microsoft Edge uses Bing search"><BrandIcon id="edge" size={14} fallback={null} /></span></div><small>Bing · Microsoft Edge</small><b>—</b><em>{m.bingNote}</em></div>
           <div className="dh-rank"><div className="dh-rank-logos"><BrandIcon id="chatgpt" size={24} fallback={<Sparkles size={18} />} /></div><small>ChatGPT</small><b>{m.chatgpt ? `${Math.round(m.chatgpt.share)}%` : "—"}</b>{m.chatgpt ? <em>mentioned in {m.chatgpt.mentioned} of {m.chatgpt.prompts} questions <Delta now={m.chatgpt.share} before={m.chatgpt.previous} suffix=" pts" /></em> : <em>{m.aiNote || "No AI check yet"}</em>}</div>
-        </div>
+        </div></>}
       </>}
     </section>
 

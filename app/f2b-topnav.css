@@ -1083,7 +1083,7 @@ html body .app-shell .dh-head h2 { margin: 2px 0 0; font-size: 17px; }
 html body .app-shell .dh-head .eyebrow { display: inline-flex; align-items: center; gap: 5px; margin: 0; }
 html body .app-shell .dh-client { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #667085; }
 html body .app-shell .dh-client select { min-width: 170px; }
-html body .app-shell .dh-tiles { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+html body .app-shell .dh-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
 html body .app-shell .dh-tile { display: flex; gap: 10px; padding: 12px; border-radius: 13px; background: #f7f9fb; border: 1px solid #e8edf1; min-width: 0; }
 html body .app-shell .dh-tile.good { background: #effaf3; border-color: #cdebd8; }
 html body .app-shell .dh-tile.expense { background: #fff2f2; border-color: #f6d4d4; }
@@ -1130,3 +1130,4 @@ body.f2b-dark :is(.app-shell .dh-delta.good, .app-shell .dh-list small.good, #f2
 body.f2b-dark :is(.app-shell .dh-delta.bad, #f2b-dh-x) { color: #ff9b94 !important; -webkit-text-fill-color: #ff9b94 !important; }
 body.f2b-dark .app-shell .dh-delta.good { background: #1d3a2a !important; } body.f2b-dark .app-shell .dh-delta.bad { background: #3a1f1f !important; }
 body.f2b-dark .app-shell .dh-list li:hover { background: #222a30 !important; }
+html body .app-shell .dh-sub { display: flex; align-items: center; gap: 6px; } html body .app-shell .dh-cur { font-weight: 700; color: #475467; }
