@@ -1231,8 +1231,7 @@ html body .app-shell .dh-ads-embed .panel-heading .eyebrow { display: none; }
 html body .app-shell .dh-ads-embed .panel-heading h2 { font-size: 14px !important; }
 /* ===== Mobile top bar: sticky, compact, no AI button (the chat widget is the assistant) ===== */
 @media (max-width: 860px) {
-  html body .app-shell.topnav-layout .tn-bar { position: sticky !important; top: 0; z-index: 1200; margin: 0 -12px 10px !important; padding: calc(8px + env(safe-area-inset-top, 0px)) 10px 8px !important; border-radius: 0 0 18px 18px !important; background: color-mix(in srgb, var(--surface, #fff) 82%, transparent) !important; backdrop-filter: blur(16px) saturate(1.4); -webkit-backdrop-filter: blur(16px) saturate(1.4); display: flex !important; align-items: center; gap: 8px; flex-wrap: nowrap !important; }
-  html body.f2b-dark .app-shell.topnav-layout .tn-bar { background: rgba(18,22,27,.82) !important; }
+  html body .app-shell.topnav-layout .tn-bar { position: sticky !important; top: 0; z-index: 1200; margin: 0 -12px 10px !important; padding: calc(8px + env(safe-area-inset-top, 0px)) 10px 8px !important; border-radius: 0 0 18px 18px !important; display: flex !important; align-items: center; gap: 8px; flex-wrap: nowrap !important; }
   html body .app-shell.topnav-layout .tn-brand .tn-bot-logo, html body .app-shell.topnav-layout .ai-assistant-quick-link { display: none !important; }
   html body .app-shell.topnav-layout .tn-brand .tn-logo:not(.tn-logo-client) { display: grid !important; place-items: center; width: 36px; height: 36px; overflow: hidden; border-radius: 10px; }
   html body .app-shell.topnav-layout .tn-brand .tn-logo img { max-width: 34px !important; max-height: 34px !important; object-fit: contain; }
@@ -1666,4 +1665,10 @@ html body .app-shell :is(.tt-group-toggle, .tt-group-toggle:hover, .tt-group-tog
   html body .app-shell .pipeline-toolbar select { width: 100% !important; max-width: none !important; }
   /* generic: hide long helper paragraphs under section headers */
   html body .app-shell :is(.panel-heading, .lead-section-heading, .iv-card-head) > div > p { display: none !important; }
+}
+
+/* Mobile top bar: fixed to the top (always visible on scroll), same colours as desktop */
+@media (max-width: 860px) {
+  html body .app-shell.topnav-layout .tn-bar { position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; width: 100% !important; z-index: 1200 !important; margin: 0 !important; border-radius: 0 0 16px 16px !important; box-shadow: 0 6px 20px rgba(16,24,40,.12); }
+  html body .app-shell.topnav-layout .main-area { padding-top: calc(62px + env(safe-area-inset-top, 0px)) !important; }
 }
