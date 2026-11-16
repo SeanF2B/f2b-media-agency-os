@@ -9454,3 +9454,31 @@ html body.f2b-dark .f2b-on-light:is(input, textarea, #f2b-white-text-override)::
 .app-shell.dark-mode .sf-card small,.app-shell.dark-mode .sf-stats,.app-shell.dark-mode .sf-meta,.app-shell.dark-mode .sf-q-row small,.app-shell.dark-mode .sf-step-n,.app-shell.dark-mode .sf-history small{color:#9fb0ba}.app-shell.dark-mode .sf-stats b{color:#edf3f6}
 .app-shell.dark-mode .sf-name:hover,.app-shell.dark-mode .sf-name:focus,.app-shell.dark-mode .sf-step header input:focus{background:#171c20;border-color:#3c4850}
 .cv-filters{flex-wrap:wrap}.cv-filters button{min-width:max-content}
+
+/* Pipeline (Leads) and Tasks boards: each column scrolls on its own; the column title covers the cards fully (no cards peeking above/behind it) */
+.app-shell .crm-kanban { align-items: start !important; }
+.app-shell .crm-kanban > .crm-stage { max-height: calc(100vh - 230px); overflow-y: auto !important; overflow-x: hidden !important; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--stage-color, #94a3b8) 45%, transparent) transparent; }
+.app-shell .crm-kanban > .crm-stage > header.crm-stage-header { border-radius: 14px 14px 0 0; }
+.app-shell .pipeline-board > .pipeline-column { padding-top: 0 !important; }
+.app-shell .pipeline-board > .pipeline-column > .pipeline-column-head { margin: 0 -10px 8px !important; padding: 12px 20px 6px !important; border-radius: 16px 16px 0 0 !important; }
+
+/* Lead Factory ICP cards: the whole card highlights, not the inner button */
+.app-shell .lead-profile-card { transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease; cursor: pointer; }
+.app-shell .lead-profile-card:hover, .app-shell .lead-profile-card:focus-within { transform: translateY(-2px); border-color: var(--brand-secondary, var(--brand-primary, #2563eb)) !important; box-shadow: 0 0 0 1px var(--brand-secondary, var(--brand-primary, #2563eb)), 0 10px 24px color-mix(in srgb, var(--brand-secondary, var(--brand-primary, #2563eb)) 18%, transparent) !important; }
+.app-shell .lead-profile-card .lead-profile-select, .app-shell .lead-profile-card .lead-profile-select:hover, .app-shell .lead-profile-card .lead-profile-select:focus, .app-shell .lead-profile-card .lead-profile-select:focus-visible { border-color: transparent !important; box-shadow: none !important; outline: none !important; transform: none !important; background: transparent !important; }
+
+/* Lead Factory: country filter beside section headings */
+.app-shell .lead-heading-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.app-shell .lead-country-filter { display: inline-flex; align-items: center; gap: 8px; padding: 4px 4px 4px 12px; border: 1px solid rgba(127,138,160,.3); border-radius: 12px; background: var(--f2b-white, #fff); font-size: 12px; font-weight: 700; color: #667085; }
+.app-shell .lead-country-filter select { border: 0; background: transparent; font: inherit; font-size: 13px; font-weight: 600; color: inherit; padding: 6px 8px; cursor: pointer; }
+.app-shell.dark-mode .lead-country-filter { background: #1b2128; border-color: rgba(255,255,255,.14); color: #cbd5e1; }
+
+/* "Has a website": a proper checkbox, styled */
+.app-shell .lead-check { display: inline-flex; align-items: center; gap: 10px; padding: 8px 14px 8px 10px; border: 1px solid rgba(127,138,160,.3); border-radius: 12px; background: var(--f2b-white, #fff); cursor: pointer; user-select: none; transition: border-color .14s, box-shadow .14s, transform .14s; }
+.app-shell .lead-check:hover { transform: translateY(-1px); border-color: var(--brand-secondary, var(--brand-primary, #2563eb)); }
+.app-shell .lead-check input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.app-shell .lead-check-box { width: 20px; height: 20px; flex-shrink: 0; border-radius: 6px; border: 2px solid rgba(127,138,160,.55); display: grid; place-items: center; color: transparent; transition: background .14s, border-color .14s, color .14s; }
+.app-shell .lead-check.is-on .lead-check-box { background: var(--brand-primary, #2563eb); border-color: var(--brand-primary, #2563eb); color: #fff; }
+.app-shell .lead-check input:focus-visible + .lead-check-box { box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary, #2563eb) 30%, transparent); }
+.app-shell .lead-check-text { display: grid; line-height: 1.2; } .app-shell .lead-check-text b { font-size: 13px; } .app-shell .lead-check-text small { font-size: 11px; color: #667085; }
+.app-shell.dark-mode .lead-check { background: #1b2128; border-color: rgba(255,255,255,.14); } .app-shell.dark-mode .lead-check-text small { color: #94a3b8; }
