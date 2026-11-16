@@ -63,7 +63,6 @@ export async function GET(request: Request) {
       // Demo data helper: the client's own services, areas and team names, from their profile and website.
       const client = ctx.ws.clients.find((c) => c.id === (str(url.searchParams.get("clientId"), 80) || ctx.scope));
       if (!client) return json({ services: [], locations: [], team: [] });
-      if (url.searchParams.get("debug") === "1") { siteCache.clear(); const out = await siteSampleFor(client, db); return json({ ...out, debug: debugInfo }); }
       return json(await siteSampleFor(client, db));
     }
     if (view === "calendars") return json({ calendars: (await listCalendars(db, ctx.ws.ownerId, ctx.scope)).map((c) => ({ id: c.id, name: c.name, clientId: c.clientId })) });
@@ -353,7 +352,6 @@ async function suggest(ctx: Ctx) {
 }
 
 // ---- Sample-data helper: read the client's website once (cached) for service names, areas and team names.
-const debugInfo: Record<string, unknown> = {};
 type SiteSampleOut = { services: string[]; locations: string[]; team: string[]; photos: Record<string, string> };
 const siteCache = new Map<string, { at: number; value: SiteSampleOut }>();
 const SERVICE_WORDS = /(repair|install|replace|clean|survey|inspect|consult|design|fit|fitting|quote|service|maintenance|roof|gutter|chimney|kitchen|bathroom|tattoo|piercing|treatment|massage|facial|cut|colour|color|lesson|session|assessment|check|removal|painting|plaster|tiling|flooring|electrical|plumbing|heating|boiler|solar|window|door|garden|landscap|fencing|driveway|extension|renovat|cosmetic|whitening|implant|physio|therapy|training|coaching|valuation|viewing|measure)/i;
@@ -416,9 +414,7 @@ async function siteSampleFor(client: { id: string; name: string; email?: string;
     // Team: the home page plus the site's artists / team page, names with their photos.
     const hrefs = [...html.matchAll(/href="([^"#]+)"/gi)].map((m) => m[1]);
     const teamHref = hrefs.find((h) => /\/(meet-the-team|our-team|the-team|team|artists?|our-artists|staff|people)(\/|$|\?)/i.test(h)) || hrefs.find((h) => /\/about(-us)?(\/|$)/i.test(h));
-    debugInfo.teamHref = teamHref || "";
     const pages = [html]; if (teamHref) { const abs = new URL(teamHref, home.url).href; if (new URL(abs).host === new URL(home.url).host) pages.push((await get(abs)).html); }
-    if (pages[1]) debugInfo.heads = [...pages[1].matchAll(/<(h1|h2|h3|h4|h5|h6|strong|figcaption)\b[^>]*>([\s\S]{1,140}?)<\/\1>/gi)].map((m) => text(m[2])).filter(Boolean).slice(0, 40), debugInfo.imgs = [...pages[1].matchAll(/<img\b[^>]*>/gi)].map((m) => m[0].slice(0, 220)).slice(0, 12);
     const NAME = /^([A-Z][A-Za-zÀ-ÿ'’.-]{1,20}( [A-Z][A-Za-zÀ-ÿ'’.-]{1,20}){0,2}|[A-Z]{2,4})$/;
     const notName = /^(Home|About|Contact|Book|Booking|Gallery|Shop|Blog|News|Reviews?|Services?|Prices?|Pricing|Faqs?|Team|Artists?|Our Team|Our Artists|Meet|Menu|Aftercare|Piercing|Piercings|Tattoo|Tattoos|Read More|Learn More|Instagram|Facebook|Tiktok|Email|Phone|Call|Opening Hours|Location|Find Us|Privacy|Terms|Cookie|Get In Touch|Follow Us|Studio|Welcome|Testimonials|Portfolio|Styles|View|Ireland|England|Birmingham|Dublin|Galway|Cork|London|Uk|Ie|Faq)$/i;
     const team: string[] = []; const photos: Record<string, string> = {};
@@ -427,11 +423,16 @@ async function siteSampleFor(client: { id: string; name: string; email?: string;
       const pageUrl = i ? new URL(teamHref!, home.url).href : home.url;
       const scope = i ? page : (/(meet (the|our) (team|artists)|our (team|artists)|the (team|artists)|resident artists?)[\s\S]{0,12000}/i.exec(page)?.[0] || "");
       if (!scope) continue;
-      const imgs = [...scope.matchAll(/<img\b[^>]*>/gi)].map((m) => ({ at: m.index || 0, src: /(?:data-src|data-lazy-src|src)="([^"]+)"/i.exec(m[0])?.[1] || "", alt: /alt="([^"]*)"/i.exec(m[0])?.[1] || "" })).filter((x) => x.src && !/logo|icon|svg|sprite|placeholder|data:image/i.test(x.src));
+      const imgs = [...scope.matchAll(/<img\b[^>]*>/gi)].map((m) => ({ at: m.index || 0, src: /(?:data-src|data-lazy-src|src)="([^"]+)"/i.exec(m[0])?.[1] || "", alt: /alt="([^"]*)"/i.exec(m[0])?.[1] || "" })).filter((x) => x.src && !/logo|icon|svg|sprite|placeholder|empty|blank|spacer|transparent|data:image/i.test(x.src));
+      let lastAt = -9999;
       for (const m of scope.matchAll(/<(h2|h3|h4|h5|h6|strong|figcaption)\b[^>]*>([\s\S]{1,100}?)<\/\1>/gi)) {
-        const t = text(m[2]).replace(/\s*[-–|:].*$/, "").trim(); if (!NAME.test(t) || notName.test(t) || SERVICE_WORDS.test(t) || team.includes(t)) continue;
-        const at = m.index || 0; const near = imgs.filter((x) => Math.abs(x.at - at) < 1500).sort((a, b) => Math.abs(a.at - at) - Math.abs(b.at - at))[0] || imgs.find((x) => x.alt && x.alt.toLowerCase().includes(t.toLowerCase()));
-        team.push(t); if (near) photos[t] = absImg(near.src, pageUrl);
+        let t = text(m[2]).replace(/\s*[-–|:].*$/, "").trim(); if (!NAME.test(t) || notName.test(t) || SERVICE_WORDS.test(t)) continue;
+        // "Adriana" + "Castillo" in back-to-back headings = one person.
+        const prev = team[team.length - 1]; if (prev && !prev.includes(" ") && !t.includes(" ") && /^[A-Z][a-z]/.test(t) && (m.index || 0) - lastAt < 260) { const full = `${prev} ${t}`; team[team.length - 1] = full; if (photos[prev]) { photos[full] = photos[prev]; delete photos[prev]; } lastAt = m.index || 0; continue; }
+        if (team.includes(t) || team.some((n) => n.startsWith(`${t} `) || n.endsWith(` ${t}`))) { lastAt = m.index || 0; continue; }
+        lastAt = m.index || 0;
+        const at = m.index || 0; const used = new Set(Object.values(photos)); const near = imgs.find((x) => x.alt && x.alt.toLowerCase().includes(t.toLowerCase())) || imgs.filter((x) => Math.abs(x.at - at) < 1200 && !used.has(absImg(x.src, pageUrl))).sort((a, b) => Math.abs(a.at - at) - Math.abs(b.at - at))[0];
+        void t; t = t.trim(); team.push(t); if (near) photos[t] = absImg(near.src, pageUrl);
         if (team.length >= 6) break;
       }
       for (const x of imgs) { const t = text(x.alt).replace(/\s*[-–|:].*$/, "").trim(); if (team.length < 6 && NAME.test(t) && !notName.test(t) && !team.includes(t) && !SERVICE_WORDS.test(t) && /artist|team|staff|tattoo/i.test(x.src + scope.slice(Math.max(0, x.at - 300), x.at + 300))) { team.push(t); photos[t] = absImg(x.src, pageUrl); } }
