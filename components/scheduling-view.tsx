@@ -93,6 +93,7 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
   const [editProfile, setEditProfile] = useState<Staff | null>(null);
   const [listMode, setListMode] = useState<"upcoming" | "past" | "cancelled">("upcoming");
   const dragRef = useRef<{ id: string; grabMin: number } | null>(null);
+  const [sel, setSel] = useState<{ day: string; a: number; b: number; moved: boolean } | null>(null); // drag on empty time to create
   const [dropHint, setDropHint] = useState<{ day: string; min: number } | null>(null);
   const moveBooking = async (b: Booking, dayKey: string, minOfDay: number) => {
     const start = new Date(`${dayKey}T00:00:00`); start.setMinutes(minOfDay);
@@ -220,7 +221,12 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
               onDragOver={(e) => { if (!dragRef.current) return; e.preventDefault(); e.dataTransfer.dropEffect = "move"; const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect(); const m = Math.max(HOURS_FROM * 60, Math.min(HOURS_TO * 60 - 15, Math.round(((e.clientY - rect.top) / PX_PER_MIN - dragRef.current.grabMin) / 15) * 15 + HOURS_FROM * 60)); if (!dropHint || dropHint.day !== key || dropHint.min !== m) setDropHint({ day: key, min: m }); }}
               onDragLeave={(e) => { if (e.currentTarget === e.target) setDropHint(null); }}
               onDrop={(e) => { e.preventDefault(); const drag = dragRef.current; dragRef.current = null; const hint = dropHint; setDropHint(null); const b = drag && data?.bookings.find((x) => x.id === drag.id); if (b && hint) void moveBooking(b, hint.day, hint.min); }}
-              onClick={(e) => { if (e.target !== e.currentTarget) return; const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect(); const mins = Math.floor(((e.clientY - rect.top) / PX_PER_MIN) / 30) * 30 + HOURS_FROM * 60; setNewAppt({ date: key, time: `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}` }); }} title="Click an empty time to add an appointment">
+              onPointerDown={(e) => { if (e.target !== e.currentTarget || e.button !== 0) return; const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect(); const m = Math.max(HOURS_FROM * 60, Math.min(HOURS_TO * 60 - 15, Math.floor(((e.clientY - rect.top) / PX_PER_MIN) / 15) * 15 + HOURS_FROM * 60)); (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId); setSel({ day: key, a: m, b: m + 30, moved: false }); }}
+              onPointerMove={(e) => { if (!sel || sel.day !== key) return; const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect(); const m = Math.max(HOURS_FROM * 60, Math.min(HOURS_TO * 60, Math.ceil(((e.clientY - rect.top) / PX_PER_MIN) / 15) * 15 + HOURS_FROM * 60)); const b = Math.max(sel.a + 15, m); if (b !== sel.b) setSel({ ...sel, b, moved: true }); }}
+              onPointerUp={() => { if (!sel || sel.day !== key) return; const { a, b, moved } = sel; setSel(null); setNewAppt({ date: key, time: `${String(Math.floor(a / 60)).padStart(2, "0")}:${String(a % 60).padStart(2, "0")}`, durationMin: moved ? b - a : undefined }); }}
+              onPointerCancel={() => setSel(null)}
+              title="Click or drag on an empty time to add an appointment">
+              {sel?.day === key && <div className="sch-sel" style={{ top: (sel.a - HOURS_FROM * 60) * PX_PER_MIN, height: Math.max(14, (sel.b - sel.a) * PX_PER_MIN) }}><b>{String(Math.floor(sel.a / 60)).padStart(2, "0")}:{String(sel.a % 60).padStart(2, "0")} – {String(Math.floor(sel.b / 60)).padStart(2, "0")}:{String(sel.b % 60).padStart(2, "0")}</b><small>{sel.b - sel.a >= 60 ? `${Math.floor((sel.b - sel.a) / 60)}h${(sel.b - sel.a) % 60 ? ` ${(sel.b - sel.a) % 60}m` : ""}` : `${sel.b - sel.a} min`}</small></div>}
               {Array.from({ length: HOURS_TO - HOURS_FROM }, (_, i) => <i key={i} className="sch-line" style={{ top: i * 60 * PX_PER_MIN }} />)}
               {key === todayKey && (() => { const n = new Date(); const m = n.getHours() * 60 + n.getMinutes() - HOURS_FROM * 60; return m > 0 && m < (HOURS_TO - HOURS_FROM) * 60 ? <i className="sch-now" style={{ top: m * PX_PER_MIN }} /> : null; })()}
               {dropHint?.day === key && <i className="sch-drop-hint" style={{ top: (dropHint.min - HOURS_FROM * 60) * PX_PER_MIN }}><b>{String(Math.floor(dropHint.min / 60)).padStart(2, "0")}:{String(dropHint.min % 60).padStart(2, "0")}</b></i>}
@@ -402,7 +408,7 @@ function SlotPicker({ data, scope, calendarId, staffIds, date, exclude, value, o
   return <div className="sch-times">{slots.map((s) => <button key={s.start} type="button" className={value === s.start ? "on" : ""} onClick={() => onPick(s)}>{time(s.start)}</button>)}</div>;
 }
 
-type ApptDraft = { date: string; time: string; calendarId?: string; staffIds?: string[]; name?: string; email?: string; phone?: string; notes?: string };
+type ApptDraft = { date: string; time: string; durationMin?: number; calendarId?: string; staffIds?: string[]; name?: string; email?: string; phone?: string; notes?: string };
 
 function NewAppointment({ data, scope, initial, onClose, onSaved, onCalendarsChanged }: { data: Data; scope: string; initial: ApptDraft; onClose: () => void; onSaved: (msg: string) => void; onCalendarsChanged: () => void }) {
   const [calendars, setCalendars] = useState<Calendar[]>(data.calendars);
@@ -416,7 +422,7 @@ function NewAppointment({ data, scope, initial, onClose, onSaved, onCalendarsCha
   const [form, setForm] = useState({ name: initial.name || "", email: initial.email || "", phone: initial.phone || "", notes: initial.notes || "" });
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [location, setLocation] = useState("");
-  const [duration, setDuration] = useState(0); // 0 = the appointment type's own length
+  const [duration, setDuration] = useState(initial.durationMin || 0); // 0 = the appointment type's own length
   const [price, setPrice] = useState("");
   const [images, setImages] = useState<string[]>([]);
   const [uploading, setUploading] = useState(0);
@@ -473,12 +479,12 @@ function NewAppointment({ data, scope, initial, onClose, onSaved, onCalendarsCha
     </div>
     <h3 className="sch-h3">2 · What and with who?</h3>
     {!calendars.length ? <div className="iv-small">Getting things ready…</div> : <>
-      <div className="sch-type-pick">{calendars.map((c) => <button key={c.id} type="button" className={c.id === calendarId ? "on" : ""} style={{ ["--c" as string]: c.color }} onClick={() => setCalendarId(c.id)}><b>{c.name}</b><small>{c.durationMin} min{data.scope === null && c.clientId ? ` · ${data.clients.find((x) => x.id === c.clientId)?.name || ""}` : ""}</small></button>)}</div>
+      <div className="sch-type-pick">{calendars.map((c) => <button key={c.id} type="button" className={c.id === calendarId ? "on" : ""} style={{ ["--c" as string]: c.color }} onClick={() => setCalendarId(c.id)}><b>{c.name}</b><small>{c.id === calendarId && duration ? (duration >= 60 ? `${duration / 60 % 1 ? (duration / 60).toFixed(1) : duration / 60} h` : `${duration} min`) : `${c.durationMin} min`}{data.scope === null && c.clientId ? ` · ${data.clients.find((x) => x.id === c.clientId)?.name || ""}` : ""}</small></button>)}</div>
       <div className="sch-staff-pick compact">
         {!custom && <button type="button" className={staffIds.length ? "" : "on"} aria-pressed={!staffIds.length} onClick={() => { setStaffIds([]); setSlot(""); }}><span className="sch-avatar" style={{ width: 26, height: 26, fontSize: 12 }}>★</span><span><b>{cal?.assignMode === "collective" ? "Everyone on this type" : "Anyone free"}</b></span></button>}
         {pool.map((s) => { const on = staffIds.includes(s.id); return <button key={s.id} type="button" className={on ? "on" : ""} aria-pressed={on} onClick={() => { setStaffIds(on ? staffIds.filter((x) => x !== s.id) : [...staffIds, s.id]); setSlot(""); }}><Avatar person={s} size={26} /><span><b>{s.name}</b></span></button>; })}
       </div>
-      {staffIds.length > 1 && <div className="iv-small">They'll all be booked together, so only times when everyone is free are shown.</div>}
+      {staffIds.length > 1 && !custom && <div className="iv-small">They'll all be booked together, so only times when everyone is free are shown.</div>}
     </>}
     <h3 className="sch-h3">3 · When?</h3>
     <div className="sch-daystrip">{days.map((d) => { const k = ymd(d); return <button key={k} type="button" className={date === k ? "on" : ""} onClick={() => { setDate(k); setSlot(""); }}><small>{d.toLocaleDateString("en-IE", { weekday: "short" })}</small><b>{d.getDate()}</b><small>{d.toLocaleDateString("en-IE", { month: "short" })}</small></button>; })}
@@ -487,7 +493,7 @@ function NewAppointment({ data, scope, initial, onClose, onSaved, onCalendarsCha
       : cal ? <><SlotPicker data={data} scope={scope} calendarId={calendarId} staffIds={staffIds} date={date} value={slot} onPick={(s) => setSlot(s.start)} /><button type="button" className="sch-linkbtn" onClick={useAnyTime}>Need a time that isn't listed? Pick any time</button></> : null}
     {cal?.questions.length ? <><h3 className="sch-h3">Details</h3><div className="iv-grid">{cal.questions.map((q) => <Field key={q.id} label={q.label}>{q.type === "select" ? <select value={answers[q.id] || ""} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}><option value="">Choose…</option>{(q.options || []).map((o) => <option key={o}>{o}</option>)}</select> : <input value={answers[q.id] || ""} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })} />}</Field>)}</div></> : null}
     {cal && <><h3 className="sch-h3">Length, price &amp; photos</h3><div className="iv-grid">
-      <Field label="How long?"><select value={duration} onChange={(e) => setDuration(Number(e.target.value))}><option value={0}>Default ({cal.durationMin} min)</option>{[15, 30, 45, 60, 90, 120, 180, 240, 300, 360, 480].filter((m) => m !== cal.durationMin).map((m) => <option key={m} value={m}>{m < 60 ? `${m} min` : `${m / 60 % 1 ? (m / 60).toFixed(1) : m / 60} hour${m === 60 ? "" : "s"}`}</option>)}</select></Field>
+      <Field label="How long?"><select value={duration} onChange={(e) => setDuration(Number(e.target.value))}><option value={0}>Default ({cal.durationMin} min)</option>{[...new Set([15, 30, 45, 60, 90, 120, 180, 240, 300, 360, 480, ...(duration ? [duration] : [])])].sort((a, b) => a - b).filter((m) => m !== cal.durationMin).map((m) => <option key={m} value={m}>{m < 60 ? `${m} min` : `${m / 60 % 1 ? (m / 60).toFixed(1) : m / 60} hour${m === 60 ? "" : "s"}`}</option>)}</select></Field>
       <Field label={`Price (${cal.currency || "EUR"})`}><input type="number" inputMode="decimal" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} placeholder={cal.price ? String(cal.price) : "Optional"} /></Field>
     </div>
     <div className="sch-appt-photos">{images.map((u) => <span key={u} className="sch-appt-photo"><img src={u} alt="" /><button type="button" aria-label="Remove photo" onClick={() => setImages(images.filter((x) => x !== u))}>×</button></span>)}

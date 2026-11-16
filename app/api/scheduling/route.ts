@@ -396,6 +396,7 @@ async function siteSampleFor(client: { id: string; name: string; email?: string;
   const emailDomain = /@([a-z0-9.-]+\.[a-z]{2,})$/i.exec(String(client.email || ""))?.[1] || "";
   const freeMail = /^(gmail|googlemail|hotmail|outlook|live|yahoo|icloud|me|aol|eircom|proton|protonmail)\./i.test(emailDomain);
   let site = String(client.website || "").trim() || own.url || (emailDomain && !freeMail ? emailDomain : "");
+  if (!site) site = await guessSiteFromName(client.name);
   if (!site) return { ...base, photos: {} };
   if (!/^https?:\/\//i.test(site)) site = `https://${site}`;
   const hit = siteCache.get(site); if (hit && Date.now() - hit.at < 6 * 3600_000) return hit.value;
@@ -427,4 +428,29 @@ async function siteSampleFor(client: { id: string; name: string; email?: string;
   } catch { /* site unreachable: fall back to the profile */ }
   siteCache.set(site, { at: Date.now(), value });
   return value;
+}
+
+// No website on file: try the obvious domains for the business name (theblackpoppy.ie, blackpoppy.com …) and keep
+// the first one whose page actually mentions the business.
+const guessCache = new Map<string, string>();
+async function guessSiteFromName(name: string): Promise<string> {
+  const key = name.trim().toLowerCase(); if (!key) return "";
+  if (guessCache.has(key)) return guessCache.get(key) || "";
+  const words = key.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/&/g, "and").replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter(Boolean);
+  const core = words.filter((w) => !/^(the|ltd|limited|llc|inc|co)$/.test(w));
+  const slugs = [...new Set([words.join(""), core.join(""), core.join("-")])].filter((x) => x.length >= 4);
+  const tlds = [".ie", ".com", ".co.uk", ".uk"];
+  const mark = core.filter((w) => w.length >= 4);
+  let found = "";
+  outer: for (const slug of slugs) for (const tld of tlds) {
+    const url = `https://${slug}${tld}`;
+    try {
+      const r = await fetch(url, { headers: { "user-agent": "Mozilla/5.0 (compatible; F2B Agency OS sample data)", accept: "text/html" }, signal: AbortSignal.timeout(3500), redirect: "follow" });
+      if (!r.ok) continue;
+      const html = (await r.text()).slice(0, 200_000).toLowerCase();
+      if (mark.length && mark.every((w) => html.includes(w)) && !/domain (is )?for sale|parked|buy this domain/.test(html)) { found = r.url || url; break outer; }
+    } catch { /* try the next one */ }
+  }
+  guessCache.set(key, found);
+  return found;
 }
