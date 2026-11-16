@@ -32,11 +32,11 @@ const PRIORITY_COLOURS: Record<string, string> = { Urgent: "#e5484d", High: "#f0
 const PRIORITIES = ["Urgent", "High", "Normal", "Low"];
 const shortDate = (iso?: string) => iso ? new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString("en-IE", { day: "numeric", month: "short" }) : "";
 
-export function TaskTable({ onQuickAdd, tasks, clients, staff, statuses, onStatus, onEdit, onChangeDate, onBulkUpdate, onBulkDelete, renderAvatar }: {
+export function TaskTable({ onQuickAdd, tasks, clients, staff, statuses, onStatus, onEdit, onChangeDate, onBulkUpdate, onBulkDelete, onDuplicate, renderAvatar }: {
   tasks: TableTask[]; clients: TableClient[]; staff: TableStaff[];
   statuses: Array<{ label: string; value: string }>;
   onStatus: (id: string, status: string) => void; onEdit: (id: string) => void; onChangeDate: (id: string, due: string) => void;
-  onBulkUpdate?: (ids: string[], patch: TaskPatch) => void; onBulkDelete?: (ids: string[]) => void;
+  onBulkUpdate?: (ids: string[], patch: TaskPatch) => void; onBulkDelete?: (ids: string[]) => void; onDuplicate?: (id: string) => void;
   renderAvatar: (staffId: string) => ReactNode; onQuickAdd?: (clientId: string) => void;
 }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -78,7 +78,7 @@ export function TaskTable({ onQuickAdd, tasks, clients, staff, statuses, onStatu
       {onBulkUpdate && <label>Priority<select value="" onChange={(event) => event.target.value && bulk({ priority: event.target.value })}><option value="">Change…</option>{PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}</select></label>}
       {onBulkUpdate && <label>Owner<select value="" onChange={(event) => event.target.value && bulk({ assigneeId: event.target.value === "__none" ? "" : event.target.value })}><option value="">Change…</option>{people.map((member) => <option key={member.id} value={member.id}>{member.name.split("|")[0].trim()}</option>)}<option value="__none">Unassigned</option></select></label>}
       {onBulkUpdate && <label>Due<input type="date" onChange={(event) => event.target.value && bulk({ due: event.target.value })} /></label>}
-      {onBulkDelete && <button type="button" className="tt-bulk-delete" onClick={async () => { if ((await appConfirm(`Delete ${pickedIds.length} task${pickedIds.length === 1 ? "" : "s"}? This can't be undone.`))) { onBulkDelete(pickedIds); setPicked(new Set()); } }}>Delete</button>}
+      {onDuplicate && <button type="button" className="tt-bulk-dup" onClick={() => { pickedIds.forEach((id) => onDuplicate(id)); setPicked(new Set()); }}>Duplicate</button>}{onBulkDelete && <button type="button" className="tt-bulk-delete" onClick={async () => { if ((await appConfirm(`Delete ${pickedIds.length} task${pickedIds.length === 1 ? "" : "s"}? This can't be undone.`))) { onBulkDelete(pickedIds); setPicked(new Set()); } }}>Delete</button>}
       <button type="button" className="text-button" onClick={() => setPicked(new Set())}>Clear</button>
     </div>}
     <div className="tt-wrap"><table className="tt-table">
@@ -91,7 +91,7 @@ export function TaskTable({ onQuickAdd, tasks, clients, staff, statuses, onStatu
         </tr>
         {open && group.list.map((task) => { const owner = staffById.get(task.assigneeId); const overdue = Boolean(task.due && task.due < today && isOpen(task)); return <tr key={task.id} className={`tt-row ${picked.has(task.id) ? "picked" : ""}`} style={{ ["--tt-group" as string]: group.colour }}>
           <td className="tt-check"><input type="checkbox" aria-label={`Select ${task.title}`} checked={picked.has(task.id)} onChange={(event) => togglePick([task.id], event.target.checked)} /></td>
-          <td><span className="tt-title-wrap"><TaskIcon service={task.service} title={task.title} /><button type="button" className="tt-title" onClick={() => onEdit(task.id)} title={task.title}>{task.title}</button>{overdue && <span className="tt-overdue">Overdue</span>}</span><select className="tt-mobile-status" aria-label={`Status of ${task.title}`} value={task.status} style={{ background: STATUS_COLOURS[task.status] || "#8a94a6" }} onChange={(event) => onStatus(task.id, event.target.value)}>{statuses.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></td>
+          <td><span className="tt-title-wrap"><TaskIcon service={task.service} title={task.title} /><button type="button" className="tt-title" onClick={() => onEdit(task.id)} title={task.title}>{task.title}</button>{overdue && <span className="tt-overdue">Overdue</span>}{onDuplicate && <button type="button" className="tt-dup" onClick={() => onDuplicate(task.id)} aria-label={`Duplicate ${task.title}`} title="Duplicate task">⧉</button>}</span><select className="tt-mobile-status" aria-label={`Status of ${task.title}`} value={task.status} style={{ background: STATUS_COLOURS[task.status] || "#8a94a6" }} onChange={(event) => onStatus(task.id, event.target.value)}>{statuses.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></td>
           <td><span className="tt-owner">{renderAvatar(task.assigneeId)}<span>{owner?.name?.split("|")[0].trim() || "Unassigned"}</span></span></td>
           <td><select className="tt-pill" aria-label={`Status of ${task.title}`} value={task.status} style={{ background: STATUS_COLOURS[task.status] || "#8a94a6" }} onChange={(event) => onStatus(task.id, event.target.value)}>{statuses.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}{!statuses.some((item) => item.value === task.status) && <option value={task.status}>{task.status}</option>}</select></td>
           <td>{onBulkUpdate ? <select className="tt-pill" aria-label={`Priority of ${task.title}`} value={task.priority || "Normal"} style={{ background: PRIORITY_COLOURS[task.priority] || "#9aa5b1" }} onChange={(event) => onBulkUpdate([task.id], { priority: event.target.value })}>{PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}</select> : <span className="tt-pill" style={{ background: PRIORITY_COLOURS[task.priority] || "#9aa5b1" }}>{task.priority || "Normal"}</span>}</td>

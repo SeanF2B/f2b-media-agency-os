@@ -107,3 +107,11 @@ html body .app-shell .launchpad-heading .launchpad-actions .primary-button { bac
 .crv-types.single { grid-template-columns: minmax(0, 1fr); }
 .crv-types.single .crv-type { cursor: default; }
 html body .app-shell .crv-history li > .crv-mark { flex: none !important; display: inline-grid !important; width: 36px !important; height: 36px !important; }
+
+/* Task table: duplicate on each row (shows on hover) and in bulk actions */
+.tt-dup { margin-left: 6px; width: 26px; height: 26px; border: 1px solid var(--border, #e3e8ec); border-radius: 8px; background: var(--card, #fff); color: inherit; font-size: 13px; line-height: 1; cursor: pointer; opacity: 0; transition: opacity .15s, transform .15s, border-color .15s; flex: none; }
+tr:hover .tt-dup, .tt-dup:focus-visible { opacity: 1; }
+.tt-dup:hover { border-color: var(--brand-secondary, #ee5a29); transform: translateY(-1px); }
+@media (hover: none) { .tt-dup { opacity: 1; } }
+.tt-bulk-dup { height: 32px; padding: 0 12px; border: 1px solid var(--border, #d7dee4); border-radius: 9px; background: var(--card, #fff); color: inherit; font: inherit; font-weight: 700; cursor: pointer; }
+.tt-bulk-dup:hover { border-color: var(--brand-secondary, #ee5a29); }
