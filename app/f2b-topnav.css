@@ -1977,3 +1977,6 @@ html body .app-shell.dark-mode .crm-stage-pop-list button { background: #12171b;
   html body .crm-lightbox { padding: 40px 8px 70px; }
   html body .app-shell .crm-card-actions { grid-template-columns: 1fr 1fr; }
 }
+html body .app-shell .crm-opportunity .crm-card-actions { grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)) !important; }
+html body .app-shell .crm-opportunity .crm-card-actions > button { min-width: 0; width: 100%; justify-content: center; }
+html body .app-shell .crm-opportunity .crm-card-stage-btn { justify-content: space-between; }
