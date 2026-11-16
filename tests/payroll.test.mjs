@@ -101,3 +101,15 @@ test("payslip PDF: valid file with fonts, euro sign and optional JPEG logo", asy
   const withLogo = Buffer.from(buildPayslipPdf(rec, { currency: "EUR", businessName: "F2B", logo: { jpeg: new Uint8Array([0xff, 0xd8, 0xff, 0xd9]), width: 2, height: 1 } })).toString("latin1");
   assert.match(withLogo, /\/Subtype \/Image/); assert.match(withLogo, /\/Im1 Do/);
 });
+
+test("staff pay for a period: commission, hourly from clock-ins, salary pro rata", async () => {
+  const { staffPayForPeriod } = await import("../lib/scheduling/staff-pay.ts");
+  const from = new Date("2026-10-01T00:00:00Z"), to = new Date("2026-11-01T00:00:00Z"), now = Date.parse("2026-11-16T00:00:00Z");
+  const bookings = [
+    { calendarId: "c1", start: "2026-10-05T10:00:00Z", end: "2026-10-05T12:00:00Z", status: "completed", staffIds: ["a"], answers: [] },
+    { calendarId: "c1", start: "2026-10-06T10:00:00Z", end: "2026-10-06T12:00:00Z", status: "no_show", staffIds: ["a"], answers: [] },
+    { calendarId: "c1", start: "2026-10-07T10:00:00Z", end: "2026-10-07T11:00:00Z", status: "completed", staffIds: ["b"], answers: [{ label: "Price", value: "€500" }] },
+  ];
+  const rows = staffPayForPeriod({ staff: [{ id: "a", name: "Ann | Artist" }, { id: "b", name: "Bob", profile: { payType: "hourly", payRate: 20 } }, { id: "c", name: "Cat", profile: { payType: "salary", payRate: 36500 } }], bookings, calendars: [{ id: "c1", price: 200 }], std: { payType: "commission", payRate: 70 }, entries: [{ staffId: "b", taskId: "clock", startAt: "2026-10-07T09:00:00Z", seconds: 8 * 3600 }], from, to, now });
+  assert.deepEqual(rows.map((r) => [r.name, r.amount]), [["Ann", 140], ["Bob", 160], ["Cat", 3100]]);
+});

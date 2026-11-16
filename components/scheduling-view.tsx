@@ -1565,6 +1565,21 @@ function PaySettingsModal({ staff, scope, sample, onClose, onSaved }: { staff: S
   </div></div>;
 }
 
+function StdSplitEditor({ value, msg, onSave }: { value: PayRule; msg: string; onSave: (v: PayRule) => void }) {
+  const [t, setT] = useState<"commission" | "hourly">(value.payType === "hourly" ? "hourly" : "commission");
+  const [rate, setRate] = useState(String(value.payRate || ""));
+  useEffect(() => { setT(value.payType === "hourly" ? "hourly" : "commission"); setRate(String(value.payRate || "")); }, [value.payType, value.payRate]);
+  const n = Number(rate) || 0;
+  return <div className="ps-std">
+    <select aria-label="Standard pay type" value={t} onChange={(e) => setT(e.target.value as "commission" | "hourly")}><option value="commission">Commission (% of price)</option><option value="hourly">Hourly rate</option></select>
+    <input type="number" aria-label={t === "hourly" ? "Euro per hour" : "Staff share %"} min={0} max={t === "commission" ? 100 : undefined} step={t === "hourly" ? "0.5" : "1"} value={rate} onChange={(e) => setRate(e.target.value)} />
+    <b>{t === "commission" ? (n > 0 && n <= 100 ? `Staff ${n}% · Business ${100 - n}%` : "% to staff") : "€ per hour"}</b>
+    <button type="button" className="secondary-button" disabled={!(n > 0) || (t === "commission" && n > 100)} onClick={() => onSave({ payType: t, payRate: n })}>Save split</button>
+    {msg && <small className="bt-status">{msg}</small>}
+    <p className="muted">Used for anyone without their own pay setting.</p>
+  </div>;
+}
+
 // Books → Settings: payroll & tax (employer details for payslips, the standard commission split, everyone's pay settings).
 export function PayrollSettingsPanel({ scopeClientId, business }: { scopeClientId: string; business: Business }) {
   const [sample] = useSampleData();
@@ -1589,7 +1604,7 @@ export function PayrollSettingsPanel({ scopeClientId, business }: { scopeClientI
       <h4 className="ps-sub">Employer details (on every payslip)</h4>
       <PayrollEmployerForm value={{ ...employer, name: employer.name }} business={business} onSave={async (v) => { if (sample) return; const r = await api<{ employer: PayrollEmployer }>(scopeClientId, { action: "savePayrollEmployer", employer: v }); setEmployer(r.employer); }} />
       <h4 className="ps-sub">Standard split</h4>
-      <div className="ps-pay-row"><span className="muted">Used for anyone without their own pay setting.</span><PayEditor value={std} onSave={async (v) => { setStd(v); if (sample) return; try { await api(scopeClientId, { action: "saveDefaultPay", ...v }); setStdMsg("Saved."); } catch (e) { setStdMsg(errText(e, "Couldn't save.")); } }} onCancel={() => undefined} /><small className="bt-status">{stdMsg}</small></div>
+      <StdSplitEditor value={std} msg={stdMsg} onSave={async (v) => { setStd(v); if (sample) { setStdMsg("Sample data: nothing saved."); return; } try { await api(scopeClientId, { action: "saveDefaultPay", ...v }); setStdMsg("Saved."); } catch (e) { setStdMsg(errText(e, "Couldn't save.")); } }} />
       <h4 className="ps-sub">Staff pay</h4>
       <div className="ps-staff-list">{data.staff.map((p) => { const d = people[p.id]; return <div key={p.id} className="ps-staff-line">
         <Avatar person={p} size={30} /><span><b>{firstName(p.name)}</b><small>{payLabel(p)} · {d?.employment === "contractor" ? "Contractor" : validPps(d?.pps || "") ? `PPS ${maskPps(d!.pps)}` : <em className="ps-missing">PPS missing</em>}</small></span>

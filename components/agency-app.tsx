@@ -2614,9 +2614,16 @@ ${senderName}`, staffType: member.staffType || (isSubAccountRole(member.role) ? 
       const entries = (detail?.entries || []).filter((e) => e && e.id && e.amount > 0);
       if (!entries.length) return;
       const ids = new Set(entries.map((e) => e.id));
-      const records: FinanceRecord[] = entries.map((e) => ({ id: e.id, kind: "Expense", description: e.description.slice(0, 200), category: "Staff wages", amount: Math.round(e.amount * 100) / 100, date: e.date, clientId: e.clientId || "" }));
-      void persist({ ...workspaceRef.current, financeRecords: [...records, ...(workspaceRef.current.financeRecords || []).filter((r) => !ids.has(r.id))] }, `Staff pay added to Books (${records.length})`);
-      setToast(`Staff pay added to Books · ${records.length} expense${records.length === 1 ? "" : "s"} under “Staff wages”.`);
+      const live = workspaceRef.current;
+      // A client's staff pay goes into that client's own Books (their tax figures); the agency's goes into agency Books.
+      const forClient = new Map<string, TaxBookEntry[]>();
+      const agencyEntries = entries.filter((e) => { const c = live.clients.find((x) => x.id === e.clientId); if (!c) return true; forClient.set(c.id, [...(forClient.get(c.id) || []), { id: e.id, kind: "Expense", date: e.date, description: e.description.slice(0, 200), category: "Wages & subcontractors", amount: Math.round(e.amount * 100) / 100 }]); return false; });
+      const records: FinanceRecord[] = agencyEntries.map((e) => ({ id: e.id, kind: "Expense", description: e.description.slice(0, 200), category: "Staff wages", amount: Math.round(e.amount * 100) / 100, date: e.date, clientId: "" }));
+      // A saved payslip replaces the automatic estimate for that person and month.
+      const payslipCovers = (entry: TaxBookEntry, added: TaxBookEntry[]) => entry.id.startsWith("staffpay-auto-") && added.some((n) => n.id.startsWith("payslip-") && entry.id.startsWith(`staffpay-auto-${n.id.slice(8).split(":")[0]}-`) && entry.date.slice(0, 7) === n.date.slice(0, 7));
+      const clients = live.clients.map((c) => { const add = forClient.get(c.id); if (!add) return c; const books = c.taxBooks || { entries: [] }; return { ...c, taxBooks: { ...books, entries: [...add, ...(books.entries || []).filter((r) => !ids.has(r.id) && !payslipCovers(r, add))] } }; });
+      void persist({ ...live, clients, financeRecords: [...records, ...(live.financeRecords || []).filter((r) => !ids.has(r.id))] }, `Staff pay added to Books (${entries.length})`);
+      setToast(`Staff pay added to Books · ${entries.length} expense${entries.length === 1 ? "" : "s"} under ${records.length ? "“Staff wages”" : "“Wages & subcontractors”"}.`);
     };
     window.addEventListener("f2b-staff-pay-expense", onPay);
     return () => window.removeEventListener("f2b-staff-pay-expense", onPay);
@@ -4075,7 +4082,7 @@ async function fetchAutoAdSpendEntries(client: Client, year: number): Promise<{ 
   return { entries, synced, errors };
 }
 // Irish 2026 rates (Budget 2026): income tax 20%/40% (single cut-off €44,000, joint one-earner €53,000), USC, self-employed PRSI, 12.5% corporation tax on trading profits.
-function ClientTaxTracker({ client, onSave, taxSettings, range, rangeLabel = "Year to date" }: { client: Client; onSave?: (client: Client, newFile?: ClientFile) => void; taxSettings?: TaxSettings; range?: { start: string; end: string }; rangeLabel?: string }) {
+function ClientTaxTracker({ client, onSave, taxSettings, range, rangeLabel = "Year to date", timeEntries = [] }: { client: Client; onSave?: (client: Client, newFile?: ClientFile) => void; taxSettings?: TaxSettings; range?: { start: string; end: string }; rangeLabel?: string; timeEntries?: Entry[] }) {
   const country = taxCountry(taxSettings); const countryLabel = TAX_COUNTRIES.find((item) => item.code === country)?.label || "Ireland";
   const books: ClientTaxBooks = { ...(client.taxBooks || { entries: [] }), businessType: client.taxBooks?.businessType || taxSettings?.defaultBusinessType, entries: client.taxBooks?.entries || [] };
   const year = new Date().getFullYear();
@@ -4086,6 +4093,42 @@ function ClientTaxTracker({ client, onSave, taxSettings, range, rangeLabel = "Ye
   const adSyncStarted = useRef(false);
   const hasAdAccounts = AD_SPEND_SOURCES.some((source) => source.account(client));
   const save = (next: ClientTaxBooks, newFile?: ClientFile) => onSave?.({ ...client, taxBooks: next }, newFile);
+  // Staff wages go into these Books automatically (this month so far + last month), worked out like the
+  // Dashboard's staff earnings. A saved payslip (or pay sent by hand) for that person and month wins.
+  const wagesSynced = useRef(false);
+  useEffect(() => {
+    if (!onSave || wagesSynced.current) return; wagesSynced.current = true;
+    let live = true;
+    (async () => {
+      const now = new Date(); const ym = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const months = [new Date(now.getFullYear(), now.getMonth() - 1, 1), new Date(now.getFullYear(), now.getMonth(), 1)];
+      const qs = `clientId=${encodeURIComponent(client.id)}`;
+      const [dRes, sRes] = await Promise.all([
+        fetch(`/api/scheduling?${qs}&from=${months[0].toISOString()}&to=${new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString()}`, { cache: "no-store" }),
+        fetch(`/api/scheduling?${qs}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "getDefaultPay" }) }),
+      ]);
+      if (!dRes.ok || !live) return;
+      const d = await dRes.json() as { staff: Array<{ id: string; name: string; profile?: { payType?: string; payRate?: number } | null }>; bookings: Array<{ calendarId: string; start: string; end: string; status: string; staffIds: string[]; answers: Array<{ label: string; value: string }> }>; calendars: Array<{ id: string; price?: number }> };
+      const std = sRes.ok ? await sRes.json() as { payType: "commission" | "hourly"; payRate: number } : { payType: "commission" as const, payRate: 70 };
+      const { staffPayForPeriod } = await import("@/lib/scheduling/staff-pay");
+      const current = client.taxBooks?.entries || [];
+      const next: TaxBookEntry[] = [];
+      for (const m0 of months) {
+        const key = ym(m0); const m1 = new Date(m0.getFullYear(), m0.getMonth() + 1, 1);
+        const isNow = key === ym(now);
+        for (const r of staffPayForPeriod({ staff: d.staff || [], bookings: d.bookings || [], calendars: d.calendars || [], std, entries: timeEntries, from: m0, to: m1 })) {
+          if (!(r.amount > 0)) continue;
+          if (current.some((e) => (e.id.startsWith(`payslip-${r.staffId}:`) || (e.id.startsWith(`staffpay-${r.staffId}-`) && !e.id.startsWith("staffpay-auto-"))) && e.date.startsWith(key))) continue;
+          next.push({ id: `staffpay-auto-${r.staffId}-${key}`, kind: "Expense", date: isNow ? localDateKey(now) : localDateKey(new Date(m1.getTime() - 86_400_000)), description: `Staff wages · ${r.name} · ${m0.toLocaleDateString("en-IE", { month: "long", year: "numeric" })}${isNow ? " (so far)" : ""} · ${r.basis}`, category: "Wages & subcontractors", amount: r.amount });
+        }
+      }
+      const isAuto = (e: TaxBookEntry) => e.id.startsWith("staffpay-auto-") && months.some((m) => e.id.endsWith(`-${ym(m)}`));
+      const sig = (list: TaxBookEntry[]) => list.map((e) => `${e.id}:${e.amount}`).sort().join("|");
+      if (!live || sig(current.filter(isAuto)) === sig(next)) return;
+      save({ ...books, entries: [...next, ...current.filter((e) => !isAuto(e))] });
+    })().catch(() => undefined);
+    return () => { live = false; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [receipt, setReceipt] = useState<File | null>(null);
   const [editingEntryId, setEditingEntryId] = useState("");
   const openEntry = (entry: { id: string; kind: "Income" | "Expense"; date: string; description: string; category?: string; amount: number }, attach = false) => {
@@ -4107,6 +4150,7 @@ function ClientTaxTracker({ client, onSave, taxSettings, range, rangeLabel = "Ye
   const periodIncome = periodEntries.filter((e) => e.kind === "Income").reduce((sum, e) => sum + e.amount, 0);
   const periodExpenses = periodEntries.filter((e) => e.kind === "Expense").reduce((sum, e) => sum + e.amount, 0);
   const adSpend = periodEntries.filter((e) => e.kind === "Expense" && e.category === AD_SPEND_CATEGORY).reduce((sum, e) => sum + e.amount, 0);
+  const wages = periodEntries.filter((e) => e.kind === "Expense" && e.category === "Wages & subcontractors").reduce((sum, e) => sum + e.amount, 0);
   const periodProfit = periodIncome - periodEntries.filter((e) => e.kind === "Expense" && !isNonDeductible(e.category)).reduce((sum, e) => sum + e.amount, 0);
   const periodName = rangeLabel.toLowerCase();
   const deductible = entries.filter((e) => e.kind === "Expense" && !isNonDeductible(e.category)).reduce((sum, e) => sum + e.amount, 0);
@@ -4195,7 +4239,7 @@ function ClientTaxTracker({ client, onSave, taxSettings, range, rangeLabel = "Ye
   if (!books.businessType) return <section className="panel client-tax" aria-label="Business type"><div className="client-tax-head"><div><p className="eyebrow">💶 EXPENSES & TAX · {countryLabel.toUpperCase()}</p><h2>Is {client.name} a sole trader or a company?</h2><p>This decides how tax is estimated: personal income tax and social charges for a sole trader, or company tax for a limited company. (Change the country in Settings → Tax.)</p></div></div><div className="client-tax-choice"><button type="button" disabled={!onSave} onClick={() => save({ ...books, businessType: "sole_trader", household: "single" })}><b>👤 Sole trader</b><small>Personal income tax + social charges</small></button><button type="button" disabled={!onSave} onClick={() => save({ ...books, businessType: "company" })}><b>🏢 Company</b><small>Company / corporation tax on profit</small></button></div></section>;
   return <section className="panel client-tax" aria-label="Expenses and tax tracker">
     <div className="client-tax-head"><div><p className="eyebrow">💶 EXPENSES & TAX · {countryLabel.toUpperCase()} · {year}</p><h2>{client.name} · {books.businessType === "company" ? "Company" : "Sole trader"}</h2><p>Log income and expenses; the tax estimate updates as you go.</p></div>{onSave && <div className="client-tax-type"><button type="button" className={books.businessType === "sole_trader" ? "selected" : ""} onClick={() => save({ ...books, businessType: "sole_trader" })}>👤 Sole trader</button><button type="button" className={books.businessType === "company" ? "selected" : ""} onClick={() => save({ ...books, businessType: "company" })}>🏢 Company</button></div>}</div>
-    <div className="client-tax-stats"><div><small>Income · {periodName}</small><b>{eur(periodIncome)}</b></div><div><small>Expenses · {periodName}</small><b>{eur(periodExpenses)}</b></div><div><small>Ad spend · {periodName}</small><b>{eur(adSpend)}</b></div><div><small>Taxable profit · {periodName}</small><b>{eur(periodProfit)}</b></div><div className="accent"><small>{books.businessType === "company" ? "Corporation tax so far" : "Tax so far"} · {year}</small><b>{eur(books.businessType === "company" ? company.tax : personalNow.total)}</b></div></div>
+    <div className="client-tax-stats"><div><small>Income · {periodName}</small><b>{eur(periodIncome)}</b></div><div><small>Expenses · {periodName}</small><b>{eur(periodExpenses)}</b></div><div><small>Ad spend · {periodName}</small><b>{eur(adSpend)}</b></div><div className="client-tax-wages"><small>Staff wages · {periodName}</small><b>{eur(wages)}</b></div><div><small>Taxable profit · {periodName}</small><b>{eur(periodProfit)}</b></div><div className="accent"><small>{books.businessType === "company" ? "Corporation tax so far" : "Tax so far"} · {year}</small><b>{eur(books.businessType === "company" ? company.tax : personalNow.total)}</b></div></div>
     <div className="finance-actions client-tax-actions"><button type="button" className="secondary-button income-button" onClick={() => { setEditingEntryId(""); setReceipt(null); setDraft({ ...draft, kind: "Income", description: "", amount: "", date: localDateKey() }); setFormOpen(true); }}>＋ Add income</button><button type="button" className="secondary-button expense-button" onClick={() => { setEditingEntryId(""); setReceipt(null); setDraft({ ...draft, kind: "Expense", description: "", amount: "", date: localDateKey(), category: draft.category === AD_SPEND_CATEGORY ? TAX_EXPENSE_CATEGORIES[0] : draft.category }); setFormOpen(true); }}>＋ Add expense</button><div className="client-tax-export"><button type="button" className="secondary-button" aria-haspopup="menu" aria-expanded={exportOpen} onClick={() => setExportOpen((open) => !open)}>⤓ Export for filing</button>{exportOpen && <div className="client-tax-export-menu" role="menu"><button type="button" role="menuitem" onClick={() => exportBooks("pdf")}>PDF (print or save)</button><button type="button" role="menuitem" onClick={() => exportBooks("xls")}>Excel (.xls)</button><button type="button" role="menuitem" onClick={() => exportBooks("csv")}>CSV (any accounts software)</button></div>}</div></div>
     {feeFrom && <div className="client-tax-adsync"><small>Service fees of {eur(clientMonthlyFee(client))}/month are added as an expense automatically from the client’s services.</small>{onSave && <label className="client-tax-fees-from">Tracked from <input type="month" value={feeFrom} max={localDateKey().slice(0, 7)} onChange={(event) => { if (/^\d{4}-\d{2}$/.test(event.target.value)) save({ ...books, feesFrom: event.target.value }); }} /></label>}</div>}
     {hasAdAccounts && <div className="client-tax-adsync"><small>{adSync.note || "Ad spend from the connected Google / Meta Ads account is added here automatically each day."}</small>{onSave && <button type="button" className="text-button" disabled={adSync.busy} onClick={() => void syncAdSpend(true)}>{adSync.busy ? "Syncing…" : "⟳ Sync ad spend now"}</button>}</div>}
@@ -4413,7 +4457,7 @@ function Overview({ payslips, onOpenTask, onReviewTask, currentStaffId = "", foc
     {!scopeClientId && showProjection && projectionPanel()}
     <div className="metric-grid overview-metrics"><Metric title={`Turnover · ${rangeLabel.toLowerCase()}`} value={money(clientTurnover)} detail={scopedBooks ? "Income logged in Expenses & Tax" : monthSummary ? `${money(monthSummary.retainer)} monthly fees + recorded income` : "Recorded income in this period"} icon={currencySymbol()} tint="mint" />{scopedBooks || scopeClientId ? null : <Metric title="Tracked labour cost" value={money(monthSummary ? monthSummary.labor : selectedLabour)} detail={`Saved time · ${rangeLabel.toLowerCase()}`} icon="↗" tint="lilac" />}<Metric title={`Expenses · ${rangeLabel.toLowerCase()}`} value={money(clientExpenses)} detail={scopedBooks ? "Expenses logged in Expenses & Tax" : monthSummary ? "Recorded + expected recurring" : "Recorded expenses in this period"} icon="−" tint="peach" /><Metric title={`${monthSummary ? "Estimated profit" : "Net profit"} · ${rangeLabel.toLowerCase()}`} value={money(clientProfit)} detail={scopedBooks ? "Their income − expenses" : monthSummary ? "Fees + income − expenses − labour" : "Recorded income − expenses − labour"} icon="↗" tint={clientProfit < 0 ? "peach" : "blue"} />{!scopeClientId && <Metric title={`Estimated tax · ${monthSummary ? "this month" : rangeLabel.toLowerCase()}`} value={money(monthSummary ? projectedTax.monthly : projectedTax.monthly * Math.max(1, Math.round(((new Date(`${financeRange.end}T12:00:00`).getTime() - new Date(`${financeRange.start || financeRange.end}T12:00:00`).getTime()) / 86400000 + 1) / 30.4)))} detail={`${money(projectedTax.total)} for the year · Income Tax, USC, PRSI`} icon="%" tint="peach" />}</div>
     {!scopeClientId && <FinancePanel workspace={workspace} period={financePeriod} periodRange={financeRange} periodLabel={rangeLabel} onAdd={onAddFinance} onEditClientFee={onEditClientFee} onEditFinance={onEditFinance} onEditRecurring={onEditRecurring} onDelete={onDeleteFinance} onStopRecurring={onStopRecurring} onRecurringReceipt={onRecurringReceipt} exportMenu={section === "bookkeeping" ? <div className="books-export"><button type="button" className="secondary-button" onClick={() => setBooksExportOpen(!booksExportOpen)} aria-expanded={booksExportOpen}>⤓ Export</button>{booksExportOpen && <div className="books-export-menu" role="menu"><button type="button" role="menuitem" onClick={() => exportAgencyBooks("csv")}>CSV</button><button type="button" role="menuitem" onClick={() => exportAgencyBooks("xls")}>Excel</button><button type="button" role="menuitem" onClick={() => exportAgencyBooks("pdf")}>PDF / print</button></div>}</div> : undefined} />}
-    {scopeClientId && workspace.clients[0] && <ClientTaxTracker key={workspace.clients[0].id} client={workspace.clients[0]} onSave={onSaveClient} taxSettings={workspace.clients[0].tax || workspace.settings?.tax} range={financeRange} rangeLabel={rangeLabel} />}
+    {scopeClientId && workspace.clients[0] && <ClientTaxTracker key={workspace.clients[0].id} client={workspace.clients[0]} timeEntries={workspace.entries || []} onSave={onSaveClient} taxSettings={workspace.clients[0].tax || workspace.settings?.tax} range={financeRange} rangeLabel={rangeLabel} />}
     </>}
   </>;
   return <><div className="welcome-row"><div><p className="eyebrow">{today}</p><h1>{greeting}, {scopeClientId ? (workspace.clients.find((item) => item.id === scopeClientId)?.name || "Sean") : "Sean"} <span>✦</span></h1><p className="muted">{scopeClientId ? "Here’s the pulse of this business today." : "Here’s the pulse of your agency today."}</p></div></div>

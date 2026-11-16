@@ -2546,3 +2546,8 @@ html body .app-shell .timesheet-person-filter:has(select:focus-visible) { outlin
 html body .app-shell.dark-mode .timesheet-person-filter { background: #1b2227 !important; border-color: #2f3a41 !important; }
 html body .app-shell.dark-mode .timesheet-person-filter select { color: #fff; }
 html body .app-shell.dark-mode .timesheet-person-filter span { color: #98a2b3; }
+
+/* Client Books: six figure cards now (Staff wages added) */
+html body .app-shell .client-tax-stats { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)) !important; }
+html body .app-shell .client-tax-stats .client-tax-wages b { color: #6941c6; }
+html body .app-shell.dark-mode .client-tax-stats .client-tax-wages b { color: #bdb4fe; }
