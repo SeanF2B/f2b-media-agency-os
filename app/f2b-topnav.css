@@ -1580,3 +1580,35 @@ html body .app-shell .dh-appt-status { padding: 4px 10px; border-radius: 999px; 
 html body .app-shell .dh-appt-status.ok { background: #e7f6ec; color: #157a43; } html body .app-shell .dh-appt-status.live { background: #e8f0ff; color: #1d4ed8; } html body .app-shell .dh-appt-status.pending { background: #fff4e0; color: #b45309; } html body .app-shell .dh-appt-status.done { background: #eef1f4; color: #667085; } html body .app-shell .dh-appt-status.bad { background: #fde8e8; color: #b42318; }
 body.f2b-dark .app-shell .dh-appt-status.ok { background: #15291e; color: #6fdc9b; } body.f2b-dark .app-shell .dh-appt-status.live { background: #172440; color: #8fb4ff; } body.f2b-dark .app-shell .dh-appt-status.pending { background: #2d2610; color: #f5c46b; } body.f2b-dark .app-shell .dh-appt-status.done { background: #232a30; color: #a8b3bd; } body.f2b-dark .app-shell .dh-appt-status.bad { background: #3a1f1f; color: #ff9b94; }
 body.f2b-dark :is(.app-shell .dh-appt-who small, .app-shell .dh-appt-stats, #f2b-appt-x) { color: #a8b3bd !important; -webkit-text-fill-color: #a8b3bd !important; }
+/* Scheduling → Dashboard: appointments with time stamps + staff availability */
+html body .app-shell .sch-dash { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 14px; }
+@media (max-width: 1000px) { html body .app-shell .sch-dash { grid-template-columns: 1fr; } }
+html body .app-shell .sch-dash-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+html body .app-shell .sch-dash-head h3 { margin: 0; font-size: 16px; }
+html body .app-shell .sch-dash-nav { display: flex; align-items: center; gap: 6px; }
+html body .app-shell .sch-dash-nav input { height: 32px; border-radius: 9px; padding: 0 8px; font: inherit; font-size: 13px; }
+html body .app-shell .sch-dash-stats { display: flex; gap: 14px; font-size: 12.5px; opacity: .8; margin-bottom: 6px; } html body .app-shell .sch-dash-stats b { font-size: 15px; margin-right: 3px; }
+html body .app-shell .sch-dash-list { list-style: none; margin: 0; padding: 0; }
+html body .app-shell .sch-dash-list li { display: grid; grid-template-columns: 52px 34px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 4px; border-bottom: 1px solid rgba(127,138,160,.14); cursor: pointer; border-radius: 8px; }
+html body .app-shell .sch-dash-list li:hover { background: rgba(127,138,160,.07); }
+html body .app-shell .sch-dash-list time { font-weight: 700; font-size: 13.5px; }
+html body .app-shell .sch-dash-av { width: 34px; height: 34px; border-radius: 999px; display: grid; place-items: center; font-weight: 700; font-size: 13px; background: color-mix(in srgb, var(--c) 18%, transparent); color: var(--c); }
+html body .app-shell .sch-dash-who { display: grid; min-width: 0; } html body .app-shell .sch-dash-who b { font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } html body .app-shell .sch-dash-who small { font-size: 11.5px; opacity: .7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } html body .app-shell .sch-dash-staff { font-weight: 600; }
+html body .app-shell .sch-dash-status { padding: 4px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+html body .app-shell .sch-dash-status.ok { background: #e7f6ec; color: #157a43; } html body .app-shell .sch-dash-status.live { background: #e8f0ff; color: #1d4ed8; } html body .app-shell .sch-dash-status.done { background: #eef1f4; color: #667085; } html body .app-shell .sch-dash-status.bad { background: #fde8e8; color: #b42318; }
+body.f2b-dark .app-shell .sch-dash-status.ok { background: #15291e; color: #6fdc9b; } body.f2b-dark .app-shell .sch-dash-status.live { background: #172440; color: #8fb4ff; } body.f2b-dark .app-shell .sch-dash-status.done { background: #232a30; color: #a8b3bd; } body.f2b-dark .app-shell .sch-dash-status.bad { background: #3a1f1f; color: #ff9b94; }
+html body .app-shell .sch-dash-empty { padding: 18px 4px; }
+html body .app-shell .sch-dash-staff-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+html body .app-shell .sch-dash-person { display: grid; gap: 6px; align-content: start; }
+html body .app-shell .sch-dash-person-top { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; } html body .app-shell .sch-dash-person-top div { display: grid; min-width: 0; } html body .app-shell .sch-dash-person-top b { font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } html body .app-shell .sch-dash-person-top small { font-size: 11.5px; opacity: .7; }
+html body .app-shell .sch-slot { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 8px; border-radius: 9px; font-size: 12px; background: rgba(127,138,160,.07); }
+html body .app-shell .sch-slot em { font-style: normal; font-weight: 700; font-size: 11px; padding: 2px 8px; border-radius: 999px; }
+html body .app-shell .sch-slot.booked em { background: #fde8e8; color: #b42318; } html body .app-shell .sch-slot.free em { background: #e7f6ec; color: #157a43; }
+html body .app-shell .sch-slot.off { justify-content: center; opacity: .6; font-style: italic; }
+body.f2b-dark .app-shell .sch-slot.booked em { background: #3a1f1f; color: #ff9b94; } body.f2b-dark .app-shell .sch-slot.free em { background: #15291e; color: #6fdc9b; }
+/* Delete lives in the edit popup (bottom-left) for lead cards and tasks */
+html body .modal-delete-button { margin-right: auto; display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 14px; border-radius: 10px; border: 1px solid #f3d0d0; background: #fff5f5; color: #c0392b; font-weight: 700; cursor: pointer; }
+html body .modal-delete-button:hover { background: #fde4e4; }
+body.f2b-dark .modal-delete-button { background: rgba(229,72,77,.12); border-color: rgba(229,72,77,.35); color: #ff9b94; }
+html body .crm-modal footer, html body .modal-actions { display: flex; align-items: center; gap: 8px; }
+html body .app-shell .crm-opportunity .crm-card-top { padding-right: 40px !important; }

@@ -57,7 +57,8 @@ export function SchedulingView({ scopeClientId, onAddStaff }: { scopeClientId: s
     return () => { window.clearTimeout(t); window.removeEventListener("resize", fit); };
   });
   const [data, setData] = useState<Data | null>(null);
-  const [tab, setTab] = useState<"calendar" | "appointments" | "calendars" | "availability">("calendar");
+  const [tab, setTab] = useState<"dashboard" | "calendar" | "appointments" | "calendars" | "availability">("dashboard");
+  const [dashDate, setDashDate] = useState(() => new Date());
   const [week, setWeek] = useState(() => mondayOf(new Date()));
   const [staffFilter, setStaffFilter] = useState("");
   const [calFilter, setCalFilter] = useState("");
@@ -124,13 +125,40 @@ export function SchedulingView({ scopeClientId, onAddStaff }: { scopeClientId: s
       <div className="sch-perstaff"><small>This month by person</small>{stats.perStaff.length ? stats.perStaff.map(({ s, n }) => <span key={s.id}><Avatar person={s} size={20} /> {s.name.split(" ")[0]} <b>{n}</b></span>) : <span className="iv-small">No bookings yet</span>}</div></div>
 
     <div className="sch-toolbar">
-      <div className="iv-tabs" role="tablist" aria-label="Scheduling sections">{([["calendar", "Calendar"], ["appointments", "Appointments"], ["calendars", "Booking calendars"], ["availability", "Staff & availability"]] as const).map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{l}</button>)}</div>
-      {(tab === "calendar" || tab === "appointments") && <div className="sch-filters">
+      <div className="iv-tabs" role="tablist" aria-label="Scheduling sections">{([["dashboard", "Dashboard"], ["calendar", "Calendar"], ["appointments", "Appointments"], ["calendars", "Booking calendars"], ["availability", "Staff & availability"]] as const).map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{l}</button>)}</div>
+      {(tab === "dashboard" || tab === "calendar" || tab === "appointments") && <div className="sch-filters">
         <label className="sch-select"><Users size={14} /><select aria-label="Filter by staff member" value={staffFilter} onChange={(e) => setStaffFilter(e.target.value)}><option value="">Everyone</option>{data.staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
         <label className="sch-select"><CalendarDays size={14} /><select aria-label="Filter by booking calendar" value={calFilter} onChange={(e) => setCalFilter(e.target.value)}><option value="">All calendars</option>{data.calendars.map((c) => <option key={c.id} value={c.id}>{data.scope === null && c.clientId ? `${clientName(c.clientId)} · ` : ""}{c.name}</option>)}</select></label>
       </div>}
     </div>
 
+    {tab === "dashboard" && (() => {
+      const key = ymd(dashDate); const isToday = key === todayKey;
+      const dayList = visible.filter((b) => ymd(new Date(b.start)) === key && b.status !== "cancelled").sort((x, y) => x.start.localeCompare(y.start));
+      const statusOf = (b: Booking): [string, string] => { const now = Date.now(), st = Date.parse(b.start), en = Date.parse(b.end); if (b.status === "no_show") return ["No-show", "bad"]; if (b.status === "completed" || en < now) return ["Done", "done"]; if (st <= now && now <= en) return ["In progress", "live"]; return ["Confirmed", "ok"]; };
+      const dayKeyName = (["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as DayKey[])[dashDate.getDay()];
+      const mins = (hhmm: string) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + (m || 0); };
+      const hm = (n: number) => `${String(Math.floor(n / 60)).padStart(2, "0")}:${String(n % 60).padStart(2, "0")}`;
+      const staffSlots = (st: Staff) => {
+        if (st.blocked?.includes(key)) return [{ from: "", to: "", state: "off" as const }];
+        const windows = st.weekly?.[dayKeyName] || [];
+        const booked = dayList.filter((b) => b.staffIds.includes(st.id)).map((b) => { const s0 = new Date(b.start), e0 = new Date(b.end); return [s0.getHours() * 60 + s0.getMinutes(), e0.getHours() * 60 + e0.getMinutes(), b] as const; });
+        const out: Array<{ from: string; to: string; state: "booked" | "free" | "off"; who?: string }> = [];
+        for (const w of windows) { let cur = mins(w[0]); const end = mins(w[1]); for (const [bs, be, b] of booked.filter(([bs, be]) => be > cur && bs < end).sort((x, y) => x[0] - y[0])) { if (bs > cur) out.push({ from: hm(cur), to: hm(bs), state: "free" }); out.push({ from: hm(Math.max(bs, cur)), to: hm(Math.min(be, end)), state: "booked", who: b.name }); cur = Math.max(cur, be); } if (cur < end) out.push({ from: hm(cur), to: hm(end), state: "free" }); }
+        return out;
+      };
+      return <div className="sch-dash">
+        <div className="iv-card sch-dash-appts">
+          <div className="sch-dash-head"><h3>{isToday ? "Today’s appointments" : dashDate.toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "short" })}</h3><div className="sch-dash-nav"><button type="button" className="iv-btn" aria-label="Previous day" onClick={() => setDashDate(addDays(dashDate, -1))}><ChevronLeft size={15} /></button><input type="date" value={key} onChange={(e) => e.target.value && setDashDate(new Date(`${e.target.value}T12:00:00`))} aria-label="Pick a date" /><button type="button" className="iv-btn" aria-label="Next day" onClick={() => setDashDate(addDays(dashDate, 1))}><ChevronRight size={15} /></button>{!isToday && <button type="button" className="iv-btn" onClick={() => setDashDate(new Date())}>Today</button>}</div></div>
+          <div className="sch-dash-stats"><span><b>{dayList.length}</b> booked</span><span><b>{dayList.filter((b) => statusOf(b)[0] === "Confirmed").length}</b> to come</span><span><b>{dayList.filter((b) => statusOf(b)[0] === "Done").length}</b> done</span>{dayList.some((b) => b.status === "no_show") && <span><b>{dayList.filter((b) => b.status === "no_show").length}</b> no-show</span>}</div>
+          {dayList.length ? <ul className="sch-dash-list">{dayList.map((b) => { const [label, tone] = statusOf(b); const cal = calById.get(b.calendarId); return <li key={b.id} onClick={() => setDetail(b)}><time>{time(b.start)}</time><span className="sch-dash-av" style={{ ["--c" as string]: cal?.color || "#2563eb" }}>{(b.name || "?").slice(0, 1).toUpperCase()}</span><span className="sch-dash-who"><b>{b.name}</b><small>{cal?.name || ""}</small><small className="sch-dash-staff">{b.staffIds.map((id) => staffById.get(id)?.name.split(" ")[0]).filter(Boolean).join(", ")}</small></span><span className={`sch-dash-status ${tone}`}>{label}</span></li>; })}</ul> : <p className="iv-small sch-dash-empty">Nothing booked{isToday ? " today" : " on this day"}.</p>}
+        </div>
+        <div className="iv-card sch-dash-staff-card">
+          <div className="sch-dash-head"><h3>Staff availability</h3><span className="iv-small">{dashDate.toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short" })}</span></div>
+          <div className="sch-dash-staff-grid">{data.staff.map((st) => { const slots = staffSlots(st); return <div key={st.id} className="sch-dash-person"><div className="sch-dash-person-top"><Avatar person={st} size={34} /><div><b>{st.name.split("|")[0].trim()}</b><small>{st.role}</small></div></div>{slots.length ? slots.map((sl, i) => sl.state === "off" ? <div key={i} className="sch-slot off"><span>Day off</span></div> : <div key={i} className={`sch-slot ${sl.state}`} title={sl.who || ""}><span>{sl.from} – {sl.to}</span><em>{sl.state === "booked" ? "Booked" : "Available"}</em></div>) : <div className="sch-slot off"><span>Not working</span></div>}</div>; })}</div>
+        </div>
+      </div>;
+    })()}
     {tab === "calendar" && <div className="iv-card sch-week-card">
       <div className="sch-week-nav"><button type="button" className="iv-btn" aria-label="Previous week" onClick={() => setWeek(addDays(week, -7))}><ChevronLeft size={15} /></button><button type="button" className="iv-btn" onClick={() => setWeek(mondayOf(new Date()))}>Today</button><button type="button" className="iv-btn" aria-label="Next week" onClick={() => setWeek(addDays(week, 7))}><ChevronRight size={15} /></button>
         <b>{week.toLocaleDateString("en-IE", { day: "numeric", month: "short" })} – {addDays(week, 6).toLocaleDateString("en-IE", { day: "numeric", month: "short", year: "numeric" })}</b>
