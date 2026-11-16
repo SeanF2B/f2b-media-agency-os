@@ -1173,3 +1173,21 @@ body.f2b-dark .app-shell .dh-split-row.good { background: #15291e !important; }
 body.f2b-dark :is(.app-shell .dh-split-row b, .app-shell .dh-split-head b, .app-shell .dh-split-total b, .app-shell .dh-split-row span, .app-shell .dh-split-total span, #f2b-dh-y) { color: #f2f4f7 !important; -webkit-text-fill-color: #f2f4f7 !important; }
 body.f2b-dark :is(.app-shell .dh-split-row.good b, #f2b-dh-y) { color: #6fdc9b !important; -webkit-text-fill-color: #6fdc9b !important; }
 body.f2b-dark :is(.app-shell .dh-split-head small, .app-shell .dh-split-note, .app-shell .dh-split-total small, #f2b-dh-y) { color: #a8b3bd !important; -webkit-text-fill-color: #a8b3bd !important; }
+/* Sales pipeline: stage value as rings instead of bars */
+html body .app-shell .overview-pipeline-rings { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; margin: 14px 0; }
+html body .app-shell .overview-stage-ring { display: grid; justify-items: center; gap: 2px; padding: 12px 8px; border-radius: 16px; border: 1px solid #e8edf1; background: #fff; text-align: center; }
+html body .app-shell .overview-stage-ring .ring-track { fill: none; stroke: #eef1f4; stroke-width: 8; }
+html body .app-shell .overview-stage-ring .ring-fill { fill: none; stroke: var(--brand-primary, #1f6feb); stroke-width: 8; stroke-linecap: round; transition: stroke-dasharray .6s ease; }
+html body .app-shell .overview-stage-ring.won .ring-fill { stroke: #22a55b; }
+html body .app-shell .overview-stage-ring.lost .ring-fill { stroke: #e5484d; }
+html body .app-shell .overview-stage-ring text { font-size: 14px; font-weight: 700; fill: #101828; }
+html body .app-shell .overview-stage-ring b { font-size: 16px; margin-top: 4px; color: #101828; }
+html body .app-shell .overview-stage-ring.won b { color: #157a43; }
+html body .app-shell .overview-stage-ring span { font-size: 12.5px; font-weight: 600; color: #344054; }
+html body .app-shell .overview-stage-ring em { font-style: normal; font-size: 11.5px; color: #667085; }
+body.f2b-dark .app-shell .overview-stage-ring { background: #1a2025 !important; border-color: #33404a !important; }
+body.f2b-dark .app-shell .overview-stage-ring .ring-track { stroke: #2b353d; }
+body.f2b-dark .app-shell .overview-stage-ring text { fill: #f2f4f7; }
+body.f2b-dark :is(.app-shell .overview-stage-ring b, .app-shell .overview-stage-ring span, #f2b-ring-x) { color: #f2f4f7 !important; -webkit-text-fill-color: #f2f4f7 !important; }
+body.f2b-dark :is(.app-shell .overview-stage-ring.won b, #f2b-ring-x) { color: #6fdc9b !important; -webkit-text-fill-color: #6fdc9b !important; }
+body.f2b-dark :is(.app-shell .overview-stage-ring em, #f2b-ring-x) { color: #a8b3bd !important; -webkit-text-fill-color: #a8b3bd !important; }
