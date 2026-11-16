@@ -11,7 +11,7 @@ import {
   SchedulingError, availableSlots, createBooking, deleteCalendar, getBooking, getCalendar, getStaffSettings, listBookings, listCalendars,
   saveCalendar, saveStaffSettings, staffFeedToken, updateBooking, getStaffProfiles, saveStaffProfile, reviewLinkToken,
 } from "@/lib/scheduling/server";
-import { getPayroll, savePayrollEmployer, savePayrollPerson, issuePayslip, deletePayslip } from "@/lib/scheduling/payroll-store";
+import { getPayroll, savePayrollEmployer, savePayrollPerson, issuePayslip, deletePayslip, getPayslip, markPayslipEmailed } from "@/lib/scheduling/payroll-store";
 
 export const dynamic = "force-dynamic";
 const json = (data: unknown, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
@@ -153,13 +153,33 @@ export async function POST(request: Request) {
         return json({ profile: await saveStaffProfile(db, ownerId, staffId, body.profile) });
       }
       // Payroll & payslips: admins only (PPS numbers and pay are never sent to anyone else).
-      case "getPayroll": case "savePayrollEmployer": case "savePayrollPerson": case "previewPayslip": case "issuePayslip": case "deletePayslip": {
+      case "getPayroll": case "savePayrollEmployer": case "savePayrollPerson": case "previewPayslip": case "issuePayslip": case "deletePayslip": case "emailPayslip": {
         if (!ctx.admin) return fail("Only admins can see payroll.", 403);
         const scope = ctx.scope || "";
         try {
           if (body.action === "getPayroll") { const year = Math.max(2020, Math.min(2100, Number(body.year) || new Date().getFullYear())); return json(await getPayroll(db, ownerId, scope, ctx.staff.map((s) => s.id), year)); }
           if (body.action === "savePayrollEmployer") return json({ employer: await savePayrollEmployer(db, ownerId, scope, body.employer) });
           const staffId = str(body.staffId, 120);
+          if (body.action === "emailPayslip") {
+            // Sends the saved payslip (PDF made in the browser) to that staff member's own email address only.
+            const rec = await getPayslip(db, ownerId, scope, str(body.key, 200));
+            if (!rec) return fail("Save the payslip first, then email it.", 404);
+            const member = ctx.ws.staffRaw.find((s) => s.id === rec.staffId);
+            const to = String(member?.email || "").trim();
+            if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) return fail(`${rec.staffName} has no email address on their team profile.`, 400);
+            if (!deps.sendEmail) return fail("Email sending isn't set up yet.", 503);
+            const pdf = typeof body.pdf === "string" ? body.pdf.replace(/^data:application\/pdf;base64,/, "") : "";
+            if (!pdf || pdf.length > 4_000_000 || !/^[A-Za-z0-9+/=]+$/.test(pdf) || !atob(pdf.slice(0, 8)).startsWith("%PDF")) return fail("The payslip PDF couldn't be attached.", 400);
+            const employer = (rec.employer.name || str(body.businessName, 120) || ctx.ws.agencyName || "Your employer").replace(/[<>]/g, "");
+            const period = `${new Date(`${rec.periodStart}T12:00:00`).toLocaleDateString("en-IE", { day: "numeric", month: "short", year: "numeric" })} – ${new Date(`${rec.periodEnd}T12:00:00`).toLocaleDateString("en-IE", { day: "numeric", month: "short", year: "numeric" })}`;
+            const net = new Intl.NumberFormat("en-IE", { style: "currency", currency: str(body.currency, 3) || "EUR" }).format(rec.result.net);
+            const first = rec.staffName.split(" ")[0].replace(/[<>]/g, "");
+            const subject = `Your payslip for ${period} · ${employer}`;
+            const text = `Hi ${first},\n\nYour payslip for ${period} is attached (payslip no. ${rec.number}). Net pay: ${net}, paid ${rec.payDate}.\n\nKeep it somewhere safe; you may need it for Revenue or a mortgage application.\n\n${employer}`;
+            const html = `<div style="font-family:Arial,sans-serif;color:#101828;font-size:14px;line-height:1.5"><p>Hi ${first},</p><p>Your payslip for <b>${period}</b> is attached (payslip no. ${rec.number}).</p><p style="font-size:18px;margin:16px 0"><b>Net pay: ${net}</b><br><span style="font-size:13px;color:#667085">Paid ${rec.payDate}</span></p><p style="color:#475467">Keep it somewhere safe; you may need it for Revenue or a mortgage application.</p><p>${employer}</p></div>`;
+            await deps.sendEmail({ to: [to], subject, html, text, fromName: employer, kind: "Payslip", idempotencyKey: `payslip/${rec.key}/${Date.now()}`, attachments: [{ filename: `Payslip-${rec.number}-${rec.staffName.replace(/[^A-Za-z0-9]+/g, "-")}.pdf`, content: pdf }] });
+            return json({ slip: await markPayslipEmailed(db, ownerId, scope, rec, to) });
+          }
           if (body.action === "deletePayslip") { await deletePayslip(db, ownerId, scope, str(body.key, 200)); return json({ ok: true }); }
           const person = ctx.staff.find((s) => s.id === staffId);
           if (!person) return fail("Team member not found.", 404);

@@ -88,3 +88,16 @@ test("register: issuing payslips builds year-to-date, scoped per account, invali
   await issuePayslip(db, "o", "c1", staff, { payDate: "2026-03-31", periodStart: "2026-03-01", periodEnd: "2026-03-31", earnings: [{ label: "x", amount: 10 }] }, false);
   assert.equal((await getPayroll(db, "o", "c1", ["pat"], 2026)).slips.length, 1);
 });
+
+test("payslip PDF: valid file with fonts, euro sign and optional JPEG logo", async () => {
+  const { buildPayslipPdf } = await import("../lib/scheduling/payslip-pdf.ts");
+  const result = computePayslip({ person: PERSON, gross: 2000, otherDeductions: 0, payDate: "2026-11-30", periodStart: "2026-11-01", periodEnd: "2026-11-30", ytd: EMPTY_YTD });
+  const rec = { key: "k", number: 1, staffId: "s", staffName: "Seán Ó Briain", role: "", payDate: "2026-11-30", periodStart: "2026-11-01", periodEnd: "2026-11-30", issuedAt: "2026-11-30T10:00:00Z", note: "", earnings: [{ label: "Hours worked", detail: "80h @ €25/h", amount: 2000 }], deductions: [], employer: { name: "F2B Media", address: "", employerNo: "", phone: "", email: "" }, person: PERSON, result };
+  const plain = buildPayslipPdf(rec, { currency: "EUR", businessName: "F2B" });
+  const text = Buffer.from(plain).toString("latin1");
+  assert.ok(text.startsWith("%PDF-1.4")); assert.ok(text.trimEnd().endsWith("%%EOF"));
+  assert.match(text, /\/BaseFont \/Helvetica-Bold/); assert.match(text, /\\200/); // € in WinAnsi
+  const start = Number(/startxref\n(\d+)/.exec(text)[1]); assert.equal(text.slice(start, start + 4), "xref");
+  const withLogo = Buffer.from(buildPayslipPdf(rec, { currency: "EUR", businessName: "F2B", logo: { jpeg: new Uint8Array([0xff, 0xd8, 0xff, 0xd9]), width: 2, height: 1 } })).toString("latin1");
+  assert.match(withLogo, /\/Subtype \/Image/); assert.match(withLogo, /\/Im1 Do/);
+});

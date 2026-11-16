@@ -8,13 +8,14 @@ import "./scheduling.css";
 import { ReportGeneratingAnimation } from "./report-generating-animation";
 import { computePayslip, maskPps, normalisePps, validPps, DEFAULT_PERSON, EMPTY_YTD, type PayrollEmployer, type PayrollPerson } from "@/lib/scheduling/payroll";
 import type { PayLine, PayslipRecord } from "@/lib/scheduling/payroll-store";
+import { buildPayslipPdf, bytesToBase64, type PdfLogo } from "@/lib/scheduling/payslip-pdf";
 
 type DayKey = "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
 type Window = [string, string];
 type Question = { id: string; label: string; required?: boolean; type?: "text" | "textarea" | "select"; options?: string[] };
 type Calendar = { id: string; clientId: string; name: string; slug: string; kind: "service" | "consultation"; description: string; durationMin: number; bufferBefore: number; bufferAfter: number; slotInterval: number; minNoticeMin: number; maxDaysAhead: number; dailyLimit: number; locationType: "onsite" | "phone" | "video" | "office"; locationDetail: string; price: number; currency: string; color: string; assignMode: "customer_pick" | "round_robin" | "collective"; staffIds: string[]; questions: Question[]; stageId: string; confirmationMessage: string; redirectUrl: string; active: boolean; timezone: string };
 type StaffReview = { id: string; author: string; rating: number; text: string; source: string; date: string };
-type StaffProfile = { showReviews: boolean; showPhotos: boolean; title: string; bio: string; reviews: StaffReview[]; photos: Array<{ url: string; caption: string }>; payType?: "none" | "hourly" | "commission"; payRate?: number };
+type StaffProfile = { showReviews: boolean; showPhotos: boolean; title: string; bio: string; reviews: StaffReview[]; photos: Array<{ url: string; caption: string }>; payType?: "none" | "hourly" | "commission" | "salary"; payRate?: number };
 type Staff = { id: string; name: string; email?: string; role?: string; avatar?: string; profile?: StaffProfile | null; timezone?: string; weekly?: Partial<Record<DayKey, Window[]>>; blocked?: string[]; dailyLimit: number; google: string; feedUrl: string; canEdit: boolean };
 type Booking = { id: string; clientId: string; calendarId: string; start: string; end: string; status: "booked" | "cancelled" | "completed" | "no_show"; staffIds: string[]; contactId: string | null; name: string; email: string; phone: string; answers: Array<{ label: string; value: string }>; notes: string; source: string; channel: string; meetLink: string; createdBy: string; createdAt: string };
 type Data = { calendars: Calendar[]; bookings: Booking[]; staff: Staff[]; clients: Array<{ id: string; name: string; logo: string }>; scope: string | null; canManage: boolean; isAdmin: boolean; meId: string; googleAvailable: boolean; emailReady: boolean; publicBase: string };
@@ -1039,15 +1040,15 @@ function StaffHoursPanel({ data: base, scopeClientId, sample }: { data: Data; sc
   const [to, setTo] = useState(() => ymd(new Date()));
   const [who, setWho] = useState("");
   const [own, setOwn] = useState<Data | null>(null);
-  const [pay, setPay] = useState<Record<string, { payType: "none" | "hourly" | "commission"; payRate: number }>>({});
+  const [pay, setPay] = useState<Record<string, { payType: "none" | "hourly" | "commission" | "salary"; payRate: number }>>({});
   const [editPay, setEditPay] = useState("");
   const [cover, setCover] = useState<null | { staffId: string; to: string; from: string; until: string; dayOff: boolean }>(null);
   const [coverMsg, setCoverMsg] = useState("");
   const [covering, setCovering] = useState(false);
   const [tick, setTick] = useState(0);
-  const [std, setStd] = useState<{ payType: "none" | "hourly" | "commission"; payRate: number }>({ payType: "commission", payRate: 70 });
+  const [std, setStd] = useState<{ payType: "none" | "hourly" | "commission" | "salary"; payRate: number }>({ payType: "commission", payRate: 70 });
   const [editStd, setEditStd] = useState(false);
-  useEffect(() => { if (sample) return; let live = true; api<{ payType: "none" | "hourly" | "commission"; payRate: number }>(scopeClientId, { action: "getDefaultPay" }).then((r) => { if (live) setStd({ payType: r.payType, payRate: r.payRate }); }).catch(() => undefined); return () => { live = false; }; }, [sample, scopeClientId]);
+  useEffect(() => { if (sample) return; let live = true; api<{ payType: "none" | "hourly" | "commission" | "salary"; payRate: number }>(scopeClientId, { action: "getDefaultPay" }).then((r) => { if (live) setStd({ payType: r.payType, payRate: r.payRate }); }).catch(() => undefined); return () => { live = false; }; }, [sample, scopeClientId]);
   const range = useMemo(() => {
     if (period === "custom") { const a = new Date(`${from}T00:00:00`), b = addDays(new Date(`${to}T00:00:00`), 1); return { a, b: b > a ? b : addDays(a, 1) }; }
     if (period === "day") { const a = new Date(anchor); a.setHours(0, 0, 0, 0); return { a, b: addDays(a, 1) }; }
@@ -1065,7 +1066,7 @@ function StaffHoursPanel({ data: base, scopeClientId, sample }: { data: Data; sc
   const cal = new Map(data.calendars.map((c) => [c.id, c]));
   const money = (n: number) => new Intl.NumberFormat("en-IE", { style: "currency", currency: data.calendars[0]?.currency || "EUR", maximumFractionDigits: 0 }).format(n);
   const priceOf = (b: Booking) => { const a = b.answers.find((x) => /^price$/i.test(x.label))?.value || ""; const n = Number(a.replace(/[^0-9.]/g, "")); return n > 0 ? n : (cal.get(b.calendarId)?.price || 0); };
-  const payOf = (p: Staff) => pay[p.id] || (p.profile?.payType && p.profile.payType !== "none" ? { payType: p.profile.payType, payRate: p.profile.payRate || 0 } : { ...std, standard: true } as { payType: "none" | "hourly" | "commission"; payRate: number; standard?: boolean });
+  const payOf = (p: Staff) => pay[p.id] || (p.profile?.payType && p.profile.payType !== "none" ? { payType: p.profile.payType, payRate: p.profile.payRate || 0 } : { ...std, standard: true } as { payType: "none" | "hourly" | "commission" | "salary"; payRate: number; standard?: boolean });
   const inRangeAll = data.bookings.filter((b) => Date.parse(b.start) >= range.a.getTime() && Date.parse(b.start) < range.b.getTime());
   const inRange = inRangeAll.filter((b) => b.status !== "cancelled");
   const depositOf = (b: Booking) => { const v = b.answers.find((x) => /^deposit/i.test(x.label))?.value || ""; const n = Number(v.replace(/[^0-9.]/g, "")); return n > 0 ? n : 0; };
@@ -1083,6 +1084,7 @@ function StaffHoursPanel({ data: base, scopeClientId, sample }: { data: Data; sc
     const deposits = mineAll.reduce((n, b) => n + depositOf(b) * share(b), 0);
     const pr = payOf(p); const workedH = hrs(worked), upcomingH = hrs(upcoming);
     const cut = (v: number, h: number) => pr.payType === "hourly" ? h * pr.payRate : pr.payType === "commission" ? v * pr.payRate / 100 : 0;
+    if (pr.payType === "salary") { const span = range.b.getTime() - range.a.getTime(); const done = Math.max(0, Math.min(span, Date.now() - range.a.getTime())); const perMs = pr.payRate / (365 * 86_400_000); return { p, count: mine.length, workedH, upcomingH, noShows: lostList.filter((b) => b.status === "no_show").length, revenue, aheadRevenue, lost, deposits, earned: perMs * done, scheduledPay: perMs * (span - done), pr }; }
     return { p, count: mine.length, workedH, upcomingH, noShows: lostList.filter((b) => b.status === "no_show").length, revenue, aheadRevenue, lost, deposits, earned: cut(revenue, workedH), scheduledPay: cut(aheadRevenue, upcomingH), pr };
   });
   const tot = rows.reduce((t, r) => ({ h: t.h + r.workedH, u: t.u + r.upcomingH, n: t.n + r.count, rev: t.rev + r.revenue, sched: t.sched + r.aheadRevenue, lost: t.lost + r.lost, dep: t.dep + r.deposits, earn: t.earn + r.earned, earnS: t.earnS + r.scheduledPay }), { h: 0, u: 0, n: 0, rev: 0, sched: 0, lost: 0, dep: 0, earn: 0, earnS: 0 });
@@ -1090,13 +1092,13 @@ function StaffHoursPanel({ data: base, scopeClientId, sample }: { data: Data; sc
   const label = period === "custom" ? `${new Date(`${from}T12:00:00`).toLocaleDateString("en-IE", { day: "numeric", month: "short" })} – ${new Date(`${to}T12:00:00`).toLocaleDateString("en-IE", { day: "numeric", month: "short", year: "numeric" })}` : period === "day" ? range.a.toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short" }) : period === "week" ? `Week of ${range.a.toLocaleDateString("en-IE", { day: "numeric", month: "short" })}` : range.a.toLocaleDateString("en-IE", { month: "long", year: "numeric" });
   const setP = (v: typeof period) => { setPeriod(v); try { localStorage.setItem("f2b-staff-hours-period2", v); } catch { /* optional */ } };
   const step = (dir: 1 | -1) => setAnchor(period === "month" ? new Date(anchor.getFullYear(), anchor.getMonth() + dir, 1) : addDays(anchor, (period === "day" ? 1 : 7) * dir));
-  const savePay = async (p: Staff, v: { payType: "none" | "hourly" | "commission"; payRate: number }) => {
+  const savePay = async (p: Staff, v: { payType: "none" | "hourly" | "commission" | "salary"; payRate: number }) => {
     setPay((cur) => ({ ...cur, [p.id]: v })); setEditPay("");
     if (sample) return;
     try { await api(scopeClientId, { action: "saveProfile", staffId: p.id, profile: { ...(p.profile || { showReviews: false, showPhotos: false, title: "", bio: "", reviews: [], photos: [] }), ...v } }); } catch { /* keeps the local value */ }
   };
-  const saveStd = async (v: { payType: "none" | "hourly" | "commission"; payRate: number }) => { setStd(v); setEditStd(false); if (!sample) { try { await api(scopeClientId, { action: "saveDefaultPay", ...v }); } catch { /* keeps the local value */ } } };
-  const rule = (pr: { payType: string; payRate: number; standard?: boolean }) => pr.payType === "hourly" ? `${money(pr.payRate)}/h` : pr.payType === "commission" ? `${pr.payRate}% / ${100 - pr.payRate}%${pr.standard ? " · standard" : ""}` : "No pay set";
+  const saveStd = async (v: { payType: "none" | "hourly" | "commission" | "salary"; payRate: number }) => { setStd(v); setEditStd(false); if (!sample) { try { await api(scopeClientId, { action: "saveDefaultPay", ...v }); } catch { /* keeps the local value */ } } };
+  const rule = (pr: { payType: string; payRate: number; standard?: boolean }) => pr.payType === "hourly" ? `${money(pr.payRate)}/h` : pr.payType === "salary" ? `${money(pr.payRate)}/year` : pr.payType === "commission" ? `${pr.payRate}% / ${100 - pr.payRate}%${pr.standard ? " · standard" : ""}` : "No pay set";
   return <section className="sch-earn" aria-label="Staff hours and earnings">
     <div className="sch-earn-head">
       <div><p className="eyebrow">⏱ STAFF HOURS &amp; EARNINGS <span className="admin-badge" title="Only admins can see staff pay and business profit">ADMIN</span></p><h3>{label}</h3></div>
@@ -1152,7 +1154,7 @@ function StaffHoursPanel({ data: base, scopeClientId, sample }: { data: Data; sc
         <div className="sch-earn-cell"><b>{money(r.aheadRevenue)}</b></div>
         <div className="sch-earn-cell lost"><b>{money(r.lost)}</b>{r.noShows > 0 && <em>{r.noShows} no-show{r.noShows === 1 ? "" : "s"}</em>}</div>
         <div className="sch-earn-cell"><b>{money(r.deposits)}</b></div>
-        <div className="sch-earn-cell earn">{editPay === r.p.id ? <PayEditor value={r.pr} onSave={(v) => void savePay(r.p, v)} onCancel={() => setEditPay("")} /> : <><b>{money(r.earned)}{r.scheduledPay > 0 && <small> +{money(r.scheduledPay)}</small>}</b><button type="button" className="sch-earn-chip sm" onClick={() => setEditPay(r.p.id)} title="Change this person's pay">{r.pr.payType === "hourly" ? `${money(r.pr.payRate)}/h` : r.pr.payType === "commission" ? `${r.pr.payRate}%${(r.pr as { standard?: boolean }).standard ? "" : " (own)"}` : "Set pay"}</button></>}</div>
+        <div className="sch-earn-cell earn">{editPay === r.p.id ? <PayEditor value={r.pr} onSave={(v) => void savePay(r.p, v)} onCancel={() => setEditPay("")} /> : <><b>{money(r.earned)}{r.scheduledPay > 0 && <small> +{money(r.scheduledPay)}</small>}</b><button type="button" className="sch-earn-chip sm" onClick={() => setEditPay(r.p.id)} title="Change this person's pay">{r.pr.payType === "hourly" ? `${money(r.pr.payRate)}/h` : r.pr.payType === "salary" ? `${money(r.pr.payRate)}/yr` : r.pr.payType === "commission" ? `${r.pr.payRate}%${(r.pr as { standard?: boolean }).standard ? "" : " (own)"}` : "Set pay"}</button></>}</div>
         <button type="button" className="sch-earn-cover" title={`Off sick or away? Move ${r.p.name.split("|")[0].trim()}'s bookings to someone else`} onClick={() => setCover({ staffId: r.p.id, to: "", from: ymd(new Date()), until: ymd(new Date()), dayOff: true })}>Reassign</button>
       </div>)}
       {!rows.length && <p className="dh-muted">No staff to show.</p>}
@@ -1160,17 +1162,17 @@ function StaffHoursPanel({ data: base, scopeClientId, sample }: { data: Data; sc
   </section>;
 }
 
-function PayEditor({ value, onSave, onCancel }: { value: { payType: "none" | "hourly" | "commission"; payRate: number }; onSave: (v: { payType: "none" | "hourly" | "commission"; payRate: number }) => void; onCancel: () => void }) {
+function PayEditor({ value, onSave, onCancel }: { value: { payType: "none" | "hourly" | "commission" | "salary"; payRate: number }; onSave: (v: { payType: "none" | "hourly" | "commission" | "salary"; payRate: number }) => void; onCancel: () => void }) {
   const [t, setT] = useState(value.payType === "none" ? "commission" : value.payType);
   const [rate, setRate] = useState(value.payRate ? String(value.payRate) : "");
-  return <span className="sch-pay-edit"><select value={t} onChange={(e) => setT(e.target.value as "hourly" | "commission")}><option value="commission">% of price</option><option value="hourly">Per hour</option></select><input type="number" min={0} step="0.5" value={rate} placeholder={t === "hourly" ? "€/h" : "%"} onChange={(e) => setRate(e.target.value)} autoFocus /><button type="button" className="iv-btn ok" onClick={() => onSave({ payType: Number(rate) > 0 ? t : "none", payRate: Number(rate) || 0 })}>Save</button><button type="button" className="iv-btn" onClick={onCancel}>×</button></span>;
+  return <span className="sch-pay-edit"><select value={t} onChange={(e) => setT(e.target.value as "hourly" | "commission" | "salary")}><option value="commission">% of price</option><option value="hourly">Per hour</option><option value="salary">Salary / year</option></select><input type="number" min={0} step="0.5" value={rate} placeholder={t === "hourly" ? "€/h" : t === "salary" ? "€/year" : "%"} onChange={(e) => setRate(e.target.value)} autoFocus /><button type="button" className="iv-btn ok" onClick={() => onSave({ payType: Number(rate) > 0 ? t : "none", payRate: Number(rate) || 0 })}>Save</button><button type="button" className="iv-btn" onClick={onCancel}>×</button></span>;
 }
 
 
 // ================= Payslips (Books → Payslips, admins only) =================
 // Built from each person's finished appointments and pay split, with Irish PAYE / USC / PRSI worked out from their
 // payroll details (PPS number, RPN tax credits and cut-off point). Issued payslips go into a register for year-to-date figures.
-type PayRule = { payType: "none" | "hourly" | "commission"; payRate: number };
+type PayRule = { payType: "none" | "hourly" | "commission" | "salary"; payRate: number };
 type Business = { name: string; logo: string };
 const PERIOD_PRESETS = [["thisMonth", "This month"], ["lastMonth", "Last month"], ["thisWeek", "This week"], ["lastWeek", "Last week"], ["custom", "Custom dates"]] as const;
 type PeriodKey = typeof PERIOD_PRESETS[number][0];
@@ -1188,14 +1190,15 @@ function periodRange(key: PeriodKey, from: string, to: string) {
   const a = new Date(`${from}T00:00:00`), b = new Date(`${to}T00:00:00`); return { a, b: b < a ? a : b };
 }
 
-export function PayslipsView({ scopeClientId, business }: { scopeClientId: string; business: Business }) {
+export type TimeEntryLite = { staffId: string; taskId: string; startAt: string; seconds: number };
+export function PayslipsView({ scopeClientId, business, timeEntries = [] }: { scopeClientId: string; business: Business; timeEntries?: TimeEntryLite[] }) {
   const [sample] = useSampleData();
   const [real, setReal] = useState<Data | null>(null);
   const [err, setErr] = useState("");
   const [payroll, setPayroll] = useState<{ employer: PayrollEmployer; people: Record<string, PayrollPerson>; slips: PayslipRecord[] } | null>(null);
   const [std, setStd] = useState<PayRule>({ payType: "commission", payRate: 70 });
   const [demoSlips, setDemoSlips] = useState<PayslipRecord[]>([]);
-  const [demoPeople, setDemoPeople] = useState<Record<string, PayrollPerson>>({});
+  const [demoPeople] = useState<Record<string, PayrollPerson>>({});
   const [demoEmployer, setDemoEmployer] = useState<PayrollEmployer | null>(null);
   const [view, setView] = useState<PayslipRecord | null>(null);
   const [editPerson, setEditPerson] = useState("");
@@ -1223,13 +1226,12 @@ export function PayslipsView({ scopeClientId, business }: { scopeClientId: strin
   const slips = sample ? demoSlips : payroll!.slips;
   const payOf = (p: Staff): PayRule => p.profile?.payType && p.profile.payType !== "none" ? { payType: p.profile.payType, payRate: p.profile.payRate || 0 } : std;
   const currency = data.calendars[0]?.currency || "EUR";
-  const savePerson = async (id: string, person: PayrollPerson) => { if (sample) { setDemoPeople((m) => ({ ...m, [id]: person })); return person; } const r = await api<{ person: PayrollPerson }>(scopeClientId, { action: "savePayrollPerson", staffId: id, person }); setPayroll((cur) => cur ? { ...cur, people: { ...cur.people, [id]: r.person } } : cur); return r.person; };
   const removeSlip = async (s: PayslipRecord) => { if (!(await appConfirm(`Delete payslip #${s.number} for ${s.staffName}?`))) return; if (sample) { setDemoSlips((l) => l.filter((x) => x.key !== s.key)); return; } try { await api(scopeClientId, { action: "deletePayslip", key: s.key }); setPayroll((cur) => cur ? { ...cur, slips: cur.slips.filter((x) => x.key !== s.key) } : cur); } catch (e) { await appAlert(errText(e, "Couldn't delete it.")); } };
   return <section className="crv ps-view" aria-label="Payslips">
     {head}
     {sample && <p className="ps-banner">Sample data: demo PPS numbers and figures. Nothing is saved.</p>}
     {!sample && !employer.employerNo && <p className="ps-banner warn">Add your Revenue employer registration number under <button type="button" className="text-button" onClick={() => setEditEmployer(true)}>Employer details</button>.</p>}
-    <PayslipCreator data={data} people={people} employer={employer} business={business} slips={slips} payOf={payOf} currency={currency} sample={sample} scopeClientId={scopeClientId} onEditPerson={setEditPerson}
+    <PayslipCreator timeEntries={timeEntries} onEmailed={(rec) => setPayroll((cur) => cur ? { ...cur, slips: cur.slips.map((s) => s.key === rec.key ? rec : s) } : cur)} data={data} people={people} employer={employer} business={business} slips={slips} payOf={payOf} currency={currency} sample={sample} scopeClientId={scopeClientId} onEditPerson={setEditPerson}
       onIssued={(rec) => { if (sample) setDemoSlips((list) => [rec, ...list.filter((s) => s.key !== rec.key)]); else setPayroll((cur) => cur ? { ...cur, slips: [rec, ...cur.slips.filter((s) => s.key !== rec.key)] } : cur); }} />
     <div className="crv-history">
       <h3>Saved payslips</h3>
@@ -1238,16 +1240,16 @@ export function PayslipsView({ scopeClientId, business }: { scopeClientId: strin
         <Avatar person={p || { name: s.staffName }} size={34} />
         <span><b>{s.staffName} · {fmtDate(s.periodStart)} – {fmtDate(s.periodEnd)}</b><small>Payslip #{s.number} · paid {fmtDate(s.payDate)} · gross {moneyOf(s.result.gross, currency)} · net <b>{moneyOf(s.result.net, currency)}</b></small></span>
         <button type="button" className="secondary-button" onClick={() => setView(s)}>View</button>
-        <button type="button" className="secondary-button" onClick={() => printPayslip(s, business, currency)}>PDF</button>
+        <button type="button" className="secondary-button" onClick={() => void downloadPayslipPdf(s, business, currency)}>PDF</button><button type="button" className="secondary-button" title={s.emailedAt ? `Emailed to ${s.emailedTo} on ${fmtDate(s.emailedAt.slice(0, 10))}` : "Email the PDF to them"} onClick={async () => { if (sample) { await appAlert("Sample data: nothing is emailed."); return; } try { const rec = await emailPayslip(s, business, currency, scopeClientId); setPayroll((cur) => cur ? { ...cur, slips: cur.slips.map((x) => x.key === rec.key ? rec : x) } : cur); await appAlert(`Payslip emailed to ${rec.emailedTo}.`); } catch (e) { await appAlert(errText(e, "Couldn't email it.")); } }}>{s.emailedAt ? "Emailed ✓" : "Email"}</button>
         <button type="button" className="text-button ps-del" aria-label={`Delete payslip ${s.number}`} onClick={() => void removeSlip(s)}>Delete</button>
       </li>; })}</ul> : <p className="muted">No saved payslips for {business.name} yet.</p>}
     </div>
     {view && <div className="bt-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setView(null); }}><div className="bt ps" role="dialog" aria-modal="true" aria-label="Payslip">
       <header className="bt-head"><div><p className="eyebrow">🧾 PAYSLIP #{view.number}</p><h2>{view.staffName}</h2></div><button type="button" className="bt-x" aria-label="Close" onClick={() => setView(null)}>×</button></header>
       <div className="ps-body"><PayslipDoc rec={view} business={business} currency={currency} /></div>
-      <footer className="bt-foot"><span style={{ flex: 1 }} /><button type="button" className="primary-button" onClick={() => printPayslip(view, business, currency)}>Download PDF</button></footer>
+      <footer className="bt-foot"><span style={{ flex: 1 }} /><button type="button" className="secondary-button" onClick={() => printPayslip(view, business, currency)}>Print</button><button type="button" className="primary-button" onClick={() => void downloadPayslipPdf(view, business, currency)}>Download PDF</button></footer>
     </div></div>}
-    {editPerson && <PayrollPersonModal person={data.staff.find((p) => p.id === editPerson)} value={people[editPerson]} sample={sample} onClose={() => setEditPerson("")} onSave={(v) => savePerson(editPerson, v)} />}
+    {editPerson && data.staff.find((p) => p.id === editPerson) && <PaySettingsModal staff={data.staff.find((p) => p.id === editPerson)!} scope={scopeClientId} sample={sample} onClose={() => setEditPerson("")} onSaved={() => void load()} />}
     {editEmployer && <div className="bt-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setEditEmployer(false); }}><div className="bt ps ps-form" role="dialog" aria-modal="true" aria-label="Employer details">
       <header className="bt-head"><div><p className="eyebrow">EMPLOYER DETAILS <span className="admin-badge">ADMIN</span></p><h2>{employer.name || business.name}</h2><p>Shown at the top of every payslip.</p></div><button type="button" className="bt-x" aria-label="Close" onClick={() => setEditEmployer(false)}>×</button></header>
       <div className="ps-body"><PayrollEmployerForm value={employer} business={business} onSave={async (v) => { if (sample) setDemoEmployer(v); else { const r = await api<{ employer: PayrollEmployer }>(scopeClientId, { action: "savePayrollEmployer", employer: v }); setPayroll((cur) => cur ? { ...cur, employer: r.employer } : cur); } setEditEmployer(false); }} /></div>
@@ -1257,7 +1259,7 @@ export function PayslipsView({ scopeClientId, business }: { scopeClientId: strin
 
 const moneyOf = (n: number, currency: string) => { try { return new Intl.NumberFormat("en-IE", { style: "currency", currency }).format(n); } catch { return `€${n.toFixed(2)}`; } };
 
-function PayslipCreator({ data, people, employer, business, slips, payOf, currency, sample, scopeClientId, onIssued, onEditPerson }: { data: Data; people: Record<string, PayrollPerson>; employer: PayrollEmployer; business: Business; slips: PayslipRecord[]; payOf: (p: Staff) => PayRule; currency: string; sample: boolean; scopeClientId: string; onIssued: (rec: PayslipRecord) => void; onEditPerson: (id: string) => void }) {
+function PayslipCreator({ data, people, employer, business, slips, payOf, currency, sample, scopeClientId, onIssued, onEditPerson, timeEntries, onEmailed }: { timeEntries: TimeEntryLite[]; onEmailed: (rec: PayslipRecord) => void; data: Data; people: Record<string, PayrollPerson>; employer: PayrollEmployer; business: Business; slips: PayslipRecord[]; payOf: (p: Staff) => PayRule; currency: string; sample: boolean; scopeClientId: string; onIssued: (rec: PayslipRecord) => void; onEditPerson: (id: string) => void }) {
   const [who, setWho] = useState(data.staff[0]?.id || "");
   const [period, setPeriod] = useState<PeriodKey>(sample ? "thisMonth" : "lastMonth");
   const [from, setFrom] = useState(() => ymd(addDays(new Date(), -30)));
@@ -1271,6 +1273,7 @@ function PayslipCreator({ data, people, employer, business, slips, payOf, curren
   const [msg, setMsg] = useState("");
   const [shown, setShown] = useState(false);
   const [adjust, setAdjust] = useState(false);
+  const [hoursOverride, setHoursOverride] = useState("");
   const [generating, setGenerating] = useState(false);
   const genTimer = useRef(0);
   useEffect(() => () => window.clearTimeout(genTimer.current), []);
@@ -1278,7 +1281,7 @@ function PayslipCreator({ data, people, employer, business, slips, payOf, curren
   const genSteps = useMemo(() => ["Gathering details…", `Finding ${whoName}'s finished appointments…`, "Working out PAYE, USC and PRSI…", "Adding your logo and year-to-date totals…"], [whoName]);
   const generate = () => { setMsg(""); setShown(false); setGenerating(true); window.clearTimeout(genTimer.current); genTimer.current = window.setTimeout(() => { setGenerating(false); setShown(true); }, 4600); };
   useEffect(() => { if (!data.staff.some((p) => p.id === who)) setWho(data.staff[0]?.id || ""); }, [data.staff, who]);
-  const reset = () => { window.clearTimeout(genTimer.current); setGenerating(false); setShown(false); setMsg(""); setExtras([]); setCuts([]); setAdjust(false); };
+  const reset = () => { window.clearTimeout(genTimer.current); setGenerating(false); setShown(false); setMsg(""); setExtras([]); setCuts([]); setAdjust(false); setHoursOverride(""); };
   const person = data.staff.find((p) => p.id === who);
   const details = people[who] || { ...DEFAULT_PERSON };
   const periodStart = ymd(range.a), periodEnd = ymd(range.b), pay = payDate || periodEnd;
@@ -1289,7 +1292,23 @@ function PayslipCreator({ data, people, employer, business, slips, payOf, curren
   // One earnings line per service: count, hours and value at this person's split.
   const groups = new Map<string, { n: number; h: number; v: number }>();
   for (const b of done) { const share = 1 / Math.max(1, b.staffIds.length); const k = cal.get(b.calendarId)?.name || "Appointments"; const g = groups.get(k) || { n: 0, h: 0, v: 0 }; g.n++; g.h += (Date.parse(b.end) - Date.parse(b.start)) / 3_600_000 * share; g.v += priceOf(b) * share; groups.set(k, g); }
-  const workLines: PayLine[] = [...groups.entries()].map(([k, g]) => ({ label: k, detail: rule.payType === "hourly" ? `${g.n} appt${g.n === 1 ? "" : "s"} · ${g.h.toFixed(1)}h @ ${moneyOf(rule.payRate, currency)}/h` : `${g.n} appt${g.n === 1 ? "" : "s"} · ${g.h.toFixed(1)}h · ${moneyOf(g.v, currency)} work @ ${rule.payRate}%`, amount: Math.round((rule.payType === "hourly" ? g.h * rule.payRate : rule.payType === "commission" ? g.v * rule.payRate / 100 : 0) * 100) / 100 })).filter((l) => l.amount > 0);
+  // Hours for hourly staff: clock-ins first, then the task timer, then finished appointments (or typed in by hand).
+  const inPeriod = (iso: string) => { const d = ymd(new Date(iso)); return d >= periodStart && d <= periodEnd; };
+  const mine = timeEntries.filter((e) => e.staffId === who && inPeriod(e.startAt));
+  const clockH = mine.filter((e) => e.taskId === "clock").reduce((n, e) => n + e.seconds / 3600, 0);
+  const timerH = mine.filter((e) => e.taskId !== "clock").reduce((n, e) => n + e.seconds / 3600, 0);
+  const apptH = [...groups.values()].reduce((n, g) => n + g.h, 0);
+  const auto = clockH > 0 ? { h: clockH, src: "clocked in" } : timerH > 0 ? { h: timerH, src: "task timer" } : { h: apptH, src: "appointments" };
+  const manualH = hoursOverride.trim() === "" ? null : Math.max(0, Number(hoursOverride) || 0);
+  const hours = Math.round((manualH ?? auto.h) * 100) / 100;
+  const days = Math.round((range.b.getTime() - range.a.getTime()) / 86_400_000) + 1;
+  const isMonth = range.a.getDate() === 1 && addDays(range.b, 1).getDate() === 1 && range.a.getMonth() === range.b.getMonth();
+  const salaryPart = isMonth ? 1 / 12 : days === 7 ? 1 / 52 : days === 14 ? 1 / 26 : days / 365;
+  const workLines: PayLine[] = rule.payType === "hourly"
+    ? (hours > 0 ? [{ label: "Hours worked", detail: `${hours.toFixed(2)}h @ ${moneyOf(rule.payRate, currency)}/h · ${manualH !== null ? "entered by hand" : auto.src}`, amount: Math.round(hours * rule.payRate * 100) / 100 }] : [])
+    : rule.payType === "salary"
+      ? [{ label: "Salary", detail: `${moneyOf(rule.payRate, currency)} a year · ${isMonth ? "monthly" : days === 7 ? "weekly" : days === 14 ? "fortnightly" : `${days} days`}`, amount: Math.round(rule.payRate * salaryPart * 100) / 100 }]
+      : [...groups.entries()].map(([k, g]) => ({ label: k, detail: `${g.n} appt${g.n === 1 ? "" : "s"} · ${g.h.toFixed(1)}h · ${moneyOf(g.v, currency)} work @ ${rule.payRate}%`, amount: Math.round((rule.payType === "commission" ? g.v * rule.payRate / 100 : 0) * 100) / 100 })).filter((l) => l.amount > 0);
   const earnings = [...workLines, ...extras.filter((l) => l.label && l.amount)];
   const deductions = cuts.filter((l) => l.label && l.amount);
   const key = `${who}:${periodStart}:${periodEnd}`;
@@ -1300,7 +1319,7 @@ function PayslipCreator({ data, people, employer, business, slips, payOf, curren
     return { key, number: already?.number || slips.reduce((m, s) => Math.max(m, s.number || 0), 0) + 1, staffId: who, staffName: firstName(person?.name || ""), role: person?.role || "", payDate: pay, periodStart, periodEnd, issuedAt: new Date().toISOString(), note, earnings, deductions, employer, person: details, result };
   };
   const preview = shown && person ? localCompute() : null;
-  const issue = async () => {
+  const issue = async (andEmail = false) => {
     if (!person) return; setBusy(true); setMsg("");
     try {
       const rec = sample ? localCompute() : (await api<{ slip: PayslipRecord }>(scopeClientId, { action: "issuePayslip", staffId: who, payDate: pay, periodStart, periodEnd, earnings, deductions, note })).slip;
@@ -1310,7 +1329,9 @@ function PayslipCreator({ data, people, employer, business, slips, payOf, curren
         if (rec.result.prsiER > 0) entries.push({ id: `payslip-er-${rec.key}`, description: `Employer PRSI · ${rec.staffName} · payslip #${rec.number}`, amount: rec.result.prsiER, date: rec.payDate, clientId: data.scope || scopeClientId || "" });
         window.dispatchEvent(new CustomEvent("f2b-staff-pay-expense", { detail: { entries } }));
       }
-      setMsg(sample ? "Sample: saved on this screen only (nothing added to Books)." : `Payslip #${rec.number} saved and added to Books (wages${rec.result.prsiER > 0 ? " + employer PRSI" : ""}).`);
+      let mailed = "";
+      if (andEmail && !sample) { try { const sent = await emailPayslip(rec, business, currency, scopeClientId); onEmailed(sent); mailed = ` Emailed to ${sent.emailedTo}.`; } catch (e) { mailed = ` Not emailed: ${errText(e, "email failed")}`; } }
+      setMsg(sample ? `Sample: saved on this screen only (nothing added to Books${andEmail ? " or emailed" : ""}).` : `Payslip #${rec.number} saved and added to Books (wages${rec.result.prsiER > 0 ? " + employer PRSI" : ""}).${mailed}`);
     } catch (e) { setMsg(errText(e, "Couldn't save the payslip.")); }
     setBusy(false);
   };
@@ -1320,17 +1341,19 @@ function PayslipCreator({ data, people, employer, business, slips, payOf, curren
   </div>;
   return <>
     <div className="crv-types ps-staff" role="radiogroup" aria-label="Staff member">
-      {data.staff.map((p) => { const d = people[p.id]; const r = payOf(p); const ppsOk = d?.employment === "contractor" || validPps(d?.pps || ""); return <button key={p.id} type="button" role="radio" aria-checked={who === p.id} className={`crv-type ${who === p.id ? "on" : ""}`} onClick={() => { setWho(p.id); reset(); }}>
+      {data.staff.map((p) => { const d = people[p.id]; const r = payOf(p); const ppsOk = d?.employment === "contractor" || validPps(d?.pps || ""); return <div key={p.id} role="radio" tabIndex={0} aria-checked={who === p.id} className={`crv-type ps-card ${who === p.id ? "on" : ""}`} onClick={() => { if (who !== p.id) { setWho(p.id); reset(); } }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setWho(p.id); reset(); } }}>
         <Avatar person={p} size={40} />
-        <span><b>{firstName(p.name)}</b><small>{r.payType === "hourly" ? `${moneyOf(r.payRate, currency)}/h` : r.payType === "commission" ? `${r.payRate}% split` : "No pay set"} · {d?.employment === "contractor" ? "Contractor" : ppsOk ? `PPS ${maskPps(d!.pps)}` : <em className="ps-missing">PPS missing</em>}</small></span>
-      </button>; })}
+        <span><b>{firstName(p.name)}</b><small>{r.payType === "hourly" ? `${moneyOf(r.payRate, currency)}/h` : r.payType === "salary" ? `${moneyOf(r.payRate, currency)}/yr` : r.payType === "commission" ? `${r.payRate}% commission` : "No pay set"} · {d?.employment === "contractor" ? "Contractor" : ppsOk ? `PPS ${maskPps(d!.pps)}` : <em className="ps-missing">PPS missing</em>}</small></span>
+        <button type="button" className="ps-card-edit" title={`Edit ${firstName(p.name)}'s pay and tax settings`} aria-label={`Edit ${firstName(p.name)}'s pay settings`} onClick={(e) => { e.stopPropagation(); onEditPerson(p.id); }}><Settings2 size={15} /></button>
+      </div>; })}
       {!data.staff.length && <p className="dh-muted">No staff in this account yet.</p>}
     </div>
     <div className="crv-controls">
       <label className="crv-field"><span>Period</span><select value={period} onChange={(e) => { setPeriod(e.target.value as PeriodKey); reset(); }}>{PERIOD_PRESETS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
       {period === "custom" && <><label className="crv-field"><span>From</span><input type="date" value={from} max={to} onChange={(e) => { if (e.target.value) { setFrom(e.target.value); reset(); } }} /></label><label className="crv-field"><span>To</span><input type="date" value={to} min={from} onChange={(e) => { if (e.target.value) { setTo(e.target.value); reset(); } }} /></label></>}
       <label className="crv-field"><span>Pay date</span><input type="date" value={pay} onChange={(e) => setPayDate(e.target.value)} /></label>
-      <span className="crv-range">{fmtDate(periodStart)} – {fmtDate(periodEnd)} · {done.length} finished appointment{done.length === 1 ? "" : "s"}{person ? <> · <button type="button" className="text-button" onClick={() => onEditPerson(who)}>{firstName(person.name)}&apos;s payroll details</button></> : null}</span>
+      {rule.payType === "hourly" && <label className="crv-field ps-hours"><span>Hours</span><input type="number" min={0} step="0.25" value={hoursOverride} placeholder={auto.h.toFixed(2)} onChange={(e) => setHoursOverride(e.target.value)} title={`Leave empty to use ${auto.h.toFixed(2)}h from ${auto.src}`} /></label>}
+      <span className="crv-range">{fmtDate(periodStart)} – {fmtDate(periodEnd)} · {rule.payType === "hourly" ? `${hours.toFixed(2)}h ${manualH !== null ? "entered by hand" : `from ${auto.src}`}` : rule.payType === "salary" ? "Salary" : `${done.length} finished appointment${done.length === 1 ? "" : "s"}`}{person ? <> · <button type="button" className="text-button" onClick={() => onEditPerson(who)}>{firstName(person.name)}&apos;s pay settings</button></> : null}</span>
       <button type="button" className="primary-button crv-go" disabled={!person || generating} onClick={generate}>{generating ? "Generating…" : shown ? "Regenerate" : "Generate preview"}</button>
     </div>
     {generating && person && <ReportGeneratingAnimation title={`Generating ${firstName(person.name)}'s payslip`} steps={genSteps} />}
@@ -1339,7 +1362,8 @@ function PayslipCreator({ data, people, employer, business, slips, payOf, curren
         <span className="crv-live">{already ? `Payslip #${already.number} already saved for this period — saving again replaces it` : "Preview · not saved yet"}</span>
         <span className="crv-spacer" />
         <button type="button" className={`secondary-button ${adjust ? "on" : ""}`} onClick={() => setAdjust((v) => !v)}>{adjust ? "Hide extras" : "Add pay or deductions"}</button>
-        <button type="button" className="secondary-button" onClick={() => printPayslip(preview, business, currency)}>Download PDF</button>
+        <button type="button" className="secondary-button" onClick={() => void downloadPayslipPdf(preview, business, currency)}>Download PDF</button>
+        <button type="button" className="secondary-button" disabled={busy || !earnings.length} onClick={() => void issue(true)} title="Saves the payslip and emails the PDF to them">Save &amp; email</button>
         <button type="button" className="primary-button" disabled={busy || !earnings.length} onClick={() => void issue()}>{busy ? "Saving…" : already ? "Save again" : "Save payslip"}</button>
       </div>
       {msg && <p className="crv-notice" role="status">{msg}</p>}
@@ -1418,21 +1442,102 @@ function printPayslip(rec: PayslipRecord, business: Business, currency: string) 
   }).catch(() => { host.remove(); });
 }
 
+// Logo → JPEG (white background) so it can go inside the PDF.
+async function logoForPdf(src: string): Promise<PdfLogo | null> {
+  if (!src || !/^(https?:|data:image\/|\/)/.test(src)) return null;
+  try {
+    const img = new Image(); img.crossOrigin = "anonymous";
+    await new Promise<void>((ok, bad) => { img.onload = () => ok(); img.onerror = () => bad(new Error("logo")); img.src = src; });
+    const scale = Math.min(1, 360 / Math.max(img.naturalWidth || 1, img.naturalHeight || 1));
+    const w = Math.max(1, Math.round((img.naturalWidth || 1) * scale)), h = Math.max(1, Math.round((img.naturalHeight || 1) * scale));
+    const c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d"); if (!g) return null;
+    g.fillStyle = "#fff"; g.fillRect(0, 0, w, h); g.drawImage(img, 0, 0, w, h);
+    const bin = atob(c.toDataURL("image/jpeg", 0.92).split(",")[1]); const jpeg = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) jpeg[i] = bin.charCodeAt(i);
+    return { jpeg, width: w, height: h };
+  } catch { return null; }
+}
+async function payslipPdf(rec: PayslipRecord, business: Business, currency: string) { return buildPayslipPdf(rec, { currency, businessName: business.name, logo: await logoForPdf(business.logo) }); }
+const pdfName = (rec: PayslipRecord) => `Payslip-${rec.number}-${rec.staffName.replace(/[^A-Za-z0-9]+/g, "-")}-${rec.periodEnd}.pdf`;
+async function downloadPayslipPdf(rec: PayslipRecord, business: Business, currency: string) {
+  const bytes = await payslipPdf(rec, business, currency);
+  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/pdf" }));
+  const a = document.createElement("a"); a.href = url; a.download = pdfName(rec); document.body.appendChild(a); a.click(); a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+async function emailPayslip(rec: PayslipRecord, business: Business, currency: string, scope: string): Promise<PayslipRecord> {
+  const pdf = bytesToBase64(await payslipPdf(rec, business, currency));
+  return (await api<{ slip: PayslipRecord }>(scope, { action: "emailPayslip", key: rec.key, pdf, currency, businessName: business.name })).slip;
+}
+
 const PAYSLIP_PRINT_CSS = `body{font-family:Inter,Arial,sans-serif;color:#101828;margin:28px;font-size:12px}.ps-doc{max-width:780px;margin:0 auto}.ps-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:2px solid #101828;padding-bottom:12px}.ps-brand{display:flex;gap:12px;align-items:center}.ps-brand img{max-height:56px;max-width:160px;object-fit:contain}.ps-brand b{font-size:15px}.ps-title{text-align:right}.ps-title h1{font-size:22px;margin:0 0 4px}.ps-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0}.ps-meta div{border:1px solid #e4e7ec;border-radius:8px;padding:8px}.ps-meta small{display:block;font-size:9.5px;color:#667085;text-transform:uppercase;letter-spacing:.04em}.ps-meta b{display:block;font-size:12px}.ps-meta em{display:block;font-style:normal;color:#667085;font-size:10.5px}.ps-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #eaecf0;vertical-align:top}th{font-size:9.5px;text-transform:uppercase;color:#667085;letter-spacing:.04em}td small{display:block;color:#667085;font-size:10px}.r{text-align:right;white-space:nowrap}tr.tot td{font-weight:700;border-top:1.5px solid #101828}.ps-net{display:flex;justify-content:flex-end;margin:14px 0}.ps-net div{border:2px solid #101828;border-radius:10px;padding:10px 18px;text-align:right}.ps-net small{display:block;font-size:10px;text-transform:uppercase;color:#667085}.ps-net b{font-size:24px}.ps-net em{display:block;font-style:normal;color:#667085;font-size:10.5px}.ps-small td,.ps-small th{font-size:11px}.ps-note{margin:10px 0 0;color:#475467}.ps-note.warn{color:#b54708}.ps-foot{margin-top:20px;font-size:9.5px;color:#98a2b3}`;
 
-function PayrollPersonModal({ person, value, sample, onClose, onSave }: { person?: Staff; value?: PayrollPerson; sample: boolean; onClose: () => void; onSave: (p: PayrollPerson) => Promise<PayrollPerson> }) {
-  const [form, setForm] = useState<PayrollPerson>({ ...DEFAULT_PERSON, ...(value || {}) });
+// Pay & tax settings for one person: commission toggle (own split or the standard split), otherwise hourly or salary,
+// plus PPS and Revenue (RPN) details. Used in Team → staff settings, Books → Settings and on the Payslips page.
+type PayKind = "commission" | "hourly" | "salary";
+export function StaffPaySettings({ staffId, scope = "", staffName = "", sample = false, onSaved, onCancel }: { staffId: string; scope?: string; staffName?: string; sample?: boolean; onSaved?: () => void; onCancel?: () => void }) {
+  const [loaded, setLoaded] = useState(false);
+  const [profile, setProfile] = useState<StaffProfile | null>(null);
+  const [std, setStd] = useState<PayRule>({ payType: "commission", payRate: 70 });
+  const [kind, setKind] = useState<PayKind>("commission");
+  const [ownSplit, setOwnSplit] = useState(false);
+  const [rate, setRate] = useState("");
+  const [form, setForm] = useState<PayrollPerson>({ ...DEFAULT_PERSON });
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    let live = true;
+    if (sample || !staffId) { setLoaded(true); return; }
+    Promise.all([
+      api<{ profile: StaffProfile | null }>(scope, { action: "getProfile", staffId }).catch(() => ({ profile: null })),
+      api<PayRule>(scope, { action: "getDefaultPay" }).catch(() => null),
+      api<{ people: Record<string, PayrollPerson> }>(scope, { action: "getPayroll", year: new Date().getFullYear() }),
+    ]).then(([p, d, pr]) => {
+      if (!live) return;
+      setProfile(p.profile); if (d) setStd({ payType: d.payType, payRate: d.payRate });
+      const t = p.profile?.payType;
+      if (t === "hourly" || t === "salary") { setKind(t); setRate(String(p.profile?.payRate || "")); }
+      else if (t === "commission") { setKind("commission"); setOwnSplit(true); setRate(String(p.profile?.payRate || "")); }
+      else { setKind(d?.payType === "hourly" ? "hourly" : "commission"); setOwnSplit(false); setRate(d?.payType === "hourly" ? String(d.payRate) : ""); }
+      setForm({ ...DEFAULT_PERSON, ...(pr.people[staffId] || {}) }); setLoaded(true);
+    }).catch((e) => { if (live) { setErr(errText(e, "Pay settings couldn't load.")); setLoaded(true); } });
+    return () => { live = false; };
+  }, [staffId, scope, sample]);
   const set = <K extends keyof PayrollPerson>(k: K, v: PayrollPerson[K]) => setForm((f) => ({ ...f, [k]: v }));
   const save = async () => {
     const pps = normalisePps(form.pps);
     if (form.employment === "employee" && pps && !validPps(pps)) { setMsg("That PPS number isn't valid. It's 7 digits then one or two letters, e.g. 1234567TA."); return; }
-    setBusy(true); try { await onSave({ ...form, pps }); onClose(); } catch (e) { setMsg(errText(e, "Couldn't save.")); } setBusy(false);
+    const n = Number(rate) || 0;
+    if (kind === "commission" && ownSplit && (n <= 0 || n > 100)) { setMsg("Enter the staff share as a % between 1 and 100."); return; }
+    if (kind !== "commission" && n <= 0) { setMsg(kind === "hourly" ? "Enter the hourly rate." : "Enter the yearly salary."); return; }
+    if (sample) { setMsg("Sample data: nothing saved."); return; }
+    setBusy(true); setMsg("");
+    try {
+      const pay = kind === "commission" ? (ownSplit ? { payType: "commission" as const, payRate: n } : { payType: "none" as const, payRate: 0 }) : { payType: kind, payRate: n };
+      await api(scope, { action: "saveProfile", staffId, profile: { ...(profile || { showReviews: false, showPhotos: false, title: "", bio: "", reviews: [], photos: [] }), ...pay } });
+      await api(scope, { action: "savePayrollPerson", staffId, person: { ...form, pps } });
+      // The hourly rate is also this person's cost rate, so tracked task time is costed the same way.
+      if (kind === "hourly") window.dispatchEvent(new CustomEvent("f2b-staff-rate", { detail: { staffId, rate: n } }));
+      setMsg("Saved."); onSaved?.();
+    } catch (e) { setMsg(errText(e, "Couldn't save.")); }
+    setBusy(false);
   };
-  return <div className="bt-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}><div className="bt ps ps-form" role="dialog" aria-modal="true" aria-label="Payroll details">
-    <header className="bt-head"><div><p className="eyebrow">PAYROLL DETAILS <span className="admin-badge">ADMIN</span></p><h2>{firstName(person?.name || "")}</h2><p>Copy the tax credits, cut-off point and USC status from their Revenue Payroll Notification (RPN).</p></div><button type="button" className="bt-x" aria-label="Close" onClick={onClose}>×</button></header>
-    <div className="ps-body"><div className="form-grid ps-grid">
+  if (!loaded) return <p className="dh-muted">Loading pay settings…</p>;
+  if (err) return <p className="dh-muted">{err}</p>;
+  const n = Number(rate) || 0;
+  return <div className="ps-paysettings" aria-label={`Pay settings for ${staffName}`}>
+    <div className="ps-pay-row">
+      <label className={`ps-switch ${kind === "commission" ? "on" : ""}`}><input type="checkbox" role="switch" checked={kind === "commission"} onChange={(e) => { setKind(e.target.checked ? "commission" : "hourly"); setRate(""); setOwnSplit(false); }} /><span className="ps-switch-track" aria-hidden="true"><i /></span><b>Paid by commission</b></label>
+      {kind !== "commission" && <div className="sch-seg" role="tablist" aria-label="Pay type">{(["hourly", "salary"] as const).map((k) => <button key={k} type="button" role="tab" aria-selected={kind === k} className={kind === k ? "on" : ""} onClick={() => { setKind(k); setRate(""); }}>{k === "hourly" ? "Hourly" : "Salary"}</button>)}</div>}
+    </div>
+    {kind === "commission" ? <div className="ps-pay-row">
+      <label className="ps-check"><input type="checkbox" checked={!ownSplit} onChange={(e) => { setOwnSplit(!e.target.checked); setRate(""); }} /> Use the standard split{std.payType === "commission" ? ` (staff ${std.payRate}% · business ${100 - std.payRate}%)` : ""}</label>
+      {ownSplit && <label className="ps-inline">Staff share<input type="number" min={1} max={100} step="1" value={rate} placeholder="70" onChange={(e) => setRate(e.target.value)} />%<small>{n > 0 && n <= 100 ? `Business keeps ${100 - n}%` : ""}</small></label>}
+    </div> : <div className="ps-pay-row">
+      <label className="ps-inline">{kind === "hourly" ? "Hourly rate" : "Yearly salary"}<span className="ps-cur">€</span><input type="number" min={0} step={kind === "hourly" ? "0.5" : "100"} value={rate} placeholder={kind === "hourly" ? "15.00" : "38000"} onChange={(e) => setRate(e.target.value)} /><small>{kind === "hourly" ? "Hours come from clock-ins, otherwise the task timer, otherwise finished appointments." : n > 0 ? `≈ €${(n / 12).toFixed(2)} a month` : ""}</small></label>
+    </div>}
+    <h4 className="ps-sub">Payroll &amp; tax</h4>
+    <div className="form-grid ps-grid">
       <label>Employment<select value={form.employment} onChange={(e) => set("employment", e.target.value as PayrollPerson["employment"])}><option value="employee">Employee (PAYE)</option><option value="contractor">Self-employed contractor</option></select></label>
       <label>PPS number<input value={form.pps} maxLength={12} autoComplete="off" placeholder="1234567TA" onChange={(e) => set("pps", e.target.value.toUpperCase())} /></label>
       <label>Employee / works no.<input value={form.employeeNo} maxLength={30} onChange={(e) => set("employeeNo", e.target.value)} /></label>
@@ -1447,9 +1552,52 @@ function PayrollPersonModal({ person, value, sample, onClose, onSave }: { person
       </>}
       <label>Start date<input type="date" value={form.startDate} onChange={(e) => set("startDate", e.target.value)} /></label>
       <label>Payment method<input value={form.paymentMethod} maxLength={60} onChange={(e) => set("paymentMethod", e.target.value)} /></label>
-    </div>{sample && <p className="iv-small">Sample data: changes stay on this screen only.</p>}</div>
-    <footer className="bt-foot"><span className="bt-status">{msg}</span><span style={{ flex: 1 }} /><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button type="button" className="primary-button" disabled={busy} onClick={() => void save()}>{busy ? "Saving…" : "Save"}</button></footer>
+    </div>
+    <p className="iv-small">Tax credits, cut-off point and USC status come from the employee&apos;s Revenue Payroll Notification (RPN).</p>
+    <div className="ps-actions"><span className="bt-status" role="status">{msg}</span><span style={{ flex: 1 }} />{onCancel && <button type="button" className="secondary-button" onClick={onCancel}>Cancel</button>}<button type="button" className="primary-button" disabled={busy} onClick={() => void save()}>{busy ? "Saving…" : "Save pay settings"}</button></div>
+  </div>;
+}
+
+function PaySettingsModal({ staff, scope, sample, onClose, onSaved }: { staff: Staff; scope: string; sample: boolean; onClose: () => void; onSaved: () => void }) {
+  return <div className="bt-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}><div className="bt ps ps-form" role="dialog" aria-modal="true" aria-label="Pay settings">
+    <header className="bt-head"><div><p className="eyebrow">PAY SETTINGS <span className="admin-badge">ADMIN</span></p><h2>{firstName(staff.name)}</h2></div><button type="button" className="bt-x" aria-label="Close" onClick={onClose}>×</button></header>
+    <div className="ps-body"><StaffPaySettings staffId={staff.id} scope={scope} staffName={firstName(staff.name)} sample={sample} onCancel={onClose} onSaved={() => { onSaved(); onClose(); }} /></div>
   </div></div>;
+}
+
+// Books → Settings: payroll & tax (employer details for payslips, the standard commission split, everyone's pay settings).
+export function PayrollSettingsPanel({ scopeClientId, business }: { scopeClientId: string; business: Business }) {
+  const [sample] = useSampleData();
+  const [data, setData] = useState<Data | null>(null);
+  const [employer, setEmployer] = useState<PayrollEmployer | null>(null);
+  const [people, setPeople] = useState<Record<string, PayrollPerson>>({});
+  const [std, setStd] = useState<PayRule>({ payType: "commission", payRate: 70 });
+  const [stdMsg, setStdMsg] = useState("");
+  const [edit, setEdit] = useState<Staff | null>(null);
+  const [err, setErr] = useState("");
+  const load = useCallback(async () => {
+    try {
+      const [d, p, s] = await Promise.all([api<Data>(scopeClientId), api<{ employer: PayrollEmployer; people: Record<string, PayrollPerson> }>(scopeClientId, { action: "getPayroll", year: new Date().getFullYear() }), api<PayRule>(scopeClientId, { action: "getDefaultPay" }).catch(() => null)]);
+      setData(d); setEmployer(p.employer); setPeople(p.people); if (s) setStd({ payType: s.payType, payRate: s.payRate }); setErr("");
+    } catch (e) { setErr(errText(e, "Payroll settings couldn't load.")); }
+  }, [scopeClientId]);
+  useEffect(() => { void load(); }, [load]);
+  const payLabel = (p: Staff) => { const t = p.profile?.payType; const r = p.profile?.payRate || 0; return t === "hourly" ? `€${r}/hour` : t === "salary" ? `€${r.toLocaleString("en-IE")}/year` : t === "commission" ? `${r}% commission (own)` : std.payType === "commission" ? `${std.payRate}% commission (standard)` : `€${std.payRate}/hour (standard)`; };
+  return <section className="panel ps-settings" aria-label="Payroll and tax settings">
+    <div className="panel-heading"><div><p className="eyebrow">🧾 PAYROLL &amp; TAX <span className="admin-badge">ADMIN</span></p><h2>Payroll &amp; tax</h2><p className="muted">Employer details shown on payslips, the standard commission split and each person&apos;s pay.</p></div></div>
+    {err ? <p className="dh-muted">{err}</p> : !data || !employer ? <p className="dh-muted">Loading…</p> : <>
+      <h4 className="ps-sub">Employer details (on every payslip)</h4>
+      <PayrollEmployerForm value={{ ...employer, name: employer.name }} business={business} onSave={async (v) => { if (sample) return; const r = await api<{ employer: PayrollEmployer }>(scopeClientId, { action: "savePayrollEmployer", employer: v }); setEmployer(r.employer); }} />
+      <h4 className="ps-sub">Standard split</h4>
+      <div className="ps-pay-row"><span className="muted">Used for anyone without their own pay setting.</span><PayEditor value={std} onSave={async (v) => { setStd(v); if (sample) return; try { await api(scopeClientId, { action: "saveDefaultPay", ...v }); setStdMsg("Saved."); } catch (e) { setStdMsg(errText(e, "Couldn't save.")); } }} onCancel={() => undefined} /><small className="bt-status">{stdMsg}</small></div>
+      <h4 className="ps-sub">Staff pay</h4>
+      <div className="ps-staff-list">{data.staff.map((p) => { const d = people[p.id]; return <div key={p.id} className="ps-staff-line">
+        <Avatar person={p} size={30} /><span><b>{firstName(p.name)}</b><small>{payLabel(p)} · {d?.employment === "contractor" ? "Contractor" : validPps(d?.pps || "") ? `PPS ${maskPps(d!.pps)}` : <em className="ps-missing">PPS missing</em>}</small></span>
+        <button type="button" className="secondary-button" onClick={() => setEdit(p)}>Edit pay</button>
+      </div>; })}{!data.staff.length && <p className="dh-muted">No staff in this account yet.</p>}</div>
+    </>}
+    {edit && <PaySettingsModal staff={edit} scope={scopeClientId} sample={sample} onClose={() => setEdit(null)} onSaved={() => void load()} />}
+  </section>;
 }
 
 function PayrollEmployerForm({ value, business, onSave }: { value: PayrollEmployer; business: Business; onSave: (v: PayrollEmployer) => Promise<void> }) {

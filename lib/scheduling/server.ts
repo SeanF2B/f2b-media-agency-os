@@ -11,7 +11,7 @@ import { logSystemEmail } from "../email-log.ts";
 type Stmt = { bind(...values: unknown[]): Stmt; first<T = Record<string, unknown>>(): Promise<T | null>; all<T = Record<string, unknown>>(): Promise<{ results?: T[] }>; run(): Promise<unknown> };
 export type Db = { prepare(sql: string): Stmt; batch(statements: unknown[]): Promise<unknown> };
 
-export type Mail = { to: string[]; subject: string; html: string; text: string; replyTo?: string; fromName?: string; idempotencyKey: string };
+export type Mail = { to: string[]; subject: string; html: string; text: string; replyTo?: string; fromName?: string; idempotencyKey: string; attachments?: Array<{ filename: string; content: string }>; kind?: string };
 export type GoogleEvent = { summary: string; description: string; location: string; start: string; end: string; video: boolean; requestId: string };
 export type GoogleOps = {
   connected(ownerId: string, staffIds: string[]): Promise<Record<string, string>>;
@@ -496,7 +496,7 @@ export async function icsFeed(db: Db, feedToken: string, workspace: WorkspaceLit
 // ---------- staff booking profiles (reviews + photos) ----------
 export type StaffReview = { id: string; author: string; rating: number; text: string; source: string; date: string };
 export type StaffPhoto = { url: string; caption: string };
-export type StaffProfile = { showReviews: boolean; showPhotos: boolean; title: string; bio: string; reviews: StaffReview[]; photos: StaffPhoto[]; payType?: "none" | "hourly" | "commission"; payRate?: number };
+export type StaffProfile = { showReviews: boolean; showPhotos: boolean; title: string; bio: string; reviews: StaffReview[]; photos: StaffPhoto[]; payType?: "none" | "hourly" | "commission" | "salary"; payRate?: number };
 const EMPTY_PROFILE: StaffProfile = { showReviews: false, showPhotos: false, title: "", bio: "", reviews: [], photos: [] };
 const okImage = (url: string) => /^(https:\/\/|\/media\/|\/api\/marketing-public\/media)/.test(url) && url.length < 1000;
 
@@ -507,8 +507,8 @@ export function sanitizeProfile(input: unknown): StaffProfile {
     return { id: clean(v.id, 40) || `rv${i}${Date.now().toString(36)}`, author: clean(v.author, 80), rating: Math.max(1, Math.min(5, Math.round(Number(v.rating) || 5))), text: clean(v.text, 800), source: clean(v.source, 40), date: /^\d{4}-\d{2}-\d{2}$/.test(String(v.date)) ? String(v.date) : "" };
   }).filter((x) => x.author || x.text) : [];
   const photos = Array.isArray(r.photos) ? (r.photos as unknown[]).slice(0, 16).map((x) => { const v = (x || {}) as Record<string, unknown>; return { url: clean(v.url, 1000), caption: clean(v.caption, 120) }; }).filter((p) => okImage(p.url)) : [];
-  const payType = r.payType === "hourly" || r.payType === "commission" ? r.payType : "none";
-  const payRate = Math.max(0, Math.min(100000, Math.round((Number(r.payRate) || 0) * 100) / 100));
+  const payType = r.payType === "hourly" || r.payType === "commission" || r.payType === "salary" ? r.payType : "none";
+  const payRate = Math.max(0, Math.min(10000000, Math.round((Number(r.payRate) || 0) * 100) / 100));
   return { showReviews: Boolean(r.showReviews), showPhotos: Boolean(r.showPhotos), title: clean(r.title, 60), bio: clean(r.bio, 400), reviews, photos, payType, payRate };
 }
 

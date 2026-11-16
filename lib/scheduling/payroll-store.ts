@@ -10,6 +10,7 @@ export type PayslipRecord = {
   payDate: string; periodStart: string; periodEnd: string; issuedAt: string; note: string;
   earnings: PayLine[]; deductions: PayLine[];
   employer: PayrollEmployer; person: PayrollPerson; result: PayslipResult;
+  emailedTo?: string; emailedAt?: string;
 };
 
 const ymd = /^\d{4}-\d{2}-\d{2}$/;
@@ -88,4 +89,16 @@ export async function issuePayslip(db: Db, ownerId: string, scope: string, staff
 export async function deletePayslip(db: Db, ownerId: string, scope: string, key: string) {
   await ensureSchedulingTables(db);
   await db.prepare("DELETE FROM sched_payroll WHERE owner_id=?1 AND scope=?2 AND kind='slip' AND key=?3").bind(ownerId, scope, String(key).slice(0, 200)).run();
+}
+
+export async function getPayslip(db: Db, ownerId: string, scope: string, key: string) {
+  await ensureSchedulingTables(db);
+  const row = await db.prepare("SELECT data FROM sched_payroll WHERE owner_id=?1 AND scope=?2 AND kind='slip' AND key=?3").bind(ownerId, scope, String(key).slice(0, 200)).first<{ data: string }>();
+  return row ? parse<PayslipRecord | null>(row.data, null) : null;
+}
+
+export async function markPayslipEmailed(db: Db, ownerId: string, scope: string, rec: PayslipRecord, to: string) {
+  const next = { ...rec, emailedTo: to, emailedAt: new Date().toISOString() };
+  await db.prepare("UPDATE sched_payroll SET data=?4, updated_at=?5 WHERE owner_id=?1 AND scope=?2 AND kind='slip' AND key=?3").bind(ownerId, scope, rec.key, JSON.stringify(next), next.emailedAt).run();
+  return next;
 }

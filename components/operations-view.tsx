@@ -52,7 +52,7 @@ function SiteTemplatesPanel({ clients, onEdit }: { clients: OpsClient[]; onEdit:
 type SiteRow = { clientId: string; backend: string; previewUrl: string; repo: string; branch: string; updatedAt: string };
 // Where everything lives: Clients · Google Ads (Setup · Manage · Performance) · SEO (Setup · Research ·
 // Performance) · Sites (Overview · Forms · Email) · Reports. Google Maps listing lives in the client profile.
-const OPS_TABS: Array<[OperationsTab, string, LucideIcon]> = [["clients", "Clients", Briefcase], ["ads", "Google Ads", Megaphone], ["seo", "SEO", Search], ["sites", "Sites", Globe], ["reports", "Reports", FileText]];
+const OPS_TABS: Array<[OperationsTab, string, LucideIcon]> = [["clients", "Clients", Briefcase], ["sites", "Sites", Globe], ["seo", "SEO", Search], ["ads", "Google Ads", Megaphone], ["reports", "Reports", FileText]];
 export type OperationsTab = "overview" | "clients" | "ads" | "seo" | "sites" | "reports" | "onboarding";
 type SeoMode = "setup" | "keywords" | "competitors" | "backlinks" | "pages" | "overview" | "ranks" | "audit" | "ai";
 const SEO_MAIN: Array<{ key: string; label: string; views: Array<[SeoMode, string]> }> = [

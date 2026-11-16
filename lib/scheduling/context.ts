@@ -37,11 +37,11 @@ export function schedulingDeps(request: Request): Deps {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json", "Idempotency-Key": mail.idempotencyKey.slice(0, 250) },
-      body: JSON.stringify({ from: mail.fromName ? `${mail.fromName.replace(/[<>"]/g, "").slice(0, 60)} <${address}>` : from, to: mail.to, subject: mail.subject, html: mail.html, text: mail.text, ...(mail.replyTo ? { reply_to: mail.replyTo } : {}) }),
+      body: JSON.stringify({ from: mail.fromName ? `${mail.fromName.replace(/[<>"]/g, "").slice(0, 60)} <${address}>` : from, to: mail.to, subject: mail.subject, html: mail.html, text: mail.text, ...(mail.replyTo ? { reply_to: mail.replyTo } : {}), ...(mail.attachments?.length ? { attachments: mail.attachments } : {}) }),
       signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) { const d = await res.json().catch(() => null) as { message?: string } | null; throw new Error(`Email provider returned HTTP ${res.status}: ${d?.message || "not accepted"}`); }
-    for (const to of mail.to.slice(0, 5)) await logSystemEmail(env.DB as never, { to, subject: mail.subject, text: mail.text, kind: "Scheduling", conversation: false });
+    for (const to of mail.to.slice(0, 5)) await logSystemEmail(env.DB as never, { to, subject: mail.subject, text: mail.text, kind: mail.kind || "Scheduling", conversation: false });
   } : undefined;
   return { db: env.DB as never, sendEmail, google: googleSchedulingAvailable() ? createGoogleOps() : undefined, baseUrl: new URL(request.url).origin };
 }

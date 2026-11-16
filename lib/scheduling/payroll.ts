@@ -118,7 +118,7 @@ export function computePayslip(input: PayslipInput): PayslipResult {
   if (p.employment === "contractor") {
     const net = r2(gross - other);
     notes.push("Self-employed contractor: no PAYE, USC or PRSI deducted. The contractor accounts for their own tax.");
-    return { employment: "contractor", basis: p.basis, period, periods, gross, pension: 0, taxable: gross, payeStandard: 0, payeHigher: 0, taxCredits: 0, paye: 0, srcop: 0, usc: 0, prsiEE: 0, prsiER: 0, prsiWeeks: 0, prsiClass: p.prsiClass, otherDeductions: other, totalDeductions: other, net,
+    return { employment: "contractor", basis: p.basis, period, periods, gross, pension: 0, taxable: gross, payeStandard: 0, payeHigher: 0, taxCredits: 0, paye: 0, srcop: 0, usc: 0, prsiEE: 0, prsiER: 0, prsiWeeks: 0, prsiClass: p.prsiClass, otherDeductions: other, totalDeductions: other, net, notes,
       ytd: { gross: r2(input.ytd.gross + gross), taxable: r2(input.ytd.taxable + gross), paye: input.ytd.paye, usc: input.ytd.usc, prsi: input.ytd.prsi, net: r2(input.ytd.net + net), pension: input.ytd.pension } };
   }
   const basis: TaxBasis = validPps(p.pps) ? p.basis : "emergency";
