@@ -63,7 +63,7 @@ export async function GET(request: Request) {
       // Demo data helper: the client's own services, areas and team names, from their profile and website.
       const client = ctx.ws.clients.find((c) => c.id === (str(url.searchParams.get("clientId"), 80) || ctx.scope));
       if (!client) return json({ services: [], locations: [], team: [] });
-      return json(await siteSampleFor(client));
+      return json(await siteSampleFor(client, db));
     }
     if (view === "calendars") return json({ calendars: (await listCalendars(db, ctx.ws.ownerId, ctx.scope)).map((c) => ({ id: c.id, name: c.name, clientId: c.clientId })) });
     if (view === "slots") {
@@ -355,11 +355,45 @@ async function suggest(ctx: Ctx) {
 const siteCache = new Map<string, { at: number; value: { services: string[]; locations: string[]; team: string[] } }>();
 const SERVICE_WORDS = /(repair|install|replace|clean|survey|inspect|consult|design|fit|fitting|quote|service|maintenance|roof|gutter|chimney|kitchen|bathroom|tattoo|piercing|treatment|massage|facial|cut|colour|color|lesson|session|assessment|check|removal|painting|plaster|tiling|flooring|electrical|plumbing|heating|boiler|solar|window|door|garden|landscap|fencing|driveway|extension|renovat|cosmetic|whitening|implant|physio|therapy|training|coaching|valuation|viewing|measure)/i;
 const SKIP_WORDS = /^(home|about|about us|contact|contact us|blog|news|faq|faqs|gallery|reviews|testimonials|privacy|terms|cookie|careers|login|menu|services|our services|get a quote|call now|read more|learn more|book now|see more|view all)$/i;
-async function siteSampleFor(client: { id: string; name: string; website?: string; seoServices?: string[]; seoLocations?: string[] }) {
+type SiteDb = { prepare: (q: string) => { bind: (...a: unknown[]) => { all: <T>() => Promise<{ results?: T[] }>; first: <T>() => Promise<T | null> } } };
+// Walk a site's own content files (website builder) for service titles, team names and areas.
+async function siteContentSample(db: SiteDb, clientId: string) {
+  const out = { services: [] as string[], team: [] as string[], locations: [] as string[], url: "" };
+  try {
+    const site = await db.prepare("SELECT preview_url FROM site_content_sites WHERE client_id = ?1").bind(clientId).first<{ preview_url: string }>();
+    out.url = site?.preview_url || "";
+    const rows = (await db.prepare("SELECT path, text FROM site_content_files WHERE client_id = ?1 AND text IS NOT NULL AND (path LIKE '%.json' OR path LIKE '%.md' OR path LIKE '%.html') LIMIT 80").bind(clientId).all<{ path: string; text: string }>()).results || [];
+    const walk = (node: unknown, trail: string) => {
+      if (Array.isArray(node)) { node.forEach((n) => walk(n, trail)); return; }
+      if (!node || typeof node !== "object") return;
+      const obj = node as Record<string, unknown>;
+      const label = String(obj.title || obj.name || obj.heading || "").trim();
+      if (label && label.length >= 3 && label.length <= 40) {
+        if (/team|staff|artist|people|crew|member/i.test(trail) && /^[A-Z][a-zà-ú'’-]+( [A-Z][a-zà-ú'’-]+){0,2}$/.test(label)) out.team.push(label);
+        else if (/service|treatment|offer|menu|package|style/i.test(trail) || SERVICE_WORDS.test(label)) out.services.push(label);
+      }
+      for (const [k, v] of Object.entries(obj)) {
+        if (typeof v === "string" && /^(areas?|locations?|towns?|serviceAreas?)$/i.test(k)) out.locations.push(...v.split(/[,·|]/).map((x) => x.trim()).filter((x) => x.length > 2 && x.length < 30));
+        else if (Array.isArray(v) && /^(areas?|locations?|towns?|serviceAreas?)$/i.test(k)) out.locations.push(...v.filter((x): x is string => typeof x === "string"));
+        else walk(v, `${trail}.${k}`);
+      }
+    };
+    for (const row of rows) {
+      if (row.path.endsWith(".json")) { try { walk(JSON.parse(row.text), row.path); } catch { /* not JSON */ } }
+      else for (const m of row.text.matchAll(/^#{2,3}\s+(.{3,40})$/gm)) if (SERVICE_WORDS.test(m[1])) out.services.push(m[1].trim());
+    }
+  } catch { /* no website builder content */ }
+  return out;
+}
+async function siteSampleFor(client: { id: string; name: string; email?: string; website?: string; seoServices?: string[]; seoLocations?: string[] }, db?: SiteDb) {
   const cleanList = (list: unknown) => (Array.isArray(list) ? list : []).map((x) => String(x || "").trim()).filter(Boolean);
   const services = cleanList(client.seoServices), locations = cleanList(client.seoLocations);
   const base = { services: services.slice(0, 6), locations: locations.slice(0, 6), team: [] as string[] };
-  let site = String(client.website || "").trim();
+  const own = db ? await siteContentSample(db, client.id) : { services: [], team: [], locations: [], url: "" };
+  base.services = [...new Set([...base.services, ...own.services])].slice(0, 6); base.team = [...new Set(own.team)].slice(0, 5); base.locations = [...new Set([...base.locations, ...own.locations])].slice(0, 6);
+  const emailDomain = /@([a-z0-9.-]+\.[a-z]{2,})$/i.exec(String(client.email || ""))?.[1] || "";
+  const freeMail = /^(gmail|googlemail|hotmail|outlook|live|yahoo|icloud|me|aol|eircom|proton|protonmail)\./i.test(emailDomain);
+  let site = String(client.website || "").trim() || own.url || (emailDomain && !freeMail ? emailDomain : "");
   if (!site) return base;
   if (!/^https?:\/\//i.test(site)) site = `https://${site}`;
   const hit = siteCache.get(site); if (hit && Date.now() - hit.at < 6 * 3600_000) return hit.value;
@@ -378,7 +412,7 @@ async function siteSampleFor(client: { id: string; name: string; website?: strin
     const teamBlock = /(meet (the|our) team|our team|the team)[\s\S]{0,4000}/i.exec(html)?.[0] || "";
     for (const m of teamBlock.matchAll(/<(h3|h4|h5|strong)\b[^>]*>([\s\S]{1,80}?)<\/\1>/gi)) { const t = text(m[2]); if (/^[A-Z][a-zà-ú'’-]+( [A-Z][a-zà-ú'’-]+){1,2}$/.test(t)) team.push(t); }
     const areas = [...new Set([...html.matchAll(/\b(?:in|across|serving|covering)\s+((?:Co\.\s)?[A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/g)].map((m) => m[1]).filter((a) => !/^(The|Our|Your|Ireland|Business|Touch)$/.test(a)))];
-    value = { services: [...new Set([...services, ...found])].slice(0, 6), locations: [...new Set([...locations, ...areas])].slice(0, 6), team: [...new Set(team)].slice(0, 5) };
+    value = { services: [...new Set([...base.services, ...found])].slice(0, 6), locations: [...new Set([...base.locations, ...areas])].slice(0, 6), team: [...new Set([...base.team, ...team])].slice(0, 5) };
   } catch { /* site unreachable: fall back to the profile */ }
   siteCache.set(site, { at: Date.now(), value });
   return value;
