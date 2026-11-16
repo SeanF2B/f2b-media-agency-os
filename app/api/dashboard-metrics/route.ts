@@ -4,7 +4,7 @@ import { fullTeamPermissions, getTeamPermissions, type TeamPermissions } from "@
 import { buildClientReport } from "@/lib/client-report-data";
 import { listBookings } from "@/lib/scheduling/server";
 import { metaAdsConnectionExists, readDirectMetaAdsInsights } from "@/lib/meta-ads-direct";
-import { summarizeMetaAdsTotals } from "@/lib/meta-ads-performance";
+import { summarizeMetaAdsRows, summarizeMetaAdsTotals } from "@/lib/meta-ads-performance";
 import { getGoogleAdsCallStats } from "@/lib/google-ads-direct";
 
 // Dashboard tiles: marketing results for one client (from the same cached reads as client reports),
@@ -51,11 +51,13 @@ export async function GET(request: Request) {
     if (!linked.length) return { meta: null, metaNote: "No Meta Ads account linked" };
     if (!(await metaAdsConnectionExists(ownerId).catch(() => false))) return { meta: null, metaNote: "Meta Ads isn’t connected" };
     const window = { start: day(-30), end: day(0) };
-    const rows = await Promise.all(linked.map((c) => readDirectMetaAdsInsights(ownerId, c.metaAdsAccountId!, window, "campaigns").then((r) => summarizeMetaAdsTotals(r)).catch(() => null)));
+    const raw = await Promise.all(linked.map((c) => readDirectMetaAdsInsights(ownerId, c.metaAdsAccountId!, window, "campaigns").catch(() => null)));
+    const rows = raw.map((r) => r ? summarizeMetaAdsTotals(r) : null);
+    const campaigns = raw.flatMap((r) => r ? summarizeMetaAdsRows(r, "campaigns").map((c) => ({ id: c.id, name: c.name, status: c.status, spend: c.spend, clicks: c.clicks, impressions: c.impressions, leads: c.leads })) : []).slice(0, 40);
     const ok = rows.filter((r): r is NonNullable<typeof r> => Boolean(r));
     if (!ok.length) return { meta: null, metaNote: "Meta didn’t return data" };
     const t = ok.reduce((a, r) => ({ spend: a.spend + r.spend, impressions: a.impressions + r.impressions, clicks: a.clicks + r.clicks, leads: a.leads + r.leads }), { spend: 0, impressions: 0, clicks: 0, leads: 0 });
-    return { meta: { ...t, cpc: t.clicks ? t.spend / t.clicks : null, costPerLead: t.leads ? t.spend / t.leads : null, accounts: ok.length, linkedAccounts: linked.length }, metaNote: "" };
+    return { meta: { ...t, cpc: t.clicks ? t.spend / t.clicks : null, costPerLead: t.leads ? t.spend / t.leads : null, accounts: ok.length, linkedAccounts: linked.length, campaigns }, metaNote: "" };
   };
   const marketing = async () => {
     if (!clientId || !(admin || permissions.reports)) return null;
@@ -104,6 +106,7 @@ export async function GET(request: Request) {
     };
     return {
       ...meta, split,
+      googleCampaigns: adsData ? adsData.campaigns.slice(0, 40).map((c) => ({ id: c.id, name: c.name, status: c.status, spend: c.spend, clicks: c.clicks, impressions: c.impressions, conversions: c.conversions })) : [],
       currency: seo?.client.currency || ads?.client.currency || "EUR",
       visits: traffic ? { value: traffic.current, previous: traffic.previous, metric: traffic.metric } : null, visitsNote: why(seo?.traffic),
       ...adsBlock(adsData ? adsData.current : null, adsData?.previous || null), adsNote: why(ads?.ads),

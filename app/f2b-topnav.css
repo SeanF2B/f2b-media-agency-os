@@ -1456,3 +1456,25 @@ html body .app-shell .sch-add-staff { display: grid; place-items: center; align-
 html body .app-shell .sch-add-staff:hover { border-color: var(--brand-primary, #1f6feb) !important; }
 html body .app-shell .sch-add-plus { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; font-size: 22px; background: color-mix(in srgb, var(--brand-primary, #1f6feb) 14%, transparent); color: var(--brand-primary, #1f6feb); }
 html body .app-shell .sch-add-staff small { opacity: .7; font-size: 12px; }
+/* Dashboard: split columns 3-up + campaign selectors + expense rows */
+html body .app-shell .dh-split { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+@media (max-width: 1000px) { html body .app-shell .dh-split { grid-template-columns: 1fr !important; } }
+html body .app-shell .dh-split-head { flex-wrap: wrap; }
+html body .app-shell .dh-camp { margin-left: auto; max-width: 60%; height: 30px; border-radius: 9px; font-size: 12px; padding: 0 8px; border: 1px solid rgba(127,138,160,.35); }
+html body .app-shell .dh-split-row.expense { background: #fff2f2; } html body .app-shell .dh-split-row.expense b { color: #b42318; }
+body.f2b-dark .app-shell .dh-split-row.expense { background: #2c1a1a !important; } body.f2b-dark :is(.app-shell .dh-split-row.expense b, #f2b-exp-x) { color: #ff9b94 !important; -webkit-text-fill-color: #ff9b94 !important; }
+/* Ad spend report: tidy, matching sizes, spend in red */
+html body .app-shell .dh-ads-wrap > .panel { padding: 16px 18px !important; }
+html body .app-shell .dh-ads-wrap .panel-heading .eyebrow { display: none; }
+html body .app-shell .dh-ads-wrap .panel-heading h2 { font-size: 17px !important; margin: 0 0 2px !important; color: #b42318 !important; -webkit-text-fill-color: #b42318 !important; }
+body.f2b-dark :is(.app-shell .dh-ads-wrap .panel-heading h2, #f2b-ads-h) { color: #ff9b94 !important; -webkit-text-fill-color: #ff9b94 !important; }
+html body .app-shell .dh-ads-wrap .panel-heading p { font-size: 12.5px !important; opacity: .75; }
+html body .app-shell .ad-report-card { padding: 14px !important; border-radius: 14px !important; }
+html body .app-shell .ad-report-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+html body .app-shell .ad-report-head b, html body .app-shell .ad-report-head h3 { font-size: 15px !important; }
+html body .app-shell .ad-report-head select { margin-left: auto; max-width: 55%; height: 32px; border-radius: 9px; font-size: 13px; }
+html body .app-shell .ad-report-stats { display: grid !important; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)) !important; gap: 8px !important; }
+html body .app-shell .ad-report-stats > div { display: grid; gap: 2px; padding: 10px 12px !important; border-radius: 10px !important; background: rgba(127,138,160,.08); }
+html body .app-shell .ad-report-stats > div b { font-size: 18px !important; line-height: 1.2; }
+html body .app-shell .ad-report-stats > div span { font-size: 11.5px !important; opacity: .75; }
+html body .app-shell .ad-report-off p, html body .app-shell .ad-report-card p { font-size: 13px !important; }

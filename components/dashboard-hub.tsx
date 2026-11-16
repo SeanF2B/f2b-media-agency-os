@@ -8,7 +8,7 @@ type HubClient = { id: string; name: string; logo?: string; googleAdsAccountId?:
 type HubStaff = { id: string; name: string; isBot?: boolean };
 type Stat = { value: number; previous: number | null } | null;
 type Marketing = {
-  currency: string; visits: (Stat & { metric?: string }) | null; visitsNote: string; adSpend: Stat; adClicks: Stat; impressions?: Stat; conversions?: Stat; cpc?: Stat; costPerConversion?: Stat; adsNote: string; split?: Split; meta?: { spend: number; impressions: number; clicks: number; leads: number; cpc: number | null; costPerLead: number | null; accounts: number; linkedAccounts: number } | null; metaNote?: string; scope?: string; accounts?: number; linkedAccounts?: number; calls: Stat; profileClicks: Stat; businessNote: string; leads: Stat;
+  currency: string; visits: (Stat & { metric?: string }) | null; visitsNote: string; adSpend: Stat; adClicks: Stat; impressions?: Stat; conversions?: Stat; cpc?: Stat; costPerConversion?: Stat; adsNote: string; split?: Split; googleCampaigns?: Array<{ id: string; name: string; status: string; spend: number; clicks: number; impressions: number; conversions: number }>; meta?: { spend: number; impressions: number; clicks: number; leads: number; cpc: number | null; costPerLead: number | null; accounts: number; linkedAccounts: number; campaigns?: Array<{ id: string; name: string; status: string; spend: number; clicks: number; impressions: number; leads: number }> } | null; metaNote?: string; scope?: string; accounts?: number; linkedAccounts?: number; calls: Stat; profileClicks: Stat; businessNote: string; leads: Stat;
   google: { position: number | null; previous: number | null; tracked: number; top3: number } | null; rankNote: string;
   chatgpt: { share: number; previous: number | null; prompts: number; mentioned: number } | null; aiNote: string; bing: null; bingNote: string;
 };
@@ -50,6 +50,9 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(false);
   const [sample, setSample] = useState(() => { try { return localStorage.getItem("f2b-dash-sample") === "1"; } catch { return false; } });
+  const [gCamp, setGCamp] = useState("");
+  const [mCamp, setMCamp] = useState("");
+  useEffect(() => { setGCamp(""); setMCamp(""); }, [clientId]);
   const [showAi, setShowAi] = useState(() => { try { return localStorage.getItem("f2b-dash-ai") !== "0"; } catch { return true; } });
 
   useEffect(() => {
@@ -94,7 +97,7 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
       <div className="dh-head"><div><p className="eyebrow">📈 LAST 30 DAYS</p><h2>Marketing</h2></div>
         {!scopeClientId && clients.length > 0 && <label className="dh-client"><span>Client</span><select value={clientId} onChange={(e) => { setPickedClient(e.target.value); try { localStorage.setItem("f2b-dash-client", e.target.value); } catch { /* ignore */ } }}>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>}
       </div>
-      {loading && !m ? <><p className="dh-muted">Loading results…</p>{adsPanel && <div className="dh-ads-embed">{adsPanel}</div>}</> : !m ? <>{adsPanel && <div className="dh-ads-embed">{adsPanel}</div>}</> : <>
+      {loading && !m ? <><p className="dh-muted">Loading results…</p></> : !m ? <></> : <>
         {(() => { const sp = m.split; const v = (x: number | null | undefined) => x == null ? "—" : num(x);
           const Row = ({ icon, label, value, good }: { icon: ReactNode; label: string; value: string; good?: boolean }) => <div className={`dh-split-row ${good ? "good" : ""}`}><span className="dh-split-ico">{icon}</span><span>{label}</span><b>{value}</b></div>;
           return <div className="dh-split">
@@ -105,16 +108,28 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
               <Row icon={<UserPlus size={15} />} label="Leads" value={v(sp?.organic.leads)} good={(sp?.organic.leads || 0) > 0} />
               {sp?.notes.organic && <em className="dh-split-note">{sp.notes.organic}</em>}
             </div>
-            <div className="dh-split-col"><div className="dh-split-head"><BrandIcon id="google-ads" size={20} fallback={null} /><b>Google Ads</b><small>Paid search</small></div>
-              <Row icon={<MousePointerClick size={15} />} label="Ad clicks" value={v(sp?.paid.clicks)} good={(sp?.paid.clicks || 0) > 0} />
-              <Row icon={<Phone size={15} />} label={sp?.paid.callConversions ? "Calls from ads (call conversions)" : "Calls from ads"} value={v(sp?.paid.calls ?? sp?.paid.callConversions)} good={(sp?.paid.calls || 0) > 0} />
-              <Row icon={<CheckCircle2 size={15} />} label="Conversions" value={v(sp?.paid.conversions)} good={(sp?.paid.conversions || 0) > 0} />
-              <Row icon={<UserPlus size={15} />} label="Leads in CRM" value={v(sp?.paid.leads)} good={(sp?.paid.leads || 0) > 0} />
-              {sp?.notes.paid && <em className="dh-split-note">{sp.notes.paid}</em>}
-            </div>
+            {(() => { const camps = m.googleCampaigns || []; const c = camps.find((x) => x.id === gCamp); const spend = c ? c.spend : m.adSpend?.value; const clicks = c ? c.clicks : sp?.paid.clicks; const conv = c ? c.conversions : sp?.paid.conversions;
+              return <div className="dh-split-col"><div className="dh-split-head"><BrandIcon id="google-ads" size={20} fallback={null} /><b>Google Ads</b>{camps.length > 0 && <select className="dh-camp" aria-label="Google Ads campaign" value={gCamp} onChange={(e) => setGCamp(e.target.value)}><option value="">All campaigns ({camps.length})</option>{camps.map((x) => <option key={x.id} value={x.id}>{x.name}{/paused/i.test(x.status) ? " · paused" : ""}</option>)}</select>}</div>
+                <div className="dh-split-row expense"><span className="dh-split-ico"><span className="dh-cur">€</span></span><span>Spend</span><b>{spend != null ? money(spend, cur) : "—"}</b></div>
+                <Row icon={<MousePointerClick size={15} />} label="Ad clicks" value={v(clicks)} good={(clicks || 0) > 0} />
+                <Row icon={<span className="dh-cur">€</span>} label="Avg. CPC" value={spend != null && clicks ? money2(spend / clicks, cur) : "—"} />
+                <Row icon={<CheckCircle2 size={15} />} label="Conversions" value={v(conv)} good={(conv || 0) > 0} />
+                {!c && <Row icon={<Phone size={15} />} label="Calls from ads" value={v(sp?.paid.calls ?? sp?.paid.callConversions)} good={(sp?.paid.calls || 0) > 0} />}
+                {!c && <Row icon={<UserPlus size={15} />} label="Leads in CRM" value={v(sp?.paid.leads)} good={(sp?.paid.leads || 0) > 0} />}
+                {sp?.notes.paid && <em className="dh-split-note">{sp.notes.paid}</em>}
+              </div>; })()}
+            {(() => { const meta = m.meta; const camps = meta?.campaigns || []; const c = camps.find((x) => x.id === mCamp); const spend = c ? c.spend : meta?.spend; const clicks = c ? c.clicks : meta?.clicks; const leads = c ? c.leads : meta?.leads;
+              return <div className="dh-split-col"><div className="dh-split-head"><BrandIcon id="meta-ads" size={20} fallback={null} /><b>Meta Ads</b>{camps.length > 0 && <select className="dh-camp" aria-label="Meta Ads campaign" value={mCamp} onChange={(e) => setMCamp(e.target.value)}><option value="">All campaigns ({camps.length})</option>{camps.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>}</div>
+                {meta ? <>
+                  <div className="dh-split-row expense"><span className="dh-split-ico"><span className="dh-cur">€</span></span><span>Spend</span><b>{money(spend || 0, cur)}</b></div>
+                  <Row icon={<MousePointerClick size={15} />} label="Clicks" value={v(clicks)} good={(clicks || 0) > 0} />
+                  <Row icon={<span className="dh-cur">€</span>} label="Avg. CPC" value={clicks ? money2((spend || 0) / clicks, cur) : "—"} />
+                  <Row icon={<UserPlus size={15} />} label="Leads" value={v(leads)} good={(leads || 0) > 0} />
+                  <Row icon={<CheckCircle2 size={15} />} label="Cost per lead" value={leads ? money2((spend || 0) / leads, cur) : "—"} />
+                </> : <em className="dh-split-note">{m.metaNote || "No Meta Ads account linked to this client."}</em>}
+              </div>; })()}
             <div className="dh-split-total"><UserPlus size={16} /><span>All leads · 30 days</span><b>{v(m.leads?.value)}</b>{sp?.otherLeads ? <small>{sp.otherLeads} from other or unknown sources</small> : null}</div>
           </div>; })()}
-        {adsPanel && <div className="dh-ads-embed">{adsPanel}</div>}
         {m.scope !== "all" && <><h3 className="dh-sub">Where you show up</h3>
         <div className="dh-ranks">
           <div className="dh-rank"><div className="dh-rank-logos"><BrandIcon id="google" size={24} fallback={<span>G</span>} /><span className="dh-rank-also" title="Chrome and Safari use Google search"><BrandIcon id="chrome" size={14} fallback={null} /><BrandIcon id="safari" size={14} fallback={null} /></span></div><small>Google · Chrome & Safari</small><b>{m.google?.position != null ? `#${m.google.position}` : "—"}</b>{m.google ? <em>avg of {m.google.tracked} keywords · {m.google.top3} in top 3 <Delta now={m.google.position} before={m.google.previous} lowerIsBetter suffix="" /></em> : <em>{m.rankNote || "Not tracked yet"}</em>}</div>
@@ -124,6 +139,7 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
       </>}
     </section>
 
+    {adsPanel && <div className="dh-ads-wrap">{adsPanel}</div>}
     <div className="dh-grid">
       <section className="panel dh-panel"><div className="dh-head"><div><p className="eyebrow">📅 SCHEDULED</p><h2>Appointments</h2></div><button type="button" className="text-button" onClick={() => onNavigate("Scheduling")}>Open</button></div>
         {view?.appointments?.length ? <ul className="dh-list">{view!.appointments.map((a) => <li key={a.id}>{logo(a.clientId)}<span><b>{a.name || "Appointment"}</b><small>{when(a.start)}{a.channel ? ` · ${a.channel}` : ""}</small></span></li>)}</ul> : <p className="dh-muted">{loading ? "Loading…" : "Nothing booked in the next 3 weeks."}</p>}
