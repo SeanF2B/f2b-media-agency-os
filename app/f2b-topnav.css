@@ -2388,3 +2388,14 @@ html body .app-shell.dark-mode label:has(> svg) > select, html body .app-shell.d
 .ps-notelabel{display:grid;gap:4px;margin-top:12px;font-size:12px;font-weight:700;color:#475467}.ps-notelabel input{height:38px;border:1px solid #d0d7dd;border-radius:10px;padding:0 10px;font:inherit}
 .sch-earn-split .sch-earn-chip:disabled{opacity:.45;cursor:default}
 @media(max-width:700px){.ps-doc .ps-meta{grid-template-columns:1fr 1fr}}
+/* Clients list: wider, cleaner cards (one tidy tools row, connections underneath) */
+@media (min-width: 1101px) { html body .app-shell .clients-layout { grid-template-columns: minmax(340px, 380px) minmax(0, 1fr); gap: 18px; } }
+html body .app-shell .client-list { gap: 10px; }
+html body .app-shell .client-list-card.has-extras { padding: 14px 16px; border-radius: 16px; row-gap: 10px; }
+html body .app-shell .client-list-card.has-extras .client-card-name b { font-size: 15px; }
+html body .app-shell .client-card-extras { gap: 10px; padding-top: 10px; }
+html body .app-shell .client-tool-row { gap: 8px; flex-wrap: nowrap; }
+html body .app-shell .client-tool { width: 34px; height: 32px; border-radius: 10px; }
+html body .app-shell .client-card-extras .ops-conn { flex-wrap: nowrap; gap: 8px; align-items: center; }
+html body .app-shell.dark-mode .client-tool { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.12); }
+html body .app-shell.dark-mode .client-tool i { border-color: #1b2128; }
