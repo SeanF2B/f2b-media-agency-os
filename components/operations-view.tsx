@@ -9,6 +9,7 @@ import { Briefcase, FileText, Globe, Check, Link2, Mail, MapPin, Megaphone, Mess
 import { AiVisibilityPanel } from "./ai-visibility-panel";
 import { RankTrackingPanel } from "./rank-tracking-panel";
 import { SiteFormsPanel } from "./site-forms-panel";
+const SocialPlanner = lazy(() => import("./social-planner").then((module) => ({ default: module.SocialPlanner })));
 const EmailMarketingView = lazy(() => import("./email-marketing-view").then((module) => ({ default: module.EmailMarketingView })));
 
 // Operations Centre: one admin-only page that reuses existing features (SEO, Google Ads, Websites,
@@ -205,7 +206,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
 
     {tab === "seo" && seoMode === "local" && <>
       {notice && <p className="ops-notice" role="status">{notice}</p>}
-      {!selected ? <p className="ops-empty">No active clients.</p> : (() => { const client = selected; const c = community[client.id] || {}; const gbp = Boolean(client.googleBusinessProfileLocationId || client.googleBusinessProfileAccountId); return <div className="ops-local-grid">
+      {!selected ? <p className="ops-empty">No active clients.</p> : (() => { const client = selected; const c = community[client.id] || {}; const gbp = Boolean(client.googleBusinessProfileLocationId || client.googleBusinessProfileAccountId); return <><Suspense fallback={null}><SocialPlanner key={client.id} clientId={client.id} clientName={client.name} /></Suspense><details className="ops-local-more"><summary>Business Profile · AI Reviews · Community questions</summary><div className="ops-local-grid">
         <section className="ops-local-card">
           <header><MapPin size={18} aria-hidden="true" /><div><h3>Google Business Profile</h3><p>{gbp ? "Connected. AI drafts posts and replies to new reviews; nothing is posted until you approve it." : `Link ${client.name}’s Business Profile to draft posts and review replies.`}</p></div><span className={`ops-local-status ${gbp ? "ok" : "off"}`}>{gbp ? "Connected" : "Not linked"}</span></header>
           <div className="ops-local-actions">{gbp ? onCreateGbpTask && <button type="button" className="primary-button" onClick={() => setNotice(onCreateGbpTask(client.id))}>Draft posts &amp; review replies</button> : <button type="button" className="primary-button" onClick={() => onOpenPage("Integrations", client.id)}>Link Business Profile</button>}</div>
@@ -219,7 +220,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
           <div className="ops-local-actions"><button type="button" className="secondary-button" disabled={c.busy} onClick={() => void findQuestions(client)}>{c.busy ? "Searching…" : "Find questions"}</button>{c.results && c.results.length > 0 && onCreateCommunityTask && <button type="button" className="primary-button" onClick={() => { setNotice(onCreateCommunityTask(client.id, c.results || [])); setCommunity((current) => ({ ...current, [client.id]: { ...current[client.id], results: [] } })); }}>Draft answers for {c.results.length}</button>}<span className="muted">{c.error ? <span className="ops-error">{c.error}</span> : c.results ? `${c.results.length} found${c.cost != null ? ` · $${c.cost.toFixed(3)}` : ""}${c.note ? ` · ${c.note}` : ""}` : c.usage?.lastRun ? `Last search ${new Date(c.usage.lastRun).toLocaleDateString("en-IE")}` : ""}</span></div>
           {c.results && c.results.length > 0 && <ul className="ops-local-results">{c.results.map((item) => <li key={item.url}><a href={item.url} target="_blank" rel="noreferrer"><b>{item.platform}</b> {item.title}</a></li>)}</ul>}
         </section>
-      </div>; })()}
+      </div></details></>; })()}
     </>}
   </section>;
 }
