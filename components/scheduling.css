@@ -288,3 +288,13 @@ html body .app-shell.dark-mode .sch-dash-panel-tools .sch-seg button.on{backgrou
 .sch-appt-photo.add{cursor:pointer;border-style:dashed;color:#5b6773;text-align:center;gap:2px;align-content:center;font-size:12px}
 .sch-appt-photo.add small{font-size:11px;font-weight:700}
 .sch-detail-photo{width:120px;height:90px;object-fit:cover;border-radius:10px;display:block;margin-top:4px}
+/* Calendar blocks: readable at any length */
+.sch-block{padding:4px 30px 4px 8px!important;line-height:1.3!important;font-size:12px!important;justify-content:flex-start;gap:1px}
+.sch-block b,.sch-block span:not(.sch-block-avs),.sch-block em{display:block;min-height:0;flex-shrink:0;line-height:1.3}
+.sch-block.short{flex-direction:row;align-items:center;padding-top:0!important;padding-bottom:0!important}
+.sch-block.short span:not(.sch-block-avs),.sch-block.short em{display:none}
+.sch-block.short .sch-block-avs{top:50%;transform:translateY(-50%)}
+.sch-block .sch-block-avs .sch-avatar{width:20px!important;height:20px!important}
+.sch-dash-nav{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.sch-dash-head h3{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sch-dash-panel-tools .iv-btn:disabled{opacity:.45;cursor:default}

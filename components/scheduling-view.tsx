@@ -56,10 +56,10 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
   const weekRef = useRef<HTMLDivElement>(null);
   const [PX_PER_MIN, setPpm] = useState(PX_DEFAULT);
   useEffect(() => {
-    const fit = () => { const el = weekRef.current; if (!el) return; const top = el.getBoundingClientRect().top; const room = window.innerHeight - top - 52 - 24; setPpm(Math.max(0.55, Math.min(2.2, room / ((HOURS_TO - HOURS_FROM) * 60)))); };
+    const fit = () => { const el = weekRef.current; if (!el) return; const top = el.getBoundingClientRect().top; const room = window.innerHeight - top - 52 - 24; setPpm(Math.max(1.05, Math.min(2.2, room / ((HOURS_TO - HOURS_FROM) * 60)))); };
     fit(); const t = window.setTimeout(fit, 250); window.addEventListener("resize", fit);
     return () => { window.clearTimeout(t); window.removeEventListener("resize", fit); };
-  });
+  }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
   const [realData, setData] = useState<Data | null>(null);
   const [sample, setSampleState] = useState(() => { try { return localStorage.getItem("f2b-dash-sample") === "1"; } catch { return false; } });
   const setSample = (on: boolean) => { setSampleState(on); try { localStorage.setItem("f2b-dash-sample", on ? "1" : "0"); } catch { /* optional */ } };
@@ -178,7 +178,7 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
       };
       return <div className="sch-dash">
         <div className="iv-card sch-dash-appts">
-          <div className="sch-dash-head"><h3>{isToday ? "Today’s appointments" : dashDate.toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "short" })}</h3><div className="sch-dash-nav"><button type="button" className="iv-btn" aria-label="Previous day" onClick={() => setDashDate(addDays(dashDate, -1))}><ChevronLeft size={15} /></button><input type="date" value={key} onChange={(e) => e.target.value && setDashDate(new Date(`${e.target.value}T12:00:00`))} aria-label="Pick a date" /><button type="button" className="iv-btn" aria-label="Next day" onClick={() => setDashDate(addDays(dashDate, 1))}><ChevronRight size={15} /></button>{!isToday && <button type="button" className="iv-btn" onClick={() => setDashDate(new Date())}>Today</button>}</div></div>
+          <div className="sch-dash-head"><h3>{isToday ? "Today’s appointments" : dashDate.toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "short" })}</h3><div className="sch-dash-nav"><button type="button" className="iv-btn" aria-label="Previous day" onClick={() => setDashDate(addDays(dashDate, -1))}><ChevronLeft size={15} /></button><input type="date" value={key} onChange={(e) => e.target.value && setDashDate(new Date(`${e.target.value}T12:00:00`))} aria-label="Pick a date" /><button type="button" className="iv-btn" aria-label="Next day" onClick={() => setDashDate(addDays(dashDate, 1))}><ChevronRight size={15} /></button><button type="button" className="iv-btn" style={{ visibility: isToday ? "hidden" : "visible" }} onClick={() => setDashDate(new Date())}>Today</button></div></div>
           <div className="sch-dash-stats"><span><b>{dayList.length}</b> booked</span><span><b>{dayList.filter((b) => statusOf(b)[0] === "Confirmed").length}</b> to come</span><span><b>{dayList.filter((b) => statusOf(b)[0] === "Done").length}</b> done</span>{dayList.some((b) => b.status === "no_show") && <span><b>{dayList.filter((b) => b.status === "no_show").length}</b> no-show</span>}</div>
           {dayList.length ? <ul className="sch-dash-list">{dayList.map((b) => { const [label, tone] = statusOf(b); const cal = calById.get(b.calendarId); return <li key={b.id} onClick={() => setDetail(b)}><time>{time(b.start)}</time>{b.staffIds.length ? <span className="sch-dash-avs">{b.staffIds.slice(0, 2).map((id) => <Avatar key={id} person={personOf(id)} size={30} />)}</span> : <span className="sch-dash-av" style={{ ["--c" as string]: cal?.color || "#2563eb" }}>{(b.name || "?").slice(0, 1).toUpperCase()}</span>}<span className="sch-dash-who"><b>{b.name}</b><small>{cal?.name || ""}</small><small className="sch-dash-staff">{b.staffIds.map((id) => staffById.get(id)?.name.split(" ")[0]).filter(Boolean).join(", ")}</small></span><span className={`sch-dash-status ${tone}`}>{label}</span></li>; })}</ul> : <p className="iv-small sch-dash-empty">Nothing booked{isToday ? " today" : " on this day"}.</p>}
         </div>
@@ -218,9 +218,14 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
               {Array.from({ length: HOURS_TO - HOURS_FROM }, (_, i) => <i key={i} className="sch-line" style={{ top: i * 60 * PX_PER_MIN }} />)}
               {key === todayKey && (() => { const n = new Date(); const m = n.getHours() * 60 + n.getMinutes() - HOURS_FROM * 60; return m > 0 && m < (HOURS_TO - HOURS_FROM) * 60 ? <i className="sch-now" style={{ top: m * PX_PER_MIN }} /> : null; })()}
               {dropHint?.day === key && <i className="sch-drop-hint" style={{ top: (dropHint.min - HOURS_FROM * 60) * PX_PER_MIN }}><b>{String(Math.floor(dropHint.min / 60)).padStart(2, "0")}:{String(dropHint.min % 60).padStart(2, "0")}</b></i>}
+              {(() => { // side-by-side lanes for overlapping appointments
+                const sorted = [...dayBookings].sort((a, z) => a.start.localeCompare(z.start)); const laneEnd: number[] = []; const lane = new Map<string, number>(); const groupOf = new Map<string, number>(); let group = 0, groupEnd = 0; const groupLanes: number[] = [];
+                for (const b of sorted) { const st = Date.parse(b.start), en = Date.parse(b.end); if (st >= groupEnd) { group++; laneEnd.length = 0; } groupEnd = Math.max(groupEnd, en); let l = laneEnd.findIndex((x) => x <= st); if (l < 0) { l = laneEnd.length; laneEnd.push(en); } else laneEnd[l] = en; lane.set(b.id, l); groupOf.set(b.id, group); groupLanes[group] = Math.max(groupLanes[group] || 0, l + 1); }
+                (dayBookings as Array<Booking & { _lane?: number; _lanes?: number }>).forEach((b) => { b._lane = lane.get(b.id) || 0; b._lanes = groupLanes[groupOf.get(b.id) || 0] || 1; });
+                return null; })()}
               {dayBookings.map((b) => { const s = new Date(b.start), e = new Date(b.end); const top = Math.max(0, (s.getHours() * 60 + s.getMinutes() - HOURS_FROM * 60) * PX_PER_MIN); const height = Math.max(22, ((e.getTime() - s.getTime()) / 60000) * PX_PER_MIN - 2); const cal = calById.get(b.calendarId);
                 const canDrag = b.status === "booked" && (data?.canManage || b.staffIds.includes(data?.meId || ""));
-                return <button key={b.id} type="button" className={`sch-block ${b.status}${canDrag ? " draggable" : ""}`} style={{ top, height, ["--c" as string]: cal?.color || "#2563eb" }} draggable={canDrag}
+                return <button key={b.id} type="button" className={`sch-block ${b.status}${canDrag ? " draggable" : ""}${height < 44 ? " short" : ""}`} style={{ top, height, left: `calc(${((b as Booking & { _lane?: number })._lane || 0) * 100 / ((b as Booking & { _lanes?: number })._lanes || 1)}% + 3px)`, width: `calc(${100 / ((b as Booking & { _lanes?: number })._lanes || 1)}% - 6px)`, right: "auto", ["--c" as string]: cal?.color || "#2563eb" }} draggable={canDrag}
                   onDragStart={(ev) => { const r = (ev.currentTarget as HTMLElement).getBoundingClientRect(); dragRef.current = { id: b.id, grabMin: (ev.clientY - r.top) / PX_PER_MIN }; ev.dataTransfer.effectAllowed = "move"; ev.dataTransfer.setData("text/plain", b.id); (ev.currentTarget as HTMLElement).classList.add("dragging"); }}
                   onDragEnd={(ev) => { (ev.currentTarget as HTMLElement).classList.remove("dragging"); dragRef.current = null; setDropHint(null); }}
                   onClick={() => setDetail(b)} title={`${time(b.start)} ${cal?.name || ""} · ${b.name}`}>
@@ -849,7 +854,7 @@ export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, c
         <label className="sch-select"><Users size={14} /><select aria-label="Staff member" value={staffId} onChange={(e) => setStaffId(e.target.value)}><option value="">Everyone</option>{(data?.staff || []).map((p) => <option key={p.id} value={p.id}>{p.name.split("|")[0].trim()}</option>)}</select></label>
         <div className="sch-seg" role="tablist" aria-label="View"><button type="button" role="tab" aria-selected={view === "day"} className={view === "day" ? "on" : ""} onClick={() => setMode("day")}>Day</button><button type="button" role="tab" aria-selected={view === "week"} className={view === "week" ? "on" : ""} onClick={() => setMode("week")}>Week</button></div>
         <button type="button" className="iv-btn" aria-label="Previous" onClick={() => setDay(addDays(day, view === "day" ? -1 : -7))}><ChevronLeft size={15} /></button>
-        {!isToday && <button type="button" className="iv-btn" onClick={() => setDay(new Date())}>Today</button>}
+        <button type="button" className="iv-btn" disabled={isToday} onClick={() => setDay(new Date())}>Today</button>
         <button type="button" className="iv-btn" aria-label="Next" onClick={() => setDay(addDays(day, view === "day" ? 1 : 7))}><ChevronRight size={15} /></button>
         <button type="button" className="text-button" onClick={onOpen}>Open Scheduling ↗</button>
       </div>
