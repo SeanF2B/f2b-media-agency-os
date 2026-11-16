@@ -64,6 +64,7 @@ export async function GET(request: Request) {
       // Demo data helper: the client's own services, areas and team names, from their profile and website.
       const client = ctx.ws.clients.find((c) => c.id === (str(url.searchParams.get("clientId"), 80) || ctx.scope));
       if (!client) return json({ services: [], locations: [], team: [] });
+      if (url.searchParams.get("debug") === "1") { siteCache.clear(); debugInfo.fetches = []; const out = await siteSampleFor(client, db); return json({ ...out, debug: debugInfo }); }
       return json(await siteSampleFor(client, db));
     }
     if (view === "calendars") return json({ calendars: (await listCalendars(db, ctx.ws.ownerId, ctx.scope)).map((c) => ({ id: c.id, name: c.name, clientId: c.clientId })) });
@@ -353,6 +354,7 @@ async function suggest(ctx: Ctx) {
 }
 
 // ---- Sample-data helper: read the client's website once (cached) for service names, areas and team names.
+const debugInfo: Record<string, unknown> = {}; // last sample-data lookup (shown with ?view=site&debug=1)
 type SiteSampleOut = { services: string[]; locations: string[]; team: string[]; photos: Record<string, string>; work?: Record<string, string[]>; gallery?: string[] };
 const siteCache = new Map<string, { at: number; value: SiteSampleOut }>();
 const SERVICE_WORDS = /(repair|install|replace|clean|survey|inspect|consult|design|fit|fitting|quote|service|maintenance|roof|gutter|chimney|kitchen|bathroom|tattoo|piercing|treatment|massage|facial|cut|colour|color|lesson|session|assessment|check|removal|painting|plaster|tiling|flooring|electrical|plumbing|heating|boiler|solar|window|door|garden|landscap|fencing|driveway|extension|renovat|cosmetic|whitening|implant|physio|therapy|training|coaching|valuation|viewing|measure)/i;
@@ -402,7 +404,10 @@ async function siteSampleFor(client: { id: string; name: string; email?: string;
   const hit = siteCache.get(site); if (hit && Date.now() - hit.at < 6 * 3600_000) return hit.value;
   let value: SiteSampleOut = { ...base, photos: {} };
   try {
-    const get = async (url: string) => { try { const r = await fetch(url, { headers: { "user-agent": "Mozilla/5.0 (compatible; F2B Agency OS sample data)", accept: "text/html" }, signal: AbortSignal.timeout(6000), redirect: "follow" }); return r.ok ? { html: (await r.text()).slice(0, 700_000), url: r.url || url } : { html: "", url }; } catch { return { html: "", url }; } };
+    const get = async (url: string) => {
+      const log = (Array.isArray(debugInfo.fetches) ? debugInfo.fetches : (debugInfo.fetches = [])) as unknown[];
+      // A normal browser user agent: some hosts' firewalls refuse bot-looking requests.
+      try { const r = await fetch(url, { headers: { "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36", accept: "text/html,application/xhtml+xml", "accept-language": "en-GB,en;q=0.9" }, signal: AbortSignal.timeout(8000), redirect: "follow" }); const html = r.ok ? (await r.text()).slice(0, 700_000) : ""; if (log.length < 10) log.push({ url, status: r.status, bytes: html.length }); return { html, url: r.url || url }; } catch (e) { if (log.length < 10) log.push({ url, error: String(e).slice(0, 120) }); return { html: "", url }; } };
     const home = await get(site);
     const html = home.html;
     const text = (h: string) => h.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&#0?39;|&rsquo;|&#8217;/g, "'").replace(/&[a-z#0-9]+;/gi, " ").replace(/\s+/g, " ").trim();
