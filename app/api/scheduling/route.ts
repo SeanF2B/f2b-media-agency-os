@@ -444,10 +444,10 @@ async function guessSiteFromName(name: string): Promise<string> {
   const words = key.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/&/g, "and").replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter(Boolean);
   const core = words.filter((w) => !/^(the|ltd|limited|llc|inc|co)$/.test(w));
   const roots = [...new Set([words.join(""), core.join(""), core.join("-")])].filter((x) => x.length >= 4);
-  const trades = ["", "tattoo", "tattoos", "tattooparlour", "tattoostudio", "studio", "salon", "clinic"];
+  const trades = ["", "tattoo", "tattoos", "tattooparlour", "tattoostudio", "studio", "salon", "clinic", "cork", "dublin", "galway", "limerick", "waterford", "belfast", "london", "birmingham", "manchester", "ireland", "uk"];
   const tlds = [".ie", ".com", ".co.uk"];
   const mark = core.filter((w) => w.length >= 4);
-  const candidates = [...new Set(roots.flatMap((r) => trades.map((t) => `${r}${t}`)))].flatMap((slug) => tlds.map((tld) => `https://${slug}${tld}`)).slice(0, 48);
+  const candidates = [...new Set(roots.flatMap((r) => trades.map((t) => `${r}${t}`)))].flatMap((slug) => tlds.map((tld) => `https://${slug}${tld}`)).slice(0, 180);
   // Check them all at once; first page that names the business wins.
   const tryOne = async (url: string) => {
     const r = await fetch(url, { headers: { "user-agent": "Mozilla/5.0 (compatible; F2B Agency OS sample data)", accept: "text/html" }, signal: AbortSignal.timeout(4000), redirect: "follow" });
@@ -457,8 +457,8 @@ async function guessSiteFromName(name: string): Promise<string> {
     return r.url || url;
   };
   let found = "";
-  for (let i = 0; i < candidates.length && !found; i += 12) {
-    try { found = await Promise.any(candidates.slice(i, i + 12).map(tryOne)); } catch { /* none in this batch */ }
+  for (let i = 0; i < candidates.length && !found; i += 20) {
+    try { found = await Promise.any(candidates.slice(i, i + 20).map(tryOne)); } catch { /* none in this batch */ }
   }
   guessCache.set(key, found);
   return found;
