@@ -1752,3 +1752,8 @@ html body .app-shell .main-area :is(.panel, .iv-card, .studio-panel, .crm-worksp
 html body .app-shell .main-area .crm-opportunity, html body .app-shell .main-area .tt-row { animation-duration: .25s; }
 html body :is(.crm-modal, .modal, .app-dialog, .ai-chat-panel, .ai-chat-toast, .cp-menu-float) { animation: f2b-fade-in .2s ease-out both; }
 @media (prefers-reduced-motion: reduce) { html body .app-shell .main-area *, html body :is(.crm-modal, .modal, .ai-chat-panel) { animation: none !important; } }
+/* Client picker in the top bar: always its own readable pill, whatever the bar colour */
+html body .app-shell.topnav-layout .tn-left :is(.client-scope-trigger, #f2b-pick-a) { background: #ffffff !important; color: #101828 !important; -webkit-text-fill-color: #101828 !important; border: 1px solid rgba(16,24,40,.14) !important; box-shadow: 0 1px 2px rgba(16,24,40,.06) !important; }
+html body .app-shell.topnav-layout .tn-left .client-scope-trigger :is(span, svg, b, #f2b-pick-a) { color: #101828 !important; -webkit-text-fill-color: #101828 !important; opacity: 1 !important; }
+html body.f2b-dark .app-shell.topnav-layout .tn-left :is(.client-scope-trigger, #f2b-pick-a), html body .app-shell.dark-mode.topnav-layout .tn-left :is(.client-scope-trigger, #f2b-pick-a) { background: #1f262d !important; color: #f2f4f7 !important; -webkit-text-fill-color: #f2f4f7 !important; border-color: rgba(255,255,255,.18) !important; }
+html body.f2b-dark .app-shell.topnav-layout .tn-left .client-scope-trigger :is(span, svg, b, #f2b-pick-a), html body .app-shell.dark-mode.topnav-layout .tn-left .client-scope-trigger :is(span, svg, b, #f2b-pick-a) { color: #f2f4f7 !important; -webkit-text-fill-color: #f2f4f7 !important; }
