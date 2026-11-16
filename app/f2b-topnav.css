@@ -437,14 +437,6 @@ html body .app-shell.dark-mode .bs select { background-image: url("data:image/sv
 .workroom-icon.active i { background: rgba(255,255,255,.25); }
 .app-shell.dark-mode .workroom-icon i { background: rgba(255,255,255,.12); }
 
-/* Settings → APIs: one tidy column, both panels the same width */
-html body .app-shell .settings-apis-stack { max-width: 980px; margin: 0 auto; display: grid; gap: 18px; }
-html body .app-shell .settings-apis-stack .settings-view { max-width: none !important; width: 100% !important; margin: 0 !important; padding: 0 !important; display: grid; gap: 18px; }
-html body .app-shell .settings-apis-stack .settings-panel { width: 100% !important; max-width: none !important; margin: 0 !important; box-sizing: border-box; padding: 24px 26px !important; border-radius: 18px !important; }
-html body .app-shell .settings-apis-stack .settings-page-header { margin: 8px 0 0 !important; }
-html body .app-shell .settings-apis-stack .dns-panel form, html body .app-shell .settings-apis-stack .dns-panel .custom-key-form { display: grid !important; grid-template-columns: 1fr 1.6fr 1.2fr auto; gap: 10px; align-items: end; border: 0 !important; padding: 0 !important; }
-html body .app-shell .settings-apis-stack .dns-panel form button { height: 42px; white-space: nowrap; }
-@media (max-width: 760px) { html body .app-shell .settings-apis-stack .dns-panel form { grid-template-columns: 1fr; } }
 
 /* Focus-client picker beside Agency */
 .tn-bar .client-focus .client-scope-trigger { min-width: 130px; }

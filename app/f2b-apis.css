@@ -1,0 +1,93 @@
+/* Settings → APIs: one neat column, compact rows, solid white pop-ups */
+html body .app-shell .apis-page { width: 100%; max-width: 880px; margin: 0 auto; padding: 4px 0 32px; display: grid; gap: 16px; box-sizing: border-box; }
+.apis-page h1, .apis-page h2, .apis-page p { margin: 0; }
+.apis-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.apis-head h1 { font-size: 28px; line-height: 1.1; }
+.apis-head p { margin-top: 6px !important; color: #6d7882; font-size: 14px; max-width: 520px; }
+.apis-head-actions { display: flex; align-items: center; gap: 10px; }
+.apis-add { display: inline-flex; align-items: center; gap: 6px; height: 40px; white-space: nowrap; }
+.apis-pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; background: #eef1f4; color: #5b6770; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.apis-pill i { width: 7px; height: 7px; border-radius: 50%; background: #9aa5ad; }
+.apis-pill.on { background: #25a75b; color: #fff; }
+.apis-pill.on i { background: #fff; }
+
+.apis-card { background: var(--card, #fff); border: 1px solid var(--border, #e3e8ec); border-radius: 16px; padding: 18px; display: grid; gap: 12px; box-shadow: 0 6px 22px rgba(20,35,45,.05); }
+.apis-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.apis-card-head h2 { font-size: 16px; }
+.apis-card-head small { color: #6d7882; font-size: 13px; }
+
+.apis-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.apis-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--border, #e3e8ec); border-radius: 12px; background: rgba(0,0,0,.015); transition: border-color .15s, transform .15s, box-shadow .15s; }
+.apis-row:hover { border-color: var(--brand-secondary, #ee5a29); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,.06); }
+.apis-row-text { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.apis-row-text b { font-size: 14px; }
+.apis-row-text small { color: #6d7882; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.apis-row-text code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; padding: 1px 5px; border-radius: 5px; background: rgba(0,0,0,.06); }
+.apis-row-actions { display: flex; gap: 6px; }
+.apis-row-actions button, .apis-inline-form button { height: 34px; padding: 0 12px; font-size: 13px; }
+html body .app-shell .apis-danger:hover { color: #c62f35 !important; border-color: #e5484d !important; }
+
+.apis-logo { width: 36px; height: 36px; min-width: 36px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; background: #fff; border: 1px solid #e6eaee; overflow: hidden; color: var(--brand-primary, #0f6fa8); }
+.apis-logo img { width: 22px; height: 22px; object-fit: contain; }
+.apis-logo b { font-size: 15px; }
+
+.apis-inline-form { display: flex; gap: 8px; }
+.apis-inline-form input { flex: 1; min-width: 0; height: 34px; padding: 0 12px; border: 1px solid var(--border, #d7dee4); border-radius: 9px; background: var(--input, #fff); font: inherit; font-size: 13.5px; color: inherit; }
+
+.apis-empty { color: #6d7882; font-size: 13px; }
+.apis-empty-add { display: flex; align-items: center; gap: 12px; width: 100%; padding: 16px; border: 1.5px dashed var(--border, #d3dae0); border-radius: 12px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color .15s, transform .15s; }
+.apis-empty-add:hover { border-color: var(--brand-secondary, #ee5a29); transform: translateY(-1px); }
+.apis-empty-add > svg { color: var(--brand-primary, #0f6fa8); }
+.apis-empty-add span { display: grid; gap: 2px; }
+.apis-empty-add small { color: #6d7882; }
+
+.apis-status { padding: 9px 12px; border-radius: 10px; font-size: 13px; font-weight: 600; }
+.apis-status.ok { background: #e8f7ee; color: #197144; }
+.apis-status.error { background: #fdecec; color: #b42328; }
+.apis-foot { display: flex; align-items: center; gap: 6px; color: #7a858e; font-size: 12.5px; }
+
+/* Dark mode (page only — pop-ups stay solid white) */
+.app-shell.dark-mode .apis-card { background: #25252a; border-color: #404046; box-shadow: none; }
+.app-shell.dark-mode .apis-row { border-color: #404046; background: rgba(255,255,255,.02); }
+.app-shell.dark-mode .apis-head p, .app-shell.dark-mode .apis-card-head small, .app-shell.dark-mode .apis-row-text small, .app-shell.dark-mode .apis-empty, .app-shell.dark-mode .apis-empty-add small, .app-shell.dark-mode .apis-foot { color: #b7bcc4; }
+.app-shell.dark-mode .apis-row-text code { background: rgba(255,255,255,.1); }
+.app-shell.dark-mode .apis-inline-form input { background: #302f33; border-color: #49484e; color: #fff; }
+.app-shell.dark-mode .apis-empty-add { border-color: #4a4a52; }
+.app-shell.dark-mode .apis-pill:not(.on) { background: #343339; color: #dedde2; }
+
+/* Pop-up (portalled to body) */
+.apis-scrim { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 20px; background: rgba(15,25,32,.45); backdrop-filter: blur(3px); }
+.apis-popup { width: min(620px, 100%); max-height: min(86vh, 720px); overflow: auto; background: #fff; color: #18232c; border-radius: 18px; padding: 18px 20px 20px; box-shadow: 0 24px 70px rgba(0,0,0,.25); display: grid; gap: 14px; font-family: inherit; }
+.apis-popup-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.apis-popup-head h3 { margin: 0; font-size: 18px; }
+.apis-popup-title { display: inline-flex; align-items: center; gap: 10px; }
+.apis-icon-btn { width: 32px; height: 32px; border: 0; border-radius: 9px; background: #f1f4f6; color: #3b4852; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.apis-icon-btn:hover { background: #e5eaee; }
+.apis-search { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; border: 1px solid #d7dee4; border-radius: 10px; color: #6d7882; }
+.apis-search:focus-within { border-color: var(--brand-secondary, #ee5a29); }
+.apis-search input { flex: 1; border: 0; outline: 0; background: transparent; font: inherit; font-size: 14px; color: #18232c; }
+.apis-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.apis-option { position: relative; display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid #e3e8ec; border-radius: 12px; background: #fff; color: #18232c; font: inherit; text-align: left; cursor: pointer; transition: border-color .15s, transform .15s, box-shadow .15s; }
+.apis-option:hover { border-color: var(--brand-secondary, #ee5a29); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,.07); }
+.apis-option > span:last-of-type { display: grid; gap: 1px; min-width: 0; }
+.apis-option b { font-size: 13.5px; }
+.apis-option small { color: #6d7882; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.apis-option em { position: absolute; top: 8px; right: 9px; font-style: normal; font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: #25a75b; color: #fff; }
+.apis-option-custom { border-style: dashed; }
+.apis-form { display: grid; gap: 12px; }
+.apis-form label { display: grid; gap: 5px; font-size: 12.5px; font-weight: 700; color: #3b4852; }
+.apis-form label em { font-style: normal; font-weight: 500; color: #8a949c; }
+.apis-form input { height: 40px; padding: 0 12px; border: 1px solid #d7dee4; border-radius: 10px; background: #fff; color: #18232c; font: inherit; font-size: 14px; font-weight: 500; transition: border-color .15s, transform .15s; }
+.apis-form input:hover, .apis-form input:focus { border-color: var(--brand-secondary, #ee5a29); outline: 0; }
+.apis-form-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 4px; }
+.apis-form-actions button { height: 38px; }
+
+/* Operations → Sites → Domains: let the DNS view use the full width */
+.ops-domains .settings-view, .ops-domains .dns-view { max-width: none; margin: 0; padding: 0; }
+
+@media (max-width: 640px) {
+  .apis-row { flex-wrap: wrap; }
+  .apis-row-actions { width: 100%; justify-content: flex-end; }
+  .apis-inline-form { flex-direction: column; }
+  .apis-grid { grid-template-columns: 1fr; }
+}

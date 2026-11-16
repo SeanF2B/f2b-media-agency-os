@@ -11,6 +11,7 @@ import { RankTrackingPanel } from "./rank-tracking-panel";
 import { SiteFormsPanel } from "./site-forms-panel";
 import { SetupWizard } from "./setup-wizard";
 const SocialPlanner = lazy(() => import("./social-planner").then((module) => ({ default: module.SocialPlanner })));
+const DomainsDnsView = lazy(() => import("./domains-dns-view").then((module) => ({ default: module.DomainsDnsView })));
 const EmailMarketingView = lazy(() => import("./email-marketing-view").then((module) => ({ default: module.EmailMarketingView })));
 
 // Operations Centre: one admin-only page that reuses existing features (SEO, Google Ads, Websites,
@@ -61,7 +62,7 @@ const SEO_MAIN: Array<{ key: string; label: string; views: Array<[SeoMode, strin
 ];
 const seoMainOf = (mode: SeoMode) => SEO_MAIN.find((group) => group.views.some(([key]) => key === mode)) || SEO_MAIN[2];
 type AdsMode = "setup" | "manage" | "performance";
-type SitesTab = "overview" | "forms" | "email";
+type SitesTab = "overview" | "forms" | "email" | "domains";
 type SiteMode = "sites" | "settings" | "media" | "templates";
 /** Older links/state used other tabs; map them onto the current areas (+ the sub-view they opened). */
 export function normalizeOpsTab(value: string): { tab: OperationsTab; sub?: string } {
@@ -69,7 +70,7 @@ export function normalizeOpsTab(value: string): { tab: OperationsTab; sub?: stri
     keywords: { tab: "seo", sub: "keywords" }, ai: { tab: "seo", sub: "ai" }, backlinks: { tab: "seo", sub: "backlinks" }, competitors: { tab: "seo", sub: "competitors" }, ranks: { tab: "seo", sub: "ranks" }, pages: { tab: "seo", sub: "pages" },
     local: { tab: "clients", sub: "maps" }, audits: { tab: "reports", sub: "audits" },
     websites: { tab: "sites", sub: "overview" }, media: { tab: "sites", sub: "media" }, templates: { tab: "sites", sub: "templates" }, forms: { tab: "sites", sub: "forms" }, submissions: { tab: "sites", sub: "submissions" },
-    email: { tab: "sites", sub: "email" }, emails: { tab: "sites", sub: "email" }, automations: { tab: "sites", sub: "automations" }, "system-emails": { tab: "sites", sub: "system" }, leadfactory: { tab: "clients" },
+    email: { tab: "sites", sub: "email" }, emails: { tab: "sites", sub: "email" }, domains: { tab: "sites", sub: "domains" }, dns: { tab: "sites", sub: "domains" }, automations: { tab: "sites", sub: "automations" }, "system-emails": { tab: "sites", sub: "system" }, leadfactory: { tab: "clients" },
   };
   return legacy[value] || { tab: (OPS_TABS.some(([key]) => key === value) || value === "onboarding" ? value : "clients") as OperationsTab };
 }
@@ -127,6 +128,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
     else if (tab === "reports") setReportMode(sub as "audits");
     else if (tab === "sites") {
       if (sub === "forms" || sub === "submissions") { setSitesTab("forms"); setFormsView(sub); }
+      else if (sub === "domains" || sub === "dns") setSitesTab("domains");
       else if (sub === "email" || sub === "automations" || sub === "system") { setSitesTab("email"); setEmailStart(sub === "email" ? "campaigns" : sub); }
       else { setSitesTab("overview"); setSiteMode(sub === "media" || sub === "templates" ? sub : "sites"); }
     }
@@ -198,7 +200,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
 
     {tab === "ads" && selected && <div className="ops-subbar">{seg(adsMode || (selected.googleAdsAccountId ? "performance" : "setup"), setAdsMode, [["setup", "Setup"], ["manage", "Manage"], ["performance", "Performance"]], "Google Ads sections")}</div>}
     {tab === "seo" && selected && <div className="ops-subbar">{seg(seoMainOf(seoMode).key, (key: string) => setSeoMode(SEO_MAIN.find((group) => group.key === key)!.views[0][0]), SEO_MAIN.map((group) => [group.key, group.label] as [string, string]), "SEO sections")}</div>}
-    {tab === "sites" && <div className="ops-subbar">{seg(sitesTab, (key: SitesTab) => { setSitesTab(key); if (key === "overview") setSiteMode("sites"); }, [["overview", "Overview"], ["forms", "Forms"], ["email", "Email"]], "Sites sections")}</div>}
+    {tab === "sites" && <div className="ops-subbar">{seg(sitesTab, (key: SitesTab) => { setSitesTab(key); if (key === "overview") setSiteMode("sites"); }, [["overview", "Overview"], ["forms", "Forms"], ["email", "Email"], ["domains", "Domains"]], "Sites sections")}</div>}
     {(tab === "seo" || tab === "ads") && selected && (() => { const site = hostOf(selected.website || selected.wordpressSiteUrl); const chips: Array<[string, boolean]> = tab === "ads" ? [["Google Ads account", Boolean(selected.googleAdsAccountId)], ["Website", Boolean(site)]] : [["Website", Boolean(site)], ["Search Console", Boolean(selected.googleSearchConsoleAccountId)], ["Analytics", Boolean(selected.googleAnalyticsAccountId)], ["Business Profile", Boolean(selected.googleBusinessProfileLocationId || selected.googleBusinessProfileAccountId)]]; return <div className="ops-client-strip">
       {site ? <a href={`https://${site}`} target="_blank" rel="noreferrer" className="ops-strip-site">{site}</a> : onEditClient && <button type="button" className="text-button" onClick={() => onEditClient(selected.id)}>Add client website</button>}
       <span className="ops-strip-chips">{chips.map(([label, ok]) => <span key={label} className={ok ? "ok" : "missing"} title={ok ? `${label} connected` : `${label} not connected`}>{ok ? "✓" : "○"} {label}</span>)}</span>
@@ -225,7 +227,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
     </>}
     {tab === "sites" && sitesTab === "overview" && siteMode !== "sites" && selected && <>
       <button type="button" className="text-button ops-back" onClick={() => setSiteMode("sites")}>← All sites</button>
-      <div className="ops-forms-toggle">{seg(siteMode, setSiteMode, [["settings", "Site settings"], ["media", "Media library"], ["templates", "Templates"]], `${selected.name} site`)}<button type="button" className="secondary-button" onClick={onOpenDns}>Domains &amp; DNS</button></div>
+      <div className="ops-forms-toggle">{seg(siteMode, setSiteMode, [["settings", "Site settings"], ["media", "Media library"], ["templates", "Templates"]], `${selected.name} site`)}<button type="button" className="secondary-button" onClick={() => setSitesTab("domains")}>Domains &amp; DNS</button></div>
       {siteMode === "settings" && renderTool && <div className="ops-embed" key={`site-settings-${selected.id}`}>{renderTool("site-settings", selected.id)}</div>}
       {siteMode === "media" && renderTool && <div className="ops-embed">{renderTool("media", selected.id)}</div>}
       {siteMode === "templates" && <SiteTemplatesPanel clients={clients} onEdit={(client) => onOpenWebsite(client)} />}
@@ -233,6 +235,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
     {tab === "sites" && sitesTab === "forms" && <div className="ops-forms-toggle">{seg(formsView, setFormsView, [["forms", "Forms"], ["submissions", "Submissions"]], "Forms view")}</div>}
     {tab === "sites" && sitesTab === "forms" && formsView === "forms" && <SiteFormsPanel clients={clients.filter((client) => !/^agency$/i.test(client.name.trim()))} clientId={toolClientId && clients.some((c) => c.id === toolClientId) ? toolClientId : ""} onClient={setToolClientId} />}
     {tab === "sites" && sitesTab === "forms" && formsView === "submissions" && renderTool && <div className="ops-embed" key={`subs-${selected?.id || "all"}`}>{renderTool("submissions", selected?.id || "")}</div>}
+    {tab === "sites" && sitesTab === "domains" && <div className="ops-embed ops-domains"><Suspense fallback={<div className="page-loading" role="status" aria-label="Loading domains…"><i /></div>}><DomainsDnsView /></Suspense></div>}
     {tab === "sites" && sitesTab === "email" && emailClient && <Suspense fallback={<div className="page-loading" role="status" aria-label="Loading email…"><i /></div>}><EmailMarketingView key={emailStart} initialMode={emailStart} clientId={emailClient.id} clientName={emailClient.name} clientLogo={emailClient.logo} clientColor={emailClient.color} automations={automations} /></Suspense>}
 
 
