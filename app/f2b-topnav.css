@@ -2508,3 +2508,41 @@ html body .app-shell.topnav-layout .tn-clock.on svg { color: #12b76a; animation:
 html body .app-shell.dark-mode.topnav-layout .tn-clock { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.16); color: #fff; }
 html body .app-shell.dark-mode.topnav-layout .tn-clock small { color: #fda29b; }
 @media (max-width: 860px) { html body .app-shell.topnav-layout .tn-clock small { display: none; } }
+
+/* Date boxes open their picker anywhere you click */
+html body input[type="date"], html body input[type="datetime-local"], html body input[type="time"], html body input[type="month"], html body input[type="week"] { cursor: pointer; }
+
+/* ===== ROAS / close rate: colour-coded by performance, note only when genuinely low ===== */
+html body .app-shell .dh-graded.dh-grade-good { background: rgba(18,183,106,.10) !important; }
+html body .app-shell .dh-graded.dh-grade-good b { color: #067647; }
+html body .app-shell .dh-graded.dh-grade-ok { background: rgba(247,144,9,.10) !important; }
+html body .app-shell .dh-graded.dh-grade-ok b { color: #b54708; }
+html body .app-shell .dh-graded.dh-grade-low { background: rgba(240,68,56,.09) !important; }
+html body .app-shell .dh-graded.dh-grade-low b { color: #b42318; }
+html body .app-shell .dh-graded > span:nth-child(2) { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; position: relative; }
+html body .app-shell .dh-close { display: inline-flex; align-items: center; gap: 6px; margin-left: 12px; padding: 3px 10px; border-radius: 999px; font-size: 12px; position: relative; }
+html body .app-shell .dh-close b { font-size: 14px; }
+html body .app-shell .dh-close.dh-grade-good { background: rgba(18,183,106,.12); color: #067647; }
+html body .app-shell .dh-close.dh-grade-ok { background: rgba(247,144,9,.12); color: #b54708; }
+html body .app-shell .dh-close.dh-grade-low { background: rgba(240,68,56,.10); color: #b42318; }
+html body .app-shell .dh-close.dh-grade-na { background: rgba(127,138,160,.12); }
+html body .app-shell .dh-grade-tip { position: relative; display: inline-block; }
+html body .app-shell .dh-grade-tip summary { list-style: none; cursor: pointer; font-size: 10.5px; font-weight: 700; color: #b42318; padding: 1px 7px; border-radius: 999px; border: 1px solid rgba(240,68,56,.35); background: #fff; animation: dh-tip-pulse 2.4s ease-in-out 2; }
+html body .app-shell .dh-grade-tip summary::-webkit-details-marker { display: none; }
+html body .app-shell .dh-grade-tip summary:hover { transform: translateY(-1px); }
+html body .app-shell .dh-grade-tip p { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; width: 260px; margin: 0; padding: 10px 12px; border-radius: 12px; background: #101828; color: #fff; font-size: 12px; font-weight: 500; line-height: 1.45; box-shadow: 0 12px 30px rgba(16,24,40,.25); white-space: normal; }
+@keyframes dh-tip-pulse { 50% { box-shadow: 0 0 0 4px rgba(240,68,56,.15); } }
+html body .app-shell.dark-mode .dh-grade-tip summary { background: #2a1a1a; color: #fda29b; }
+html body .app-shell.dark-mode .dh-graded.dh-grade-good b, html body .app-shell.dark-mode .dh-close.dh-grade-good { color: #75e0a7; }
+html body .app-shell.dark-mode .dh-graded.dh-grade-ok b, html body .app-shell.dark-mode .dh-close.dh-grade-ok { color: #fec84b; }
+html body .app-shell.dark-mode .dh-graded.dh-grade-low b, html body .app-shell.dark-mode .dh-close.dh-grade-low { color: #fda29b; }
+
+/* ===== Timesheets teammate filter: looks like a real dropdown ===== */
+html body .app-shell .timesheet-person-filter { display: inline-flex !important; align-items: center; gap: 8px; height: 38px; padding: 0 12px; border: 1px solid #d0d5dd !important; border-radius: 12px; background: #fff !important; box-shadow: 0 1px 2px rgba(16,24,40,.06); cursor: pointer; transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease; }
+html body .app-shell .timesheet-person-filter:hover { transform: translateY(-1px); border-color: var(--brand-secondary, #8b5cf6) !important; box-shadow: 0 4px 12px rgba(16,24,40,.08); }
+html body .app-shell .timesheet-person-filter span { font-size: 12px; font-weight: 700; color: #667085; white-space: nowrap; }
+html body .app-shell .timesheet-person-filter select { border: 0 !important; background: transparent !important; font: inherit; font-weight: 700; color: #101828; padding: 0 4px; cursor: pointer; outline: none; box-shadow: none !important; }
+html body .app-shell .timesheet-person-filter:has(select:focus-visible) { outline: 2px solid var(--brand-secondary, #8b5cf6); outline-offset: 2px; }
+html body .app-shell.dark-mode .timesheet-person-filter { background: #1b2227 !important; border-color: #2f3a41 !important; }
+html body .app-shell.dark-mode .timesheet-person-filter select { color: #fff; }
+html body .app-shell.dark-mode .timesheet-person-filter span { color: #98a2b3; }

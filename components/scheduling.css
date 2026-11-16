@@ -499,6 +499,12 @@ html body .app-shell.dark-mode .sch-dash-panel-tools .sch-seg button.on{backgrou
 .crv-history li .ps-del{color:#b42318}
 .crv-history li .sch-avatar{flex:none}
 
+/* ===== Day timeline: short appointments are clean colour blocks (no clipped "10:" labels) ===== */
+.sch-tl-item.narrow{min-width:6px!important;padding:0!important;overflow:hidden;border-radius:6px;margin-right:1px}
+.sch-tl-item.narrow b,.sch-tl-item.narrow span{display:none!important}
+.sch-tl-item{box-sizing:border-box;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.sch-tl-item span{overflow:hidden;text-overflow:ellipsis}
+
 /* ===== Pay settings ===== */
 .ps-paysettings{display:grid;gap:12px}
 .ps-pay-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}

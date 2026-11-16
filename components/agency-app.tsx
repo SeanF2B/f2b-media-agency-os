@@ -745,9 +745,10 @@ function AnimatedBot({ status, member }: { status: string; member: Staff }) {
 }
 function ClockButton({ startedAt, onToggle }: { startedAt: string; onToggle: () => void }) {
   const [now, setNow] = useState(() => Date.now());
-  useEffect(() => { if (!startedAt) return; const t = window.setInterval(() => setNow(Date.now()), 30_000); setNow(Date.now()); return () => window.clearInterval(t); }, [startedAt]);
-  const mins = startedAt ? Math.max(0, Math.floor((now - Date.parse(startedAt)) / 60_000)) : 0;
-  return <button type="button" className={`tn-clock ${startedAt ? "on" : ""}`} onClick={onToggle} title={startedAt ? `Clocked in at ${new Date(startedAt).toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit" })} — click to clock out` : "Clock in (your hours go on your payslip)"}><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg><b>{startedAt ? `${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, "0")}m` : "Clock in"}</b>{startedAt && <small>Clock out</small>}</button>;
+  useEffect(() => { if (!startedAt) return; const t = window.setInterval(() => setNow(Date.now()), 1000); setNow(Date.now()); return () => window.clearInterval(t); }, [startedAt]);
+  const secs = startedAt ? Math.max(0, Math.floor((now - Date.parse(startedAt)) / 1000)) : 0;
+  const clockText = `${Math.floor(secs / 3600)}:${String(Math.floor((secs % 3600) / 60)).padStart(2, "0")}:${String(secs % 60).padStart(2, "0")}`;
+  return <button type="button" className={`tn-clock ${startedAt ? "on" : ""}`} onClick={onToggle} title={startedAt ? `Clocked in at ${new Date(startedAt).toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit" })} — click to clock out` : "Clock in (your hours go on your payslip)"}><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg><b>{startedAt ? clockText : "Clock in"}</b>{startedAt && <small>Clock out</small>}</button>;
 }
 function BrandLogo({ className }: { className: string }) {
   const branding = useBranding();
@@ -1245,6 +1246,16 @@ export function AgencyApp() {
 
   useEffect(() => { setDarkMode(window.localStorage.getItem("f2b-dark-mode") === "true"); }, []);
   const [sampleOn, setSampleOn] = useSampleData(); // one Sample switch in the top bar for every page
+  // Date / time boxes everywhere open their picker wherever you click, not just on the little calendar icon.
+  useEffect(() => {
+    const open = (event: MouseEvent) => {
+      const el = event.target as HTMLInputElement | null;
+      if (!el || el.tagName !== "INPUT" || !/^(date|datetime-local|time|month|week)$/.test(el.type) || el.disabled || el.readOnly) return;
+      try { (el as HTMLInputElement & { showPicker?: () => void }).showPicker?.(); } catch { /* not allowed in this browser: native behaviour still works */ }
+    };
+    document.addEventListener("click", open);
+    return () => document.removeEventListener("click", open);
+  }, []);
   // Dark mode is flagged on <html>/<body> directly instead of CSS "body:has(.app-shell.dark-mode)".
   // A :has() on <body> made every DOM insertion re-style the whole page (the drag/pick-up lag).
   useEffect(() => {
@@ -1452,14 +1463,21 @@ export function AgencyApp() {
   useEffect(() => { const sync = (event: Event) => { const d = (event as CustomEvent).detail as { staffId?: string; rate?: number } | undefined; if (!d?.staffId || !(Number(d.rate) > 0)) return; const live = workspaceLiveRef.current; if (!live.staff.some((m) => m.id === d.staffId && m.costRate !== d.rate)) return; void persist({ ...live, staff: live.staff.map((m) => m.id === d.staffId ? { ...m, costRate: Number(d.rate) } : m) }, "Hourly rate saved"); }; window.addEventListener("f2b-staff-rate", sync); return () => window.removeEventListener("f2b-staff-rate", sync); }, [persist]);
   // Simple clock in / out: each shift is saved as a time entry (task "clock"), used for hourly payslips.
   const clockedInAt = selfProfile ? workspace.clockIns?.[selfProfile.id] || "" : "";
+  const clockBusyRef = useRef(false);
   const toggleClock = async () => {
     if (!selfProfile) return;
-    const live = workspaceLiveRef.current; const ins = { ...(live.clockIns || {}) }; const started = ins[selfProfile.id];
-    if (!started) { ins[selfProfile.id] = new Date().toISOString(); await persist({ ...live, clockIns: ins }, "Clocked in"); return; }
-    delete ins[selfProfile.id];
-    const end = new Date(); const seconds = Math.max(60, Math.round((end.getTime() - new Date(started).getTime()) / 1000));
-    const entry: Entry = { id: `clock-${selfProfile.id}-${Date.parse(started)}`, taskId: "clock", clientId: activeScopeId || "", staffId: selfProfile.id, startAt: started, endAt: end.toISOString(), seconds, note: "Clocked in", billable: false };
-    await persist({ ...live, clockIns: ins, entries: [...(live.entries || []).filter((e) => e.id !== entry.id), entry] }, `Clocked out · ${(seconds / 3600).toFixed(2)}h`);
+    if (clockBusyRef.current) return; clockBusyRef.current = true;
+    try {
+      // Own endpoint so every team member (not only admins) can clock themselves in and out.
+      const r = await fetch("/api/clock", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: clockedInAt ? "out" : "in", clientId: activeScopeId || "" }) });
+      const j = await r.json().catch(() => ({})) as { clockedInAt?: string; entry?: Entry; error?: string };
+      if (!r.ok) { setError(j.error || "Couldn't update your clock. Try again."); return; }
+      const apply = (w: Workspace): Workspace => { const ins = { ...(w.clockIns || {}) }; if (j.clockedInAt) ins[selfProfile.id] = j.clockedInAt; else delete ins[selfProfile.id]; return { ...w, clockIns: ins, entries: j.entry ? [...(w.entries || []).filter((e) => e.id !== j.entry!.id), j.entry] : w.entries }; };
+      workspaceLiveRef.current = apply(workspaceLiveRef.current); setWorkspace((w) => apply(w));
+      const secs = j.entry?.seconds || 0;
+      setToast(j.clockedInAt ? "Clocked in" : `Clocked out · ${Math.floor(secs / 3600)}h ${String(Math.round((secs % 3600) / 60)).padStart(2, "0")}m logged`); window.setTimeout(() => setToast(""), 2400);
+    } catch { setError("Couldn't update your clock. Check your connection and try again."); }
+    finally { clockBusyRef.current = false; }
   };
   useEffect(() => {
     if (!ready || !isAdmin || previewMemberId) { setGoogleCalendarStatus(null); return; }
@@ -4400,7 +4418,7 @@ function Overview({ payslips, onOpenTask, onReviewTask, currentStaffId = "", foc
   </>;
   return <><div className="welcome-row"><div><p className="eyebrow">{today}</p><h1>{greeting}, {scopeClientId ? (workspace.clients.find((item) => item.id === scopeClientId)?.name || "Sean") : "Sean"} <span>✦</span></h1><p className="muted">{scopeClientId ? "Here’s the pulse of this business today." : "Here’s the pulse of your agency today."}</p></div></div>
     {dateSlot ? createPortal(topDatePicker, dateSlot) : financeToolbar}
-    <DashboardHub currentStaffId={currentStaffId} onOpenTask={onOpenTask} onReviewTask={onReviewTask} scopeClientId={scopeClientId} clients={scopeClientId ? workspace.clients : workspace.clients.filter((client) => !/^(inactive|archived)$/i.test(client.status || ""))} tasks={workspace.tasks} staff={workspace.staff} onNavigate={onNavigate} onAddTask={onAddTask} adsPanel={adSpendPanel} valuePanel={valuePanel || null} focusClientId={focusClientId} periodStart={financeRange.start} periodEnd={financeRange.end} periodLabel={rangeLabel} activityPanel={workspace.clients.length > 0 ? <section className="panel dh-activity"><ActivityView workspace={workspace} limit={8} compact onViewAll={() => onNavigate("Activity")} /></section> : null} />
+    <DashboardHub salesStats={opportunitySummary?.sources?.length ? (() => { const rows = opportunitySummary.sources!; const ads = rows.filter((row) => /google ads|adwords|ppc|cpc|paid/i.test(row.source)); const sum = (list: typeof rows, k: "count" | "won" | "wonValue") => list.reduce((n, row) => n + (Number(row[k]) || 0), 0); return { leads: sum(rows, "count"), won: sum(rows, "won"), wonValue: sum(rows, "wonValue"), adsLeads: sum(ads, "count"), adsWon: sum(ads, "won"), adsWonValue: sum(ads, "wonValue"), periodLabel: rangeLabel.toLowerCase() }; })() : null} currentStaffId={currentStaffId} onOpenTask={onOpenTask} onReviewTask={onReviewTask} scopeClientId={scopeClientId} clients={scopeClientId ? workspace.clients : workspace.clients.filter((client) => !/^(inactive|archived)$/i.test(client.status || ""))} tasks={workspace.tasks} staff={workspace.staff} onNavigate={onNavigate} onAddTask={onAddTask} adsPanel={adSpendPanel} valuePanel={valuePanel || null} focusClientId={focusClientId} periodStart={financeRange.start} periodEnd={financeRange.end} periodLabel={rangeLabel} activityPanel={workspace.clients.length > 0 ? <section className="panel dh-activity"><ActivityView workspace={workspace} limit={8} compact onViewAll={() => onNavigate("Activity")} /></section> : null} />
   </>;
 }
 function relativeTime(value: string) {

@@ -1,8 +1,36 @@
 "use client";
 import { useSampleData } from "@/hooks/use-sample-data";
 import { useEffect, useMemo, useState, type ReactNode, lazy, Suspense } from "react";
-import { BarChart3, BookOpen, CalendarPlus, CheckCircle2, ClipboardList, Compass, ListChecks, Image as ImageIcon, Mail, MessageSquare, MousePointerClick, Phone, Plus, Sparkles, UserPlus, Users } from "lucide-react";
+import { BarChart3, BookOpen, CalendarPlus, CheckCircle2, ClipboardList, Compass, ListChecks, Image as ImageIcon, Mail, MessageSquare, MousePointerClick, Phone, Plus, Sparkles, TrendingUp, UserPlus, Users } from "lucide-react";
 import { BrandIcon } from "./brand-icon";
+
+// ROAS and close rate, graded only when there's enough data to judge fairly.
+export type SalesStats = { leads: number; won: number; wonValue: number; adsLeads: number; adsWon: number; adsWonValue: number; periodLabel: string };
+type Grade = "good" | "ok" | "low" | "na";
+function roasGrade(wonValue: number, spend: number | null, leads: number): { value: string; grade: Grade; tip: string } {
+  if (!spend || spend <= 0) return { value: "—", grade: "na", tip: "" };
+  const roas = wonValue / spend;
+  const value = `${roas.toFixed(roas >= 10 ? 0 : 1)}×`;
+  if (spend < 200 && leads < 10) return { value, grade: "na", tip: "" }; // too early to judge
+  if (roas >= 4) return { value, grade: "good", tip: "" };
+  if (roas >= 2) return { value, grade: "ok", tip: "" };
+  return { value, grade: "low", tip: roas === 0 ? "No won revenue is linked to ad leads yet. Mark won deals in the pipeline (with their value) so ad results show up, then check the search terms and landing page if deals still aren't closing." : `Every €1 on ads is bringing back €${roas.toFixed(2)} in won work. Check search terms for wasted spend, tighten locations and keywords, and follow up ad leads faster.` };
+}
+function closeGrade(won: number, leads: number): { value: string; grade: Grade; tip: string } {
+  if (!leads) return { value: "—", grade: "na", tip: "" };
+  const pct = Math.round((won / leads) * 100);
+  const value = `${pct}%`;
+  if (leads < 10) return { value, grade: "na", tip: "" }; // too few leads to judge
+  if (pct >= 25) return { value, grade: "good", tip: "" };
+  if (pct >= 15) return { value, grade: "ok", tip: "" };
+  return { value, grade: "low", tip: `Only ${won} of ${leads} leads became won jobs. Reply to new leads within the hour, follow up quotes after 2 and 7 days, and check that won deals are being marked as Won in the pipeline.` };
+}
+function GradeTip({ tip }: { tip: string }) {
+  return <details className="dh-grade-tip"><summary>Room for improvement</summary><p role="note">{tip}</p></details>;
+}
+function GradedRow({ icon, label, value, grade, tip, detail }: { icon: ReactNode; label: string; value: string; grade: Grade; tip: string; detail: string }) {
+  return <div className={`dh-split-row dh-graded dh-grade-${grade}`} title={detail}><span className="dh-split-ico">{icon}</span><span>{label}{grade === "low" && <GradeTip tip={tip} />}</span><b>{value}</b></div>;
+}
 const AppointmentsDashboard = lazy(() => import("./scheduling-view").then((module) => ({ default: module.AppointmentsDashboard })));
 import { CampaignPicker } from "./campaign-picker";
 
@@ -55,7 +83,7 @@ function Tile({ icon, label, value, note, tone = "", children }: { icon: ReactNo
   return <div className={`dh-tile ${tone}`}><span className="dh-tile-icon">{icon}</span><div className="dh-tile-body"><small>{label}</small><b>{value}</b>{children}{note && <em>{note}</em>}</div></div>;
 }
 
-export function DashboardHub({ activityPanel = null, scopeClientId, clients, tasks, staff, onNavigate, onAddTask, onOpenTask, onReviewTask, currentStaffId = "", adsPanel, valuePanel, periodStart = "", periodEnd = "", periodLabel = "Last 30 days", focusClientId = "" }: { activityPanel?: ReactNode; focusClientId?: string; periodStart?: string; periodEnd?: string; periodLabel?: string; adsPanel?: ReactNode; valuePanel?: ReactNode; scopeClientId: string; clients: HubClient[]; tasks: HubTask[]; staff: HubStaff[]; onNavigate: (page: string) => void; onAddTask: () => void; onOpenTask?: (id: string) => void; onReviewTask?: (id: string, action: "approve" | "request_changes") => void; currentStaffId?: string }) {
+export function DashboardHub({ salesStats = null, activityPanel = null, scopeClientId, clients, tasks, staff, onNavigate, onAddTask, onOpenTask, onReviewTask, currentStaffId = "", adsPanel, valuePanel, periodStart = "", periodEnd = "", periodLabel = "Last 30 days", focusClientId = "" }: { salesStats?: SalesStats | null; activityPanel?: ReactNode; focusClientId?: string; periodStart?: string; periodEnd?: string; periodLabel?: string; adsPanel?: ReactNode; valuePanel?: ReactNode; scopeClientId: string; clients: HubClient[]; tasks: HubTask[]; staff: HubStaff[]; onNavigate: (page: string) => void; onAddTask: () => void; onOpenTask?: (id: string) => void; onReviewTask?: (id: string, action: "approve" | "request_changes") => void; currentStaffId?: string }) {
   const [pickedClient, setPickedClient] = useState(() => { try { return localStorage.getItem("f2b-dash-client") || ""; } catch { return ""; } });
   // Agency view defaults to all clients' Google Ads; a client can be picked for their full results.
   const clientId = scopeClientId || (clients.some((c) => c.id === focusClientId) ? focusClientId : (clients.find((c) => c.googleAdsAccountId) || clients[0])?.id || ""); void pickedClient; void setPickedClient;
@@ -64,6 +92,8 @@ export function DashboardHub({ activityPanel = null, scopeClientId, clients, tas
   const [apprOpen, setApprOpen] = useState<"" | "ai" | "human">("");
   const [rankOpen, setRankOpen] = useState<"" | "google" | "chatgpt">("");
   const [sample] = useSampleData();
+  // Won deals from the CRM (sample figures when Sample is on).
+  const sales: SalesStats | null = sample ? { leads: 47, won: 12, wonValue: 18400, adsLeads: 19, adsWon: 5, adsWonValue: 7600, periodLabel: "sample" } : salesStats;
   const [apptRange, setApptRange] = useState<"today" | "tomorrow" | "week" | "all" | "date">("today");
   const [apptDate, setApptDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [gReviews, setGReviews] = useState<{ total: number | null; averageRating: number | null } | null>(null);
@@ -161,6 +191,8 @@ export function DashboardHub({ activityPanel = null, scopeClientId, clients, tas
                 <Row icon={<CheckCircle2 size={15} />} label="Conversions" value={v(conv)} good={(conv || 0) > 0} />
                 {!c && <Row icon={<Phone size={15} />} label="Calls from ads" value={v(sp?.paid.calls ?? sp?.paid.callConversions)} good={(sp?.paid.calls || 0) > 0} />}
                 {!c && <Row icon={<UserPlus size={15} />} label="Leads in CRM" value={v(sp?.paid.leads)} good={(sp?.paid.leads || 0) > 0} />}
+                {!c && sales && (() => { const r = roasGrade(sales.adsWonValue, spend ?? null, sales.adsLeads); return <GradedRow icon={<TrendingUp size={15} />} label="Return on ad spend" value={r.value} grade={r.grade} tip={r.tip} detail={spend ? `${money(sales.adsWonValue, cur)} won from ${money(spend, cur)} spend` : "No spend yet"} />; })()}
+                {!c && sales && (() => { const r = closeGrade(sales.adsWon, sales.adsLeads); return <GradedRow icon={<CheckCircle2 size={15} />} label="Ads close rate" value={r.value} grade={r.grade} tip={r.tip} detail={`${sales.adsWon} won of ${sales.adsLeads} leads`} />; })()}
                 {sp?.notes.paid && <em className="dh-split-note">{sp.notes.paid}</em>}
               </div>; })()}
             {(() => { const meta = m.meta; const camps = meta?.campaigns || []; const c = camps.find((x) => x.id === mCamp); const spend = c ? c.spend : meta?.spend; const clicks = c ? c.clicks : meta?.clicks; const leads = c ? c.leads : meta?.leads;
@@ -173,7 +205,9 @@ export function DashboardHub({ activityPanel = null, scopeClientId, clients, tas
                   <Row icon={<CheckCircle2 size={15} />} label="Cost per lead" value={leads ? money2((spend || 0) / leads, cur) : "—"} />
                 </> : <em className="dh-split-note">{m.metaNote || "No Meta Ads account linked to this client."}</em>}
               </div>; })()}
-            <div className="dh-split-total"><UserPlus size={16} /><span>All leads · 30 days</span><b>{v(m.leads?.value)}</b>{sp?.otherLeads ? <small>{sp.otherLeads} from other or unknown sources</small> : null}</div>
+            <div className="dh-split-total"><UserPlus size={16} /><span>All leads · 30 days</span><b>{v(m.leads?.value)}</b>{sp?.otherLeads ? <small>{sp.otherLeads} from other or unknown sources</small> : null}
+              {sales && (() => { const r = closeGrade(sales.won, sales.leads); return <span className={`dh-close dh-grade-${r.grade}`} title={`${sales.won} won of ${sales.leads} leads (${sales.periodLabel})`}><span>Close rate</span><b>{r.value}</b>{r.grade === "low" && <GradeTip tip={r.tip} />}</span>; })()}
+            </div>
           </div>; })()}
         {m.gsc && !m.gsc.error && ((m.gsc.pages || []).length > 0 || (m.gsc.queries || []).length > 0) && <div className="dh-gsc">
           <div className="dh-gsc-col"><h3 className="dh-sub">Top pages from Google</h3>{(m.gsc.pages || []).map((p) => <div key={p.page} className="dh-gsc-row"><span title={p.page}>{p.page}</span><b>{num(p.clicks)}</b><small>{num(p.impressions)} seen{p.position != null ? ` · #${p.position}` : ""}</small></div>)}</div>

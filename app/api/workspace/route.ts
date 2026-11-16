@@ -291,6 +291,8 @@ export async function PUT(request: Request) {
         notes: mergeServerActivity(savedWorkspace.notes || [], current.notes || [], latestData.notes || []),
         entries: mergeServerActivity(savedWorkspace.entries || [], current.entries || [], latestData.entries || []),
         activity: mergeServerActivity(savedWorkspace.activity || [], current.activity || [], latestData.activity || [], 100),
+        // Clock-ins are owned by /api/clock: always keep the server's latest, never an older browser copy.
+        clockIns: latestData.clockIns || {},
       };
       const version = `workspace-${crypto.randomUUID()}`;
       const result = await env.DB!.prepare("UPDATE workspace_documents SET data = json_set(?1, '$.chessGames', json(COALESCE(json_extract(data, '$.chessGames'), '[]'))), updated_at = ?2 WHERE id = ?3 AND updated_at = ?4")
