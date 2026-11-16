@@ -1282,6 +1282,7 @@ function PayslipCreator({ symbol = "€", data, people, employer, business, slip
   const [shown, setShown] = useState(false);
   const [adjust, setAdjust] = useState(false);
   const [hoursOverride, setHoursOverride] = useState("");
+  const [customAmount, setCustomAmount] = useState("");
   const [generating, setGenerating] = useState(false);
   const genTimer = useRef(0);
   useEffect(() => () => window.clearTimeout(genTimer.current), []);
@@ -1289,7 +1290,7 @@ function PayslipCreator({ symbol = "€", data, people, employer, business, slip
   const genSteps = useMemo(() => ["Gathering details…", `Finding ${whoName}'s finished appointments…`, "Working out PAYE, USC and PRSI…", "Adding your logo and year-to-date totals…"], [whoName]);
   const generate = () => { setMsg(""); setShown(false); setGenerating(true); window.clearTimeout(genTimer.current); genTimer.current = window.setTimeout(() => { setGenerating(false); setShown(true); }, 4600); };
   useEffect(() => { if (!data.staff.some((p) => p.id === who)) setWho(data.staff[0]?.id || ""); }, [data.staff, who]);
-  const reset = () => { window.clearTimeout(genTimer.current); setGenerating(false); setShown(false); setMsg(""); setExtras([]); setCuts([]); setAdjust(false); setHoursOverride(""); };
+  const reset = () => { window.clearTimeout(genTimer.current); setGenerating(false); setShown(false); setMsg(""); setExtras([]); setCuts([]); setAdjust(false); setHoursOverride(""); setCustomAmount(""); };
   const person = data.staff.find((p) => p.id === who);
   const details = people[who] || { ...DEFAULT_PERSON };
   const periodStart = ymd(range.a), periodEnd = ymd(range.b), pay = payDate || periodEnd;
@@ -1317,7 +1318,11 @@ function PayslipCreator({ symbol = "€", data, people, employer, business, slip
     : rule.payType === "salary"
       ? [{ label: "Salary", detail: `${moneyOf(rule.payRate, currency)} a year · ${isMonth ? "monthly" : days === 7 ? "weekly" : days === 14 ? "fortnightly" : `${days} days`}`, amount: Math.round(rule.payRate * salaryPart * 100) / 100 }]
       : [...groups.entries()].map(([k, g]) => ({ label: k, detail: `${g.n} appt${g.n === 1 ? "" : "s"} · ${g.h.toFixed(1)}h · ${moneyOf(g.v, currency)} work @ ${rule.payRate}%`, amount: Math.round((rule.payType === "commission" ? g.v * rule.payRate / 100 : 0) * 100) / 100 })).filter((l) => l.amount > 0);
-  const earnings = [...workLines, ...extras.filter((l) => l.label && l.amount)];
+  // A custom amount typed in replaces the worked-out pay with one line.
+  const calcTotal = Math.round(workLines.reduce((n, l) => n + l.amount, 0) * 100) / 100;
+  const custom = customAmount.trim() === "" ? null : Math.max(0, Math.round((Number(customAmount) || 0) * 100) / 100);
+  const baseLines: PayLine[] = custom === null ? workLines : custom > 0 ? [{ label: rule.payType === "salary" ? "Salary" : rule.payType === "hourly" ? "Wages" : "Pay", detail: "Amount entered by hand", amount: custom }] : [];
+  const earnings = [...baseLines, ...extras.filter((l) => l.label && l.amount)];
   const deductions = cuts.filter((l) => l.label && l.amount);
   const key = `${who}:${periodStart}:${periodEnd}`;
   const already = slips.find((s) => s.key === key);
@@ -1361,6 +1366,7 @@ function PayslipCreator({ symbol = "€", data, people, employer, business, slip
       {period === "custom" && <><label className="crv-field"><span>From</span><input type="date" value={from} max={to} onChange={(e) => { if (e.target.value) { setFrom(e.target.value); reset(); } }} /></label><label className="crv-field"><span>To</span><input type="date" value={to} min={from} onChange={(e) => { if (e.target.value) { setTo(e.target.value); reset(); } }} /></label></>}
       <label className="crv-field"><span>Pay date</span><input type="date" value={pay} onChange={(e) => setPayDate(e.target.value)} /></label>
       {rule.payType === "hourly" && <label className="crv-field ps-hours"><span>Hours</span><input type="number" min={0} step="0.25" value={hoursOverride} placeholder={auto.h.toFixed(2)} onChange={(e) => setHoursOverride(e.target.value)} title={`Leave empty to use ${auto.h.toFixed(2)}h from ${auto.src}`} /></label>}
+      <label className="crv-field ps-hours"><span>Custom amount</span><input type="number" min={0} step="0.01" value={customAmount} placeholder={calcTotal ? calcTotal.toFixed(2) : "0.00"} onChange={(e) => setCustomAmount(e.target.value)} title={calcTotal ? `Leave empty to use ${moneyOf(calcTotal, currency)} worked out for this period` : "Type the gross pay for this payslip"} /></label>
       <span className="crv-range">{fmtDate(periodStart)} – {fmtDate(periodEnd)} · {rule.payType === "hourly" ? `${hours.toFixed(2)}h ${manualH !== null ? "entered by hand" : `from ${auto.src}`}` : rule.payType === "salary" ? "Salary" : `${done.length} finished appointment${done.length === 1 ? "" : "s"}`}{person ? <> · <button type="button" className="text-button" onClick={() => onEditPerson(who)}>{firstName(person.name)}&apos;s pay settings</button></> : null}</span>
       <button type="button" className="primary-button crv-go" disabled={!person || generating} onClick={generate}>{generating ? "Generating…" : shown ? "Regenerate" : "Generate preview"}</button>
     </div>
@@ -1379,7 +1385,7 @@ function PayslipCreator({ symbol = "€", data, people, employer, business, slip
         <div><h4>Extra pay</h4>{lineEditor(extras, setExtras, "pay")}</div>
         <div><h4>Other deductions</h4>{lineEditor(cuts, setCuts, "cut")}<label className="ps-notelabel">Note on the payslip<input value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Paid by bank transfer" /></label></div>
       </div>}
-      {!earnings.length && <p className="dh-muted">No finished appointments for {firstName(person!.name)} in this period. Use “Add pay or deductions” to add pay by hand.</p>}
+      {!earnings.length && <p className="dh-muted">No pay worked out for {firstName(person!.name)} in this period. Type a <b>Custom amount</b> above, or use “Add pay or deductions”.</p>}
       <PayslipDoc rec={preview} business={business} currency={currency} />
     </div>}
   </>;
@@ -1433,7 +1439,7 @@ function PayslipDoc({ rec, business, currency }: { rec: PayslipRecord; business:
     </div>}
     {rec.note && <p className="ps-note">{rec.note}</p>}
     {r.notes.map((n, i) => <p key={i} className="ps-note warn">{n}</p>)}
-    <p className="ps-foot">Issued {new Date(rec.issuedAt).toLocaleDateString("en-IE", { day: "numeric", month: "long", year: "numeric" })} · Earnings from appointment records. {contractor ? "" : `PAYE, USC and PRSI worked out with ${rec.payDate.slice(0, 4)} Irish rates from the tax credits and cut-off point on file. Check them against the employee's Revenue Payroll Notification (RPN) and report each payment to Revenue.`}</p>
+    <p className="ps-foot">Issued {new Date(rec.issuedAt).toLocaleDateString("en-IE", { day: "numeric", month: "long", year: "numeric" })} · {rec.earnings.some((l) => /by hand/i.test(l.detail || "")) ? "Earnings entered by hand." : "Earnings from appointment records."} {contractor ? "" : `PAYE, USC and PRSI worked out with ${rec.payDate.slice(0, 4)} Irish rates from the tax credits and cut-off point on file. Check them against the employee's Revenue Payroll Notification (RPN) and report each payment to Revenue.`}</p>
   </div>;
 }
 
