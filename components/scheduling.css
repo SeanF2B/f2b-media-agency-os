@@ -301,7 +301,7 @@ html body .app-shell.dark-mode .sch-dash-panel-tools .sch-seg button.on{backgrou
 /* Reference photo (e.g. the tattoo design) on calendar blocks and dashboard chips */
 .sch-block-img{display:block;flex:1 1 auto;min-height:0;width:100%;margin-top:3px;border-radius:6px;object-fit:cover;background:color-mix(in srgb,var(--c) 10%,#fff);pointer-events:none}
 .sch-block.cancelled .sch-block-img{filter:grayscale(1)}
-.sch-chip-img{display:block;width:100%;height:46px;margin-top:3px;border-radius:5px;object-fit:cover;opacity:1!important}
+.sch-chip-img{display:block;width:100%;aspect-ratio:4/3;height:auto;max-height:150px;margin-top:5px;border-radius:7px;object-fit:cover;object-position:center 35%;opacity:1!important;background:color-mix(in srgb,var(--c) 10%,#fff)}
 .sch-detail .sch-detail-photo{width:180px;height:180px}
 /* Appointment photos: thumbnails on the dashboard, gallery + lightbox in the pop-up */
 .sch-dash-thumb{width:52px;height:52px;border-radius:10px;object-fit:cover;flex-shrink:0;margin-left:auto;border:1px solid #e6ebef;box-shadow:0 2px 8px rgba(16,24,40,.08)}
