@@ -329,3 +329,10 @@
 .ox-signin { display: inline-grid; gap: 4px; }
 .ox-signin a { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
 .ox-warm-results li.connect { border-color: color-mix(in srgb, var(--ox-p, #2878a8) 50%, transparent); }
+
+/* Compact date + campaign filters beside the tabs (Overview) */
+.ox-bar-filters{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-right:auto}
+.ox-bar-filters select,.ox-bar-filters input{height:34px;padding:0 10px;border:1px solid #d8dfe3;border-radius:10px;background:#fff;color:#26313a;font:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:transform .15s,border-color .15s}
+.ox-bar-filters select:hover,.ox-bar-filters input:hover{transform:translateY(-1px);border-color:var(--secondary,#0b7bb8)}
+.ox-bar-filters select{padding-right:28px}
+.app-shell.dark-mode .ox-bar-filters select,.app-shell.dark-mode .ox-bar-filters input{background:#202024;border-color:#45464c;color:#f4f5f7}

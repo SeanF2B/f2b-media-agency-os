@@ -42,6 +42,11 @@ export function OutreachView({ clients = [], leadLists = [] }: { clients?: Array
       <nav className="ox-tabs" role="tablist" aria-label="Outreach sections">
         {TABS.map(([key, label, Icon]) => <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? "on" : ""} onClick={() => setTab(key)}><Icon size={15} aria-hidden="true" /> {label}{key === "inbox" && state?.overview.reviewQueue ? <span className="ox-dot" aria-label={`${state.overview.reviewQueue} to review`}>{state.overview.reviewQueue}</span> : null}</button>)}
       </nav>
+      {tab === "overview" && state && <div className="ox-bar-filters">
+        <select aria-label="Date range" value={range.preset} onChange={(event) => { const preset = event.target.value; if (preset === "custom") { setRange({ ...range, preset }); return; } const to = new Date(); const from = new Date(Date.now() - (Number(preset) - 1) * 86_400_000); setRange({ ...range, preset, from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) }); }}><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="custom">Custom…</option></select>
+        {range.preset === "custom" && <><input type="date" aria-label="From" value={range.from} onChange={(event) => setRange({ ...range, from: event.target.value })} /><input type="date" aria-label="To" value={range.to} onChange={(event) => setRange({ ...range, to: event.target.value })} /></>}
+        {state.campaigns.length > 0 && <select aria-label="Campaign" value={range.campaign} onChange={(event) => setRange({ ...range, campaign: event.target.value })}><option value="">All campaigns</option>{state.campaigns.map((campaign) => <option key={campaign.id} value={campaign.id}>{campaign.name}</option>)}</select>}
+      </div>}
       <div className="ox-bar-actions">
         <button type="button" className="ox-icon" onClick={() => setDrawer("playbook")} title="AI Playbook" aria-label="AI Playbook"><BookOpen size={17} /></button>
         <button type="button" className="ox-icon" onClick={() => setDrawer("settings")} title="Outreach settings" aria-label="Outreach settings"><Settings2 size={17} /></button>
@@ -64,7 +69,6 @@ export function OutreachView({ clients = [], leadLists = [] }: { clients?: Array
 // ============================ Overview ============================
 function OverviewTab({ state, range, setRange, showCosts, onShowCosts, onGo }: { state: OutreachState; range: { from: string; to: string; campaign: string; preset: string }; setRange: (value: { from: string; to: string; campaign: string; preset: string }) => void; showCosts: boolean; onShowCosts: () => void; onGo: (tab: Tab) => void }) {
   const o = state.overview;
-  const setPreset = (preset: string) => { if (preset === "custom") { setRange({ ...range, preset }); return; } const to = new Date(); const from = new Date(Date.now() - (Number(preset) - 1) * 86_400_000); setRange({ ...range, preset, from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) }); };
   const healthBand = o.health === null ? "grey" : o.health >= 80 ? "green" : o.health >= 60 ? "amber" : "red";
   const cards: Array<{ label: string; value: string; hint?: string; tone?: string; go?: Tab }> = [
     { label: "Positive replies", value: num(o.positive), hint: `${pct(o.positiveRate)} of emails sent`, tone: "good", go: "inbox" },
@@ -76,11 +80,6 @@ function OverviewTab({ state, range, setRange, showCosts, onShowCosts, onGo }: {
     { label: "Deliverability health", value: o.health === null ? "Not enough data" : `${o.health}/100`, tone: healthBand, go: "infrastructure" },
   ];
   return <div className="ox-stack">
-    <div className="ox-filters">
-      <div className="ox-seg" role="group" aria-label="Date range">{[["7", "7 days"], ["30", "30 days"], ["90", "90 days"], ["custom", "Custom"]].map(([key, label]) => <button key={key} type="button" className={range.preset === key ? "on" : ""} onClick={() => setPreset(key)}>{label}</button>)}</div>
-      {range.preset === "custom" && <><input type="date" aria-label="From" value={range.from} onChange={(event) => setRange({ ...range, from: event.target.value })} /><input type="date" aria-label="To" value={range.to} onChange={(event) => setRange({ ...range, to: event.target.value })} /></>}
-      <select aria-label="Campaign" value={range.campaign} onChange={(event) => setRange({ ...range, campaign: event.target.value })}><option value="">All campaigns</option>{state.campaigns.map((campaign) => <option key={campaign.id} value={campaign.id}>{campaign.name}</option>)}</select>
-    </div>
     {o.issues.length > 0 && <div className="ox-issues" role="region" aria-label="Needs attention">{o.issues.slice(0, 6).map((issue, index) => <p key={index} className={issue.level}><b>{issue.level === "critical" ? "Critical" : "Warning"}</b> {issue.text}</p>)}</div>}
     <div className="ox-kpis">{cards.map((card, index) => <button key={card.label} type="button" className={`ox-kpi ${card.tone || ""}`} style={{ animationDelay: `${index * 40}ms` }} onClick={() => card.go && onGo(card.go)} disabled={!card.go}><span>{card.label}</span><strong>{card.value}</strong>{card.hint && <small>{card.hint}</small>}</button>)}</div>
     <div className="ox-panel ox-costs">
