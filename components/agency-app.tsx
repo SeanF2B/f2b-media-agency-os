@@ -2609,9 +2609,9 @@ ${senderName}`, staffType: member.staffType || (isSubAccountRole(member.role) ? 
   // Admins open Clients inside Operations; everyone else keeps it in Leads.
   const clientsInOps = viewIsAdmin && !activeScopeId;
   const leadsNav = (active: "Clients" | "Lead Factory") => <nav className="crm-tabs" role="tablist" aria-label="Leads sections">
+    {viewIsAdmin && !activeScopeId && <button type="button" role="tab" aria-selected={active === "Lead Factory"} className={active === "Lead Factory" ? "active" : ""} onClick={() => setPage("Lead Factory")}><FactoryIcon size={15} /> Lead Factory</button>}
     {canSeeClients && !clientsInOps && <button type="button" role="tab" aria-selected={active === "Clients"} className={active === "Clients" ? "active" : ""} onClick={() => { setSelectedClient(""); setPage("Clients"); }}><BriefcaseIcon size={15} /> Clients</button>}
     {([["Contacts", <UsersIcon key="i" size={15} />], ["Pipeline", <SquareKanbanIcon key="i" size={15} />], ...(canSeeConversations ? [["Conversations", <MessageSquareTextIcon key="i" size={15} />]] : []), ...(visibleNav.some((item) => item.key === "Media Library") ? [["Media", <ImageNavIcon key="i" size={15} />]] : []), ...(viewIsAdmin && !activeScopeId ? [["Outreach", <SendIcon key="i" size={15} />]] : [])] as Array<[LeadsTab, ReactNode]>).map(([label, icon]) => <button key={label} type="button" role="tab" aria-selected={false} onClick={() => { setLeadsTab(label); setCrmTabSeed(`${label}-${Date.now()}`); setPage("CRM"); }}>{icon} {label}</button>)}
-    {viewIsAdmin && !activeScopeId && <button type="button" role="tab" aria-selected={active === "Lead Factory"} className={active === "Lead Factory" ? "active" : ""} onClick={() => setPage("Lead Factory")}><FactoryIcon size={15} /> Lead Factory</button>}
   </nav>;
   const canSeeInvoicing = visibleNav.some((item) => item.key === "Invoicing");
   const moreNav: typeof orderedNav = [];
