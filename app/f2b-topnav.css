@@ -2660,3 +2660,7 @@ html body .app-shell.dark-mode .krb-search input, html body .app-shell.dark-mode
 html body .app-shell .krb-scanned { margin: 6px 0 0; font-size: 13px; color: #475569; }
 html body .app-shell .krb-search .krb-scan { height: 40px; white-space: nowrap; }
 html body .app-shell .crv-why { font-size: 12.5px; color: #64748b; margin-left: auto; }
+html body .app-shell .krb-del { display: inline-grid; place-items: center; width: 28px; height: 28px; flex: none; border: 1px solid #e3e8ec; border-radius: 8px; background: #fff; color: #94a3b8; cursor: pointer; transition: color .15s, background .15s, transform .15s; }
+html body .app-shell .krb-del:hover { color: #dc2626; background: #fef2f2; border-color: #fecaca; transform: translateY(-1px); }
+html body .app-shell .krb-chip-x { border: 0; background: none; padding: 0 0 0 4px; margin-left: 2px; font-size: 14px; line-height: 1; color: inherit; opacity: .45; cursor: pointer; }
+html body .app-shell .krb-chip-x:hover { opacity: 1; color: #dc2626; }

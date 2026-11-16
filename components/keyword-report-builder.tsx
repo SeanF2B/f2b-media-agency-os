@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
+import { appConfirm } from "./app-dialog";
 import { competitionLabel, competitionLevel, type SavedKeywordData } from "./saved-keywords-panel";
 
 // Reports → Keywords: search keyword ideas, tick them, add to a group, then pick which groups go in the report.
@@ -123,6 +124,19 @@ export function KeywordReportBuilder({ clientId, clientName, picked, onPicked, p
 
   const groups = [...(saved?.groups || []).map((g) => ({ id: g.id, name: g.name })), ...((saved?.keywords || []).some((k) => !k.groupId) ? [{ id: "ungrouped", name: "Ungrouped" }] : [])];
   const inGroup = (id: string) => (saved?.keywords || []).filter((k) => (id === "ungrouped" ? !k.groupId : k.groupId === id)).sort((a, b) => (b.avgMonthlySearches || 0) - (a.avgMonthlySearches || 0));
+  // Delete a group and the keywords in it (or clear Ungrouped). Asks first.
+  const deleteGroup = async (id: string, name: string) => {
+    const list = inGroup(id);
+    if (!(await appConfirm(`Delete the “${name}” group and its ${list.length} keyword${list.length === 1 ? "" : "s"}?`))) return;
+    setBusy("delete"); setMsg("");
+    try {
+      if (list.length) await call({ action: "remove", ids: list.map((k) => k.id) });
+      if (id !== "ungrouped") await call({ action: "deleteGroup", groupId: id });
+      onPicked(picked.filter((g) => g !== id)); setMsg(`Deleted “${name}”.`);
+    } catch (e) { setMsg(e instanceof Error ? e.message : "That group couldn't be deleted."); }
+    finally { setBusy(""); }
+  };
+  const removeKeyword = async (id: string) => { try { await call({ action: "remove", ids: [id] }); } catch (e) { setMsg(e instanceof Error ? e.message : "That keyword couldn't be removed."); } };
   const toggleGroup = (id: string) => onPicked(picked.includes(id) ? picked.filter((g) => g !== id) : [...picked, id]);
 
   return <div className="krb">
@@ -156,8 +170,8 @@ export function KeywordReportBuilder({ clientId, clientName, picked, onPicked, p
 
     <div className="krb-step"><span className="krb-n">2</span><div><b>Pick the groups for the report</b><small>Ticked groups go into the report. Colours show competition.</small></div></div>
     {!groups.length ? <p className="muted">No keyword groups yet. Find keywords above and add them to a group.</p> : <div className="krb-groups">{groups.map((g) => { const list = inGroup(g.id); const vol = list.reduce((n, k) => n + (k.avgMonthlySearches || 0), 0); return <div key={g.id} className={`krb-group${picked.includes(g.id) ? " on" : ""}`}>
-      <label className="krb-group-head"><input type="checkbox" checked={picked.includes(g.id)} onChange={() => toggleGroup(g.id)} /><b>{g.name}</b><small>{list.length} keyword{list.length === 1 ? "" : "s"} · {num(vol)} searches/mo</small></label>
-      <div className="krb-chips">{list.slice(0, 18).map((k) => { const lv = competitionLevel(k.competition); return <span key={k.id} className={`krb-chip lv-${lv}`} title={`${num(k.avgMonthlySearches)}/mo · ${competitionLabel[lv]} competition · ${bid(k.lowTopOfPageBid, k.highTopOfPageBid)}`}>{k.keyword}<small>{num(k.avgMonthlySearches)}</small></span>; })}{list.length > 18 && <span className="krb-more">+{list.length - 18} more</span>}</div>
+      <label className="krb-group-head"><input type="checkbox" checked={picked.includes(g.id)} onChange={() => toggleGroup(g.id)} /><b>{g.name}</b><small>{list.length} keyword{list.length === 1 ? "" : "s"} · {num(vol)} searches/mo</small><button type="button" className="krb-del" disabled={busy === "delete"} onClick={(e) => { e.preventDefault(); e.stopPropagation(); void deleteGroup(g.id, g.name); }} aria-label={`Delete group ${g.name}`} title="Delete group"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></svg></button></label>
+      <div className="krb-chips">{list.slice(0, 18).map((k) => { const lv = competitionLevel(k.competition); return <span key={k.id} className={`krb-chip lv-${lv}`} title={`${num(k.avgMonthlySearches)}/mo · ${competitionLabel[lv]} competition · ${bid(k.lowTopOfPageBid, k.highTopOfPageBid)}`}>{k.keyword}<small>{num(k.avgMonthlySearches)}</small><button type="button" className="krb-chip-x" onClick={() => void removeKeyword(k.id)} aria-label={`Remove ${k.keyword}`} title="Remove keyword">×</button></span>; })}{list.length > 18 && <span className="krb-more">+{list.length - 18} more</span>}</div>
     </div>; })}</div>}
     <div className="krb-step"><span className="krb-n">3</span><div><b>Generate the report</b><small>Press Generate preview — ticked keywords are grouped for you if you haven't already.</small></div></div>
   </div>;
