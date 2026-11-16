@@ -1713,3 +1713,9 @@ html body .app-shell .dh > .dh-sample-toggle { position: absolute; top: -58px; r
 html body .app-shell :is(.page-heading, .task-page-heading) { flex-wrap: wrap !important; gap: 12px; }
 html body .app-shell .task-heading-actions { display: flex !important; flex-wrap: wrap !important; justify-content: flex-end; gap: 8px; min-width: 0; max-width: 100%; }
 html body .app-shell .main-area { max-width: 100%; overflow-x: clip; }
+/* Chat widget: no sideways scrollbars; long links wrap; chips wrap */
+html body .ai-chat-list { overflow-x: hidden !important; }
+html body .ai-chat-msg, html body .ai-chat-msg p { max-width: 100%; overflow-wrap: anywhere; word-break: break-word; }
+html body .ai-chat-chips { display: flex !important; flex-wrap: wrap !important; overflow: visible !important; gap: 6px; }
+html body .ai-chat-chips::-webkit-scrollbar { display: none; }
+html body .ai-chat-chips button { white-space: normal !important; text-align: left; max-width: 100%; }

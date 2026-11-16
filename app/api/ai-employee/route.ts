@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "../../chatgpt-auth";
 import { aiConfigured, aiEndpoint, aiHeaders, aiModel, resolveAiProvider } from "@/lib/ai-provider";
 import { buildClientReport } from "@/lib/client-report-data";
+import { postWithCreditRetry } from "@/lib/ai-credit";
 
 // AI employees in the chat widget. GET-like call (no prompt) returns the data that employee can see for the
 // selected client; with a prompt it answers using only that data. Read-only: nothing is changed from here.
@@ -119,16 +120,17 @@ export async function POST(request: Request) {
     "DATA:", data.context || "(no data available)", data.note ? `Missing/limits: ${data.note}` : ""].filter(Boolean).join("\n");
   const isOpenRouter = /openrouter/i.test(JSON.stringify(provider ?? "")) || /openrouter/i.test(aiEndpoint(env as never, "responses", provider)!);
   const models = [employee === "copywriter" && isOpenRouter ? "anthropic/claude-sonnet-4.5" : "", aiModel(env as never, undefined, provider) || ""].filter(Boolean);
+  let lastError = "";
   for (const model of models) {
     try {
-      const response = await fetch(aiEndpoint(env as never, "responses", provider)!, { method: "POST", headers: aiHeaders(env as never, provider)!, signal: AbortSignal.timeout(45000),
-        body: JSON.stringify({ model, input: [{ role: "system", content: system }, ...history, { role: "user", content: prompt }], ...(isOpenRouter ? { reasoning: { effort: "low" } } : {}) }) });
-      const payload = await response.json().catch(() => null) as any;
-      if (!response.ok) continue;
+      const result = await postWithCreditRetry(aiEndpoint(env as never, "responses", provider)!, { headers: aiHeaders(env as never, provider)!, timeoutMs: 45000,
+        body: { model, max_output_tokens: 700, input: [{ role: "system", content: system }, ...history, { role: "user", content: prompt }], ...(isOpenRouter ? { reasoning: { effort: "low" } } : {}) } });
+      if (!result.ok) { lastError = result.message; continue; }
+      const payload = result.payload;
       let text = typeof payload?.output_text === "string" ? payload.output_text : "";
       if (!text) for (const item of payload?.output || []) for (const c of item?.content || []) if (c?.type === "output_text" && typeof c.text === "string") text += c.text;
       if (text.trim()) return respond({ employee, name: info.name, reply: text.trim().slice(0, 4000), rows: data.rows });
     } catch { /* try next model */ }
   }
-  return respond({ error: "The AI couldn’t answer just now. Try again in a moment." }, 502);
+  return respond({ error: lastError || "The AI couldn’t answer just now. Try again in a moment." }, 502);
 }
