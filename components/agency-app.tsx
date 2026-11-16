@@ -26,6 +26,7 @@ import { normalizeSitePagePlan, type SitePagePlan } from "@/lib/site-page-plan";
 const ChessView = lazy(() => import("@/components/chess-view").then((module) => ({ default: module.ChessView })));
 const SitesView = lazy(() => import("@/components/sites-view").then((module) => ({ default: module.SitesView })));
 const OnboardingWizard = lazy(() => import("@/components/onboarding-wizard").then((module) => ({ default: module.OnboardingWizard })));
+const OutreachView = lazy(() => import("@/components/outreach/outreach-view").then((module) => ({ default: module.OutreachView })));
 const OperatingWorldView = lazy(() => import("@/components/operating-world-view").then((module) => ({ default: module.OperatingWorldView })));
 const SchedulingView = lazy(() => import("@/components/scheduling-view").then((module) => ({ default: module.SchedulingView })));
 const SchedulingDashboardCard = lazy(() => import("@/components/scheduling-view").then((module) => ({ default: module.SchedulingDashboardCard })));
@@ -43,7 +44,7 @@ import { BusinessIcon, LeadPickerIcon, pickerIconFor } from "./business-icons";
 import { LeadFactoryOutlineIcon } from "./lead-factory-outline-icon";
 import { NavIcon } from "@/components/nav-icons";
 import { MediaLibraryView } from "@/components/media-library-view";
-import { CrmView } from "@/components/crm-view";
+import { CrmView, type LeadsTab } from "@/components/crm-view";
 import { CrmAutomationsView } from "@/components/crm-automations-view";
 import { ConversationsView } from "@/components/conversations-view";
 import { InvoicingView } from "@/components/invoicing-view";
@@ -61,7 +62,7 @@ import { estimatePersonalTax, estimateCompanyTax, taxCountry, TAX_COUNTRIES, typ
 import { BusinessSettings } from "@/components/business-settings";
 import { BookkeepingConnections } from "@/components/bookkeeping-connections";
 import { CleanLogo } from "@/components/clean-logo";
-import { Ban as BanLucide, Briefcase as BriefcaseIcon, Info as InfoLucide, MapPin as MapPinLucide, Search as SearchLucide, Target as TargetLucide, CircleCheck as CircleCheckIcon, Lightbulb as LightbulbIcon, Copy as CopyLucide, Paperclip, Factory as FactoryIcon, Pencil as PencilLucide, Trash2 as Trash2Lucide, MessageSquareText as MessageSquareTextIcon, SquareKanban as SquareKanbanIcon, Users as UsersIcon } from "lucide-react";
+import { Ban as BanLucide, Briefcase as BriefcaseIcon, Info as InfoLucide, MapPin as MapPinLucide, Search as SearchLucide, Target as TargetLucide, CircleCheck as CircleCheckIcon, Lightbulb as LightbulbIcon, Copy as CopyLucide, Paperclip, Factory as FactoryIcon, Send as SendIcon, Pencil as PencilLucide, Trash2 as Trash2Lucide, MessageSquareText as MessageSquareTextIcon, SquareKanban as SquareKanbanIcon, Users as UsersIcon } from "lucide-react";
 import { applyBranding, extractLogoColours, useBranding, type Branding } from "@/lib/branding";
 import { approvalEvidenceBlockReason, canCloseAiTask, canResumeAiTaskRun, hasRunnablePendingApproval, isApprovalReady } from "@/lib/ai-task-lifecycle";
 import { agentIconFor, withAgentIcon } from "@/lib/agent-icons";
@@ -798,7 +799,7 @@ export function AgencyApp() {
   const [page, setPage] = useState("Overview");
   const [marketingTab, setMarketingTab] = useState("Google Ads");
   const [opsTab, setOpsTab] = useState<"overview" | "seo" | "ads" | "websites" | "local" | "reports" | "onboarding" | "automations" | "leadfactory">("overview");
-  useEffect(() => { if (page === "CRM Automations") { setOpsTab("automations"); setPage("Operations"); } }, [page]);
+  useEffect(() => { if (page === "CRM Automations") { setOpsTab("automations"); setPage("Operations"); } else if (page === "Cold Outreach") { setLeadsTab("Outreach"); setCrmTabSeed(`out-${Date.now()}`); setPage("CRM"); } }, [page]);
   const [sitesFocusClientId, setSitesFocusClientId] = useState("");
   const [onboardingClientId, setOnboardingClientId] = useState("");
   const [onboardingKey, setOnboardingKey] = useState(0);
@@ -828,12 +829,13 @@ export function AgencyApp() {
   const [activityMenuOpen, setActivityMenuOpen] = useState(false);
   const [navMoreOpen, setNavMoreOpen] = useState(false);
   const [crmTabSeed, setCrmTabSeed] = useState("pipe");
+  const [leadsTab, setLeadsTab] = useState<LeadsTab>("Pipeline");
   const [focusClientId, setFocusClientIdState] = useState("");
   useFocusClient(setFocusClientIdState);
   useEffect(() => { if (page === "Clients" && focusClientId) setSelectedClient(focusClientId); }, [page, focusClientId]);
   const [bookTabSeed, setBookTabSeed] = useState("books");
   useEffect(() => { if (page === "Invoicing") { setBookTabSeed(`inv-${Date.now()}`); setPage("Bookkeeping"); } }, [page]);
-  useEffect(() => { if (page === "Conversations") { setCrmTabSeed(`conv-${Date.now()}`); setPage("CRM"); } }, [page]);
+  useEffect(() => { if (page === "Conversations") { setLeadsTab("Conversations"); setCrmTabSeed(`conv-${Date.now()}`); setPage("CRM"); } }, [page]);
   // A / D and ← / → switch top-nav pages when nobody is typing.
   const navOrderRef = useRef<string[]>([]);
   const darkToggleRef = useRef<() => void>(() => {});
@@ -917,6 +919,7 @@ export function AgencyApp() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("page") === "Tasks" || params.has("taskId")) setPage("Tasks");
+    if (params.get("page") === "CRM" && params.get("leads") === "outreach") { setLeadsTab("Outreach"); setCrmTabSeed("out-link"); setPage("CRM"); }
   }, []);
 
   useEffect(() => {
@@ -1471,7 +1474,7 @@ export function AgencyApp() {
   useEffect(() => { document.documentElement.classList.toggle("f2b-world", (WORLD_IN_SUBACCOUNTS || !activeScopeId) && page === "Operating World"); return () => document.documentElement.classList.remove("f2b-world"); }, [page, activeScopeId]);
   useEffect(() => { if (page === "Chess" && scopedClient && !/^agency$/i.test(scopedClient.name.trim())) setPage("Overview"); }, [page, scopedClient?.id]);
   useEffect(() => { const own = scopedBranding && (scopedBranding.primary || scopedBranding.secondary || scopedBranding.logo); applyBranding(own ? { ...workspace.settings?.branding, ...scopedBranding } : workspace.settings?.branding); }, [workspace.settings?.branding, JSON.stringify(scopedBranding)]);
-  const setClientScope = (id: string) => { setClientScopeState(id); try { document.cookie = `f2b_client=${encodeURIComponent(id || "agency")}; Path=/; Max-Age=31536000; SameSite=Lax; Secure`; window.dispatchEvent(new CustomEvent("f2b-scope", { detail: id })); } catch { /* cookie unavailable */ } try { if (id) window.localStorage.setItem("f2b-client-scope", id); else window.localStorage.removeItem("f2b-client-scope"); } catch { /* storage unavailable */ } if (id) setSelectedClient(id); else setSelectedClient(""); if (id && page === "Lead Factory") setPage("Overview"); };
+  const setClientScope = (id: string) => { setClientScopeState(id); try { document.cookie = `f2b_client=${encodeURIComponent(id || "agency")}; Path=/; Max-Age=31536000; SameSite=Lax; Secure`; window.dispatchEvent(new CustomEvent("f2b-scope", { detail: id })); } catch { /* cookie unavailable */ } try { if (id) window.localStorage.setItem("f2b-client-scope", id); else window.localStorage.removeItem("f2b-client-scope"); } catch { /* storage unavailable */ } if (id) setSelectedClient(id); else setSelectedClient(""); if (id && page === "CRM" && leadsTab === "Outreach") { setLeadsTab("Pipeline"); setCrmTabSeed(`pipe-${Date.now()}`); } };
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const linked = params.get("page") || "";
@@ -2568,6 +2571,12 @@ ${senderName}`, staffType: member.staffType || (isSubAccountRole(member.role) ? 
   const primaryNav = (() => { const list = orderedNav.filter((item) => !barExcluded.includes(item.key)); const world = list.find((item) => item.key === "Operating World"); if (!world) return list; const rest = list.filter((item) => item !== world); rest.splice(Math.ceil(rest.length / 2), 0, world); return rest; })();
   const teamOnBar = visibleNav.some((item) => item.key === "Team");
   const canSeeConversations = visibleNav.some((item) => item.key === "Conversations");
+  // One Leads tab row for every Leads screen: Clients · Contacts · Pipeline · Conversations · Outreach · Lead Factory.
+  const leadsNav = (active: "Clients" | "Lead Factory") => <nav className="crm-tabs" role="tablist" aria-label="Leads sections">
+    {canSeeClients && <button type="button" role="tab" aria-selected={active === "Clients"} className={active === "Clients" ? "active" : ""} onClick={() => { setSelectedClient(""); setPage("Clients"); }}><BriefcaseIcon size={15} /> Clients</button>}
+    {([["Contacts", <UsersIcon key="i" size={15} />], ["Pipeline", <SquareKanbanIcon key="i" size={15} />], ...(canSeeConversations ? [["Conversations", <MessageSquareTextIcon key="i" size={15} />]] : []), ...(viewIsAdmin && !activeScopeId ? [["Outreach", <SendIcon key="i" size={15} />]] : [])] as Array<[LeadsTab, ReactNode]>).map(([label, icon]) => <button key={label} type="button" role="tab" aria-selected={false} onClick={() => { setLeadsTab(label); setCrmTabSeed(`${label}-${Date.now()}`); setPage("CRM"); }}>{icon} {label}</button>)}
+    {viewIsAdmin && !activeScopeId && <button type="button" role="tab" aria-selected={active === "Lead Factory"} className={active === "Lead Factory" ? "active" : ""} onClick={() => setPage("Lead Factory")}><FactoryIcon size={15} /> Lead Factory</button>}
+  </nav>;
   const canSeeInvoicing = visibleNav.some((item) => item.key === "Invoicing");
   const moreNav: typeof orderedNav = [];
   const moreActive = moreNav.some((item) => navActive(item.key));
@@ -2606,9 +2615,9 @@ ${senderName}`, staffType: member.staffType || (isSubAccountRole(member.role) ? 
         {page === "Invoicing" && pageAllowed && <InvoicingView key={activeScopeId || "agency"} scopeClientId={activeScopeId} />}
         {page === "Conversations" && pageAllowed && <ConversationsView key={activeScopeId || "agency"} scopeClientId={activeScopeId} clients={workspace.clients.map((item) => ({ id: item.id, name: item.name }))} />}
         {page === "CRM Automations" && pageAllowed && <CrmAutomationsView clientId={activeScopeId || null} />}
-        {page === "CRM" && pageAllowed && <CrmView onOpenLeadFactory={viewIsAdmin && !activeScopeId ? () => setPage("Lead Factory") : undefined} key={`crm-${crmTabSeed}`} initialTab={crmTabSeed.startsWith("conv") ? "Conversations" : crmTabSeed.startsWith("cont") ? "Contacts" : "Pipeline"} onOpenClients={canSeeClients ? () => { setSelectedClient(""); setPage("Clients"); } : undefined} scopeClientId={activeScopeId} onOpenClient={(clientId) => { setSelectedClient(clientId); setPage("Clients"); }} conversations={canSeeConversations ? <ConversationsView key={activeScopeId || "agency"} scopeClientId={activeScopeId} clients={workspace.clients.map((item) => ({ id: item.id, name: item.name }))} /> : undefined} />}
+        {page === "CRM" && pageAllowed && <CrmView onOpenLeadFactory={viewIsAdmin && !activeScopeId ? () => setPage("Lead Factory") : undefined} key={`crm-${crmTabSeed}`} initialTab={leadsTab === "Outreach" && !(viewIsAdmin && !activeScopeId) ? "Pipeline" : leadsTab} onTabChange={setLeadsTab} outreach={viewIsAdmin && !activeScopeId ? <Suspense fallback={<div className="empty-state" role="status">Loading Outreach…</div>}><OutreachView clients={viewWorkspace.clients.filter((item) => !/^agency$/i.test(item.name.trim())).map((item) => ({ id: item.id, name: item.name }))} leadLists={(viewWorkspace.leadLists || []).map((list) => ({ id: list.id, name: list.name, count: list.rows.filter((row) => row.keep !== false).length }))} /></Suspense> : undefined} onOpenClients={canSeeClients ? () => { setSelectedClient(""); setPage("Clients"); } : undefined} scopeClientId={activeScopeId} onOpenClient={(clientId) => { setSelectedClient(clientId); setPage("Clients"); }} conversations={canSeeConversations ? <ConversationsView key={activeScopeId || "agency"} scopeClientId={activeScopeId} clients={workspace.clients.map((item) => ({ id: item.id, name: item.name }))} /> : undefined} />}
         {page === "Activity" && pageAllowed && <><div className="activity-time-switch" role="tablist" aria-label="Activity and time views">{(viewAccess.overview || viewAccess.clientActivity || viewAccess.allActivity) && <button role="tab" aria-selected={activityTimeTab === "Activity"} className={activityTimeTab === "Activity" ? "active" : ""} onClick={() => setActivityTimeTab("Activity")}>🕘 Activity</button>}{viewAccess.timesheets && <button role="tab" aria-selected={activityTimeTab === "Timesheets"} className={activityTimeTab === "Timesheets" ? "active" : ""} onClick={() => setActivityTimeTab("Timesheets")}>⏱️ Timesheets</button>}</div>{activityTimeTab === "Activity" && (viewAccess.overview || viewAccess.clientActivity || viewAccess.allActivity) ? <ActivityView workspace={viewWorkspace} /> : viewAccess.timesheets ? <TimesheetView workspace={viewWorkspace} onAdd={() => openModal("time")} /> : <div className="empty-state"><h2>This section isn’t included in your access.</h2><p>Ask an owner or admin to update your permissions.</p></div>}</>}
-        {page === "Clients" && pageAllowed && !client && canSeeLeadsPage && <section className="crm-workspace leads-clients-head"><header className="crm-heading"><div><span className="crm-eyebrow">LEADS</span><h1>Clients</h1><p>Every client's services, tasks, files and notes.</p></div></header><nav className="crm-tabs" role="tablist" aria-label="Leads sections">{([["pipe", "Pipeline", <SquareKanbanIcon key="i" size={15} />], ["cont", "Contacts", <UsersIcon key="i" size={15} />], ...(canSeeConversations ? [["conv", "Conversations", <MessageSquareTextIcon key="i" size={15} />]] : [])] as Array<[string, string, ReactNode]>).map(([seed, label, icon]) => <button key={seed} type="button" role="tab" aria-selected={false} onClick={() => { setCrmTabSeed(`${seed}-${Date.now()}`); setPage("CRM"); }}>{icon} {label}</button>)}<button type="button" role="tab" aria-selected className="active"><BriefcaseIcon size={15} /> Clients</button>{viewIsAdmin && !activeScopeId && <button type="button" role="tab" aria-selected={false} onClick={() => setPage("Lead Factory")}><FactoryIcon size={15} /> Lead Factory</button>}</nav></section>}
+        {page === "Clients" && pageAllowed && !client && canSeeLeadsPage && <section className="crm-workspace leads-clients-head"><header className="crm-heading"><div><span className="crm-eyebrow">LEADS</span><h1>Clients</h1><p>Every client's services, tasks, files and notes.</p></div></header>{leadsNav("Clients")}</section>}
         {page === "Clients" && pageAllowed && <ClientsView onSetClientStatus={viewIsAdmin ? setClientStatus : undefined} workspace={viewWorkspace} selectedClient={client} onPick={(id) => setSelectedClient(id)} onAdd={() => openModal("client")} onViewNotes={(clientId) => openModal("notes", { clientId })} onOpenReports={(reportId) => { setReportToOpenId(reportId || ""); setPage("Report Studio"); }} onOpenMarketing={(clientId, targetPage) => { setSelectedClient(clientId); setPage(targetPage); }} canViewReports={viewAccess.reports || viewIsAdmin} canOpenAds={canOpenPage("Google Ads", viewAccess, viewIsAdmin, viewHasClientScope)} canOpenSeo={canOpenPage("SEO", viewAccess, viewIsAdmin, viewHasClientScope)} canOpenSites={canOpenPage("Sites", viewAccess, viewIsAdmin, viewHasClientScope)} canRunMarketingAudit={viewIsAdmin} auditRuns={viewWorkspace.auditRuns || []} onSaveMarketingAudit={(run) => mutate("Full marketing audit saved", (current) => ({ ...current, auditRuns: [run, ...(current.auditRuns || []).filter((item) => item.id !== run.id)].slice(0, 100) }))} onCreateMarketingAuditTask={(clientId, service, title, notes) => openModal("task", { clientId, title, service, notes })} onEdit={editClient} onDelete={deleteClient} onUpload={async (clientId, file) => { await uploadClientFile(clientId, file); }} onDeleteFile={deleteClientFile} canManage={viewIsAdmin} canAddNotes={viewAccess.clients || viewIsAdmin} canAccessVault={viewAccess.vault} canManageVaultEntries={viewIsAdmin} vaultUnlocked={!!vaultKey} vaultRows={vaultRows} onUnlockVault={() => openModal("vault-access")} onLockVault={() => { setVaultKey(null); setVaultRows([]); setForm({}); }} onAddVaultEntry={(clientId) => openModal("vault-entry", { clientId })} />}
         {page === "Tasks" && pageAllowed && tasksEl()}
         {page === "SEO" && pageAllowed && <Suspense fallback={<div className="empty-state" role="status">Loading SEO tools…</div>}>{renderSeoView(page === "SEO", client?.id, undefined, "seo-page")}</Suspense>}
@@ -2639,7 +2648,7 @@ ${senderName}`, staffType: member.staffType || (isSubAccountRole(member.role) ? 
         {viewIsAdmin && <div hidden={page !== "Automations"}><MarketingStudioView scopeClientId={activeScopeId} key="automation" kind="automation" clients={viewWorkspace.clients} staff={viewWorkspace.staff} active={page === "Automations"} /></div>}
         {viewIsAdmin && page === "Sites" && sitesBuilderTab === "Submissions" && <FormSubmissionsView scopeClientId={activeScopeId} clients={viewWorkspace.clients} active={page === "Sites"} />}
         {viewIsAdmin && page === "Sites" && (sitesBuilderTab === "Forms" || sitesBuilderTab === "Surveys") && <MarketingStudioView scopeClientId={activeScopeId} key={sitesBuilderTab} kind={sitesBuilderTab === "Forms" ? "form" : "survey"} clients={viewWorkspace.clients} staff={viewWorkspace.staff} active={page === "Sites"} />}
-        {page === "Lead Factory" && viewIsAdmin && !activeScopeId && <section className="crm-workspace leads-clients-head"><header className="crm-heading"><div><span className="crm-eyebrow">LEADS</span><h1>Lead Factory</h1><p>Find the right businesses, review the matches, and send a clean list to enrichment.</p></div></header><nav className="crm-tabs" role="tablist" aria-label="Leads sections">{([["pipe", "Pipeline", <SquareKanbanIcon key="i" size={15} />], ["cont", "Contacts", <UsersIcon key="i" size={15} />], ...(canSeeConversations ? [["conv", "Conversations", <MessageSquareTextIcon key="i" size={15} />]] : [])] as Array<[string, string, ReactNode]>).map(([seed, label, icon]) => <button key={seed} type="button" role="tab" aria-selected={false} onClick={() => { setCrmTabSeed(`${seed}-${Date.now()}`); setPage("CRM"); }}>{icon} {label}</button>)}{canSeeClients && <button type="button" role="tab" aria-selected={false} onClick={() => setPage("Clients")}><BriefcaseIcon size={15} /> Clients</button>}<button type="button" role="tab" aria-selected className="active"><FactoryIcon size={15} /> Lead Factory</button></nav></section>}
+        {page === "Lead Factory" && viewIsAdmin && !activeScopeId && <section className="crm-workspace leads-clients-head"><header className="crm-heading"><div><span className="crm-eyebrow">LEADS</span><h1>Lead Factory</h1><p>Find the right businesses, review the matches, and send a clean list to enrichment.</p></div></header>{leadsNav("Lead Factory")}</section>}
         {viewIsAdmin && !activeScopeId && <div className="leads-factory-wrap" hidden={page !== "Lead Factory"}>{leadFactoryEl()}</div>}
         {page === "Team" && pageAllowed && <TeamView workspace={viewWorkspace} scopeClientId={activeScopeId} scopeClientName={scopedClient?.name || ""} onAdd={() => openModal("staff", activeScopeId ? { staffType: "subaccount", role: "Sub-account User", homeClientId: activeScopeId, limitClientAccess: "true", clientAccessIds: JSON.stringify([activeScopeId]) } : { staffType: "agency", role: "Staff" })} onAddAi={() => openModal("staff", { isAiProfile: "true", name: "", aiMode: "Google Ads", agentPrompt: "", limitClientAccess: activeScopeId ? "true" : "false", clientAccessIds: activeScopeId ? JSON.stringify([activeScopeId]) : "[]" })} onEdit={editStaff} onRemoveAi={removeAiTeammate} onRemoveStaff={removeStaffMember} currentUserId={selfProfile?.id || sessionUser.id} onRestoreAi={restoreAiTeammate} />}
       </div>

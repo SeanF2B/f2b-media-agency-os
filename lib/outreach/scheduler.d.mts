@@ -1,0 +1,8 @@
+export type DueEnrollment = { id: string; campaignId: string; email: string; step: number; nextSendAt: string | null; mailboxId?: string | null; timeZone?: string };
+export type PlannedSend = { enrollmentId: string; campaignId: string; mailboxId: string; step: number; variantId: string; idempotencyKey: string };
+export function localClock(now: Date | number | string, timeZone: string): { weekday: number; minutes: number };
+export function inSendWindow(now: Date | number | string, schedule?: { days?: number[]; start?: string; end?: string; tz?: string; fallbackTz?: string }, recipientTimeZone?: string): boolean;
+export function isSuppressed(email: string, suppressed: Set<string>): boolean;
+export function pickVariant<T extends { id: string; weight?: number }>(variants: T[], seed: string): T | null;
+export function planTick(input: { now: Date | number | string; due: DueEnrollment[]; campaigns: Record<string, { status: string; schedule?: object; mailboxIds: string[]; dailyCap?: number; sentToday?: number; steps: Array<{ variants: Array<{ id: string; weight?: number }> }> }>; mailboxes: Record<string, { id: string; status: string; remaining: number; lastSentAt?: string | null; minGapSeconds?: number }>; suppressed: Set<string>; maxPerCompanyPerTick?: number }): { sends: PlannedSend[]; skipped: Array<{ id: string; reason: string }>; stops: Array<{ id: string; reason: string }> };
+export function nextAfterSend(p: { step: number; steps: Array<{ delayDays?: number; delay_days?: number }>; sentAt: string | Date; jitterMinutes?: number }): { nextStep: number; nextSendAt: string | null; status: "active" | "completed" };

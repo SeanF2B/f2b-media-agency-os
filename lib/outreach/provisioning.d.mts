@@ -1,0 +1,8 @@
+export type ProvisionStep = { key: string; kind: string; label: string; domain: string; position: number; status: "pending" | "retry" | "waiting" | "done" | "failed" | "skipped"; attempts: number; manual: boolean; chargeable?: boolean; email?: string; to?: string; identity?: { firstName: string; lastName: string; local: string }; note?: string; message?: string; result?: Record<string, unknown>; nextAttemptAt?: string | null };
+export const STEP_LABELS: Readonly<Record<string, string>>;
+export const MAX_ATTEMPTS: number;
+export function planProvisioning(order: { host: "microsoft" | "google"; domains: Array<{ domain: string; buy: boolean }>; identities: Array<{ firstName: string; lastName: string; local: string }>; inboxesPerDomain: number }): { host: "microsoft" | "google"; steps: ProvisionStep[]; domains: number; mailboxes: number };
+export function runnableSteps(steps: ProvisionStep[], now?: number): ProvisionStep[];
+export function applyOutcome(step: ProvisionStep, outcome: { ok?: boolean; waiting?: boolean; permanent?: boolean; message?: string; result?: Record<string, unknown>; retryInMinutes?: number }, now?: number): ProvisionStep;
+export function jobProgress(steps: ProvisionStep[]): { done: number; total: number; percent: number; failed: number; waitingManual: number; state: "running" | "needs-attention" | "complete" | "ready-dkim-pending" };
+export function estimateCosts(p: { domains: Array<{ buy: boolean; registrationCents?: number; renewalCents?: number; currency?: string }>; mailboxCount: number; mailboxMonthlyCents: number }): { upfrontCents: number; monthlyCents: number; domainRenewalYearlyCents: number; mailboxMonthlyCents: number; currency: string };

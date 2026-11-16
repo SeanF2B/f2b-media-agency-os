@@ -37,5 +37,18 @@ declare namespace Cloudflare {
     GHL_APP_ID?: string;
     GHL_INSTALL_URL?: string;
     GHL_REDIRECT_URI?: string;
+    /** Outreach: must be exactly "true" before any domain can be bought. */
+    OUTREACH_PURCHASES_ENABLED?: string;
+    /** Outreach: existing F2B Telegram bot (send-only reuse). */
+    TELEGRAM_BOT_TOKEN?: string;
+    TELEGRAM_CHAT_ID?: string;
+    F2B_TELEGRAM_BOT_TOKEN?: string;
+    F2B_TELEGRAM_CHAT_ID?: string;
+    /** Outreach: OAuth apps for free seed inboxes (placement tests). */
+    OUTREACH_SEED_GOOGLE_CLIENT_ID?: string;
+    OUTREACH_SEED_GOOGLE_CLIENT_SECRET?: string;
+    OUTREACH_SEED_MS_CLIENT_ID?: string;
+    OUTREACH_SEED_MS_CLIENT_SECRET?: string;
+    OUTREACH_APP_URL?: string;
   }
 }

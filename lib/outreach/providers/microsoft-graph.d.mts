@@ -1,0 +1,21 @@
+import type { DnsRecordSpec } from "../server/hosts";
+export const MAILBOX_SKUS: string[];
+export function createMicrosoftClient(config: { tenantId: string; clientId: string; clientSecret: string }, deps?: { fetchImpl?: typeof fetch; sleepImpl?: (ms: number) => Promise<void>; now?: () => number }): {
+  name: "microsoft";
+  verify(): Promise<{ tenantName: string; initialDomain: string }>;
+  seats(): Promise<Array<{ skuId: string; sku: string; total: number; used: number; free: number }>>;
+  addDomain(domain: string): Promise<unknown>;
+  getDomain(domain: string): Promise<unknown>;
+  verificationRecords(domain: string): Promise<DnsRecordSpec[]>;
+  verifyDomain(domain: string): Promise<unknown>;
+  serviceRecords(domain: string): Promise<DnsRecordSpec[]>;
+  createMailbox(input: { email: string; displayName: string; password: string; usageLocation?: string }): Promise<{ id?: string; userPrincipalName?: string }>;
+  assignLicense(userId: string, skuId: string): Promise<unknown>;
+  mailboxReady(userId: string): Promise<boolean>;
+  updateName(userId: string, name: { firstName: string; lastName: string }): Promise<void>;
+  setPhoto(userId: string, bytes: Uint8Array, contentType?: string): Promise<void>;
+  sendMime(userId: string, rawMime: string): Promise<{ accepted: boolean }>;
+  inboxDelta(userId: string, cursor: string): Promise<{ items: import("../server/hosts").InboundMessage[]; cursor: string; primed: boolean }>;
+};
+export function normaliseGraphMessage(item: unknown): import("../server/hosts").InboundMessage;
+export function buildDkimScript(domains: string[]): string;
