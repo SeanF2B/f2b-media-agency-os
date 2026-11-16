@@ -409,7 +409,7 @@ async function siteSampleFor(client: { id: string; name: string; email?: string;
     for (const m of html.matchAll(/<(a|h2|h3|h4|li)\b[^>]*>([\s\S]{1,200}?)<\/\1>/gi)) {
       const t = text(m[2]); if (t.length < 4 || t.length > 40 || SKIP_WORDS.test(t) || /[@|©]|\d{5,}|http|styles?$|^(our|all|view|see|book|meet)\b/i.test(t)) continue;
       const href = /href="([^"]+)"/i.exec(m[0])?.[1] || "";
-      if ((SERVICE_WORDS.test(t) || /\/services?\//i.test(href)) && t.split(/\s+/).length <= 4) found.push(nice(t));
+      if ((SERVICE_WORDS.test(t) || /\/services?\//i.test(href)) && nice(t).split(/\s+/).length <= 4 && !/\b(shop|studio|near me|birmingham|dublin|galway|london|ireland|uk)\b/i.test(t)) found.push(nice(t));
     }
     // Team: the home page plus the site's artists / team page, names with their photos.
     const hrefs = [...html.matchAll(/href="([^"#]+)"/gi)].map((m) => m[1]);
@@ -428,7 +428,7 @@ async function siteSampleFor(client: { id: string; name: string; email?: string;
       for (const m of scope.matchAll(/<(h2|h3|h4|h5|h6|strong|figcaption)\b[^>]*>([\s\S]{1,100}?)<\/\1>/gi)) {
         let t = text(m[2]).replace(/\s*[-–|:].*$/, "").trim(); if (!NAME.test(t) || notName.test(t) || SERVICE_WORDS.test(t)) continue;
         // "Adriana" + "Castillo" in back-to-back headings = one person.
-        const prev = team[team.length - 1]; if (prev && !prev.includes(" ") && !t.includes(" ") && /^[A-Z][a-z]/.test(t) && (m.index || 0) - lastAt < 1400) { const full = `${prev} ${t}`; team[team.length - 1] = full; if (photos[prev]) { photos[full] = photos[prev]; delete photos[prev]; } lastAt = m.index || 0; continue; }
+        const prev = team[team.length - 1]; if (prev && !prev.includes(" ") && !t.includes(" ") && !team.some((n) => n.split(" ")[0] === t) && /^[A-Z][a-z]/.test(t) && (m.index || 0) - lastAt < 1400) { const full = `${prev} ${t}`; team[team.length - 1] = full; if (photos[prev]) { photos[full] = photos[prev]; delete photos[prev]; } lastAt = m.index || 0; continue; }
         if (team.includes(t) || team.some((n) => n.startsWith(`${t} `) || n.endsWith(` ${t}`))) { lastAt = m.index || 0; continue; }
         lastAt = m.index || 0;
         const at = m.index || 0; const used = new Set(Object.values(photos)); const near = imgs.find((x) => x.alt && x.alt.toLowerCase().includes(t.toLowerCase())) || imgs.filter((x) => Math.abs(x.at - at) < 1200 && !used.has(absImg(x.src, pageUrl))).sort((a, b) => Math.abs(a.at - at) - Math.abs(b.at - at))[0];
