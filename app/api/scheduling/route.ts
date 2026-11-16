@@ -63,6 +63,7 @@ export async function GET(request: Request) {
       // Demo data helper: the client's own services, areas and team names, from their profile and website.
       const client = ctx.ws.clients.find((c) => c.id === (str(url.searchParams.get("clientId"), 80) || ctx.scope));
       if (!client) return json({ services: [], locations: [], team: [] });
+      if (url.searchParams.get("debug") === "1") { siteCache.clear(); const out = await siteSampleFor(client, db); return json({ ...out, debug: debugInfo }); }
       return json(await siteSampleFor(client, db));
     }
     if (view === "calendars") return json({ calendars: (await listCalendars(db, ctx.ws.ownerId, ctx.scope)).map((c) => ({ id: c.id, name: c.name, clientId: c.clientId })) });
@@ -352,6 +353,7 @@ async function suggest(ctx: Ctx) {
 }
 
 // ---- Sample-data helper: read the client's website once (cached) for service names, areas and team names.
+const debugInfo: Record<string, unknown> = {};
 type SiteSampleOut = { services: string[]; locations: string[]; team: string[]; photos: Record<string, string> };
 const siteCache = new Map<string, { at: number; value: SiteSampleOut }>();
 const SERVICE_WORDS = /(repair|install|replace|clean|survey|inspect|consult|design|fit|fitting|quote|service|maintenance|roof|gutter|chimney|kitchen|bathroom|tattoo|piercing|treatment|massage|facial|cut|colour|color|lesson|session|assessment|check|removal|painting|plaster|tiling|flooring|electrical|plumbing|heating|boiler|solar|window|door|garden|landscap|fencing|driveway|extension|renovat|cosmetic|whitening|implant|physio|therapy|training|coaching|valuation|viewing|measure)/i;
@@ -413,6 +415,7 @@ async function siteSampleFor(client: { id: string; name: string; email?: string;
     }
     // Team: the home page plus the site's artists / team page, names with their photos.
     const teamHref = [...html.matchAll(/<a\b[^>]*href="([^"#]+)"[^>]*>([\s\S]{0,120}?)<\/a>/gi)].find((m) => /\/(artists?|team|our-team|meet-the-team|staff|people|about)(\/|$|\.)/i.test(m[1]) || /^(artists?|our artists|team|our team|meet the team|staff)$/i.test(text(m[2])))?.[1];
+    debugInfo.teamHref = teamHref || ""; debugInfo.home = home.url; debugInfo.links = [...html.matchAll(/href="([^"#]+)"/gi)].map((m) => m[1]).filter((h) => !/\.(css|js|png|jpe?g|webp|svg|ico)(\?|$)/i.test(h)).slice(0, 60);
     const pages = [html]; if (teamHref) { const abs = new URL(teamHref, home.url).href; if (new URL(abs).host === new URL(home.url).host) pages.push((await get(abs)).html); }
     const NAME = /^([A-Z][A-Za-zÀ-ÿ'’.-]{1,20}( [A-Z][A-Za-zÀ-ÿ'’.-]{1,20}){0,2}|[A-Z]{2,4})$/;
     const notName = /^(Home|About|Contact|Book|Booking|Gallery|Shop|Blog|News|Reviews?|Services?|Prices?|Pricing|Faqs?|Team|Artists?|Our Team|Our Artists|Meet|Menu|Aftercare|Piercing|Piercings|Tattoo|Tattoos|Read More|Learn More|Instagram|Facebook|Tiktok|Email|Phone|Call|Opening Hours|Location|Find Us|Privacy|Terms|Cookie|Get In Touch|Follow Us|Studio|Welcome|Testimonials|Portfolio|Styles|View|Ireland|England|Birmingham|Dublin|Galway|Cork|London|Uk|Ie|Faq)$/i;
