@@ -1408,3 +1408,46 @@ body.f2b-dark :is(.app-shell .dh-approval-n, #f2b-appr-x) { color: #fff !importa
 /* Chat launcher: slight gentle bob */
 html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-icon { animation: f2b-bot-bob 3.2s ease-in-out infinite; }
 @keyframes f2b-bot-bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -2px; } }
+/* Dashboard: lead pipeline chevrons + recent enquiries */
+html body .app-shell .dh-chevrons { display: flex; gap: 0; margin: 14px 0 6px; overflow-x: auto; scrollbar-width: none; padding: 2px; }
+html body .app-shell .dh-chevron { flex: 1 0 110px; position: relative; display: grid; justify-items: center; gap: 1px; padding: 10px 18px 10px 26px; border: 0; cursor: pointer; background: #eef4ff; color: #1d4ed8; clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%, 14px 50%); margin-right: -8px; transition: filter .15s; }
+html body .app-shell .dh-chevron:first-child { clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%); padding-left: 16px; border-radius: 12px 0 0 12px; }
+html body .app-shell .dh-chevron:last-child { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 14px 50%); border-radius: 0 12px 12px 0; margin-right: 0; }
+html body .app-shell .dh-chevron:hover { filter: brightness(.96); }
+html body .app-shell .dh-chevron:nth-child(2) { background: #e8f6ff; color: #0369a1; } html body .app-shell .dh-chevron:nth-child(3) { background: #f1ebff; color: #6d28d9; }
+html body .app-shell .dh-chevron:nth-child(4) { background: #fff4e5; color: #b45309; } html body .app-shell .dh-chevron:nth-child(5) { background: #ffeef2; color: #be185d; }
+html body .app-shell .dh-chevron:nth-child(6) { background: #e9f8f1; color: #047857; } html body .app-shell .dh-chevron:nth-child(7) { background: #eaf7ee; color: #15803d; }
+html body .app-shell .dh-chevron.won { background: #dcf4e4 !important; color: #157a43 !important; } html body .app-shell .dh-chevron.lost { background: #fde8e8 !important; color: #b42318 !important; }
+html body .app-shell .dh-chevron b { font-size: 20px; line-height: 1.1; color: inherit; } html body .app-shell .dh-chevron span { font-size: 11.5px; font-weight: 600; white-space: nowrap; color: inherit; } html body .app-shell .dh-chevron small { font-size: 10.5px; opacity: .75; color: inherit; }
+body.f2b-dark .app-shell .dh-chevron { filter: brightness(.55) saturate(1.3); } body.f2b-dark .app-shell .dh-chevron :is(b, span, small) { filter: brightness(2.2); }
+html body .app-shell .dh-recent { margin: 14px 0 6px; }
+html body .app-shell .dh-recent-head { display: flex; justify-content: space-between; align-items: center; } html body .app-shell .dh-recent-head h3 { margin: 0; font-size: 14px; }
+html body .app-shell .dh-recent-table { display: grid; margin-top: 6px; }
+html body .app-shell .dh-recent-row { display: grid; grid-template-columns: minmax(0, 2.2fr) 1.2fr .8fr 1fr .6fr; align-items: center; gap: 10px; padding: 8px 6px; border-bottom: 1px solid rgba(127,138,160,.15); cursor: pointer; font-size: 13px; }
+html body .app-shell .dh-recent-row:hover { background: rgba(127,138,160,.07); }
+html body .app-shell .dh-recent-who { display: flex; align-items: center; gap: 10px; min-width: 0; }
+html body .app-shell .dh-recent-who img, html body .app-shell .dh-recent-who > i { width: 30px; height: 30px; border-radius: 999px; object-fit: contain; background: #fff; border: 1px solid #e8edf1; flex: none; display: grid; place-items: center; font-style: normal; font-weight: 700; font-size: 12px; color: #475467; }
+html body .app-shell .dh-recent-who span { display: grid; min-width: 0; } html body .app-shell .dh-recent-who b, html body .app-shell .dh-recent-who small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } html body .app-shell .dh-recent-who small { color: #667085; font-size: 11.5px; }
+html body .app-shell .dh-recent-src, html body .app-shell .dh-recent-date { color: #667085; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html body .app-shell .dh-recent-val { font-weight: 700; }
+html body .app-shell .dh-recent-stage { justify-self: start; padding: 3px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700; background: #eef2ff; color: #4338ca; white-space: nowrap; }
+html body .app-shell .dh-recent-stage.won { background: #dcf4e4; color: #157a43; } html body .app-shell .dh-recent-stage.lost { background: #fde8e8; color: #b42318; }
+@media (max-width: 700px) { html body .app-shell .dh-recent-row { grid-template-columns: minmax(0, 1fr) auto; } html body .app-shell .dh-recent-src, html body .app-shell .dh-recent-date, html body .app-shell .dh-recent-val { display: none; } }
+body.f2b-dark .app-shell .dh-recent-who img, body.f2b-dark .app-shell .dh-recent-who > i { background: #1d2429; border-color: #33404a; }
+/* Launcher: dark rounded tile */
+html body .ai-chat-launcher:has(.ai-chat-eyes) { border-radius: 20px !important; }
+html body .ai-chat-launcher:has(.ai-chat-eyes)::after { border-radius: 24px !important; }
+html body .ai-chat-launcher:has(.ai-chat-eyes) .ai-chat-eyes { border-radius: 20px; }
+/* AI lives in the chat widget only: no AI buttons in the top bar */
+html body .app-shell .tn-right .ai-assistant-quick-link, html body .app-shell .tn-brand .tn-bot-logo { display: none !important; }
+html body .app-shell.topnav-layout .tn-brand .tn-logo:not(.tn-logo-client) { display: grid !important; }
+/* Sample data toggle */
+html body .app-shell .dh-sample-toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; cursor: pointer; justify-self: end; }
+html body .app-shell .dh-sample-banner { padding: 8px 12px; border-radius: 12px; background: #fff8e1; border: 1px solid #f5d77a; font-size: 12.5px; font-weight: 600; color: #8a6100; }
+body.f2b-dark .app-shell .dh-sample-banner { background: #2d2610; border-color: #6b5413; color: #f5d77a; }
+/* Scheduling: calendar in full view — fills the window, scrolls inside, day headers stay visible; AI example chips removed */
+html body .app-shell .sch-ai-chips { display: none !important; }
+html body .app-shell .sch-week-card { display: flex; flex-direction: column; height: calc(100dvh - 110px); min-height: 560px; }
+html body .app-shell .sch-week-card .sch-week { flex: 1 1 auto; min-height: 0; overflow: auto !important; }
+html body .app-shell .sch-week-card .sch-day-head { position: sticky; top: 0; z-index: 3; background: var(--surface, #fff); }
+html body.f2b-dark .app-shell .sch-week-card .sch-day-head, html body .app-shell.dark-mode .sch-week-card .sch-day-head { background: #1f262c; }

@@ -16,6 +16,15 @@ type Split = { organic: { clicks: number | null; visits: number | null; calls: n
 type Metrics = { clientId: string; marketing: Marketing | null; appointments: Array<{ id: string; name: string; start: string; clientId: string; channel: string }>; emails: { total: number; recent: Array<{ to: string; subject: string; at: string }> } };
 
 const CACHE_MS = 15 * 60_000;
+// Demo figures for the agency dashboard's "Sample data" toggle (never saved anywhere).
+const SAMPLE: Metrics = {
+  clientId: "sample",
+  marketing: { currency: "EUR", visits: { value: 1840, previous: 1510, metric: "Organic sessions" }, visitsNote: "", adSpend: { value: 1364, previous: 1290 }, adClicks: { value: 742, previous: 655 }, adsNote: "", calls: { value: 38, previous: 29 }, profileClicks: { value: 126, previous: 98 }, businessNote: "", leads: { value: 47, previous: null },
+    split: { organic: { clicks: 912, visits: 1840, calls: 38, leads: 21 }, paid: { clicks: 742, calls: 17, callConversions: 17, leads: 19, conversions: 71 }, otherLeads: 7, notes: { organic: "", paid: "" } },
+    google: { position: 4.2, previous: 5.8, tracked: 24, top3: 9 }, rankNote: "", chatgpt: { share: 42, previous: 30, prompts: 12, mentioned: 5 }, aiNote: "", bing: null, bingNote: "Sample: Bing tracking not set up" },
+  appointments: [{ id: "s1", name: "Kitchen survey · Mary Walsh", start: new Date(Date.now() + 3 * 3600_000).toISOString(), clientId: "", channel: "On site" }, { id: "s2", name: "Roof quote · John Byrne", start: new Date(Date.now() + 26 * 3600_000).toISOString(), clientId: "", channel: "Phone" }, { id: "s3", name: "Consultation · Aoife Kelly", start: new Date(Date.now() + 50 * 3600_000).toISOString(), clientId: "", channel: "Google Meet" }],
+  emails: { total: 64, recent: [{ to: "Mary Walsh", subject: "Your quote from Renew Electrical", at: new Date(Date.now() - 2 * 3600_000).toISOString() }, { to: "John Byrne", subject: "Booking confirmed for Thursday", at: new Date(Date.now() - 20 * 3600_000).toISOString() }, { to: "Aoife Kelly", subject: "Invoice INV-0012", at: new Date(Date.now() - 44 * 3600_000).toISOString() }] },
+};
 const money = (n: number, currency: string) => { try { return new Intl.NumberFormat("en-IE", { style: "currency", currency, maximumFractionDigits: 0 }).format(n); } catch { return `€${Math.round(n)}`; } };
 const money2 = (n: number, currency: string) => { try { return new Intl.NumberFormat("en-IE", { style: "currency", currency, maximumFractionDigits: 2 }).format(n); } catch { return `€${n.toFixed(2)}`; } };
 const num = (n: number) => new Intl.NumberFormat("en-IE").format(Math.round(n));
@@ -40,6 +49,7 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
   const clientId = scopeClientId || (clients.some((c) => c.id === pickedClient) ? pickedClient : (clients.find((c) => c.googleAdsAccountId) || clients[0])?.id || "");
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(false);
+  const [sample, setSample] = useState(() => { try { return localStorage.getItem("f2b-dash-sample") === "1"; } catch { return false; } });
   const [showAi, setShowAi] = useState(() => { try { return localStorage.getItem("f2b-dash-ai") !== "0"; } catch { return true; } });
 
   useEffect(() => {
@@ -58,7 +68,8 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
   const humanPending = tasks.filter((t) => inScope(t) && t.reviewStatus === "submitted").length;
   const clientOf = (id: string) => clients.find((c) => c.id === id);
   const logo = (id: string) => { const c = clientOf(id); return c?.logo ? <img className="dh-logo" src={c.logo} alt="" /> : <span className="dh-logo dh-logo-fallback">{(c?.name || "•").slice(0, 1)}</span>; };
-  const m = metrics?.marketing;
+  const view = !scopeClientId && sample ? SAMPLE : metrics;
+  const m = view?.marketing;
   const cur = m?.currency || "EUR";
 
   const actions: Array<{ label: string; hint: string; icon: ReactNode; run: () => void; tint: string }> = [
@@ -71,6 +82,8 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
   ];
 
   return <div className="dh">
+    {!scopeClientId && <label className={`task-ai-toggle dh-sample-toggle ${sample ? "is-on" : ""}`} title="Show demo figures on the dashboard (nothing is saved)"><input type="checkbox" role="switch" checked={sample} onChange={(e) => { setSample(e.target.checked); try { localStorage.setItem("f2b-dash-sample", e.target.checked ? "1" : "0"); } catch { /* ignore */ } }} /><span className="task-ai-toggle-track" aria-hidden="true"><span className="task-ai-toggle-thumb" /></span><b>Sample data</b></label>}
+    {!scopeClientId && sample && <div className="dh-sample-banner">Showing sample figures for demos — turn off “Sample data” for your real numbers.</div>}
     <section className="dh-actions" aria-label="Quick actions">{actions.map((a) => <button type="button" key={a.label} className={`dh-action ${a.tint}`} onClick={a.run}><span className="dh-action-icon">{a.icon}</span><span><b>{a.label}</b><small>{a.hint}</small></span></button>)}</section>
 
     <section className="dh-approvals" aria-label="Pending approvals">
@@ -113,7 +126,7 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
 
     <div className="dh-grid">
       <section className="panel dh-panel"><div className="dh-head"><div><p className="eyebrow">📅 SCHEDULED</p><h2>Appointments</h2></div><button type="button" className="text-button" onClick={() => onNavigate("Scheduling")}>Open</button></div>
-        {metrics?.appointments?.length ? <ul className="dh-list">{metrics.appointments.map((a) => <li key={a.id}>{logo(a.clientId)}<span><b>{a.name || "Appointment"}</b><small>{when(a.start)}{a.channel ? ` · ${a.channel}` : ""}</small></span></li>)}</ul> : <p className="dh-muted">{loading ? "Loading…" : "Nothing booked in the next 3 weeks."}</p>}
+        {view?.appointments?.length ? <ul className="dh-list">{view!.appointments.map((a) => <li key={a.id}>{logo(a.clientId)}<span><b>{a.name || "Appointment"}</b><small>{when(a.start)}{a.channel ? ` · ${a.channel}` : ""}</small></span></li>)}</ul> : <p className="dh-muted">{loading ? "Loading…" : "Nothing booked in the next 3 weeks."}</p>}
       </section>
       <section className="panel dh-panel"><div className="dh-head"><div><p className="eyebrow"><ClipboardList size={12} /> COMING UP</p><h2>Upcoming tasks</h2></div><label className={`task-ai-toggle ${showAi ? "is-on" : ""}`} title="Include tasks the AI is handling"><input type="checkbox" role="switch" checked={showAi} onChange={(e) => { setShowAi(e.target.checked); try { localStorage.setItem("f2b-dash-ai", e.target.checked ? "1" : "0"); } catch { /* ignore */ } }} /><span className="task-ai-toggle-track" aria-hidden="true"><span className="task-ai-toggle-thumb" /></span><b>AI tasks</b></label></div>
         {upcoming.length ? <ul className="dh-list">{upcoming.map((t) => <li key={t.id} onClick={() => onOpenTask?.(t.id)} className={onOpenTask ? "clickable" : ""}>{logo(t.clientId)}<span><b>{t.title}</b><small>{when(t.dueAt || t.due) || "No due date"}{bots.has(t.assigneeId) ? " · 🤖 AI" : ""}</small></span></li>)}</ul> : <p className="dh-muted">You’re all caught up.</p>}
@@ -121,8 +134,8 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
       <section className="panel dh-panel"><div className="dh-head"><div><p className="eyebrow"><CheckCircle2 size={12} /> DONE</p><h2>Recently completed</h2></div><button type="button" className="text-button" onClick={() => onNavigate("Tasks")}>All tasks</button></div>
         {completed.length ? <ul className="dh-list">{completed.map((t) => <li key={t.id}>{logo(t.clientId)}<span><b>{t.title}</b><small className="good">✓ {when(t.completedAt)}</small></span></li>)}</ul> : <p className="dh-muted">Nothing finished yet.</p>}
       </section>
-      <section className="panel dh-panel"><div className="dh-head"><div><p className="eyebrow"><Mail size={12} /> LAST 30 DAYS</p><h2>Emails sent · {metrics ? num(metrics.emails.total) : "…"}</h2></div><button type="button" className="text-button" onClick={() => onNavigate("Conversations")}>Open</button></div>
-        {metrics?.emails.recent.length ? <ul className="dh-list">{metrics.emails.recent.map((e, i) => <li key={i}><span className="dh-logo dh-logo-fallback"><Mail size={13} /></span><span><b>{e.subject || "(no subject)"}</b><small>{e.to} · {when(e.at)}</small></span></li>)}</ul> : <p className="dh-muted">{loading ? "Loading…" : "No emails sent yet."}</p>}
+      <section className="panel dh-panel"><div className="dh-head"><div><p className="eyebrow"><Mail size={12} /> LAST 30 DAYS</p><h2>Emails sent · {view ? num(view.emails.total) : "…"}</h2></div><button type="button" className="text-button" onClick={() => onNavigate("Conversations")}>Open</button></div>
+        {view?.emails.recent.length ? <ul className="dh-list">{view!.emails.recent.map((e, i) => <li key={i}><span className="dh-logo dh-logo-fallback"><Mail size={13} /></span><span><b>{e.subject || "(no subject)"}</b><small>{e.to} · {when(e.at)}</small></span></li>)}</ul> : <p className="dh-muted">{loading ? "Loading…" : "No emails sent yet."}</p>}
       </section>
     </div>
   </div>;

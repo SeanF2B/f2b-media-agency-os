@@ -159,7 +159,10 @@ export async function GET(request: Request) {
         sourceMap.set(key, item);
       }
       const sources = [...sourceMap.values()].sort((a, b) => b.count - a.count || b.value - a.value).slice(0, 12);
-      return Response.json({ open: groups.filter((row) => row.category === "open"), won: groups.filter((row) => row.category === "won"), stages, sources }, { headers: { "Cache-Control": "no-store" } });
+      // Latest enquiries for the dashboard table.
+      const recentRows = await db.prepare("SELECT o.id, o.title, o.value, o.currency, o.source, o.created_at, o.client_id, o.project_type, s.name AS stage, s.category, TRIM(COALESCE(c.first_name,'') || ' ' || COALESCE(c.last_name,'')) AS contact FROM crm_opportunities o JOIN crm_pipeline_stages s ON s.id=o.stage_id AND s.owner_id=o.owner_id JOIN crm_pipelines p ON p.id=o.pipeline_id AND p.owner_id=o.owner_id LEFT JOIN crm_contacts c ON c.id=o.contact_id AND c.owner_id=o.owner_id WHERE o.owner_id=?1 AND p.archived=0 AND (?3='1' OR COALESCE(p.client_id,'')=?2) ORDER BY o.created_at DESC LIMIT 6").bind(ownerId, scopeClient, allClients).all<Record<string, unknown>>().catch(() => ({ results: [] as Record<string, unknown>[] }));
+      const recent = (recentRows.results || []).map((r) => ({ id: String(r.id), title: String(r.title || ""), contact: String(r.contact || ""), value: Number(r.value) || 0, currency: clean(r.currency, 3) || "EUR", source: String(r.source || ""), createdAt: String(r.created_at || ""), clientId: String(r.client_id || ""), project: String(r.project_type || ""), stage: String(r.stage || ""), category: String(r.category || "") }));
+      return Response.json({ open: groups.filter((row) => row.category === "open"), won: groups.filter((row) => row.category === "won"), stages, sources, recent }, { headers: { "Cache-Control": "no-store" } });
     }
     const search = clean(url.searchParams.get("search"), 120).toLowerCase();
     // Server-side client scope (f2b_client cookie or ?clientId=). No scope = everything (legacy behaviour).
