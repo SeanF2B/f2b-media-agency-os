@@ -73,10 +73,10 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
 
     {valuePanel}
     <section className="panel dh-panel" aria-label="Website and marketing results">
-      <div className="dh-head"><div><p className="eyebrow">📈 MARKETING · LAST 30 DAYS</p><h2>Website & search results</h2></div>
+      <div className="dh-head"><div><p className="eyebrow">📈 LAST 30 DAYS</p><h2>Marketing</h2></div>
         {!scopeClientId && clients.length > 0 && <label className="dh-client"><span>Client</span><select value={clientId} onChange={(e) => { setPickedClient(e.target.value); try { localStorage.setItem("f2b-dash-client", e.target.value); } catch { /* ignore */ } }}>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>}
       </div>
-      {loading && !m ? <p className="dh-muted">Loading results…</p> : !m ? <p className="dh-muted">Results appear here once a client is chosen and you can view reports.</p> : <>
+      {loading && !m ? <><p className="dh-muted">Loading results…</p>{adsPanel && <div className="dh-ads-embed">{adsPanel}</div>}</> : !m ? <>{adsPanel && <div className="dh-ads-embed">{adsPanel}</div>}</> : <>
         {(() => { const sp = m.split; const v = (x: number | null | undefined) => x == null ? "—" : num(x);
           const Row = ({ icon, label, value, good }: { icon: ReactNode; label: string; value: string; good?: boolean }) => <div className={`dh-split-row ${good ? "good" : ""}`}><span className="dh-split-ico">{icon}</span><span>{label}</span><b>{value}</b></div>;
           return <div className="dh-split">
@@ -96,6 +96,7 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
             </div>
             <div className="dh-split-total"><UserPlus size={16} /><span>All leads · 30 days</span><b>{v(m.leads?.value)}</b>{sp?.otherLeads ? <small>{sp.otherLeads} from other or unknown sources</small> : null}</div>
           </div>; })()}
+        {adsPanel && <div className="dh-ads-embed">{adsPanel}</div>}
         {m.scope !== "all" && <><h3 className="dh-sub">Where you show up</h3>
         <div className="dh-ranks">
           <div className="dh-rank"><div className="dh-rank-logos"><BrandIcon id="google" size={24} fallback={<span>G</span>} /><span className="dh-rank-also" title="Chrome and Safari use Google search"><BrandIcon id="chrome" size={14} fallback={null} /><BrandIcon id="safari" size={14} fallback={null} /></span></div><small>Google · Chrome & Safari</small><b>{m.google?.position != null ? `#${m.google.position}` : "—"}</b>{m.google ? <em>avg of {m.google.tracked} keywords · {m.google.top3} in top 3 <Delta now={m.google.position} before={m.google.previous} lowerIsBetter suffix="" /></em> : <em>{m.rankNote || "Not tracked yet"}</em>}</div>
@@ -105,7 +106,6 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
       </>}
     </section>
 
-    {adsPanel}
     <div className="dh-grid">
       <section className="panel dh-panel"><div className="dh-head"><div><p className="eyebrow">📅 SCHEDULED</p><h2>Appointments</h2></div><button type="button" className="text-button" onClick={() => onNavigate("Scheduling")}>Open</button></div>
         {metrics?.appointments?.length ? <ul className="dh-list">{metrics.appointments.map((a) => <li key={a.id}>{logo(a.clientId)}<span><b>{a.name || "Appointment"}</b><small>{when(a.start)}{a.channel ? ` · ${a.channel}` : ""}</small></span></li>)}</ul> : <p className="dh-muted">{loading ? "Loading…" : "Nothing booked in the next 3 weeks."}</p>}

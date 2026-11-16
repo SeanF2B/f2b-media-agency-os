@@ -1213,3 +1213,19 @@ html body.f2b-dark .ai-chat-eyes { background: #1d2733; }
 html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-icon { transform: scale(2.1); }
 html body .ai-chat-eyes .ai-eyes-face i { animation: tn-bot-blink 2.6s ease-in-out infinite; }
 html body .ai-chat-eyes .ai-eyes-face i:nth-child(2) { animation-delay: .08s; }
+/* Chat launcher: solid brand bubble with a big blinking bot, no white ring */
+html body .ai-chat-launcher:has(.ai-chat-eyes) { width: 64px; height: 64px; background: var(--brand-primary, #0b74b8) !important; box-shadow: 0 10px 28px color-mix(in srgb, var(--brand-primary, #0b74b8) 45%, transparent) !important; border: 0 !important; }
+html body .ai-chat-launcher:has(.ai-chat-eyes)::after { inset: -4px; border-width: 2px; border-color: color-mix(in srgb, var(--brand-primary, #0b74b8) 45%, transparent); }
+html body .ai-chat-launcher .ai-chat-eyes { background: transparent !important; color: #fff; }
+html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-icon { transform: scale(3) !important; color: #fff !important; }
+html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-icon * { -webkit-text-fill-color: currentColor; }
+html body .ai-chat-launcher:has(.ai-chat-eyes) .ai-chat-online { right: 2px; bottom: 2px; }
+@media (max-width: 860px) { html body .ai-chat-launcher:has(.ai-chat-eyes) { width: 56px; height: 56px; } html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-icon { transform: scale(2.6) !important; } }
+html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-face { border-color: #fff !important; background: rgba(255,255,255,.12) !important; }
+html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-face i { background: #fff !important; box-shadow: 0 0 5px rgba(255,255,255,.9) !important; }
+html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-antenna, html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-antenna::before, html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-antenna::after { background: #fff !important; border-color: #fff !important; }
+/* Ad spend report embedded inside the Marketing card */
+html body .app-shell .dh-ads-embed { margin-top: 14px; }
+html body .app-shell .dh-ads-embed > .panel { margin: 0 !important; padding: 0 !important; background: transparent !important; border: 0 !important; box-shadow: none !important; backdrop-filter: none !important; }
+html body .app-shell .dh-ads-embed .panel-heading .eyebrow { display: none; }
+html body .app-shell .dh-ads-embed .panel-heading h2 { font-size: 14px !important; }
