@@ -1765,3 +1765,7 @@ html body .app-shell .crm-tabs > :is(button, a):hover { background: rgba(127,138
 html body .app-shell .crm-tabs > :is(button, a):focus-visible { box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-primary, #0b74b8) 45%, transparent) !important; }
 html body .app-shell .crm-tabs > :is(button, a):is([aria-selected="true"], .active, .on) { background: var(--brand-primary, #0b74b8) !important; color: #fff !important; -webkit-text-fill-color: #fff !important; border-color: transparent !important; }
 html body .app-shell .crm-tabs > :is(button, a):is([aria-selected="true"], .active, .on) svg { stroke: #fff !important; color: #fff !important; }
+/* Section loading: a slim branded line instead of a box */
+html body .page-loading { position: relative; height: 3px; margin: 2px 0 12px; border-radius: 999px; overflow: hidden; background: color-mix(in srgb, var(--brand-primary, #0b74b8) 14%, transparent); }
+html body .page-loading i { position: absolute; top: 0; bottom: 0; left: -40%; width: 40%; border-radius: 999px; background: var(--brand-primary, #0b74b8); animation: f2b-load-slide 1s ease-in-out infinite; }
+@keyframes f2b-load-slide { to { left: 100%; } }
