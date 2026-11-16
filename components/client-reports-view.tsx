@@ -64,6 +64,10 @@ export function ClientReportsView({ clientId, clientName, mode = "reports" }: { 
   const [history, setHistory] = useState<Saved[]>([]);
   const [groups, setGroups] = useState<string[]>([]);
   const [tickedCount, setTickedCount] = useState(0);
+  // Dark or light report — remembered, applied instantly to the preview, full-screen view, PDF and saved reports.
+  const [theme, setThemeState] = useState<"dark" | "light">(() => { try { return window.localStorage.getItem("f2b-report-theme") === "light" ? "light" : "dark"; } catch { return "dark"; } });
+  const setTheme = (next: "dark" | "light") => { setThemeState(next); try { window.localStorage.setItem("f2b-report-theme", next); } catch { /* storage unavailable */ } };
+  const themed = useCallback((content: string) => content.replace(/<body(?: class="[^"]*")?>/, `<body class="${theme}">`), [theme]);
   const prepareRef = useRef<KeywordPrepare | null>(null);
   useEffect(() => { setGroups([]); }, [clientId]);
   const frame = useRef<HTMLIFrameElement>(null);
@@ -100,7 +104,7 @@ export function ClientReportsView({ clientId, clientName, mode = "reports" }: { 
   }, [html, live, generate]);
 
   const download = () => { const win = frame.current?.contentWindow; if (!win) return; win.focus(); win.print(); };
-  const openTab = (content = html) => { const win = window.open("", "_blank"); if (!win) { setError("Allow pop-ups for this site to open the report."); return; } win.document.open(); win.document.write(content.replace("</body>", `<button onclick="print()" style="position:fixed;top:14px;right:14px;padding:10px 16px;border:0;border-radius:10px;background:#1f6feb;color:#fff;font:600 14px system-ui;cursor:pointer;z-index:9" class="no-print">Download PDF</button><style>@media print{.no-print{display:none}}</style></body>`)); win.document.close(); };
+  const openTab = (raw = html) => { const content = themed(raw); const win = window.open("", "_blank"); if (!win) { setError("Allow pop-ups for this site to open the report."); return; } win.document.open(); win.document.write(content.replace("</body>", `<button onclick="print()" style="position:fixed;top:14px;right:14px;padding:10px 16px;border:0;border-radius:10px;background:#1f6feb;color:#fff;font:600 14px system-ui;cursor:pointer;z-index:9" class="no-print">Download PDF</button><style>@media print{.no-print{display:none}}</style></body>`)); win.document.close(); };
   const autoSaveRef = useRef<(() => void) | null>(null);
   autoSaveRef.current = () => { if (!history.some((item) => item.type === type && item.periodStart === range.start && item.periodEnd === range.end)) void save(true); };
   const save = async (auto = false) => {
@@ -146,9 +150,10 @@ export function ClientReportsView({ clientId, clientName, mode = "reports" }: { 
           <button type="button" className="secondary-button" onClick={() => void generate()}>Refresh now</button>
           <button type="button" className="secondary-button" onClick={() => openTab()}>Open full screen</button>
           <button type="button" className="secondary-button" disabled={saving} onClick={() => void save()}>{saving ? "Saving…" : "Save to history"}</button>
+          <span className="crv-theme" role="radiogroup" aria-label="Report colours">{(["dark", "light"] as const).map((value) => <button key={value} type="button" role="radio" aria-checked={theme === value} className={theme === value ? "on" : ""} onClick={() => setTheme(value)}>{value === "dark" ? "Dark" : "Light"}</button>)}</span>
           <button type="button" className="primary-button" onClick={download}>Download PDF</button>
         </div>
-        <iframe ref={frame} className="crv-frame" title={`${clientName} ${META[type].name} preview`} srcDoc={html} sandbox="allow-same-origin allow-modals allow-popups" />
+        <iframe ref={frame} className="crv-frame" title={`${clientName} ${META[type].name} preview`} srcDoc={themed(html)} sandbox="allow-same-origin allow-modals allow-popups" />
         <p className="crv-hint">Download PDF opens your browser&apos;s print window: choose <b>Save as PDF</b>. The layout is fitted to A4.</p>
       </div>}
       <div className="crv-history">

@@ -2664,3 +2664,7 @@ html body .app-shell .krb-del { display: inline-grid; place-items: center; width
 html body .app-shell .krb-del:hover { color: #dc2626; background: #fef2f2; border-color: #fecaca; transform: translateY(-1px); }
 html body .app-shell .krb-chip-x { border: 0; background: none; padding: 0 0 0 4px; margin-left: 2px; font-size: 14px; line-height: 1; color: inherit; opacity: .45; cursor: pointer; }
 html body .app-shell .krb-chip-x:hover { opacity: 1; color: #dc2626; }
+html body .app-shell .crv-theme { display: inline-flex; padding: 3px; gap: 2px; border: 1px solid #dfe5ea; border-radius: 10px; background: #f4f6f8; }
+html body .app-shell .crv-theme button { border: 0; background: none; padding: 5px 12px; border-radius: 7px; font: inherit; font-size: 13px; font-weight: 600; color: #475569; cursor: pointer; }
+html body .app-shell .crv-theme button.on { background: #14213d; color: #fff; }
+html body .app-shell .crv-theme button:not(.on):hover { background: #fff; transform: translateY(-1px); }
