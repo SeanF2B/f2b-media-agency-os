@@ -517,6 +517,33 @@ function AppointmentDetail({ data, scope, booking, onClose, onSaved }: { data: D
     finally { setBusy(false); }
   };
   const staffChanged = staffIds.join(",") !== booking.staffIds.join(",");
+  const [photos, setPhotos] = useState<string[]>(() => booking.answers.filter((a) => /^Photo/i.test(a.label) && /^(https:\/\/|\/media\/)/.test(a.value)).map((a) => a.value));
+  const [zoom, setZoom] = useState<number | null>(null);
+  const [uploading, setUploading] = useState(0);
+  const isSample = booking.id.startsWith("sample-");
+  const addPhotos = async (files: FileList | null) => {
+    const list = [...(files || [])].filter((f) => f.type.startsWith("image/")).slice(0, 12 - photos.length);
+    const urls: string[] = [];
+    for (const file of list) {
+      setUploading((n) => n + 1);
+      try {
+        if (isSample) { urls.push(URL.createObjectURL(file)); continue; }
+        const q = new URLSearchParams({ scope: scope || "agency", folder: "Appointment photos", name: file.name.slice(0, 120) });
+        const res = await fetch(`/api/media-library?${q}`, { method: "PUT", headers: { "Content-Type": file.type || "application/octet-stream" }, body: file });
+        const out = await res.json().catch(() => ({})) as { item?: { url: string }; error?: string };
+        if (!res.ok || !out.item?.url) throw new Error(out.error || "Upload failed");
+        urls.push(out.item.url);
+      } catch (e) { setErr(errText(e, "A photo couldn't be uploaded.")); }
+      finally { setUploading((n) => n - 1); }
+    }
+    if (!urls.length) return;
+    setPhotos((cur) => [...cur, ...urls]);
+    if (!isSample) { try { await api(scope, { action: "updateBooking", id: booking.id, addPhotos: urls }); } catch (e) { setErr(errText(e, "Couldn't save the photos.")); } }
+  };
+  const removePhoto = async (u: string) => {
+    setPhotos((cur) => cur.filter((x) => x !== u));
+    if (!isSample && !u.startsWith("blob:")) { try { await api(scope, { action: "updateBooking", id: booking.id, removePhoto: u }); } catch (e) { setErr(errText(e, "Couldn't remove the photo.")); } }
+  };
   return <Modal title={`${cal?.name || "Appointment"} · ${booking.name}`} wide onClose={onClose}>
     {err && <div className="iv-error" role="alert">{err}</div>}
     <div className="sch-detail">
@@ -525,8 +552,12 @@ function AppointmentDetail({ data, scope, booking, onClose, onSaved }: { data: D
       <div><small>Customer</small><b>{booking.name}</b>{booking.phone && <a href={`tel:${booking.phone}`}>{booking.phone}</a>}{booking.email && <a href={`mailto:${booking.email}`}>{booking.email}</a>}</div>
       <div><small>Where</small><b>{cal ? (cal.locationType === "onsite" ? "On-site" : cal.locationType === "video" ? "Google Meet" : cal.locationType === "phone" ? "Phone call" : "Office") : "—"}</b>{booking.meetLink && <a href={booking.meetLink} target="_blank" rel="noopener noreferrer">Join Meet</a>}</div>
       <div><small>Source</small><b>{booking.source === "public" ? "Online booking" : `Added by ${booking.createdBy || "team"}`}</b>{booking.channel && <span className="iv-small">{booking.channel}</span>}</div>
-      {booking.answers.filter((a) => a.value).map((a) => <div key={a.label}><small>{a.label}</small>{/^Photo/.test(a.label) && /^(https:\/\/|\/media\/)/.test(a.value) ? <a href={a.value} target="_blank" rel="noopener noreferrer"><img className="sch-detail-photo" src={a.value} alt="" /></a> : <b>{a.value}</b>}</div>)}
+      {booking.answers.filter((a) => a.value && !/^Photo/i.test(a.label)).map((a) => <div key={a.label}><small>{a.label}</small><b>{a.value}</b></div>)}
     </div>
+    <h3 className="sch-h3">Photos</h3>
+    <div className="sch-appt-photos">{photos.map((u, i) => <span key={u} className="sch-appt-photo"><button type="button" className="sch-photo-open" aria-label="View photo" onClick={() => setZoom(i)}><img src={u} alt="" /></button><button type="button" aria-label="Remove photo" onClick={() => void removePhoto(u)}>×</button></span>)}
+      {photos.length < 12 && <label className="sch-appt-photo add">{uploading ? "Uploading…" : <><ImagePlus size={18} /><small>Add photos</small></>}<input type="file" accept="image/*" multiple hidden onChange={(e) => { void addPhotos(e.target.files); e.target.value = ""; }} /></label>}</div>
+    {zoom !== null && photos[zoom] && <div className="sch-lightbox" role="dialog" aria-modal="true" onMouseDown={(e) => { if (e.target === e.currentTarget) setZoom(null); }}><button type="button" className="sch-lb-close" aria-label="Close" onClick={() => setZoom(null)}>×</button>{photos.length > 1 && <button type="button" className="sch-lb-nav prev" aria-label="Previous" onClick={() => setZoom((zoom - 1 + photos.length) % photos.length)}>‹</button>}<img src={photos[zoom]} alt="" />{photos.length > 1 && <button type="button" className="sch-lb-nav next" aria-label="Next" onClick={() => setZoom((zoom + 1) % photos.length)}>›</button>}</div>}
     <h3 className="sch-h3">With</h3>
     <div className="sch-staff-pick compact">{data.staff.filter((s) => cal?.staffIds.includes(s.id) || staffIds.includes(s.id) || data.isAdmin).map((s) => { const on = staffIds.includes(s.id); return <button key={s.id} type="button" disabled={!live} className={on ? "on" : ""} aria-pressed={on} onClick={() => setStaffIds(on ? staffIds.filter((x) => x !== s.id) : [...staffIds, s.id])}><Avatar person={s} size={26} /><span><b>{s.name}</b></span></button>; })}</div>
     {live && staffChanged && <div className="iv-actions" style={{ justifyContent: "flex-start" }}><button type="button" className="primary-button" disabled={busy || !staffIds.length} onClick={() => void send({ staffIds }, "Appointment reassigned. Calendars updated.")}>Save new assignment</button><button type="button" className="iv-btn" onClick={() => setStaffIds(booking.staffIds)}>Undo</button></div>}
@@ -821,13 +852,15 @@ export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, c
   const [staffId, setStaffId] = useState("");
   const [day, setDay] = useState(() => new Date());
   const week = mondayOf(day);
+  const [refresh, setRefresh] = useState(0);
   useEffect(() => {
     let live = true;
     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     const from = new Date(Math.min(addDays(week, -1).getTime(), monthStart.getTime())), to = new Date(Math.max(addDays(week, 8).getTime(), addDays(new Date(), 8).getTime()));
     api<Data>(scopeClientId, undefined, `&from=${from.toISOString()}&to=${to.toISOString()}`).then((d) => { if (live) { setData(d); setErr(""); } }).catch((e) => { if (live) setErr(errText(e, "Appointments couldn't load.")); });
     return () => { live = false; };
-  }, [scopeClientId, ymd(week)]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [scopeClientId, ymd(week), refresh]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [detail, setDetail] = useState<Booking | null>(null);
   const site = useSiteSample(scopeClientId, sample);
   const data = useMemo(() => sample ? sampleSchedule(realData, mondayOf(new Date()), clientName, site) : realData, [sample, realData, clientName, site]); // eslint-disable-line react-hooks/exhaustive-deps
   if (err && !realData && !sample) return null; // no Scheduling access: hide quietly
@@ -876,7 +909,7 @@ export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, c
     {!data ? <p className="dh-muted">Loading appointments…</p> : view === "day" ? <div className="sch-dash-day">
       <div className="sch-dash-day-list">
         <div className="sch-dash-stats"><span><b>{dayList.length}</b> booked</span><span><b>{dayList.filter((b) => Date.parse(b.start) > Date.now()).length}</b> to come</span><span><b>{dayList.filter((b) => b.status === "completed" || Date.parse(b.end) < Date.now()).length}</b> done</span></div>
-        {dayList.length ? <ul className="sch-dash-list">{dayList.map((b) => { const cal = calById.get(b.calendarId); return <li key={b.id} onClick={onOpen}><time>{time(b.start)}</time>{b.staffIds.length ? <span className="sch-dash-avs">{b.staffIds.slice(0, 2).map((id) => <Avatar key={id} person={personOf(id)} size={30} />)}</span> : <span className="sch-dash-av" style={{ ["--c" as string]: cal?.color || "#2563eb" }}>{(b.name || "?").slice(0, 1).toUpperCase()}</span>}<span className="sch-dash-who"><b>{b.name}</b><small>{cal?.name || ""}{b.staffIds.length ? ` · ${b.staffIds.map(nameOf).filter(Boolean).join(", ")}` : ""}</small></span></li>; })}</ul> : <p className="dh-muted">Nothing booked{isToday ? " today" : " this day"}.</p>}
+        {dayList.length ? <ul className="sch-dash-list">{dayList.map((b) => { const cal = calById.get(b.calendarId); return <li key={b.id} onClick={() => setDetail(b)}><time>{time(b.start)}</time>{b.staffIds.length ? <span className="sch-dash-avs">{b.staffIds.slice(0, 2).map((id) => <Avatar key={id} person={personOf(id)} size={30} />)}</span> : <span className="sch-dash-av" style={{ ["--c" as string]: cal?.color || "#2563eb" }}>{(b.name || "?").slice(0, 1).toUpperCase()}</span>}<span className="sch-dash-who"><b>{b.name}</b><small>{cal?.name || ""}{b.staffIds.length ? ` · ${b.staffIds.map(nameOf).filter(Boolean).join(", ")}` : ""}</small></span>{bookingPhoto(b) ? <img className="sch-dash-thumb" src={bookingPhoto(b)} alt="" loading="lazy" /> : null}</li>; })}</ul> : <p className="dh-muted">Nothing booked{isToday ? " today" : " this day"}.</p>}
       </div>
       <div className="sch-avail-list">{staff.map((p) => {
         const off = p.blocked?.includes(key); const windows = off ? [] : p.weekly?.[dk] || [];
@@ -889,8 +922,9 @@ export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, c
           <span className={`sch-avail-pill ${!windows.length ? "off" : !booked.length ? "free" : free ? "some" : "full"}`}>{summary}</span></div>; })}</div>
     </div> : <div className="sch-dash-week">{Array.from({ length: 7 }, (_, i) => addDays(week, i)).map((d) => { const k = ymd(d); const list = bookings.filter((b) => ymd(new Date(b.start)) === k).sort((a, b) => a.start.localeCompare(b.start)); return <div key={k} className={`sch-dash-wday${k === ymd(new Date()) ? " today" : ""}`}>
       <button type="button" className="sch-dash-wday-head" onClick={() => { setDay(d); setMode("day"); }}><small>{d.toLocaleDateString("en-IE", { weekday: "short" })}</small><b>{d.getDate()}</b>{list.length > 0 && <em>{list.length}</em>}</button>
-      <div className="sch-dash-wday-body">{list.length ? list.slice(0, 6).map((b) => { const cal = calById.get(b.calendarId); return <button type="button" key={b.id} className="sch-dash-chip" style={{ ["--c" as string]: cal?.color || "#2563eb" }} onClick={onOpen} title={`${time(b.start)} ${b.name} · ${cal?.name || ""}`}><span className="sch-chip-top"><b>{time(b.start)}</b><span className="sch-chip-avs">{b.staffIds.slice(0, 2).map((id) => <Avatar key={id} person={personOf(id)} size={20} />)}</span></span><span>{b.name}</span>{(() => { const pic = bookingPhoto(b); return pic ? <img className="sch-chip-img" src={pic} alt="" loading="lazy" onError={(ev) => { (ev.currentTarget as HTMLImageElement).style.display = "none"; }} /> : null; })()}</button>; }) : <span className="sch-dash-free">Free</span>}{list.length > 6 && <small className="iv-small">+{list.length - 6} more</small>}</div>
+      <div className="sch-dash-wday-body">{list.length ? list.slice(0, 6).map((b) => { const cal = calById.get(b.calendarId); return <button type="button" key={b.id} className="sch-dash-chip" style={{ ["--c" as string]: cal?.color || "#2563eb" }} onClick={() => setDetail(b)} title={`${time(b.start)} ${b.name} · ${cal?.name || ""}`}><span className="sch-chip-top"><b>{time(b.start)}</b><span className="sch-chip-avs">{b.staffIds.slice(0, 2).map((id) => <Avatar key={id} person={personOf(id)} size={20} />)}</span></span><span>{b.name}</span>{(() => { const pic = bookingPhoto(b); return pic ? <img className="sch-chip-img" src={pic} alt="" loading="lazy" onError={(ev) => { (ev.currentTarget as HTMLImageElement).style.display = "none"; }} /> : null; })()}</button>; }) : <span className="sch-dash-free">Free</span>}{list.length > 6 && <small className="iv-small">+{list.length - 6} more</small>}</div>
     </div>; })}</div>}
+    {detail && data && <AppointmentDetail key={detail.id} data={data} scope={scopeClientId} booking={detail} onClose={() => setDetail(null)} onSaved={(msg) => { setDetail(null); void msg; setRefresh((n) => n + 1); }} />}
   </section>;
 }
 

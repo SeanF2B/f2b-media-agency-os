@@ -181,7 +181,7 @@ export async function POST(request: Request) {
         if (!row || !inScope(ctx, row.client_id)) return fail("Appointment not found.", 404);
         if (ctx.ownOnly && !(JSON.parse(row.staff_ids || "[]") as string[]).includes(ctx.me?.id || "")) return fail("You can only change your own appointments.", 403);
         const staffIds = Array.isArray(body.staffIds) ? (body.staffIds as unknown[]).map(String).filter((id) => ctx.staff.some((s) => s.id === id)) : undefined;
-        const booking = await updateBooking(deps, ownerId, row.id, { status: str(body.status, 20) || undefined, start: str(body.start, 40) || undefined, staffIds, notes: typeof body.notes === "string" ? body.notes : undefined, by, notify: body.notify !== false }, workspaceFor(ctx));
+        const booking = await updateBooking(deps, ownerId, row.id, { status: str(body.status, 20) || undefined, start: str(body.start, 40) || undefined, staffIds, notes: typeof body.notes === "string" ? body.notes : undefined, addPhotos: Array.isArray(body.addPhotos) ? (body.addPhotos as unknown[]).map(String).slice(0, 6) : undefined, removePhoto: typeof body.removePhoto === "string" ? body.removePhoto : undefined, by, notify: body.notify !== false }, workspaceFor(ctx));
         return json({ booking });
       }
       case "quickCalendar": {

@@ -339,7 +339,7 @@ async function syncGoogle(deps: Deps, cal: CalendarConfig, row: BookingRow, work
   await deps.db.prepare("UPDATE sched_bookings SET google_events=?3, meet_link=?4 WHERE owner_id=?1 AND id=?2").bind(row.owner_id, row.id, JSON.stringify(events), meet || "").run();
 }
 
-export async function updateBooking(deps: Deps, ownerId: string, id: string, change: { status?: string; start?: string; staffIds?: string[]; notes?: string; by: string; notify?: boolean }, workspace: WorkspaceLite) {
+export async function updateBooking(deps: Deps, ownerId: string, id: string, change: { status?: string; start?: string; staffIds?: string[]; notes?: string; addPhotos?: string[]; removePhoto?: string; by: string; notify?: boolean }, workspace: WorkspaceLite) {
   const { db } = deps;
   const row = await getBooking(db, ownerId, id);
   if (!row) throw new SchedulingError("That appointment no longer exists.", 404);
@@ -383,6 +383,15 @@ export async function updateBooking(deps: Deps, ownerId: string, id: string, cha
     } else if (reassigned) await sendBookingEmails(deps, cal, fresh, workspace, workspace.clients.find((c) => c.id === cal.clientId), "reassigned", false);
   }
   if (typeof change.notes === "string") await db.prepare("UPDATE sched_bookings SET notes=?3, updated_at=?4 WHERE owner_id=?1 AND id=?2").bind(ownerId, id, clean(change.notes, 2000), now).run();
+  if (change.addPhotos?.length || change.removePhoto) {
+    const answers = parse<Array<{ label: string; value: string }>>(row.answers, []);
+    const keep = answers.filter((a) => !(/^Photo/i.test(a.label) && a.value === change.removePhoto));
+    const photos = keep.filter((a) => /^Photo/i.test(a.label)).map((a) => a.value);
+    const others = keep.filter((a) => !/^Photo/i.test(a.label));
+    const added = (change.addPhotos || []).map((u) => clean(u, 600)).filter((u) => /^(https:\/\/|\/media\/)/.test(u) && !photos.includes(u));
+    const all = [...photos, ...added].slice(0, 12).map((value, i) => ({ label: i ? `Photo ${i + 1}` : "Photo", value }));
+    await db.prepare("UPDATE sched_bookings SET answers=?3, updated_at=?4 WHERE owner_id=?1 AND id=?2").bind(ownerId, id, JSON.stringify([...others, ...all]), now).run();
+  }
   return bookingView((await getBooking(db, ownerId, id)) as BookingRow);
 }
 
