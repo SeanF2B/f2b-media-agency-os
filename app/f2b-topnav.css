@@ -2119,3 +2119,12 @@ html body .app-shell.dark-mode .crm-card-src { background: #26313a; color: #c3cc
 .team-signin-link { flex: 1; min-width: 200px; padding: 8px 10px; border-radius: 9px; background: color-mix(in srgb, currentColor 6%, transparent); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .team-signin-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .team-signin-actions button { display: inline-flex; align-items: center; gap: 6px; }
+/* Original client cards + integration icons and quick stats */
+html body .app-shell .client-list-card.has-extras { flex-wrap: wrap; cursor: pointer; row-gap: 8px; }
+html body .app-shell .client-list-card.has-extras .client-card-name { flex: 1; min-width: 0; }
+html body .app-shell .client-card-extras { flex-basis: 100%; display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px solid rgba(127,138,160,.15); }
+html body .app-shell .client-card-extras .ops-conn { flex-wrap: wrap; row-gap: 4px; }
+html body .app-shell .client-card-stats { display: flex; gap: 10px; flex-wrap: wrap; font-size: 11.5px; color: #667085; }
+html body .app-shell .client-card-stats b { color: #101828; font-size: 12.5px; }
+html body .app-shell .client-card-stats .warn b { color: #b07800; }
+html body .app-shell.dark-mode .client-card-stats b { color: #e7edf1; }

@@ -4,6 +4,7 @@ import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
 import { readFocusClient, setFocusClient, useFocusClient } from "@/lib/focus-client";
 import { BrandIcon } from "./brand-icon";
+import { ConnectionDots } from "./connection-dots";
 import { Briefcase, FileText, Globe, Check, Link2, Mail, MapPin, Megaphone, MessageCircle, Star, Search, type LucideIcon } from "lucide-react";
 import { AiVisibilityPanel } from "./ai-visibility-panel";
 import { RankTrackingPanel } from "./rank-tracking-panel";
@@ -22,31 +23,6 @@ type OpsClient = {
 };
 type OpsTask = { id: string; clientId: string; title?: string; status: string; due?: string; dueAt?: string; repeat?: string; paused?: boolean; aiRunAt?: string; completedAt?: string; aiDismissedAt?: string; aiApprovals?: Array<{ status?: string }>; aiRunState?: string };
 
-// Every connection a client can have, shown as an icon with a green (connected) or red (missing) dot.
-const CONNECTIONS: Array<{ key: string; label: string; page: string; ok: (client: OpsClient, hasSite: boolean) => boolean; icon: React.ReactNode }> = [
-  { key: "gads", label: "Google Ads", page: "Google Ads", ok: (c) => Boolean(c.googleAdsAccountId), icon: <svg viewBox="0 0 24 24"><path fill="currentColor" d="M9.4 3.6a3 3 0 0 1 4.1 1.1l6.6 11.4a3 3 0 1 1-5.2 3l-6.6-11.4a3 3 0 0 1 1.1-4.1ZM5 15.5a3 3 0 1 1 0 6 3 3 0 0 1 0-6Z" /></svg> },
-  { key: "meta", label: "Meta Ads", page: "Meta Ads", ok: (c) => Boolean(c.metaAdsAccountId), icon: <svg viewBox="0 0 24 24"><path fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" d="M3 15c0-4 2-8 4.5-8C11 7 13 17 16.5 17 19 17 21 14.5 21 12s-1.5-5-3.5-5C14 7 12 17 7.5 17 5 17 3 16 3 15Z" /></svg> },
-  { key: "gsc", label: "Search Console", page: "SEO", ok: (c) => Boolean(c.googleSearchConsoleAccountId), icon: <svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6" fill="none" stroke="currentColor" strokeWidth="2.4" /><path stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" d="m15 15 5 5" /></svg> },
-  { key: "ga4", label: "Google Analytics", page: "SEO", ok: (c) => Boolean(c.googleAnalyticsAccountId), icon: <svg viewBox="0 0 24 24"><rect x="4" y="12" width="4" height="8" rx="2" fill="currentColor" /><rect x="10" y="8" width="4" height="12" rx="2" fill="currentColor" /><rect x="16" y="3" width="4" height="17" rx="2" fill="currentColor" /></svg> },
-  { key: "gbp", label: "Business Profile", page: "SEO", ok: (c) => Boolean(c.googleBusinessProfileLocationId || c.googleBusinessProfileAccountId), icon: <svg viewBox="0 0 24 24"><path fill="currentColor" d="M4 4h16l1.5 5a3 3 0 0 1-5 2.2 3 3 0 0 1-5 0 3 3 0 0 1-5 0A3 3 0 0 1 2.5 9L4 4Zm1 9.5V20h14v-6.5a5 5 0 0 1-3.5-.6 5 5 0 0 1-3.5 1 5 5 0 0 1-3.5-1 5 5 0 0 1-3.5.6Z" /></svg> },
-  { key: "site", label: "Website", page: "Sites", ok: (c, hasSite) => hasSite || Boolean(c.wordpressSiteUrl), icon: <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2" /><path fill="none" stroke="currentColor" strokeWidth="2" d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18" /></svg> },
-];
-function ConnectionDots({ client, hasSite, onOpen }: { client: OpsClient; hasSite: boolean; onOpen: (page: string) => void }) {
-  const done = CONNECTIONS.filter((item) => item.ok(client, hasSite)).length;
-  const pct = Math.round(done / CONNECTIONS.length * 100);
-  return <span className="ops-conn"><span className={`ops-conn-pct ${pct >= 80 ? "good" : pct >= 50 ? "mid" : "low"}`} style={{ ["--pct" as string]: `${pct}%` }} title={`${done} of ${CONNECTIONS.length} connected`}><b>{pct}%</b></span>{CONNECTIONS.map((item) => { const ok = item.ok(client, hasSite); return <button key={item.key} type="button" className={ok ? "ok" : "missing"} title={`${item.label}: ${ok ? "connected" : "not connected"}`} aria-label={`${item.label} ${ok ? "connected" : "not connected"}`} onClick={() => onOpen(ok ? item.page : "Integrations")}><BrandIcon id={item.key} size={16} fallback={item.icon} /><i /></button>; })}{done < CONNECTIONS.length && <QuickConnectLink client={client} missing={CONNECTIONS.filter((item) => !item.ok(client, hasSite)).map((item) => item.label)} />}</span>;
-}
-// Quick link a client can open to connect their own accounts (their Launchpad), copied or emailed in one click.
-function QuickConnectLink({ client, missing }: { client: OpsClient; missing: string[] }) {
-  const [copied, setCopied] = useState(false);
-  const [link, setLink] = useState("");
-  // A signed, login-free link to the client's own connect page (no Agency OS / Cloudflare sign-in needed).
-  const getLink = async () => { if (link) return link; const response = await fetch(`/api/client-connect-link?clientId=${encodeURIComponent(client.id)}`, { cache: "no-store" }); const json = await response.json().catch(() => ({})) as { url?: string; error?: string }; if (!response.ok || !json.url) throw new Error(json.error || "Couldn’t make the link."); setLink(json.url); return json.url; };
-  const copy = async () => { let url = ""; try { url = await getLink(); await navigator.clipboard.writeText(url); setCopied(true); window.setTimeout(() => setCopied(false), 1600); } catch (reason) { if (url) await appPrompt("Copy this link:", url); else await appAlert(reason instanceof Error ? reason.message : "Couldn’t make the link."); } };
-  const email = async () => { try { const url = await getLink(); window.location.href = mailFor(url); } catch (reason) { await appAlert(reason instanceof Error ? reason.message : "Couldn’t make the link."); } };
-  const mailFor = (url: string) => `mailto:${encodeURIComponent((client as OpsClient & { email?: string }).email || "")}?subject=${encodeURIComponent(`Connect your accounts · ${client.name}`)}&body=${encodeURIComponent(`Hi,\n\nCould you connect these so we can manage everything in one place: ${missing.join(", ")}.\n\nOpen this link and follow the steps (no login needed):\n${url}\n\nThanks!`)}`;
-  return <span className="ops-quick-link"><button type="button" title={copied ? "Link copied" : "Copy a connect link for this client"} aria-label={`Copy connect link for ${client.name}`} onClick={() => void copy()}>{copied ? <Check size={14} /> : <Link2 size={14} />}</button><button type="button" onClick={() => void email()} title="Email the connect link to the client" aria-label={`Email connect link to ${client.name}`}><Mail size={14} /></button></span>;
-}
 type SiteRow = { clientId: string; backend: string; previewUrl: string; repo: string; branch: string; updatedAt: string };
 // Where everything lives: Overview (performance, priorities, issues) · Google Ads (campaigns, optimisation,
 // conversions) · SEO & AI (SEO, AEO/GEO, keyword research, Business Profile, backlinks, AI visibility) ·
@@ -169,15 +145,15 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
       {OPS_TABS.filter(([key]) => (key !== "clients" || clientsView) && (!["seo", "ads", "reports"].includes(key) || renderTool)).map(([key, label, Icon]) => { const on = tab === key || (key === "clients" && tab === "onboarding"); return <button type="button" role="tab" key={key} aria-selected={on} className={on ? "active" : ""} onClick={() => { if (key === "clients") setWorkroom(false); onTab(key); }}><Icon size={16} strokeWidth={1.9} aria-hidden="true" className="ops-tab-icon" />{label}</button>; })}
     </div>
 
-    {tab === "clients" && workroom && clientsView && <><button type="button" className="text-button ops-back" onClick={() => setWorkroom(false)}>← All clients</button>{clientsView}</>}
-    {tab === "clients" && !workroom && <p className="ops-more">Also: {[["Meta Ads", "Meta Ads"], ["Proposal Studio", "Proposals"]].map(([page, label], index) => <span key={page}>{index ? " · " : ""}<button type="button" className="text-button" onClick={() => onOpenPage(page)}>{label}</button></span>)}</p>}
-    {tab === "clients" && !workroom && <>
+    {tab === "clients" && <p className="ops-more">Also: {[["Meta Ads", "Meta Ads"], ["Proposal Studio", "Proposals"]].map(([page, label], index) => <span key={page}>{index ? " · " : ""}<button type="button" className="text-button" onClick={() => onOpenPage(page)}>{label}</button></span>)}</p>}
+    {tab === "clients" && <>
       <div className="ops-summary">
         <div><b>{active.length}</b><span>Active clients</span></div>
         <button type="button" onClick={() => onOpenPage("Tasks")}><b>{rows.reduce((sum, row) => sum + row.openTasks, 0)}</b><span>Open tasks</span></button>
         <button type="button" onClick={() => onOpenPage("Tasks")}><b>{totalApprovals}</b><span>Waiting for review</span></button>
         <div className={issues ? "warn" : ""}><b>{issues}</b><span>Missing connections</span></div>
       </div>
+      {clientsView ? clientsView : <>
       <div className="ops-toolbar"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search clients…" aria-label="Search clients" /><span className="ops-status-filter" role="tablist" aria-label="Client status">{([["active", "Active"], ["inactive", "Inactive"], ["all", "All"]] as const).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={statusView === key} className={statusView === key ? "active" : ""} onClick={() => setStatusView(key)}>{label}<span>{key === "all" ? clients.filter((c) => !/^agency$/i.test(c.name.trim())).length : clients.filter((c) => !/^agency$/i.test(c.name.trim()) && (key === "active" ? isActiveClient(c) : !isActiveClient(c))).length}</span></button>)}</span>{onStartOnboarding && <button type="button" className="primary-button" onClick={() => onStartOnboarding("")}>＋ Onboard a client</button>}</div>
       <div className="ops-cards">{rows.map(({ client, openTasks, approvals }) => { const services = [...new Set((client.services || []).map((service) => serviceName(service.name)))]; const open = () => { if (clientsView && onPickClient) { onPickClient(client.id); setWorkroom(true); } else onEditClient?.(client.id); }; return <article key={client.id} className={`ops-card${isActiveClient(client) ? "" : " inactive"}`}>
         <button type="button" className="ops-card-head" onClick={open} title={`Open ${client.name}`}>{client.logo ? <img src={client.logo} alt="" /> : <i style={{ background: client.color || "#d9dee3" }}>{client.name.slice(0, 1)}</i>}<span><b>{client.name}</b><small>{services.length ? services.join(" · ") : "No services yet"}</small></span><em className={isActiveClient(client) ? "on" : ""}>{isActiveClient(client) ? "Active" : "Inactive"}</em></button>
@@ -188,7 +164,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
           <div><b>{(client.services || []).length}</b><small>Services</small></div>
         </div>
         <div className="ops-card-actions">{clientsView && onPickClient && <button type="button" className="primary-button" onClick={open}>Open client</button>}{onStartOnboarding && <button type="button" className="secondary-button" onClick={() => onStartOnboarding(client.id)}>Onboard</button>}<select aria-label={`Open a tool for ${client.name}`} value="" onChange={(event) => { const value = event.target.value; if (value === "website") onOpenWebsite(client); else if (value.startsWith("tab:")) { setToolClientId(client.id); onTab(value.slice(4) as OperationsTab); } else if (value === "profile") onEditClient?.(client.id); else if (value) onOpenPage(value, client.id); }}><option value="">Tools…</option><option value="website">Website builder</option><option value="tab:ads">Google Ads</option><option value="tab:seo">SEO &amp; AI</option><option value="tab:email">Email</option><option value="tab:reports">Reports</option><option value="Meta Ads">Meta Ads</option>{onEditClient && <option value="profile">Edit profile</option>}</select></div>
-      </article>; })}</div>{!rows.length && <p className="ops-empty">No clients match.</p>}
+      </article>; })}</div>{!rows.length && <p className="ops-empty">No clients match.</p>}</>}
     </>}
 
     {tab === "websites" && <div className="ops-subbar">{seg(siteMode, setSiteMode, [["sites", "Sites & domains"], ["forms", "Forms"], ["media", "Media library"]], "Websites sections")}</div>}
