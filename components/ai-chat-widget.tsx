@@ -128,13 +128,28 @@ export function AiChatWidget({ page, pageName, clientId, avatar, enabled, onComm
   const TOAST_FOCUS: Record<string, RegExp | null> = { Overview: /./, CRM: /lead|follow|conversation|reply/i, Conversations: /conversation|reply|message|lead|follow/i, Tasks: /approv|overdue|task|review/i, Bookkeeping: /invoice|expense|income|receipt|payment/i, Scheduling: /appointment|booking|book/i };
   const pageRef = useRef(page); pageRef.current = page;
   // A short, page-relevant offer of help (once per page per session).
-  const PAGE_NUDGE: Record<string, string> = { Overview: "need a hand with anything today?", CRM: "need help adding or following up a lead?", Conversations: "want me to draft a reply?", Tasks: "need some help setting up a task?", Bookkeeping: "want me to log an expense or receipt?", Scheduling: "want to book an appointment in?", Operations: "need a hand with a client’s marketing?", "Media Library": "want to upload job photos?", "Lead Factory": "want me to find new businesses to contact?" };
+  const PAGE_NUDGE: Record<string, string[]> = {
+    Overview: ["need a hand with anything today?", "want a quick rundown of what needs you?", "shall I check what’s waiting on approvals?", "want me to add a task for later?"],
+    CRM: ["need help adding a lead?", "want me to chase up your newest leads?", "shall I move a lead along the pipeline?", "want to tag a few contacts?"],
+    Conversations: ["want me to draft a reply?", "need help answering a quote request?", "shall I book someone in from a chat?"],
+    Tasks: ["need some help setting up a task?", "want me to plan this week’s tasks?", "shall I create a follow-up task for a client?", "want me to sort out what’s overdue?"],
+    Bookkeeping: ["want me to log an expense?", "got a receipt to add?", "shall I add income from a client?", "want to see how this month’s looking?"],
+    Scheduling: ["want to book an appointment in?", "shall I set up a new booking calendar?", "need to block out a day off?"],
+    Operations: ["need a hand with a client’s marketing?", "want me to check how the ads are doing?", "shall I set up an SEO task?"],
+    "Media Library": ["want to upload job photos?", "shall I sort photos by service?", "need an image made with AI?"],
+    "Lead Factory": ["want me to find new businesses to contact?", "shall I set up a new ICP?", "want to check your saved lists?"],
+  };
   useEffect(() => {
     setToast((current) => current && !/tour/i.test(current.text) ? null : current);
-    if (!enabled || !PAGE_NUDGE[page]) return;
-    let seen = ""; try { seen = window.sessionStorage.getItem(`f2b-ai-nudge-${page}`) || ""; } catch { /* ignore */ }
-    if (seen) return;
-    const timer = window.setTimeout(() => { try { window.sessionStorage.setItem(`f2b-ai-nudge-${page}`, "1"); } catch { /* ignore */ } setToast((current) => current || { text: `Hey boss 👋 ${PAGE_NUDGE[page]}`, action: { label: "Yes please", run: () => openChat() } }); }, 4000);
+    const lines = PAGE_NUDGE[page];
+    if (!enabled || !lines) return;
+    // Different line each time, at most once every 3 minutes per page.
+    let last = 0; try { last = Number(window.sessionStorage.getItem(`f2b-ai-nudge-${page}`) || 0); } catch { /* ignore */ }
+    if (Date.now() - last < 3 * 60_000) return;
+    const h = new Date().getHours();
+    const hello = ["Hey boss 👋", h < 12 ? "Morning boss ☀️" : h < 18 ? "Afternoon boss 👋" : "Evening boss 🌙", "Hi boss 👋"][Math.floor(Math.random() * 3)];
+    const line = lines[Math.floor(Math.random() * lines.length)];
+    const timer = window.setTimeout(() => { try { window.sessionStorage.setItem(`f2b-ai-nudge-${page}`, String(Date.now())); } catch { /* ignore */ } setToast((current) => current || { text: `${hello} ${line}`, action: { label: "Yes please", run: () => openChat() } }); }, 3500);
     return () => window.clearTimeout(timer);
   }, [page, enabled]); // eslint-disable-line react-hooks/exhaustive-deps
   // Notifications: what's waiting (approvals, new leads, unread messages). Checked on load and every 10 minutes.
