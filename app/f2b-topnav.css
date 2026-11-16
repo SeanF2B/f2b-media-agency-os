@@ -2137,3 +2137,31 @@ html body .app-shell .client-list .client-list-search { width: 100%; box-sizing:
 html body .app-shell.dark-mode .client-list .client-list-search { background: #1b2128; border-color: rgba(255,255,255,.16); }
 html body .app-shell .client-list .client-list-card { will-change: transform; transition: opacity .2s ease; }
 html body .app-shell .client-list .client-list-card.no-match { opacity: .38; }
+
+/* ===== Tighter CRM: less wasted space on every page (final say) ===== */
+html body .app-shell .main-area .page-heading { margin-bottom: 12px !important; gap: 12px !important; align-items: center !important; }
+html body .app-shell .main-area .page-heading h1 { font-size: clamp(24px, 2.2vw, 30px) !important; line-height: 1.1 !important; margin: 0 !important; }
+html body .app-shell .main-area .page-heading .eyebrow { margin: 0 0 3px !important; font-size: 10px !important; }
+html body .app-shell .main-area .page-heading p.muted { margin: 3px 0 0 !important; font-size: 13px !important; line-height: 1.35 !important; max-width: 70ch; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html body .app-shell .main-area .page-heading :is(.primary-button, .secondary-button, .task-sound-toggle) { padding: 7px 13px !important; font-size: 13.5px !important; min-height: 0 !important; height: auto !important; }
+
+/* ===== Tasks: clean, compact header and toolbar ===== */
+html body .app-shell .main-area .task-page-heading p.muted { display: none !important; }
+html body .app-shell .main-area .task-page-heading .eyebrow { display: none !important; }
+html body .app-shell .main-area .task-view-switch-row { display: inline-flex !important; gap: 6px !important; margin: 0 8px 8px 0 !important; padding: 0 !important; background: transparent !important; border: 0 !important; box-shadow: none !important; vertical-align: middle; }
+html body .app-shell .main-area .task-view-switch-row .task-ai-toggle { padding: 4px 10px 4px 6px !important; gap: 6px !important; font-size: 13px !important; border-radius: 10px !important; min-height: 0 !important; }
+html body .app-shell .main-area .task-view-switch-row .task-ai-toggle-track { transform: scale(.8); transform-origin: left center; margin-right: -6px; }
+html body .app-shell .main-area .workflow-review-tabs { display: inline-flex !important; width: auto !important; padding: 3px !important; gap: 3px !important; margin: 0 0 8px !important; border-radius: 12px !important; box-shadow: none !important; vertical-align: middle; }
+html body .app-shell .main-area .workflow-review-tabs > button { padding: 5px 11px !important; font-size: 13px !important; min-height: 0 !important; gap: 6px !important; border-radius: 9px !important; }
+html body .app-shell .main-area .workflow-review-tabs > button :is(span, i, b):last-child { font-size: 11px; }
+html body .app-shell .main-area .workflow-review-tabs > button svg, html body .app-shell .main-area .workflow-review-tabs > button img { width: 14px !important; height: 14px !important; }
+html body .app-shell .main-area .pipeline-toolbar { padding: 6px 10px !important; margin: 0 0 10px !important; min-height: 0 !important; gap: 8px !important; border-radius: 12px !important; box-shadow: none !important; }
+html body .app-shell .main-area .pipeline-toolbar > div:first-child { gap: 6px !important; font-size: 12px; }
+html body .app-shell .main-area .pipeline-toolbar-filters { gap: 6px !important; }
+html body .app-shell .main-area .pipeline-toolbar-filters :is(select, button, .pipeline-select-filter) { min-height: 0 !important; padding-top: 5px !important; padding-bottom: 5px !important; font-size: 12.5px !important; }
+html body .app-shell .main-area .pipeline-toolbar-filters label > span:first-child, html body .app-shell .main-area .pipeline-select-filter > span:first-child { font-size: 11px !important; }
+
+/* Compact task cards: pending reason as one short line (full reason + "Why" button in the popup) */
+html body .app-shell .pipeline-card.is-compact .task-pending-reason { padding: 4px 8px !important; font-size: 11.5px !important; display: block !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-radius: 8px !important; }
+html body .app-shell .pipeline-card.is-compact .task-pending-reason :is(small, button) { display: none !important; }
+html body .app-shell .pipeline-card.is-compact .pipeline-card-details > :not(summary) { display: none !important; }
