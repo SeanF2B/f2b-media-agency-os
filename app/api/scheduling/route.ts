@@ -1,7 +1,8 @@
 import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "../../chatgpt-auth";
 import { crmScopeFrom } from "@/lib/client-accounts/client-accounts-api";
-import { loadSchedulingWorkspace, schedulingDeps, SCHED_MANAGER_ROLES, SCHED_ROLES } from "@/lib/scheduling/context";
+import { loadSchedulingWorkspace, schedulingDeps } from "@/lib/scheduling/context";
+import { getMemberPermissions } from "@/lib/access-permissions";
 import { googleSchedulingAvailable, startGoogleConnect, disconnectGoogle } from "@/lib/scheduling/google";
 import { aiConfigured, aiEndpoint, aiHeaders, aiModel, getAiProvider, resolveAiProvider, type AiProvider } from "@/lib/ai-provider";
 import { sanitizeCalendar, sanitizeWeekly } from "@/lib/scheduling/core";
@@ -26,13 +27,17 @@ async function context(request: Request) {
   const requested = (crmScopeFrom(request) as { clientId: string | null } | null)?.clientId ?? null;
   if (admin) {
     const scope = requested && ws.clients.some((c) => c.id === requested) ? requested : null; // null = agency view (everything)
-    return { user, ws, me, admin, canManage: true, scope, staff: ws.staff };
+    return { user, ws, me, admin, canManage: true, ownOnly: false, scope, staff: ws.staff };
   }
-  const allowed = me && SCHED_ROLES.includes(me.role || "") && (!Array.isArray(me.pageAccess) || me.pageAccess.includes("Scheduling")) ? (me.clientAccessIds || []).filter((id) => ws.clients.some((c) => c.id === id)) : [];
-  if (!allowed.length || !me) return { response: fail("You don't have access to Scheduling.", 403) };
-  const scope = requested && allowed.includes(requested) ? requested : allowed[0];
-  const staff = ws.staffRaw.filter((s) => s.id === me.id || (s.clientAccessIds || []).includes(scope)).map(({ id, name, email, role, avatar }) => ({ id, name, email, role, avatar }));
-  return { user, ws, me, admin: false, canManage: SCHED_MANAGER_ROLES.includes(me.role || ""), scope, staff };
+  // Everyone else goes by their Scheduling permissions (Team → permissions).
+  const perms = me ? getMemberPermissions(me as never, ws.ownerId) : null;
+  if (!me || !perms?.scheduling || (Array.isArray(me.pageAccess) && !me.pageAccess.includes("Scheduling"))) return { response: fail("You don't have access to Scheduling.", 403) };
+  const isSubAccount = me.staffType === "subaccount" || /^Sub-account/.test(me.role || "");
+  const allowed = [...(isSubAccount ? [] : [""]), ...(me.clientAccessIds || []).filter((id) => ws.clients.some((c) => c.id === id))];
+  if (!allowed.length) return { response: fail("You don't have access to any accounts in Scheduling.", 403) };
+  const scope = requested !== null && allowed.includes(requested) ? requested : allowed[0];
+  const staff = ws.staffRaw.filter((s) => s.id === me.id || (scope ? (s.clientAccessIds || []).includes(scope) : s.staffType !== "subaccount")).map(({ id, name, email, role, avatar }) => ({ id, name, email, role, avatar }));
+  return { user, ws, me, admin: false, canManage: Boolean(perms.manageScheduling), ownOnly: !perms.allAppointments, scope, staff };
 }
 type Ctx = Exclude<Awaited<ReturnType<typeof context>>, { response: Response }>;
 
@@ -63,7 +68,8 @@ export async function GET(request: Request) {
     }
     const from = Date.parse(url.searchParams.get("from") || "") || Date.now() - 7 * 86_400_000;
     const to = Math.min(Date.parse(url.searchParams.get("to") || "") || Date.now() + 35 * 86_400_000, from + 120 * 86_400_000);
-    const [calendars, bookings] = await Promise.all([listCalendars(db, ctx.ws.ownerId, ctx.scope), listBookings(db, ctx.ws.ownerId, ctx.scope, new Date(from).toISOString(), new Date(to).toISOString())]);
+    const [calendars, allBookings] = await Promise.all([listCalendars(db, ctx.ws.ownerId, ctx.scope), listBookings(db, ctx.ws.ownerId, ctx.scope, new Date(from).toISOString(), new Date(to).toISOString())]);
+    const bookings = ctx.ownOnly ? allBookings.filter((b) => b.staffIds.includes(ctx.me?.id || "")) : allBookings;
     const deps = schedulingDeps(request);
     const staffIds = ctx.staff.map((s) => s.id);
     const [settings, google, profiles] = await Promise.all([getStaffSettings(db, ctx.ws.ownerId, staffIds), deps.google ? deps.google.connected(ctx.ws.ownerId, staffIds) : Promise.resolve({} as Record<string, string>), getStaffProfiles(db, ctx.ws.ownerId, staffIds)]);
@@ -73,7 +79,7 @@ export async function GET(request: Request) {
       return { ...s, timezone: av?.timezone, weekly: av?.weekly, blocked: av?.blocked, dailyLimit: av?.dailyLimit || 0, google: google[s.id] || "", profile: profiles[s.id] || null, feedUrl: mine(s.id) && av?.icsToken ? `${deps.baseUrl}/api/marketing-public/scheduling?ics=${av.icsToken}` : "", canEdit: mine(s.id) };
     });
     const clients = (ctx.scope === null ? ctx.ws.clients : ctx.ws.clients.filter((c) => c.id === ctx.scope)).map((c) => ({ id: c.id, name: c.name, logo: c.logo || "" }));
-    return json({ calendars, bookings, staff, clients, scope: ctx.scope, canManage: ctx.canManage, isAdmin: ctx.admin, meId: ctx.me?.id || "", googleAvailable: googleSchedulingAvailable(), emailReady: Boolean(deps.sendEmail), publicBase: `${deps.baseUrl}/f/book/` });
+    return json({ calendars, bookings, staff, clients, scope: ctx.scope, canManage: ctx.canManage, ownOnly: ctx.ownOnly, isAdmin: ctx.admin, meId: ctx.me?.id || "", googleAvailable: googleSchedulingAvailable(), emailReady: Boolean(deps.sendEmail), publicBase: `${deps.baseUrl}/f/book/` });
   } catch (error) {
     return fail(error instanceof Error ? error.message : "Scheduling could not load.", error instanceof SchedulingError ? error.status : 500);
   }
@@ -159,6 +165,7 @@ export async function POST(request: Request) {
       case "updateBooking": {
         const row = await getBooking(db, ownerId, str(body.id, 80));
         if (!row || !inScope(ctx, row.client_id)) return fail("Appointment not found.", 404);
+        if (ctx.ownOnly && !(JSON.parse(row.staff_ids || "[]") as string[]).includes(ctx.me?.id || "")) return fail("You can only change your own appointments.", 403);
         const staffIds = Array.isArray(body.staffIds) ? (body.staffIds as unknown[]).map(String).filter((id) => ctx.staff.some((s) => s.id === id)) : undefined;
         const booking = await updateBooking(deps, ownerId, row.id, { status: str(body.status, 20) || undefined, start: str(body.start, 40) || undefined, staffIds, notes: typeof body.notes === "string" ? body.notes : undefined, by, notify: body.notify !== false }, workspaceFor(ctx));
         return json({ booking });

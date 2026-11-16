@@ -49,7 +49,7 @@ function Modal({ title, onClose, children, footer, wide }: { title: string; onCl
   </div>;
 }
 
-export function SchedulingView({ scopeClientId, onAddStaff }: { scopeClientId: string; onAddStaff?: () => void }) {
+export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { scopeClientId: string; onAddStaff?: () => void; onEditStaff?: (staffId: string) => void }) {
   // Stretch the day so 07:00–21:00 fills the window (calendar always in full view).
   const weekRef = useRef<HTMLDivElement>(null);
   const [PX_PER_MIN, setPpm] = useState(PX_DEFAULT);
@@ -221,18 +221,22 @@ export function SchedulingView({ scopeClientId, onAddStaff }: { scopeClientId: s
 
     {tab === "availability" && <div className="sch-staff-grid">
       {data.staff.map((s) => { const days = DAY_LIST.filter(([k]) => s.weekly?.[k]?.length);
-        return <div key={s.id} className="iv-card sch-staff">
-          <div className="sch-staff-top"><Avatar person={s} size={40} /><div><b>{s.name}</b><small>{s.role}{s.dailyLimit ? ` · max ${s.dailyLimit}/day` : ""}</small></div></div>
-          <div className="sch-hours-sum">{days.length ? days.map(([k, l]) => <span key={k}><b>{l.slice(0, 3)}</b> {(s.weekly?.[k] || []).map((w) => `${w[0]}–${w[1]}`).join(", ")}</span>) : <span className="iv-need-text iv-small">No working hours set, so nobody can book this person.</span>}{s.blocked?.filter((d) => d >= todayKey).length ? <span className="iv-small">{s.blocked.filter((d) => d >= todayKey).length} day(s) off coming up</span> : null}</div>
-          <div className="sch-sync">
-            <div><img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_48dp.png" alt="" width={18} height={18} /><span>{s.google ? <>Google: <b>{s.google}</b></> : "Google Calendar not connected"}</span>
-              {s.canEdit && (s.google ? <button type="button" className="iv-btn danger" disabled={busy} onClick={() => void act({ action: "disconnectGoogle", staffId: s.id }, "Google Calendar disconnected.")}>Disconnect</button> : data.googleAvailable ? <span className="sch-connect-pair"><a className="iv-btn" href={`/api/scheduling?${scopeQs(scopeClientId)}&connect=${encodeURIComponent(s.id)}`}>Connect</a>{data.canManage && <button type="button" className="iv-btn" title={`Copy a link to send ${s.name.split(" ")[0]} so they can connect their own Google Calendar`} onClick={() => { void navigator.clipboard?.writeText(`${window.location.origin}/api/scheduling?${scopeQs(scopeClientId)}&connect=${encodeURIComponent(s.id)}`); setNote(`Link copied — send it to ${s.name.split(" ")[0]}. They sign in to the OS, then pick their Google account.`); }}>Copy link</button>}</span> : <span className="iv-small">Not set up on server</span>)}</div>
-            <div><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="4" fill="#fff" stroke="#e11d48" strokeWidth="1.6" /><rect x="3" y="4" width="18" height="5" rx="2" fill="#e11d48" /><text x="12" y="18" textAnchor="middle" fontSize="8" fontWeight="700" fill="#111">31</text></svg><span>Apple / Outlook calendar feed</span>
-              {s.canEdit && (s.feedUrl ? <><button type="button" className="iv-btn" onClick={() => { void navigator.clipboard?.writeText(s.feedUrl); setNote("Feed link copied. On iPhone: Settings → Calendar → Accounts → Add Account → Other → Add Subscribed Calendar, then paste. On Mac: Calendar → File → New Calendar Subscription. In Outlook: Add calendar → Subscribe from web."); }}>Copy link</button><button type="button" className="iv-btn" title="Make a new private link (the old one stops working)" onClick={() => void act({ action: "rotateFeed", staffId: s.id }, "New private feed link created. Re-subscribe with the new link.")}><RefreshCw size={12} /></button></> : <button type="button" className="iv-btn" onClick={() => void act({ action: "createFeed", staffId: s.id }, "Private feed link ready. Click Copy link.")}>Create link</button>)}</div>
+        const groups: Array<[string, string]> = []; // e.g. ["Mon–Fri", "09:00–17:00"]
+        for (const [k, l] of days) { const hours = (s.weekly?.[k] || []).map((w) => `${w[0]}–${w[1]}`).join(", "); const last = groups[groups.length - 1]; const prevKey = days[days.findIndex(([x]) => x === k) - 1]?.[0]; if (last && last[1] === hours && prevKey && DAY_LIST.findIndex(([x]) => x === k) - DAY_LIST.findIndex(([x]) => x === prevKey) === 1) last[0] = `${last[0].split("–")[0]}–${l.slice(0, 3)}`; else groups.push([l.slice(0, 3), hours]); }
+        const rating = s.profile?.reviews.length ? (s.profile.reviews.reduce((n, r) => n + r.rating, 0) / s.profile.reviews.length).toFixed(1) : "";
+        const offSoon = s.blocked?.filter((d) => d >= todayKey).length || 0;
+        return <div key={s.id} className="iv-card sch-staff sch-staff-clean">
+          <div className="sch-staff-top"><Avatar person={s} size={42} /><div><b>{s.name.split("|")[0].trim()}</b><small>{s.profile?.title || (s.name.includes("|") ? s.name.split("|")[1].trim() : s.role)}</small></div>
+            {(onEditStaff || s.canEdit || data.canManage) && <button type="button" className="iv-btn sch-edit-btn" onClick={() => onEditStaff ? onEditStaff(s.id) : setEditAvail(s)}><Settings2 size={13} /> Edit</button>}</div>
+          <div className="sch-staff-lines">
+            <span><Clock size={13} /> {groups.length ? groups.map(([d, h]) => `${d} ${h}`).join(" · ") : <span className="iv-need-text">No working hours, so nobody can book them</span>}</span>
+            {offSoon > 0 && <span className="iv-small">🏖 {offSoon} day{offSoon === 1 ? "" : "s"} off coming up</span>}
           </div>
-          {s.profile && (s.profile.reviews.length > 0 || s.profile.photos.length > 0) && <div className="sch-profile-sum">{s.profile.reviews.length > 0 && <span className={s.profile.showReviews ? "" : "muted"}>★ {(s.profile.reviews.reduce((n, r) => n + r.rating, 0) / s.profile.reviews.length).toFixed(1)} · {s.profile.reviews.length} review{s.profile.reviews.length === 1 ? "" : "s"}{s.profile.showReviews ? "" : " (hidden)"}</span>}{s.profile.photos.length > 0 && <span className={s.profile.showPhotos ? "" : "muted"}>{s.profile.photos.length} photo{s.profile.photos.length === 1 ? "" : "s"}{s.profile.showPhotos ? "" : " (hidden)"}</span>}</div>}
-          {(s.canEdit || data.canManage) && <div className="iv-actions"><button type="button" className="iv-btn" onClick={() => setEditAvail(s)}><Clock size={13} /> Edit hours &amp; days off</button><button type="button" className="iv-btn" onClick={() => setEditProfile(s)}>★ Reviews &amp; photos</button></div>}
-          {(s.canEdit || data.canManage) && <ReviewLinkBar staffId={s.id} staffName={s.name} scope={scopeClientId} />}
+          <div className="sch-staff-chips">
+            <span className={`sch-chip-status ${s.google ? "on" : ""}`}><img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_48dp.png" alt="" width={14} height={14} />{s.google ? "Google synced" : "Google not connected"}</span>
+            <span className={`sch-chip-status ${s.feedUrl ? "on" : ""}`}>📅 {s.feedUrl ? "Apple/Outlook feed on" : "No calendar feed"}</span>
+            {rating && <span className={`sch-chip-status ${s.profile?.showReviews ? "on gold" : ""}`}>★ {rating} · {s.profile?.reviews.length}</span>}
+          </div>
         </div>; })}
       {onAddStaff && <button type="button" className="iv-card sch-staff sch-add-staff" onClick={onAddStaff}><span className="sch-add-plus">＋</span><b>Add staff</b><small>Invite a team member, then connect their calendar</small></button>}
     </div>}
@@ -302,15 +306,17 @@ function CalendarEditor({ data, value, busy, onClose, onSave, onDelete }: { data
   </Modal>;
 }
 
-function AvailabilityEditor({ staff, busy, onClose, onSave }: { staff: Staff; busy: boolean; onClose: () => void; onSave: (v: { weekly: Partial<Record<DayKey, Window[]>>; blocked: string[]; dailyLimit: number; timezone: string }) => void }) {
+type HoursValue = { weekly: Partial<Record<DayKey, Window[]>>; blocked: string[]; dailyLimit: number; timezone: string };
+function HoursForm({ staff, onChange }: { staff: Staff; onChange: (v: HoursValue) => void }) {
   const [weekly, setWeekly] = useState<Partial<Record<DayKey, Window[]>>>(staff.weekly || {});
   const [blocked, setBlocked] = useState<string[]>(staff.blocked || []);
   const [limit, setLimit] = useState(staff.dailyLimit || 0);
   const [tz, setTz] = useState(staff.timezone || "Europe/Dublin");
   const [off, setOff] = useState("");
+  useEffect(() => { onChange({ weekly, blocked, dailyLimit: limit, timezone: tz }); }, [weekly, blocked, limit, tz]); // eslint-disable-line react-hooks/exhaustive-deps
   const setDay = (k: DayKey, w: Window[]) => setWeekly((x) => ({ ...x, [k]: w }));
   const today = ymd(new Date());
-  return <Modal title={`${staff.name}: hours & days off`} onClose={onClose} footer={<><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button type="button" className="primary-button" disabled={busy} onClick={() => onSave({ weekly, blocked, dailyLimit: limit, timezone: tz })}>{busy ? "Saving…" : "Save"}</button></>}>
+  return <>
     <div className="sch-weekly">{DAY_LIST.map(([k, l]) => { const w = weekly[k] || []; return <div key={k} className={`sch-wrow${w.length ? "" : " off"}`}>
       <label className="iv-check"><input type="checkbox" checked={w.length > 0} onChange={(e) => setDay(k, e.target.checked ? [["09:00", "17:00"]] : [])} /> <b>{l}</b></label>
       <div className="sch-windows">{w.length ? w.map((win, i) => <span key={i} className="sch-win"><input type="time" value={win[0]} onChange={(e) => setDay(k, w.map((x, j) => j === i ? [e.target.value, x[1]] : x))} /> – <input type="time" value={win[1]} onChange={(e) => setDay(k, w.map((x, j) => j === i ? [x[0], e.target.value] : x))} />{i > 0 && <button type="button" className="iv-btn danger" aria-label="Remove time block" onClick={() => setDay(k, w.filter((_, j) => j !== i))}>✕</button>}</span>) : <span className="iv-small">Unavailable</span>}
@@ -322,6 +328,13 @@ function AvailabilityEditor({ staff, busy, onClose, onSave }: { staff: Staff; bu
       <Field label="Add a day off"><span className="sch-inline"><input type="date" min={today} value={off} onChange={(e) => setOff(e.target.value)} /><button type="button" className="iv-btn" disabled={!off} onClick={() => { if (off && !blocked.includes(off)) setBlocked([...blocked, off].sort()); setOff(""); }}>Add</button></span></Field>
     </div>
     {blocked.filter((d) => d >= today).length > 0 && <div className="sch-chips">{blocked.filter((d) => d >= today).map((d) => <span key={d} className="sch-chip">{new Date(`${d}T12:00:00`).toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short" })}<button type="button" aria-label={`Remove ${d}`} onClick={() => setBlocked(blocked.filter((x) => x !== d))}>✕</button></span>)}</div>}
+  </>;
+}
+
+function AvailabilityEditor({ staff, busy, onClose, onSave }: { staff: Staff; busy: boolean; onClose: () => void; onSave: (v: HoursValue) => void }) {
+  const [value, setValue] = useState<HoursValue | null>(null);
+  return <Modal title={`${staff.name}: hours & days off`} onClose={onClose} footer={<><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button type="button" className="primary-button" disabled={busy || !value} onClick={() => value && onSave(value)}>{busy ? "Saving…" : "Save"}</button></>}>
+    <HoursForm staff={staff} onChange={setValue} />
     <p className="iv-small">Times already busy in a connected Google Calendar are blocked automatically.</p>
   </Modal>;
 }
@@ -696,4 +709,33 @@ export function ReviewLinkBar({ staffId, staffName, scope = "" }: { staffId: str
       <small className="iv-small">Reviews left here appear on {first}'s booking profile straight away{""} and {first} gets an email.</small>
     </>}
   </div>;
+}
+
+/** Everything Scheduling-related for one person, shown inside the Team "edit staff" window. */
+export function StaffSchedulingPanel({ staffId, staffName = "", scope = "" }: { staffId: string; staffName?: string; scope?: string }) {
+  const [data, setData] = useState<Data | null>(null);
+  const [hours, setHours] = useState<HoursValue | null>(null);
+  const [status, setStatus] = useState("");
+  const [open, setOpen] = useState<"hours" | "sync" | "">("");
+  const load = useCallback(async () => { try { setData(await api<Data>(scope, undefined, `&from=${new Date().toISOString()}&to=${addDays(new Date(), 1).toISOString()}`)); } catch (e) { setStatus(errText(e, "Scheduling couldn't load.")); } }, [scope]);
+  useEffect(() => { if (staffId) void load(); }, [staffId, load]);
+  if (!staffId) return <section className="sch-panel"><div className="sch-panel-head"><b>📅 Scheduling</b></div><p className="iv-small">Save this person first, then set their working hours, connect their calendar and add reviews & photos.</p></section>;
+  const person = data?.staff.find((x) => x.id === staffId);
+  const act = async (body: Record<string, unknown>, ok: string) => { setStatus("Saving…"); try { await api(scope, body); setStatus(ok); await load(); } catch (e) { setStatus(errText(e, "Couldn't save.")); } };
+  return <section className="sch-panel">
+    <div className="sch-panel-head"><b>📅 Scheduling</b><small>Hours, calendar sync, reviews and photos for bookings</small><span className="sch-showcase-status">{status}</span></div>
+    {!data ? <p className="iv-small">{status || "Loading…"}</p> : !person ? <p className="iv-small">This person isn't bookable in this account (AI teammates and people without an email can't take appointments).</p> : <>
+      <div className="sch-panel-row">
+        <button type="button" className={`sch-panel-toggle${open === "hours" ? " on" : ""}`} onClick={() => setOpen(open === "hours" ? "" : "hours")}><Clock size={14} /> <b>Working hours &amp; days off</b><small>{DAY_LIST.filter(([k]) => person.weekly?.[k]?.length).length} days a week</small></button>
+        <button type="button" className={`sch-panel-toggle${open === "sync" ? " on" : ""}`} onClick={() => setOpen(open === "sync" ? "" : "sync")}><CalendarDays size={14} /> <b>Calendar sync</b><small>{person.google ? "Google connected" : "Not connected"}</small></button>
+      </div>
+      {open === "hours" && <div className="sch-panel-body"><HoursForm staff={person} onChange={setHours} /><div className="iv-actions" style={{ justifyContent: "flex-start" }}><button type="button" className="primary-button" disabled={!hours} onClick={() => hours && void act({ action: "saveAvailability", staffId, ...hours }, "Hours saved ✓")}>Save hours</button></div></div>}
+      {open === "sync" && <div className="sch-panel-body sch-sync">
+        <div><img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_48dp.png" alt="" width={18} height={18} /><span>{person.google ? <>Google: <b>{person.google}</b></> : "Google Calendar not connected"}</span>
+          {person.canEdit && (person.google ? <button type="button" className="iv-btn danger" onClick={() => void act({ action: "disconnectGoogle", staffId }, "Google disconnected.")}>Disconnect</button> : data.googleAvailable ? <><a className="iv-btn" href={`/api/scheduling?${scopeQs(scope)}&connect=${encodeURIComponent(staffId)}`}>Connect</a><button type="button" className="iv-btn" onClick={() => { void navigator.clipboard?.writeText(`${window.location.origin}/api/scheduling?${scopeQs(scope)}&connect=${encodeURIComponent(staffId)}`); setStatus("Connect link copied ✓"); }}>Copy link</button></> : null)}</div>
+        <div><span>📅</span><span>Apple / Outlook calendar feed</span>{person.canEdit && (person.feedUrl ? <button type="button" className="iv-btn" onClick={() => { void navigator.clipboard?.writeText(person.feedUrl); setStatus("Feed link copied ✓"); }}>Copy feed link</button> : <button type="button" className="iv-btn" onClick={() => void act({ action: "createFeed", staffId }, "Feed link ready ✓")}>Create feed link</button>)}</div>
+      </div>}
+      <StaffShowcaseEditor staffId={staffId} scope={scope} staffName={staffName || person.name} />
+    </>}
+  </section>;
 }

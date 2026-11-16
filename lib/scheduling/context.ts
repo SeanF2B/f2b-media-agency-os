@@ -3,7 +3,7 @@ import { env } from "cloudflare:workers";
 import type { Deps, Mail, WorkspaceLite, StaffLite, ClientLite } from "./server";
 import { createGoogleOps, googleSchedulingAvailable } from "./google";
 
-type RawStaff = StaffLite & { clientAccessIds?: string[]; pageAccess?: string[]; staffType?: string };
+type RawStaff = StaffLite & { clientAccessIds?: string[]; pageAccess?: string[]; staffType?: string; permissions?: Record<string, boolean> | null };
 
 /** One indexed read of the workspace row, trimmed to what Scheduling needs. */
 export async function loadSchedulingWorkspace(): Promise<(WorkspaceLite & { staffRaw: RawStaff[] }) | null> {
@@ -17,7 +17,7 @@ export async function loadSchedulingWorkspace(): Promise<(WorkspaceLite & { staf
         'branding', json_object('primary', json_extract(value, '$.branding.primary'), 'secondary', json_extract(value, '$.branding.secondary')))) FROM json_each(data, '$.clients')), '[]')),
       'staff', json(COALESCE((SELECT json_group_array(json_object('id', json_extract(value, '$.id'), 'name', json_extract(value, '$.name'), 'email', json_extract(value, '$.email'), 'role', json_extract(value, '$.role'), 'isBot', json_extract(value, '$.isBot'), 'staffType', json_extract(value, '$.staffType'),
         'avatar', CASE WHEN length(COALESCE(json_extract(value, '$.avatar'), '')) > 120000 THEN '' ELSE json_extract(value, '$.avatar') END,
-        'clientAccessIds', json(COALESCE(json_extract(value, '$.clientAccessIds'), '[]')), 'pageAccess', json(json_extract(value, '$.pageAccess')))) FROM json_each(data, '$.staff')), '[]'))
+        'clientAccessIds', json(COALESCE(json_extract(value, '$.clientAccessIds'), '[]')), 'pageAccess', json(json_extract(value, '$.pageAccess')), 'permissions', json(json_extract(value, '$.permissions')))) FROM json_each(data, '$.staff')), '[]'))
     ) AS data FROM workspace_documents WHERE id = 'f2b-agency'
   `).first<{ data: string }>();
   if (!row?.data) return null;

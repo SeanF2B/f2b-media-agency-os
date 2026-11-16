@@ -16,6 +16,9 @@ export type TeamPermissions = {
   clientActivity: boolean;
   allActivity: boolean;
   reports: boolean;
+  scheduling: boolean;
+  allAppointments: boolean;
+  manageScheduling: boolean;
 };
 
 export const fullTeamPermissions: TeamPermissions = {
@@ -36,19 +39,22 @@ export const fullTeamPermissions: TeamPermissions = {
   clientActivity: true,
   allActivity: true,
   reports: true,
+  scheduling: true,
+  allAppointments: true,
+  manageScheduling: true,
 };
 
 export const roleTeamPermissions: Record<string, TeamPermissions> = {
   Owner: fullTeamPermissions,
   Admin: fullTeamPermissions,
-  "Account Manager": { overview: false, clients: true, projects: true, tasks: true, allTasks: false, aiTasks: false, aiApprovals: false, aiCompletedTasks: false, timesheets: true, allTimesheets: false, team: false, vault: false, finance: true, aiAssistant: false, clientActivity: false, allActivity: false, reports: false },
-  Specialist: { overview: false, clients: false, projects: false, tasks: true, allTasks: false, aiTasks: false, aiApprovals: false, aiCompletedTasks: false, timesheets: true, allTimesheets: false, team: false, vault: false, finance: false, aiAssistant: false, clientActivity: false, allActivity: false, reports: false },
-  Staff: { overview: false, clients: false, projects: false, tasks: true, allTasks: false, aiTasks: false, aiApprovals: false, aiCompletedTasks: false, timesheets: true, allTimesheets: false, team: false, vault: false, finance: false, aiAssistant: false, clientActivity: false, allActivity: false, reports: false },
+  "Account Manager": { overview: false, clients: true, projects: true, tasks: true, allTasks: false, aiTasks: false, aiApprovals: false, aiCompletedTasks: false, timesheets: true, allTimesheets: false, team: false, vault: false, finance: true, aiAssistant: false, clientActivity: false, allActivity: false, reports: false, scheduling: true, allAppointments: true, manageScheduling: true },
+  Specialist: { overview: false, clients: false, projects: false, tasks: true, allTasks: false, aiTasks: false, aiApprovals: false, aiCompletedTasks: false, timesheets: true, allTimesheets: false, team: false, vault: false, finance: false, aiAssistant: false, clientActivity: false, allActivity: false, reports: false, scheduling: true, allAppointments: false, manageScheduling: false },
+  Staff: { overview: false, clients: false, projects: false, tasks: true, allTasks: false, aiTasks: false, aiApprovals: false, aiCompletedTasks: false, timesheets: true, allTimesheets: false, team: false, vault: false, finance: false, aiAssistant: false, clientActivity: false, allActivity: false, reports: false, scheduling: true, allAppointments: false, manageScheduling: false },
   // Sub-account staff (people who belong to one client sub-account). None of these are agency admins.
-  "Sub-account Manager": { overview: false, clients: true, projects: true, tasks: true, allTasks: true, aiTasks: true, aiApprovals: true, aiCompletedTasks: true, timesheets: true, allTimesheets: true, team: true, vault: false, finance: false, aiAssistant: true, clientActivity: true, allActivity: false, reports: true },
-  "Sub-account User": { overview: false, clients: true, projects: true, tasks: true, allTasks: false, aiTasks: false, aiApprovals: false, aiCompletedTasks: false, timesheets: true, allTimesheets: false, team: false, vault: false, finance: false, aiAssistant: true, clientActivity: true, allActivity: false, reports: false },
-  "Sub-account Viewer": { overview: false, clients: true, projects: true, tasks: true, allTasks: false, aiTasks: false, aiApprovals: false, aiCompletedTasks: false, timesheets: false, allTimesheets: false, team: false, vault: false, finance: false, aiAssistant: false, clientActivity: true, allActivity: false, reports: false },
-  Viewer: { overview: false, clients: true, projects: true, tasks: true, allTasks: false, aiTasks: false, aiApprovals: false, aiCompletedTasks: false, timesheets: true, allTimesheets: false, team: false, vault: false, finance: false, aiAssistant: false, clientActivity: false, allActivity: false, reports: false },
+  "Sub-account Manager": { overview: false, clients: true, projects: true, tasks: true, allTasks: true, aiTasks: true, aiApprovals: true, aiCompletedTasks: true, timesheets: true, allTimesheets: true, team: true, vault: false, finance: false, aiAssistant: true, clientActivity: true, allActivity: false, reports: true, scheduling: true, allAppointments: true, manageScheduling: true },
+  "Sub-account User": { overview: false, clients: true, projects: true, tasks: true, allTasks: false, aiTasks: false, aiApprovals: false, aiCompletedTasks: false, timesheets: true, allTimesheets: false, team: false, vault: false, finance: false, aiAssistant: true, clientActivity: true, allActivity: false, reports: false, scheduling: true, allAppointments: false, manageScheduling: false },
+  "Sub-account Viewer": { overview: false, clients: true, projects: true, tasks: true, allTasks: false, aiTasks: false, aiApprovals: false, aiCompletedTasks: false, timesheets: false, allTimesheets: false, team: false, vault: false, finance: false, aiAssistant: false, clientActivity: true, allActivity: false, reports: false, scheduling: true, allAppointments: false, manageScheduling: false },
+  Viewer: { overview: false, clients: true, projects: true, tasks: true, allTasks: false, aiTasks: false, aiApprovals: false, aiCompletedTasks: false, timesheets: true, allTimesheets: false, team: false, vault: false, finance: false, aiAssistant: false, clientActivity: false, allActivity: false, reports: false, scheduling: false, allAppointments: false, manageScheduling: false },
 };
 
 export function getTeamPermissions(role: string, configured?: Partial<TeamPermissions> | null): TeamPermissions {

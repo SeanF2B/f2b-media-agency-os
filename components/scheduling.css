@@ -196,3 +196,25 @@
 .sch-revlink-label{font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--brand-primary,#2563eb)}
 .sch-revlink code{font-size:12px;background:rgba(127,127,127,.12);padding:6px 8px;border-radius:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sch-revlink-actions{display:flex;gap:6px;flex-wrap:wrap}
+
+/* Clean staff card (Scheduling → Staff & availability) */
+.sch-staff-clean{gap:10px}
+.sch-staff-clean .sch-staff-top{align-items:center}.sch-staff-clean .sch-staff-top>div{flex:1;min-width:0}
+.sch-staff-clean .sch-staff-top b{font-size:15px}
+.sch-edit-btn{margin-left:auto;flex:0 0 auto}
+.sch-staff-lines{display:grid;gap:4px;font-size:13px;color:#4b5a63}.sch-staff-lines>span{display:flex;gap:6px;align-items:center}
+.sch-staff-chips{display:flex;gap:6px;flex-wrap:wrap}
+.sch-chip-status{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:999px;background:#f1f5f9;color:#64748b}
+.sch-chip-status.on{background:#dcfce7;color:#166534}.sch-chip-status.gold{background:#fef3c7;color:#92400e}
+.app-shell.dark-mode .sch-staff-lines{color:#b9c6ce}.app-shell.dark-mode .sch-chip-status{background:#2b353c;color:#9fb0ba}.app-shell.dark-mode .sch-chip-status.on{background:#173a26;color:#9be7b8}.app-shell.dark-mode .sch-chip-status.gold{background:#3d2f0d;color:#fcd34d}
+
+/* Scheduling section inside the Team staff window */
+.sch-panel{display:grid;gap:12px;border:1px solid #e3e9ec;border-radius:16px;padding:14px;margin-top:10px}
+.sch-panel-head{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}.sch-panel-head small{color:#63727b;font-size:12px}
+.sch-panel-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}
+.sch-panel-toggle{display:grid;grid-template-columns:auto 1fr;gap:2px 8px;align-items:center;text-align:left;border:1.5px solid #dce3e7;background:#fff;border-radius:12px;padding:10px 12px;font:inherit;color:inherit;cursor:pointer;transition:transform .14s,border-color .14s}
+.sch-panel-toggle small{grid-column:2;color:#63727b;font-size:12px}.sch-panel-toggle:hover{transform:translateY(-1px);border-color:var(--brand-secondary,var(--brand-primary,#3b82f6))}
+.sch-panel-toggle.on{border-color:var(--brand-primary,#3b82f6);background:color-mix(in srgb,var(--brand-primary,#3b82f6) 7%,#fff)}
+.sch-panel-body{display:grid;gap:10px;padding:4px 2px}
+.sch-panel .sch-showcase{margin-top:0}
+.app-shell.dark-mode .sch-panel{border-color:#3c4850}.app-shell.dark-mode .sch-panel-toggle{background:#20272d;border-color:#3c4850}
