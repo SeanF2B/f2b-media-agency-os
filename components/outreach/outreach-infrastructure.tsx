@@ -51,6 +51,7 @@ function Connections({ state, act }: { state: OutreachState; act: Act }) {
     { key: "microsoft", label: "Microsoft 365", connection: find("microsoft") },
     { key: "google", label: "Google Workspace", connection: find("google") },
     { key: "telegram", label: "Telegram alerts", connection: find("telegram") },
+    { key: "instantly", label: "Instantly warm-up", connection: find("instantly") },
   ];
   return <div className="ox-conn-row">{items.map((item) => <span key={item.key} className={`ox-conn ${item.connection?.status === "ok" ? "ok" : item.connection ? "warn" : "off"}`} title={item.connection?.lastError || ""}>{item.connection?.status === "ok" ? <CheckCircle2 size={14} /> : <CircleDashed size={14} />}{item.label}{item.key === "telegram" && item.connection?.config?.source === "worker-secret" ? " · existing bot" : ""}{item.key === "telegram" && item.connection?.status === "needs-chat" ? " · add chat ID" : ""}</span>)}
     <span className={`ox-conn ${state.purchasesEnabled ? "warn" : "ok"}`}><Lock size={14} /> Purchases {state.purchasesEnabled ? "enabled" : "locked"}</span>
@@ -113,14 +114,40 @@ function SenderDrawer({ mailbox, act, onClose }: { mailbox: Mailbox; act: Act; o
   </aside></div>;
 }
 
-type WarmupResult = { email: string; state: "started" | "already" | "fixing" | "needs-you"; message: string };
+type WarmupResult = { email: string; state: "started" | "already" | "fixing" | "needs-you" | "connect"; message: string; authUrl?: string; mailboxId?: string };
+
+/** One-time Instantly sign-in for a mailbox: opens the link, then checks until Instantly has it. */
+function InstantlySignIn({ mailboxId, authUrl, act, compact = false }: { mailboxId: string; authUrl: string; act: Act; compact?: boolean }) {
+  const [phase, setPhase] = useState<"idle" | "waiting" | "done" | "error">("idle");
+  const [note, setNote] = useState("");
+  useEffect(() => {
+    if (phase !== "waiting") return;
+    let stopped = false; const started = Date.now();
+    const poll = async () => {
+      if (stopped) return;
+      const result = await outreachAction<{ state: string; message: string }>("instantly-connect-status", { id: mailboxId }).catch((error) => ({ state: "error", message: error instanceof Error ? error.message : "Check failed." }));
+      if (stopped) return;
+      if (result.state === "started") { setPhase("done"); setNote(result.message); void act("instantly-connect-status", { id: mailboxId }); return; } // reloads the table
+      if (result.state === "error" || result.state === "none") { setPhase("error"); setNote(result.message); return; }
+      if (Date.now() - started > 11 * 60_000) { setPhase("error"); setNote("The sign-in link expired. Click the flame for a new one."); return; }
+      window.setTimeout(poll, 4000);
+    };
+    const timer = window.setTimeout(poll, 4000);
+    return () => { stopped = true; window.clearTimeout(timer); };
+  }, [phase, mailboxId, act]);
+  if (phase === "done") return <small className="ox-good-text">{note}</small>;
+  return <span className="ox-signin">
+    <a className={compact ? "ox-link" : "primary-button"} href={authUrl} target="_blank" rel="noopener noreferrer" onClick={() => setPhase("waiting")}>{phase === "waiting" ? <><Loader2 size={14} className="ox-spin" /> Waiting for sign-in…</> : "Sign in to add to Instantly"}</a>
+    {note && <small className="ox-warn-text">{note}</small>}
+  </span>;
+}
 
 /** What one click on the flame did, mailbox by mailbox — and anything that genuinely needs you. */
-function WarmupResults({ results, onClose }: { results: WarmupResult[]; onClose: () => void }) {
-  const icon = (state: WarmupResult["state"]) => state === "started" || state === "already" ? <Flame size={16} className="ox-good-text" /> : state === "fixing" ? <Loader2 size={16} className="ox-spin" /> : <AlertTriangle size={16} className="ox-warn-text" />;
+function WarmupResults({ results, act, onClose }: { results: WarmupResult[]; act: Act; onClose: () => void }) {
+  const icon = (state: WarmupResult["state"]) => state === "started" || state === "already" ? <Flame size={16} className="ox-good-text" /> : state === "fixing" ? <Loader2 size={16} className="ox-spin" /> : state === "connect" ? <Sparkles size={16} /> : <AlertTriangle size={16} className="ox-warn-text" />;
   return <div className="ox-drawer-backdrop" onClick={onClose}><aside className="ox-drawer" role="dialog" aria-label="Warm-up" onClick={(event) => event.stopPropagation()}>
     <header><h2>Warm-up</h2><button type="button" className="ox-icon" onClick={onClose} aria-label="Close"><X size={16} /></button></header>
-    <ul className="ox-warm-results">{results.map((item) => <li key={item.email} className={item.state}>{icon(item.state)}<span><b>{item.email}</b><small>{item.message}</small></span></li>)}</ul>
+    <ul className="ox-warm-results">{results.map((item) => <li key={item.email} className={item.state}>{icon(item.state)}<span><b>{item.email}</b><small>{item.message}</small>{item.state === "connect" && item.authUrl && item.mailboxId && <InstantlySignIn mailboxId={item.mailboxId} authUrl={item.authUrl} act={act} />}</span></li>)}</ul>
     {results.some((item) => item.state === "fixing" || item.state === "needs-you") && <p className="ox-muted">You can close this. Outreach re-checks DNS every few minutes and starts warm-up on its own once everything passes.</p>}
     <div className="ox-row-end"><button type="button" className="primary-button" onClick={onClose}>Done</button></div>
   </aside></div>;
@@ -144,11 +171,42 @@ function ReportDrawer({ mailbox, onClose }: { mailbox: Mailbox; onClose: () => v
       <section><h3>Authentication</h3><div className="ox-auth-row">{report.auth.map((item) => <span key={item.key} className={`ox-auth ${item.state}`}>{stateIcon(item.state)} {item.label}</span>)}</div>{report.dmarcRecord && <code className="ox-dmarc">{report.dmarcRecord}</code>}</section>
       <section><h3>Domain blocklists</h3><ul className="ox-bl">{report.blocklists.map((item) => <li key={item.id} className={item.state}>{stateIcon(item.state)} <b>{item.name}</b> <small>{item.note}</small></li>)}</ul></section>
       <section><h3>Inbox placement</h3>{report.placement ? <><p><b>{pct(report.placement.inboxRate)}</b> reached the inbox · {ago(report.placement.completedAt)}</p><ul className="ox-bl">{report.placement.results.map((item, index) => <li key={index} className={item.placement === "inbox" ? "clear" : item.placement === "missing" ? "unknown" : "listed"}>{stateIcon(item.placement === "inbox" ? "clear" : item.placement === "missing" ? "unknown" : "listed")} <b>{item.provider}</b> <small>{item.placement}</small></li>)}</ul></> : <p className="ox-muted">No test yet. Connect free test inboxes under Placement and run one.</p>}</section>
+      {report.externalWarmup && <section><h3>{report.externalWarmup.provider} warm-up</h3><p>{report.externalWarmup.paused ? "Paused" : report.externalWarmup.ready ? "Warm-up period complete — still warming in the background." : `Day ${report.externalWarmup.day} of ${report.externalWarmup.days}`}</p>{report.externalWarmup.stats ? <div className="ox-rate-grid">
+        <div className="ox-rate"><span>Warm-up sent</span><strong>{report.externalWarmup.stats.sent}</strong></div>
+        <div className="ox-rate"><span>Received</span><strong>{report.externalWarmup.stats.received}</strong></div>
+        <div className={`ox-rate ${report.externalWarmup.stats.inboxRate === null ? "" : report.externalWarmup.stats.inboxRate >= 0.8 ? "good" : report.externalWarmup.stats.inboxRate >= 0.5 ? "warn" : "bad"}`}><span>Landed in inbox</span><strong>{pct(report.externalWarmup.stats.inboxRate)}</strong></div>
+        <div className="ox-rate"><span>Landed in spam</span><strong>{report.externalWarmup.stats.spam}</strong></div>
+        <div className="ox-rate"><span>Health score</span><strong>{report.externalWarmup.stats.healthScore ?? "—"}</strong></div>
+      </div> : <p className="ox-muted">Numbers appear within an hour of warm-up starting.</p>}</section>}
       <section><h3>Sending speed</h3><p>{report.throttle.limitToday ?? "—"} emails allowed today{report.throttle.rampDay ? ` · warm-up day ${report.throttle.rampDay}` : ""} · safety band <span className={`ox-status ${report.throttle.band === "green" ? "active" : report.throttle.band === "red" ? "error" : "paused"}`}>{report.throttle.band}</span></p><small className="ox-muted">Volume rises only while these signals stay healthy, slows on amber and stops on red.</small></section>
       {report.findings.length > 0 && <section><h3>What we found</h3><ul className="ox-findings">{report.findings.map((item, index) => <li key={index} className={item.tone}>{item.text}</li>)}</ul></section>}
       {report.actions.length > 0 && <section><h3>What to do</h3><ol className="ox-actions">{report.actions.map((item) => <li key={item}>{item}</li>)}</ol></section>}
     </>}
   </aside></div>;
+}
+
+/** The flame: one click to warm (natively or with Instantly), click again to pause; shows live progress. */
+function FlameCell({ mailbox, act, warm }: { mailbox: Mailbox; act: Act; warm: (ids: string[]) => Promise<void> }) {
+  const external = mailbox.external;
+  const warmingExternally = Boolean(external && external.startedAt && !external.paused && mailbox.status === "setup");
+  const running = mailbox.status === "ramping" || warmingExternally;
+  const stats = external?.stats;
+  const title = mailbox.warmupPending ? `Waiting for DNS — starts automatically. ${mailbox.authMissing.join(" ")}`
+    : warmingExternally ? `Warming with Instantly · day ${external!.day} of ${external!.days}${stats ? ` · ${stats.sent} sent, ${stats.received} received, ${stats.inbox} inbox / ${stats.spam} spam${stats.healthScore !== null ? ` · health ${stats.healthScore}` : ""}` : ""}. Click to pause.`
+    : running ? "Click to pause warm-up" : "Click to warm up — Outreach fixes the DNS and starts when it passes";
+  const label = mailbox.warmupPending ? "Waiting for DNS…"
+    : external?.connecting ? "Sign in needed"
+    : warmingExternally ? `Instantly · day ${external!.day}/${external!.days}`
+    : external?.paused ? "Paused"
+    : mailbox.status === "ramping" ? `${Math.round(mailbox.rampProgress * 100)}%` : mailbox.rampProgress >= 1 ? "Warm" : "Start";
+  return <div className="ox-flame-cell">
+    <button type="button" className="ox-flame-btn" title={title} onClick={() => void (running ? act("warmup-pause", { id: mailbox.id }, "Warm-up paused") : warm([mailbox.id]))}>
+      <FlameMeter progress={warmingExternally ? external!.progress : mailbox.rampProgress} active={running} waiting={mailbox.warmupPending || Boolean(external?.connecting)} /><small>{label}</small>
+    </button>
+    {external?.connecting && external.authUrl && <InstantlySignIn mailboxId={mailbox.id} authUrl={external.authUrl} act={act} compact />}
+    {warmingExternally && stats && <small className="ox-muted">{stats.inboxRate !== null ? `${Math.round(stats.inboxRate * 100)}% inbox` : "No results yet"}{stats.healthScore !== null ? ` · health ${stats.healthScore}` : ""}</small>}
+    {warmingExternally && !external!.ready && <button type="button" className="ox-link" onClick={() => void act("campaigns-unlock", { id: mailbox.id }, "Unlocked for campaigns — Instantly keeps warming")}>Use for campaigns now</button>}
+  </div>;
 }
 
 function MailboxTable({ state, act }: { state: OutreachState; act: Act }) {
@@ -189,7 +247,7 @@ function MailboxTable({ state, act }: { state: OutreachState; act: Act }) {
       {groups.map(([group, items]) => <tbody key={group}><tr className="ox-group"><td colSpan={8}>{group} <small>{items.length}</small></td></tr>{items.map((mailbox) => <tr key={mailbox.id} className={selected.includes(mailbox.id) ? "sel" : ""}>
         <td><input type="checkbox" aria-label={`Select ${mailbox.email}`} checked={selected.includes(mailbox.id)} onChange={() => setSelected(selected.includes(mailbox.id) ? selected.filter((id) => id !== mailbox.id) : [...selected, mailbox.id])} /></td>
         <td><button type="button" className="ox-sender" onClick={() => setEditing(mailbox)} title="Edit sender name and photo"><SenderAvatar mailbox={mailbox} /><span><b>{mailbox.displayName || mailbox.email}</b><small>{mailbox.email}</small></span></button><small>{mailbox.host === "google" ? "Google" : "Microsoft"} · <span className={`ox-status ${mailbox.status}`}>{mailbox.status}</span>{mailbox.tags.map((tag) => <span key={tag} className="ox-tag">{tag}</span>)}</small>{mailbox.pausedReason && <small className="ox-warn-text">{mailbox.pausedReason}</small>}</td>
-        <td><button type="button" className="ox-flame-btn" onClick={() => void (mailbox.status === "ramping" ? act("mailboxes-bulk", { ids: [mailbox.id], op: "warmup-pause" }, "Warm-up paused") : warm([mailbox.id]))} title={mailbox.warmupPending ? `Waiting for DNS — starts automatically. ${mailbox.authMissing.join(" ")}` : mailbox.status === "ramping" ? "Click to pause warm-up" : "Click to warm up — Outreach fixes the DNS and starts when it passes"}><FlameMeter progress={mailbox.rampProgress} active={mailbox.status === "ramping"} waiting={mailbox.warmupPending} />{mailbox.warmupPending ? <small>Waiting for DNS…</small> : <small>{mailbox.status === "ramping" ? `${Math.round(mailbox.rampProgress * 100)}%` : mailbox.rampProgress >= 1 ? "Warm" : "Start"}</small>}</button></td>
+        <td><FlameCell mailbox={mailbox} act={act} warm={warm} /></td>
         <td><span className="ox-meter" aria-label={`${mailbox.sentToday} of ${mailbox.limitToday} sent today`}><span style={{ width: `${mailbox.limitToday ? Math.min(100, (mailbox.sentToday / mailbox.limitToday) * 100) : 0}%` }} /></span><small>{mailbox.sentToday}/{mailbox.limitToday}</small></td>
         <td><HealthPill health={mailbox.health} /></td>
         <td><button type="button" className="ox-link" onClick={() => setReportFor(mailbox)}><Activity size={14} /> Report</button></td>
@@ -199,7 +257,7 @@ function MailboxTable({ state, act }: { state: OutreachState; act: Act }) {
     </table></div>
     {editing && <SenderDrawer mailbox={editing} act={act} onClose={() => setEditing(null)} />}
     {reportFor && <ReportDrawer mailbox={reportFor} onClose={() => setReportFor(null)} />}
-    {warmResults && <WarmupResults results={warmResults} onClose={() => setWarmResults(null)} />}
+    {warmResults && <WarmupResults results={warmResults} act={act} onClose={() => setWarmResults(null)} />}
   </div>;
 }
 
@@ -331,6 +389,9 @@ export function SettingsDrawer({ state, act, onClose }: { state: OutreachState; 
   const telegram = state.connections.find((connection) => connection.provider === "telegram");
   const [tg, setTg] = useState({ chatId: String(telegram?.config?.chatId || ""), botToken: "" });
   const [suppress, setSuppress] = useState("");
+  const instantly = state.connections.find((connection) => connection.provider === "instantly");
+  const [instantlyKey, setInstantlyKey] = useState("");
+  const [instantlyPrice, setInstantlyPrice] = useState<string>(String(s.instantlyPlanCents ?? ""));
   return <div className="ox-drawer-backdrop" onClick={onClose}><aside className="ox-drawer" onClick={(event) => event.stopPropagation()} aria-label="Outreach settings">
     <header><h2>Outreach settings</h2><button type="button" className="ox-icon" onClick={onClose} aria-label="Close"><X size={17} /></button></header>
     <section><h3>Sending rules</h3>
@@ -345,13 +406,20 @@ export function SettingsDrawer({ state, act, onClose }: { state: OutreachState; 
       <div className="ox-grid2"><label className="ox-field">Microsoft seat (cents/mo)<input type="number" value={form.ms} onChange={(event) => setForm({ ...form, ms: event.target.value as never })} /></label><label className="ox-field">Google seat (cents/mo)<input type="number" value={form.google} onChange={(event) => setForm({ ...form, google: event.target.value as never })} /></label><label className="ox-field">Workers plan (cents/mo)<input type="number" value={form.workers} onChange={(event) => setForm({ ...form, workers: event.target.value as never })} /></label></div>
       <button type="button" className="primary-button" onClick={() => void act("save-settings", { cooldownDays: form.cooldownDays, bookingUrl: form.bookingUrl, defaultTargetDaily: form.defaultTargetDaily, senderAddress: form.senderAddress, dmarcReportEmail: form.dmarcReportEmail, appUrl: form.appUrl, seatPriceCents: { microsoft: form.ms, google: form.google }, workersPlanCents: form.workers }, "Settings saved")}>Save</button>
     </section>
-    <section><h3>Microsoft 365</h3><p className="ox-muted">An Entra app with User.ReadWrite.All, Domain.ReadWrite.All, Organization.Read.All, Mail.Send and Mail.ReadBasic.All (admin consent).</p>
+    <section><h3>Microsoft 365</h3><p className="ox-muted">An Entra app with User.ReadWrite.All, Domain.ReadWrite.All, Organization.Read.All, Mail.Send and Mail.Read (application permissions, admin consent).</p>
       <input placeholder="Tenant ID" value={ms.tenantId} onChange={(event) => setMs({ ...ms, tenantId: event.target.value })} /><input placeholder="Application (client) ID" value={ms.clientId} onChange={(event) => setMs({ ...ms, clientId: event.target.value })} /><input type="password" placeholder="Client secret" value={ms.clientSecret} onChange={(event) => setMs({ ...ms, clientSecret: event.target.value })} />
       <button type="button" className="secondary-button" onClick={() => void act("connect-microsoft", ms, "Microsoft checked")}>Connect & verify</button></section>
     <section><h3>Google Workspace</h3><p className="ox-muted">Service account with domain-wide delegation (directory, site verification, gmail.send, gmail.readonly).</p>
       <input placeholder="Super-admin email" value={google.adminEmail} onChange={(event) => setGoogle({ ...google, adminEmail: event.target.value })} />
       <label className="secondary-button"><input type="file" accept=".json,application/json" hidden onChange={async (event) => { const file = event.target.files?.[0]; if (file) setGoogle({ ...google, serviceAccountJson: await file.text() }); }} />{google.serviceAccountJson ? "Key loaded ✓" : "Upload JSON key"}</label>
       <button type="button" className="secondary-button" disabled={!google.serviceAccountJson} onClick={() => void act("connect-google", google, "Google checked")}>Connect & verify</button></section>
+    <section><h3>Instantly warm-up</h3><p className="ox-muted">{instantly?.status === "ok" ? "Connected. Clicking a flame warms that mailbox on Instantly's network; campaigns still send from Agency OS and unlock after 14 days." : "Optional. Uses Instantly only for warm-up (its network of real inboxes). Create an API key in Instantly → Settings → Integrations with the accounts:all scope."}</p>
+      {instantly?.status !== "ok" && <input type="password" placeholder="Instantly API key" value={instantlyKey} onChange={(event) => setInstantlyKey(event.target.value)} />}
+      <label className="ox-field">Instantly plan (cents/mo, for the cost report)<input type="number" min={0} value={instantlyPrice} onChange={(event) => setInstantlyPrice(event.target.value)} /></label>
+      <div className="ox-row">{instantly?.status === "ok"
+        ? <button type="button" className="secondary-button" onClick={() => void act("remove-connection", { provider: "instantly" }, "Instantly disconnected")}>Disconnect</button>
+        : <button type="button" className="secondary-button" disabled={instantlyKey.length < 20} onClick={async () => { const ok = await act("connect-instantly", { apiKey: instantlyKey }, "Instantly connected"); if (ok) setInstantlyKey(""); }}>Connect & verify</button>}
+        <button type="button" className="ox-link" onClick={() => void act("save-settings", { instantlyPlanCents: instantlyPrice === "" ? null : Number(instantlyPrice) }, "Saved")}>Save price</button></div></section>
     <section><h3>Telegram</h3><p className="ox-muted">{telegram?.config?.source === "worker-secret" ? "Using your existing F2B bot from the server secrets." : telegram?.config?.source === "saved-api-key" ? "Using the Telegram key saved under Settings → Other API keys." : "No bot found in the server secrets. Paste your existing F2B bot token once (send-only; its current setup isn't touched)."}</p>
       <input placeholder="Chat ID to alert" value={tg.chatId} onChange={(event) => setTg({ ...tg, chatId: event.target.value })} />
       {!telegram?.config?.source && <input type="password" placeholder="Existing bot token" value={tg.botToken} onChange={(event) => setTg({ ...tg, botToken: event.target.value })} />}

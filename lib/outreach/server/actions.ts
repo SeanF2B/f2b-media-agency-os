@@ -12,6 +12,8 @@ import { canRemoveSuppression } from "@/lib/outreach/reply-handling.mjs";
 import { buildPlaybookContext, buildCopywriterMessages, correctionFromEdit, parseJsonReply, KINDS } from "@/lib/outreach/playbook.mjs";
 import { buildMessage, newMessageId, replySubject } from "@/lib/outreach/mime.mjs";
 import { rampProgress, dailyAllowance } from "@/lib/outreach/ramp.mjs";
+import { beginExternalWarmup, completeExternalConnect, instantlyFor, pauseExternalWarmup, readExternal, unlockForCampaigns } from "./instantly";
+import { createInstantly, externalWarmupProgress } from "@/lib/outreach/providers/instantly.mjs";
 import { DOMAIN_BLOCKLISTS, interpretBlocklist, buildDeliverabilityReport } from "@/lib/outreach/deliverability-report.mjs";
 import { monthlyCosts } from "@/lib/outreach/costs.mjs";
 import { newPlacementToken, seedAuthorizeUrl } from "@/lib/outreach/placement.mjs";
@@ -72,7 +74,7 @@ export async function loadState(ctx: Ctx, query: URLSearchParams) {
 
   const monthStart = `${day.slice(0, 7)}-01`;
   const aiUsage = (await database.prepare("SELECT feature, calls, tokens_in, tokens_out, cost_usd FROM outreach_ai_usage WHERE owner_id = ?1 AND day >= ?2").bind(ownerId, monthStart).all<Row>()).results || [];
-  const costs = monthlyCosts({ mailboxes: mailboxes.map((mailbox) => ({ monthly_cost_cents: mailbox.monthly_cost_cents ?? null, status: mailbox.status })), domains: domains.map((domain) => ({ annual_cost_cents: domain.annual_cost_cents ?? null, protected: domain.protected })), aiUsage: aiUsage as never, openRouterMonthUsd: query.get("costs") === "1" ? await openRouterMonthUsd(ownerId) : null, workersPlanCents: settings.workersPlanCents });
+  const costs = monthlyCosts({ mailboxes: mailboxes.map((mailbox) => ({ monthly_cost_cents: mailbox.monthly_cost_cents ?? null, status: mailbox.status })), domains: domains.map((domain) => ({ annual_cost_cents: domain.annual_cost_cents ?? null, protected: domain.protected })), aiUsage: aiUsage as never, openRouterMonthUsd: query.get("costs") === "1" ? await openRouterMonthUsd(ownerId) : null, workersPlanCents: settings.workersPlanCents, subscriptions: connections.some((item: Row) => item.provider === "instantly" && item.status === "ok") ? [{ key: "instantly", label: "Instantly (warm-up)", cents: settings.instantlyPlanCents, source: "Your Instantly plan price (Settings)" }] : [] });
 
   const jobs = await Promise.all((jobRows.results || []).map(async (job) => {
     const jobSteps = (await database.prepare("SELECT step_key, position, status, attempts, message, next_attempt_at, result_json FROM outreach_job_steps WHERE job_id = ?1 ORDER BY position").bind(job.id).all<Row>()).results || [];
@@ -100,7 +102,7 @@ export async function loadState(ctx: Ctx, query: URLSearchParams) {
     mailboxes: mailboxes.map((mailbox) => {
       const health = parseJson<Row>(mailbox.health_json, {});
       const allowance = dailyAllowance({ rampStartedAt: mailbox.ramp_started_at, targetDaily: mailbox.target_daily, domainRegisteredAt: domainMap[mailbox.domain]?.registered_at || null, healthBand: health.band || "grey", sentToday: todayCounts[mailbox.id] || 0 });
-      return { id: mailbox.id, email: mailbox.email, domain: mailbox.domain, host: mailbox.host, displayName: mailbox.display_name, firstName: mailbox.first_name || String(mailbox.display_name || "").split(" ")[0] || "", lastName: mailbox.last_name || String(mailbox.display_name || "").split(" ").slice(1).join(" "), photo: mailbox.photo_data || "", profileSyncedAt: mailbox.profile_synced_at, warmupPending: Boolean(health.warmupRequestedAt) && !["ramping", "active"].includes(mailbox.status), authMissing: (parseJson<Row>(domainMap[mailbox.domain]?.last_check_json, {}).details || []) as string[], group: mailbox.group_label, tags: parseJson<string[]>(mailbox.tags_json, []), clientId: mailbox.client_id, status: mailbox.status, pausedReason: mailbox.paused_reason, targetDaily: mailbox.target_daily, sentToday: todayCounts[mailbox.id] || 0, limitToday: allowance.limit, rampPhase: allowance.phase, rampReason: allowance.reason, rampProgress: rampProgress({ rampStartedAt: mailbox.ramp_started_at, targetDaily: mailbox.target_daily }), health, monthlyCostCents: mailbox.monthly_cost_cents, renewsAt: mailbox.renews_at, campaigns: campaigns.filter((campaign) => parseJson<string[]>(campaign.mailbox_ids_json, []).includes(mailbox.id)).map((campaign) => ({ id: campaign.id, name: campaign.name })) };
+      return { id: mailbox.id, email: mailbox.email, domain: mailbox.domain, host: mailbox.host, displayName: mailbox.display_name, firstName: mailbox.first_name || String(mailbox.display_name || "").split(" ")[0] || "", lastName: mailbox.last_name || String(mailbox.display_name || "").split(" ").slice(1).join(" "), photo: mailbox.photo_data || "", profileSyncedAt: mailbox.profile_synced_at, warmupPending: Boolean(health.warmupRequestedAt) && !["ramping", "active"].includes(mailbox.status), external: health.external ? { provider: "instantly", startedAt: health.external.startedAt || null, paused: Boolean(health.external.paused), connecting: Boolean(health.external.session), authUrl: health.external.session?.authUrl || "", ...externalWarmupProgress(health.external.startedAt), stats: health.external.stats || null, warmupState: health.external.warmupState || "", accountState: health.external.accountState || "" } : null, authMissing: (parseJson<Row>(domainMap[mailbox.domain]?.last_check_json, {}).details || []) as string[], group: mailbox.group_label, tags: parseJson<string[]>(mailbox.tags_json, []), clientId: mailbox.client_id, status: mailbox.status, pausedReason: mailbox.paused_reason, targetDaily: mailbox.target_daily, sentToday: todayCounts[mailbox.id] || 0, limitToday: allowance.limit, rampPhase: allowance.phase, rampReason: allowance.reason, rampProgress: rampProgress({ rampStartedAt: mailbox.ramp_started_at, targetDaily: mailbox.target_daily }), health, monthlyCostCents: mailbox.monthly_cost_cents, renewsAt: mailbox.renews_at, campaigns: campaigns.filter((campaign) => parseJson<string[]>(campaign.mailbox_ids_json, []).includes(mailbox.id)).map((campaign) => ({ id: campaign.id, name: campaign.name })) };
     }),
     domains: domains.map((domain) => ({ id: domain.id, domain: domain.domain, host: domain.mail_host, protected: Boolean(domain.protected), check: parseJson<Row>(domain.last_check_json, {}), expiresAt: domain.expires_at, annualCostCents: domain.annual_cost_cents, dmarcStage: domain.dmarc_stage })),
     campaigns: campaigns.map((campaign) => ({
@@ -155,6 +157,7 @@ const HANDLERS: Record<string, (ctx: Ctx, body: Row) => Promise<Row>> = {
     if (body.dmarcReportEmail !== undefined) { const value = str(body.dmarcReportEmail, 200); if (value && !emailRe.test(value)) throw new ActionError("Enter a valid DMARC report email."); patch.dmarcReportEmail = value; }
     if (body.senderAddress !== undefined) patch.senderAddress = str(body.senderAddress, 300);
     if (body.appUrl !== undefined) patch.appUrl = str(body.appUrl, 300);
+    if (body.instantlyPlanCents !== undefined) patch.instantlyPlanCents = numOrNull(body.instantlyPlanCents);
     return { settings: await saveSettings(ctx.ownerId, patch) };
   },
 
@@ -194,9 +197,18 @@ const HANDLERS: Record<string, (ctx: Ctx, body: Row) => Promise<Row>> = {
     await createTelegram(config).send("✅ <b>F2B Outreach</b> is connected. You'll only hear from me about positive replies and critical infrastructure problems.");
     return { ok: true };
   },
+  async "connect-instantly"(ctx, body) {
+    // Instantly is used for warm-up only. The key is verified, then stored encrypted on the server.
+    const apiKey = str(body.apiKey, 400);
+    if (apiKey.length < 20) throw new ActionError("Paste the Instantly API key (Settings → Integrations → API keys, scope accounts:all).");
+    const check = await createInstantly({ apiKey }).verify();
+    await saveConnection(ctx.ownerId, "instantly", { apiKey }, { connectedAt: nowIso() }, "ok");
+    await audit(ctx.ownerId, ctx.actor, "connect-instantly", "Instantly");
+    return { ok: true, accounts: check.accounts };
+  },
   async "remove-connection"(ctx, body) {
     const provider = str(body.provider, 20);
-    if (!["microsoft", "google", "telegram", "postmaster"].includes(provider)) throw new ActionError("Unknown connection.");
+    if (!["microsoft", "google", "telegram", "postmaster", "instantly"].includes(provider)) throw new ActionError("Unknown connection.");
     await removeConnection(ctx.ownerId, provider as never);
     await audit(ctx.ownerId, ctx.actor, "remove-connection", provider);
     return { ok: true };
@@ -286,13 +298,16 @@ const HANDLERS: Record<string, (ctx: Ctx, body: Row) => Promise<Row>> = {
     const ids = (Array.isArray(body.ids) ? body.ids : []).map((value: unknown) => str(value, 60)).filter(Boolean).slice(0, 200);
     if (!ids.length) throw new ActionError("Select at least one mailbox.");
     const database = db();
-    const rows = (await database.prepare(`SELECT m.id, m.email, m.domain, m.host, m.status, d.protected, d.mail_host FROM outreach_mailboxes m LEFT JOIN outreach_domains d ON d.owner_id = m.owner_id AND d.domain = m.domain WHERE m.owner_id = ?1 AND m.id IN (${placeholders(ids.length, 2)})`).bind(ctx.ownerId, ...ids).all<Row>()).results || [];
+    const rows = (await database.prepare(`SELECT m.id, m.email, m.domain, m.host, m.status, m.health_json, d.protected, d.mail_host FROM outreach_mailboxes m LEFT JOIN outreach_domains d ON d.owner_id = m.owner_id AND d.domain = m.domain WHERE m.owner_id = ?1 AND m.id IN (${placeholders(ids.length, 2)})`).bind(ctx.ownerId, ...ids).all<Row>()).results || [];
     const checked = new Map<string, Row>();
     const repaired = new Map<string, { applied: string[]; error?: string }>();
-    const results: Array<{ email: string; state: "started" | "already" | "fixing" | "needs-you"; message: string }> = [];
+    const results: Array<{ email: string; state: "started" | "already" | "fixing" | "needs-you" | "connect"; message: string; authUrl?: string; mailboxId?: string }> = [];
     const now = nowIso();
+    const instantly = await instantlyFor(ctx.ownerId);
     for (const row of rows) {
-      if (["ramping", "active"].includes(row.status)) { results.push({ email: row.email, state: "already", message: "Already warming." }); continue; }
+      const external = readExternal(row.health_json);
+      if (["ramping", "active"].includes(row.status) && !(instantly && external?.paused)) { results.push({ email: row.email, state: "already", message: external ? "Warmed — Instantly keeps warming in the background while campaigns send." : "Already warming." }); continue; }
+      if (external?.startedAt && !external.paused && !external.session) { const progress = externalWarmupProgress(external.startedAt); results.push({ email: row.email, state: "already", message: `Warming with Instantly — day ${progress.day} of ${progress.days}.` }); continue; }
       const host = String(row.mail_host || row.host) as HostName;
       const selectors = host === "google" ? ["google"] : ["selector1", "selector2"];
       if (!checked.has(row.domain)) checked.set(row.domain, await checkDomainAuth(ctx.ownerId, row.domain, host as never, selectors));
@@ -305,7 +320,16 @@ const HANDLERS: Record<string, (ctx: Ctx, body: Row) => Promise<Row>> = {
         } catch (error) { repaired.set(row.domain, { applied: [], error: error instanceof Error ? error.message : "DNS couldn't be updated." }); }
       }
       if (check.allPass) {
-        await database.prepare("UPDATE outreach_mailboxes SET status = 'ramping', ramp_started_at = COALESCE(ramp_started_at, ?3), paused_reason = '', health_json = json_remove(COALESCE(NULLIF(health_json, ''), '{}'), '$.warmupRequestedAt'), updated_at = ?3 WHERE owner_id = ?1 AND id = ?2").bind(ctx.ownerId, row.id, now).run();
+        await database.prepare("UPDATE outreach_mailboxes SET health_json = json_remove(COALESCE(NULLIF(health_json, ''), '{}'), '$.warmupRequestedAt'), updated_at = ?3 WHERE owner_id = ?1 AND id = ?2").bind(ctx.ownerId, row.id, now).run();
+        if (instantly) {
+          // Instantly's network does the warming; campaigns unlock after the warm-up period.
+          try {
+            const outcome = await beginExternalWarmup(ctx.ownerId, ctx.actor, { ...row, health_json: (await database.prepare("SELECT health_json FROM outreach_mailboxes WHERE id = ?1").bind(row.id).first<Row>())?.health_json }, instantly);
+            results.push({ email: row.email, mailboxId: row.id, ...outcome });
+          } catch (error) { results.push({ email: row.email, state: "needs-you", message: error instanceof Error ? error.message : "Instantly couldn't start warm-up." }); }
+          continue;
+        }
+        await database.prepare("UPDATE outreach_mailboxes SET status = 'ramping', ramp_started_at = COALESCE(ramp_started_at, ?3), paused_reason = '', updated_at = ?3 WHERE owner_id = ?1 AND id = ?2").bind(ctx.ownerId, row.id, now).run();
         results.push({ email: row.email, state: "started", message: "Warm-up started." });
         continue;
       }
@@ -324,6 +348,36 @@ const HANDLERS: Record<string, (ctx: Ctx, body: Row) => Promise<Row>> = {
     }
     await audit(ctx.ownerId, ctx.actor, "warmup-auto", `${rows.length} mailbox(es)`, { results: results.map((item) => `${item.email}:${item.state}`) });
     return { results };
+  },
+  async "warmup-pause"(ctx, body) {
+    const mailbox = await db().prepare("SELECT * FROM outreach_mailboxes WHERE owner_id = ?1 AND id = ?2").bind(ctx.ownerId, str(body.id, 60)).first<Row>();
+    if (!mailbox) throw new ActionError("Mailbox not found.", 404);
+    const external = readExternal(mailbox.health_json);
+    if (external && !external.paused) {
+      const client = await instantlyFor(ctx.ownerId);
+      if (!client) throw new ActionError("Instantly isn't connected any more — reconnect it to pause warm-up there.");
+      await pauseExternalWarmup(ctx.ownerId, ctx.actor, mailbox, client);
+    }
+    if (["ramping", "active"].includes(mailbox.status)) await db().prepare("UPDATE outreach_mailboxes SET status = 'paused', paused_reason = 'Paused by you', updated_at = ?2 WHERE id = ?1").bind(mailbox.id, nowIso()).run();
+    await audit(ctx.ownerId, ctx.actor, "warmup-pause", mailbox.email);
+    return { ok: true };
+  },
+  async "instantly-connect-status"(ctx, body) {
+    const mailbox = await db().prepare("SELECT * FROM outreach_mailboxes WHERE owner_id = ?1 AND id = ?2").bind(ctx.ownerId, str(body.id, 60)).first<Row>();
+    if (!mailbox) throw new ActionError("Mailbox not found.", 404);
+    const client = await instantlyFor(ctx.ownerId);
+    if (!client) throw new ActionError("Connect Instantly first.");
+    return completeExternalConnect(ctx.ownerId, ctx.actor, mailbox, client);
+  },
+  async "campaigns-unlock"(ctx, body) {
+    // Lets you start campaigns before the warm-up period ends (your call; the safety checks still apply).
+    const mailbox = await db().prepare("SELECT id, email, status, health_json FROM outreach_mailboxes WHERE owner_id = ?1 AND id = ?2").bind(ctx.ownerId, str(body.id, 60)).first<Row>();
+    if (!mailbox) throw new ActionError("Mailbox not found.", 404);
+    const external = readExternal(mailbox.health_json);
+    if (!external?.startedAt) throw new ActionError("This mailbox isn't warming with Instantly.");
+    await unlockForCampaigns(mailbox.id, external.startedAt);
+    await audit(ctx.ownerId, ctx.actor, "campaigns-unlock", mailbox.email, { day: externalWarmupProgress(external.startedAt).day });
+    return { ok: true };
   },
   async "deliverability-report"(ctx, body) {
     const database = db();
@@ -352,6 +406,7 @@ const HANDLERS: Record<string, (ctx: Ctx, body: Row) => Promise<Row>> = {
       placement: (tests.results || []).map((test) => ({ completedAt: test.completed_at, inboxRate: test.inbox_rate, results: parseJson(test.results_json, []) })),
       postmaster: health.postmaster || null,
       adaptive: health.adaptive || [],
+      externalWarmup: health.external ? { provider: "Instantly", ...externalWarmupProgress(health.external.startedAt), paused: Boolean(health.external.paused), stats: health.external.stats || null, warmupState: health.external.warmupState || "", accountState: health.external.accountState || "" } : null,
     });
     return { email: mailbox.email, domain: mailbox.domain, generatedAt: nowIso(), dmarcRecord, ...report };
   },
@@ -485,8 +540,11 @@ const HANDLERS: Record<string, (ctx: Ctx, body: Row) => Promise<Row>> = {
       if (!Number(stepCount?.n)) blockers.push("Add at least one email.");
       const mailboxIds = parseJson<string[]>(campaign.mailbox_ids_json, []);
       if (!mailboxIds.length) blockers.push("Choose at least one sending mailbox.");
-      const mailboxes = mailboxIds.length ? (await database.prepare(`SELECT id, email, domain, host, status FROM outreach_mailboxes WHERE owner_id = ?1 AND id IN (${placeholders(mailboxIds.length, 2)})`).bind(ctx.ownerId, ...mailboxIds).all<Row>()).results || [] : [];
-      for (const mailbox of mailboxes) if (!["ramping", "active"].includes(mailbox.status)) blockers.push(`${mailbox.email} isn't warmed up / active yet.`);
+      const mailboxes = mailboxIds.length ? (await database.prepare(`SELECT id, email, domain, host, status, health_json FROM outreach_mailboxes WHERE owner_id = ?1 AND id IN (${placeholders(mailboxIds.length, 2)})`).bind(ctx.ownerId, ...mailboxIds).all<Row>()).results || [] : [];
+      for (const mailbox of mailboxes) if (!["ramping", "active"].includes(mailbox.status)) {
+        const external = readExternal(mailbox.health_json);
+        blockers.push(external?.startedAt ? `${mailbox.email} is still warming with Instantly (day ${externalWarmupProgress(external.startedAt).day} of ${externalWarmupProgress(external.startedAt).days}). It unlocks by itself, or use "Use for campaigns now" in Infrastructure.` : `${mailbox.email} isn't warmed up / active yet.`);
+      }
       // Fresh authentication check for every sending domain — never launch on stale or failing DNS.
       const checks: Record<string, Row> = {};
       for (const domain of [...new Set(mailboxes.map((mailbox) => String(mailbox.domain)))]) {

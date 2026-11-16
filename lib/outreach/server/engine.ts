@@ -24,6 +24,7 @@ import { aiText } from "./ai";
 import { mailHost, mailboxPassword, type HostName, type InboundMessage } from "./hosts";
 import { checkDomainAuth, ensureZone, planAndApply, findZone } from "./dns";
 import { signUnsubscribe } from "./unsubscribe";
+import { beginExternalWarmup, externalWarmupPass, instantlyFor } from "./instantly";
 import { alertOnce, audit, cloudflareAccountId, cloudflareToken, db, ensureOutreachSchema, getSettings, nowIso, parseJson, purchasesEnabled, telegramConfig, todayUtc, uuid, type OutreachSettings } from "./store";
 
 type Row = Record<string, any>;
@@ -43,6 +44,7 @@ export async function processOutreach(now = new Date()): Promise<Record<string, 
   await run("placement", () => checkPlacementTests(ownerId, now));
   if (now.getUTCMinutes() < 5) await run("health", () => healthPass(ownerId, settings, now));
   await run("warmups", () => pendingWarmups(ownerId, now));
+  await run("instantly", () => externalWarmupPass(ownerId, now, (key, title, detail) => criticalAlert(ownerId, settings, key, title, detail)));
   await run("auth", () => authChecks(ownerId, now));
   return report;
 }
@@ -406,7 +408,7 @@ async function healthPass(ownerId: string, settings: OutreachSettings, now: Date
     const check = domains[mailbox.domain] || {};
     const health = scoreHealth({ auth: check.checkedAt ? { spf: check.spf, dkim: check.dkim, dmarc: check.dmarc, mx: check.mx } : {}, connection: mailbox.status === "error" ? "error" : mailbox.last_polled_at ? "ok" : null, sent: Number(totals?.sent || 0), bounced: Number(totals?.bounced || 0), complaints: Number(totals?.complaints || 0), sendErrors: Number(totals?.errors || 0), inboxPlacementRate: latestTest?.inbox_rate ?? null });
     const adaptive = adaptiveBand({ healthBand: health.band, placementInboxRate: latestTest?.inbox_rate ?? null, authAllPass: check.checkedAt ? check.allPass : undefined });
-    await database.prepare("UPDATE outreach_mailboxes SET health_json = ?2, updated_at = ?3 WHERE id = ?1").bind(mailbox.id, JSON.stringify({ ...health, band: adaptive.band, adaptive: adaptive.reasons, placementInboxRate: latestTest?.inbox_rate ?? null, scoredAt: nowIso() }), nowIso()).run();
+    await database.prepare("UPDATE outreach_mailboxes SET health_json = json_patch(COALESCE(NULLIF(health_json, ''), '{}'), ?2), updated_at = ?3 WHERE id = ?1").bind(mailbox.id, JSON.stringify({ ...health, band: adaptive.band, adaptive: adaptive.reasons, placementInboxRate: latestTest?.inbox_rate ?? null, scoredAt: nowIso() }), nowIso()).run();
     if ((health.pause.required || adaptive.band === "red") && ["ramping", "active"].includes(mailbox.status)) {
       const reason = [...health.pause.reasons, ...adaptive.reasons].join(" ") || "Safety threshold reached.";
       await database.prepare("UPDATE outreach_mailboxes SET status = 'paused', paused_reason = ?2, updated_at = ?3 WHERE id = ?1").bind(mailbox.id, reason.slice(0, 300), nowIso()).run();
@@ -436,6 +438,15 @@ async function pendingWarmups(ownerId: string, now: Date) {
       checked.set(row.domain, Boolean(result?.allPass));
     }
     if (!checked.get(row.domain)) continue;
+    const instantly = await instantlyFor(ownerId);
+    if (instantly) {
+      // DNS passes: hand the mailbox to Instantly's warm-up (a first-time sign-in link appears on the flame if needed).
+      await database.prepare("UPDATE outreach_mailboxes SET health_json = json_remove(health_json, '$.warmupRequestedAt'), updated_at = ?2 WHERE id = ?1").bind(row.id, nowIso()).run();
+      const fresh = await database.prepare("SELECT id, email, host, health_json FROM outreach_mailboxes WHERE id = ?1").bind(row.id).first<Row>();
+      const outcome = await beginExternalWarmup(ownerId, "engine", fresh!, instantly).catch((error) => ({ state: "error", message: String(error) }));
+      if (outcome.state === "started") started += 1;
+      continue;
+    }
     await database.prepare("UPDATE outreach_mailboxes SET status = 'ramping', ramp_started_at = COALESCE(ramp_started_at, ?2), paused_reason = '', health_json = json_remove(health_json, '$.warmupRequestedAt'), updated_at = ?2 WHERE id = ?1").bind(row.id, nowIso()).run();
     await audit(ownerId, "engine", "warmup-auto-started", row.email, { reason: "DNS now passes" });
     started += 1;

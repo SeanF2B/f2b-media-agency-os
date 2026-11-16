@@ -3,7 +3,7 @@ import { env } from "cloudflare:workers";
 import { aiCredentialStorageReady, decryptAiCredential, encryptAiCredential } from "@/lib/ai-credentials";
 import { OUTREACH_SCHEMA } from "@/lib/outreach/schema-sql.mjs";
 
-export type ConnectionProvider = "microsoft" | "google" | "telegram" | "postmaster";
+export type ConnectionProvider = "microsoft" | "google" | "telegram" | "postmaster" | "instantly";
 export type OutreachSettings = {
   cooldownDays: number;            // 0 = no re-contact gap; unsubscribes are always permanent
   bookingUrl: string;
@@ -13,11 +13,12 @@ export type OutreachSettings = {
   dmarcReportEmail: string;
   senderAddress: string;           // postal address for the footer (CAN-SPAM / ePrivacy best practice)
   appUrl: string;
+  instantlyPlanCents: number | null; // what you pay Instantly per month (warm-up only), shown in costs
 };
 
 export const DEFAULT_SETTINGS: OutreachSettings = {
   cooldownDays: 90, bookingUrl: "", seatPriceCents: { microsoft: 400, google: 700, smtp: null }, workersPlanCents: null,
-  defaultTargetDaily: 30, dmarcReportEmail: "", senderAddress: "", appUrl: "",
+  defaultTargetDaily: 30, dmarcReportEmail: "", senderAddress: "", appUrl: "", instantlyPlanCents: 4700,
 };
 
 let schemaReady: Promise<void> | null = null;
