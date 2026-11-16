@@ -2568,3 +2568,6 @@ html body .app-shell .client-tax-stats { grid-template-columns: repeat(auto-fit,
 .app-shell .workflow-review-approve { background: #16a34a; border-color: #16a34a !important; color: #fff; }
 .app-shell .workflow-review-changes { background: #fff7ed; border-color: #fdba74 !important; color: #9a3412; }
 .app-shell.dark-mode .workflow-review-changes { background: #3a2a1c; color: #fed7aa; }
+
+/* Confirm / prompt dialogs always sit above every pop-up (lead details was 5000 and hid them) */
+html body .app-dialog-backdrop { z-index: 2147483000 !important; }
