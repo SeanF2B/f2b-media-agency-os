@@ -1489,3 +1489,44 @@ html body .app-shell .dh-gsc-row small { grid-column: 1 / -1; font-size: 11px; c
 @media (max-width: 900px) { html body .app-shell .dh-gsc { grid-template-columns: 1fr; } }
 body.f2b-dark .app-shell .dh-gsc-col { background: #1a2025 !important; border-color: #33404a !important; }
 body.f2b-dark :is(.app-shell .dh-gsc-row b.good, #f2b-gsc-x) { color: #6fdc9b !important; -webkit-text-fill-color: #6fdc9b !important; }
+/* Lead card: big back / forward stage buttons */
+html body .app-shell .crm-stage-arrows { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+html body .app-shell .crm-stage-arrow { display: flex; align-items: center; justify-content: flex-start; gap: 6px; height: 40px; padding: 0 12px; border-radius: 12px; border: 1px solid rgba(127,138,160,.3); background: rgba(127,138,160,.08); font-size: 22px; font-weight: 700; line-height: 1; cursor: pointer; color: inherit; min-width: 0; }
+html body .app-shell .crm-stage-arrow.next { justify-content: flex-end; background: var(--brand-primary, #0b74b8); border-color: transparent; color: #fff; -webkit-text-fill-color: #fff; }
+html body .app-shell .crm-stage-arrow span { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html body .app-shell .crm-stage-arrow:disabled { opacity: .35; cursor: default; }
+/* Top bar in dark mode: logo on white tile, picker matches dark bar */
+body.f2b-dark .app-shell.topnav-layout :is(.tn-brand .tn-logo-client, #f2b-tn-logo) { background: #fff !important; border-color: rgba(255,255,255,.2) !important; }
+body.f2b-dark .app-shell.topnav-layout .tn-left :is(.client-scope-trigger, #f2b-tn-pick) { background: rgba(255,255,255,.07) !important; border: 1px solid rgba(255,255,255,.16) !important; color: #f2f4f7 !important; -webkit-text-fill-color: #f2f4f7 !important; box-shadow: none !important; }
+body.f2b-dark .app-shell.topnav-layout .tn-left .client-scope-trigger :is(span, svg, #f2b-tn-pick) { color: #f2f4f7 !important; -webkit-text-fill-color: #f2f4f7 !important; }
+/* Leads by source: icon per source, headers aligned */
+html body .app-shell .overview-source-table .src-name { display: flex !important; align-items: center; gap: 8px; position: relative; }
+html body .app-shell .src-ico { position: relative; z-index: 1; width: 24px; height: 24px; border-radius: 8px; display: inline-grid; place-items: center; background: color-mix(in srgb, var(--brand-primary, #1f6feb) 14%, transparent); color: var(--brand-primary, #1f6feb); flex: none; }
+html body .app-shell .overview-source-table .head span:first-child { text-align: left !important; justify-self: start !important; }
+html body .app-shell .dh-recent-src { display: inline-flex; align-items: center; gap: 5px; }
+/* Campaign picker with logos + spend */
+html body .cp { position: relative; min-width: 0; flex: 1 1 auto; max-width: 420px; }
+html body .cp-trigger { display: flex; align-items: center; gap: 8px; width: 100%; height: 36px; padding: 0 10px; border-radius: 10px; border: 1px solid rgba(127,138,160,.35); background: rgba(127,138,160,.06); cursor: pointer; color: inherit; font: inherit; font-size: 13px; text-align: left; }
+html body .cp-name { flex: 1; min-width: 0; display: grid; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html body .cp-name > span, html body .cp-name small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html body .cp-name small { font-size: 11px; opacity: .65; }
+html body .cp-spend { flex: none; font-size: 12.5px; color: #b42318; }
+body.f2b-dark :is(.cp-spend, #f2b-cp-x) { color: #ff9b94 !important; -webkit-text-fill-color: #ff9b94 !important; }
+html body .cp-caret { flex: none; opacity: .6; font-size: 11px; }
+html body .cp-logo { width: 22px; height: 22px; border-radius: 6px; object-fit: contain; background: #fff; border: 1px solid rgba(127,138,160,.25); flex: none; }
+html body .cp-logo-fb { display: inline-grid; place-items: center; font-size: 11px; font-weight: 700; color: #475467; background: #f2f4f7; }
+html body .cp-menu { position: absolute; z-index: 60; top: calc(100% + 6px); right: 0; width: min(440px, 92vw); max-height: 380px; overflow: auto; padding: 6px; border-radius: 14px; background: #fff; border: 1px solid #e4e9ee; box-shadow: 0 18px 40px rgba(16,24,40,.2); display: grid; gap: 2px; }
+body.f2b-dark .cp-menu { background: #1d2429; border-color: #33404a; }
+html body .cp-opt { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; border: 0; background: transparent; cursor: pointer; text-align: left; color: inherit; font: inherit; font-size: 13px; }
+html body .cp-opt:hover, html body .cp-opt.is-on { background: rgba(127,138,160,.12); }
+html body .cp-opt.is-paused { opacity: .6; }
+html body .cp-toggle { margin-top: 4px; padding: 8px; border-radius: 10px; border: 1px dashed rgba(127,138,160,.4); background: transparent; cursor: pointer; font-size: 12.5px; color: inherit; }
+html body .cp-empty { margin: 8px; font-size: 12.5px; opacity: .7; }
+html body .dh-camp-wrap { margin-left: auto; min-width: 0; flex: 1 1 200px; display: flex; justify-content: flex-end; }
+html body .ad-report-head .cp { margin-left: auto; }
+/* Dashboard period picker in the top bar */
+html body .app-shell .tn-date-slot:empty { display: none; }
+html body .app-shell .tn-date { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 8px 0 10px; border-radius: 12px; border: 1px solid rgba(127,138,160,.3); font-size: 13px; }
+html body .app-shell .tn-date select, html body .app-shell .tn-date input { border: 0 !important; background: transparent !important; font: inherit; font-weight: 600; color: inherit; height: 32px; padding: 0 2px !important; box-shadow: none !important; }
+html body .app-shell .tn-date input { width: 128px; }
+@media (max-width: 860px) { html body .app-shell .tn-date span { display: none; } html body .app-shell .tn-date select { max-width: 94px; } html body .app-shell .tn-date input { width: 112px; } }

@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { BarChart3, BookOpen, CalendarPlus, CheckCircle2, ClipboardList, Image as ImageIcon, Mail, MessageSquare, MousePointerClick, Phone, Plus, Sparkles, UserPlus, Users } from "lucide-react";
 import { BrandIcon } from "./brand-icon";
+import { CampaignPicker } from "./campaign-picker";
 
 type HubTask = { id: string; clientId: string; title: string; status: string; assigneeId: string; due?: string; dueAt?: string; completedAt?: string; service?: string; reviewStatus?: string; aiRunState?: string; aiApprovals?: Array<{ status: string }> };
 type HubClient = { id: string; name: string; logo?: string; googleAdsAccountId?: string };
@@ -44,7 +45,7 @@ function Tile({ icon, label, value, note, tone = "", children }: { icon: ReactNo
   return <div className={`dh-tile ${tone}`}><span className="dh-tile-icon">{icon}</span><div className="dh-tile-body"><small>{label}</small><b>{value}</b>{children}{note && <em>{note}</em>}</div></div>;
 }
 
-export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate, onAddTask, onOpenTask, adsPanel, valuePanel }: { adsPanel?: ReactNode; valuePanel?: ReactNode; scopeClientId: string; clients: HubClient[]; tasks: HubTask[]; staff: HubStaff[]; onNavigate: (page: string) => void; onAddTask: () => void; onOpenTask?: (id: string) => void }) {
+export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate, onAddTask, onOpenTask, adsPanel, valuePanel, periodStart = "", periodEnd = "", periodLabel = "Last 30 days" }: { periodStart?: string; periodEnd?: string; periodLabel?: string; adsPanel?: ReactNode; valuePanel?: ReactNode; scopeClientId: string; clients: HubClient[]; tasks: HubTask[]; staff: HubStaff[]; onNavigate: (page: string) => void; onAddTask: () => void; onOpenTask?: (id: string) => void }) {
   const [pickedClient, setPickedClient] = useState(() => { try { return localStorage.getItem("f2b-dash-client") || ""; } catch { return ""; } });
   // Agency view defaults to all clients' Google Ads; a client can be picked for their full results.
   const clientId = scopeClientId || (clients.some((c) => c.id === pickedClient) ? pickedClient : (clients.find((c) => c.googleAdsAccountId) || clients[0])?.id || "");
@@ -57,12 +58,12 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
   const [showAi, setShowAi] = useState(() => { try { return localStorage.getItem("f2b-dash-ai") !== "0"; } catch { return true; } });
 
   useEffect(() => {
-    const key = `f2b-dash-metrics-v3:${clientId}`;
+    const key = `f2b-dash-metrics-v3:${clientId}:${periodStart}:${periodEnd}`;
     try { const cached = JSON.parse(sessionStorage.getItem(key) || "null") as { at: number; data: Metrics } | null; if (cached && Date.now() - cached.at < CACHE_MS) { setMetrics(cached.data); return; } } catch { /* no cache */ }
     let live = true; setLoading(true);
-    fetch(`/api/dashboard-metrics?clientId=${encodeURIComponent(clientId)}`).then((r) => r.ok ? r.json() as Promise<Metrics> : null).then((data) => { if (!live || !data) return; setMetrics(data); try { sessionStorage.setItem(key, JSON.stringify({ at: Date.now(), data })); } catch { /* full */ } }).catch(() => undefined).finally(() => { if (live) setLoading(false); });
+    fetch(`/api/dashboard-metrics?clientId=${encodeURIComponent(clientId)}&start=${periodStart}&end=${periodEnd}`).then((r) => r.ok ? r.json() as Promise<Metrics> : null).then((data) => { if (!live || !data) return; setMetrics(data); try { sessionStorage.setItem(key, JSON.stringify({ at: Date.now(), data })); } catch { /* full */ } }).catch(() => undefined).finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
-  }, [clientId]);
+  }, [clientId, periodStart, periodEnd]);
 
   const bots = useMemo(() => new Set(staff.filter((s) => s.isBot).map((s) => s.id)), [staff]);
   const inScope = (t: HubTask) => !scopeClientId || t.clientId === scopeClientId;
@@ -95,7 +96,7 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
     </section>
     {valuePanel}
     <section className="panel dh-panel" aria-label="Website and marketing results">
-      <div className="dh-head"><div><p className="eyebrow">📈 LAST 30 DAYS</p><h2>Marketing</h2></div>
+      <div className="dh-head"><div><p className="eyebrow">📈 {periodLabel.toUpperCase()}</p><h2>Marketing</h2></div>
         {!scopeClientId && clients.length > 0 && <label className="dh-client"><span>Client</span><select value={clientId} onChange={(e) => { setPickedClient(e.target.value); try { localStorage.setItem("f2b-dash-client", e.target.value); } catch { /* ignore */ } }}>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>}
       </div>
       {loading && !m ? <><p className="dh-muted">Loading results…</p></> : !m ? <></> : <>
@@ -114,7 +115,7 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
               {m.gsc?.error ? <em className="dh-split-note">{m.gsc.error}</em> : !m.gsc && sp?.notes.organic ? <em className="dh-split-note">{sp.notes.organic}</em> : null}
             </div>
             {(() => { const camps = m.googleCampaigns || []; const c = camps.find((x) => x.id === gCamp); const spend = c ? c.spend : m.adSpend?.value; const clicks = c ? c.clicks : sp?.paid.clicks; const conv = c ? c.conversions : sp?.paid.conversions;
-              return <div className="dh-split-col"><div className="dh-split-head"><BrandIcon id="google-ads" size={20} fallback={null} /><b>Google Ads</b>{camps.length > 0 && <select className="dh-camp" aria-label="Google Ads campaign" value={gCamp} onChange={(e) => setGCamp(e.target.value)}><option value="">All campaigns ({camps.length})</option>{camps.map((x) => <option key={x.id} value={x.id}>{x.name}{/paused/i.test(x.status) ? " · paused" : ""}</option>)}</select>}</div>
+              return <div className="dh-split-col"><div className="dh-split-head"><BrandIcon id="google-ads" size={20} fallback={null} /><b>Google Ads</b>{camps.length > 0 && <div className="dh-camp-wrap"><CampaignPicker label="Google Ads campaign" currency={cur} value={gCamp} onChange={setGCamp} options={camps.map((x) => ({ value: x.id, name: x.name, logo: clientOf(clientId)?.logo, spend: x.spend, status: x.status }))} /></div>}</div>
                 <div className="dh-split-row expense"><span className="dh-split-ico"><span className="dh-cur">€</span></span><span>Spend</span><b>{spend != null ? money(spend, cur) : "—"}</b></div>
                 <Row icon={<MousePointerClick size={15} />} label="Ad clicks" value={v(clicks)} good={(clicks || 0) > 0} />
                 <Row icon={<span className="dh-cur">€</span>} label="Avg. CPC" value={spend != null && clicks ? money2(spend / clicks, cur) : "—"} />
@@ -124,7 +125,7 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
                 {sp?.notes.paid && <em className="dh-split-note">{sp.notes.paid}</em>}
               </div>; })()}
             {(() => { const meta = m.meta; const camps = meta?.campaigns || []; const c = camps.find((x) => x.id === mCamp); const spend = c ? c.spend : meta?.spend; const clicks = c ? c.clicks : meta?.clicks; const leads = c ? c.leads : meta?.leads;
-              return <div className="dh-split-col"><div className="dh-split-head"><BrandIcon id="meta-ads" size={20} fallback={null} /><b>Meta Ads</b>{camps.length > 0 && <select className="dh-camp" aria-label="Meta Ads campaign" value={mCamp} onChange={(e) => setMCamp(e.target.value)}><option value="">All campaigns ({camps.length})</option>{camps.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>}</div>
+              return <div className="dh-split-col"><div className="dh-split-head"><BrandIcon id="meta-ads" size={20} fallback={null} /><b>Meta Ads</b>{camps.length > 0 && <div className="dh-camp-wrap"><CampaignPicker label="Meta Ads campaign" currency={cur} value={mCamp} onChange={setMCamp} options={camps.map((x) => ({ value: x.id, name: x.name, logo: clientOf(clientId)?.logo, spend: x.spend, status: x.status }))} /></div>}</div>
                 {meta ? <>
                   <div className="dh-split-row expense"><span className="dh-split-ico"><span className="dh-cur">€</span></span><span>Spend</span><b>{money(spend || 0, cur)}</b></div>
                   <Row icon={<MousePointerClick size={15} />} label="Clicks" value={v(clicks)} good={(clicks || 0) > 0} />

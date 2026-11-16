@@ -1,0 +1,5 @@
+import { Building2, Footprints, Globe, Handshake, Mail, Megaphone, MousePointerClick, Phone, Search, Share2, UserRound, type LucideIcon } from "lucide-react";
+
+/** Icon for a lead source — shared by lead cards and the dashboard source report. */
+export const sourceIcon = (source?: string | null): LucideIcon => { const text = String(source || "").toLowerCase(); return /google ads|ppc|paid/.test(text) ? MousePointerClick : /google|search|seo|organic/.test(text) ? Search : /social|facebook|instagram|tiktok|meta|linkedin/.test(text) ? Share2 : /website|form|estimate|web/.test(text) ? Globe : /referr|word of mouth/.test(text) ? Handshake : /phone|call/.test(text) ? Phone : /walk/.test(text) ? Footprints : /email/.test(text) ? Mail : /campaign|ad\b|ads\b/.test(text) ? Megaphone : /client/.test(text) ? Building2 : UserRound; };
+export function SourceIcon({ source, size = 14 }: { source?: string | null; size?: number }) { const Icon = sourceIcon(source); return <Icon size={size} aria-hidden="true" />; }

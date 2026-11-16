@@ -38,6 +38,12 @@ export async function GET(request: Request) {
   if (clientId === "all" && !allClients) clientId = "";
   if (clientId && !allClients && !(workspace.clients || []).some((client) => client.id === clientId)) clientId = "";
   if (clientId && allowedIds && !allowedIds.includes(clientId)) return reply({ error: "You do not have access to this client." }, 403);
+  // Reporting window: from the dashboard's period picker (defaults to the last 30 days).
+  const okDate = (v: string | null) => /^\d{4}-\d{2}-\d{2}$/.test(v || "") ? v! : "";
+  const reqEnd = okDate(url.searchParams.get("end")) || day(0);
+  const reqStart = okDate(url.searchParams.get("start")) || (() => { const d = new Date(`${reqEnd}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - 30); return d.toISOString().slice(0, 10); })();
+  const windowDays = Math.max(1, Math.min(366, Math.round((Date.parse(reqEnd) - Date.parse(reqStart)) / 86_400_000)));
+  const clampStart = (() => { const d = new Date(`${reqEnd}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - windowDays); return d.toISOString().slice(0, 10); })();
   const scope: string | null = allClients ? null : clientId || (allowedIds ? allowedIds[0] || "none" : null);
 
   type Totals = { spend: number; clicks: number; impressions: number; conversions: number };
@@ -52,7 +58,7 @@ export async function GET(request: Request) {
     const linked = (workspace.clients || []).filter((c) => ids.includes(c.id) && c.metaAdsAccountId);
     if (!linked.length) return { meta: null, metaNote: "No Meta Ads account linked" };
     if (!(await metaAdsConnectionExists(ownerId).catch(() => false))) return { meta: null, metaNote: "Meta Ads isn’t connected" };
-    const window = { start: day(-30), end: day(0) };
+    const window = { start: clampStart, end: reqEnd };
     const raw = await Promise.all(linked.map((c) => readDirectMetaAdsInsights(ownerId, c.metaAdsAccountId!, window, "campaigns").catch(() => null)));
     const rows = raw.map((r) => r ? summarizeMetaAdsTotals(r) : null);
     const campaigns = raw.flatMap((r) => r ? summarizeMetaAdsRows(r, "campaigns").map((c) => ({ id: c.id, name: c.name, status: c.status, spend: c.spend, clicks: c.clicks, impressions: c.impressions, leads: c.leads })) : []).slice(0, 40);
@@ -76,7 +82,8 @@ export async function GET(request: Request) {
       if (!match) return { error: `${domain} isn’t in the connected Search Console account yet. Add it (or give that Google login access) and it will appear here.` };
       property = match.id;
     }
-    const end = day(-3), start = day(-30), pEnd = day(-31), pStart = day(-58);
+    const shift = (iso: string, n: number) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+    const end = reqEnd > day(-3) ? day(-3) : reqEnd, start = clampStart < end ? clampStart : shift(end, -28), span = Math.round((Date.parse(end) - Date.parse(start)) / 86_400_000) + 1, pEnd = shift(start, -1), pStart = shift(pEnd, -(span - 1));
     const read = (a: string, b: string) => loadCachedMarketingData({ db: db as never, ownerId, clientId: cid, service: "Search Console", key: JSON.stringify({ report: "dash-gsc", property, a, b }), ttlMs: 6 * 3600_000 }, () => readGoogleSearchConsoleRows(ownerId, property, a, b)).then((r) => r.data);
     try {
       const [cur, prev] = await Promise.all([read(start, end), read(pStart, pEnd).catch(() => [])]);
@@ -92,7 +99,7 @@ export async function GET(request: Request) {
   };
   const marketing = async () => {
     if (!clientId || !(admin || permissions.reports)) return null;
-    const period = { start: day(-30), end: day(0) };
+    const period = { start: clampStart, end: reqEnd };
     if (allClients) {
       // Agency view: Google Ads totals across every client with a linked account.
       const linked = (workspace.clients || []).filter((c) => c.googleAdsAccountId);
