@@ -162,7 +162,7 @@ export function DashboardHub({ salesStats = null, activityPanel = null, scopeCli
         <span className="dh-appr-acts">{apprOpen === "human" && onReviewTask && mine && <><button type="button" className="dh-appr-ok" onClick={() => onReviewTask(t.id, "approve")}>Approve</button><button type="button" className="dh-appr-no" onClick={() => onReviewTask(t.id, "request_changes")}>Changes</button></>}{onOpenTask && <button type="button" className="dh-appr-open" onClick={() => onOpenTask(t.id)}>Open</button>}</span></div>; })
         : <p className="dh-muted">Nothing waiting. 🎉</p>}
     </section>; })()}
-    {showAppts && <Suspense fallback={null}><AppointmentsDashboard key={scopeClientId || "agency"} scopeClientId={scopeClientId} sample={sample} clientName={clients.find((c) => c.id === scopeClientId)?.name || ""} onOpen={() => onNavigate("Scheduling")} /></Suspense>}
+    {showAppts && <Suspense fallback={null}><AppointmentsDashboard key={scopeClientId || "agency"} scopeClientId={scopeClientId} sample={sample} clientName={clients.find((c) => c.id === scopeClientId)?.name || ""} periodStart={periodStart} periodEnd={periodEnd} periodLabel={periodLabel} onOpen={() => onNavigate("Scheduling")} /></Suspense>}
     {valuePanel}
     <section className="panel dh-panel" aria-label="Website and marketing results">
       <div className="dh-head"><div><p className="eyebrow">📈 {periodLabel.toUpperCase()}</p><h2>Marketing</h2></div>

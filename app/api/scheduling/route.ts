@@ -31,7 +31,9 @@ async function context(request: Request) {
     const scope = requested && ws.clients.some((c) => c.id === requested) ? requested : null; // null = agency view (everything)
     // Inside a client's account, show that client's own team (people with access to it); agency view shows everyone.
     const clientTeam = scope ? ws.staffRaw.filter((s) => (s.clientAccessIds || []).includes(scope)).map(({ id, name, email, role, avatar }) => ({ id, name, email, role, avatar })) : [];
-    return { user, ws, me, admin, canManage: true, ownOnly: false, scope, staff: clientTeam.length ? clientTeam : ws.staff };
+    // The sub-account's own people (not agency staff who merely have access) — sample data uses only these.
+    const ownTeamIds = scope ? ws.staffRaw.filter((s) => s.staffType === "subaccount" && (s.clientAccessIds || []).includes(scope)).map((s) => s.id) : [];
+    return { user, ws, me, admin, canManage: true, ownOnly: false, scope, ownTeamIds, staff: clientTeam.length ? clientTeam : ws.staff };
   }
   // Everyone else goes by their Scheduling permissions (Team → permissions).
   const perms = me ? getMemberPermissions(me as never, ws.ownerId) : null;
@@ -90,7 +92,7 @@ export async function GET(request: Request) {
       return { ...s, timezone: av?.timezone, weekly: av?.weekly, blocked: av?.blocked, dailyLimit: av?.dailyLimit || 0, google: google[s.id] || "", profile: profiles[s.id] || null, feedUrl: mine(s.id) && av?.icsToken ? `${deps.baseUrl}/api/marketing-public/scheduling?ics=${av.icsToken}` : "", canEdit: mine(s.id) };
     });
     const clients = (ctx.scope === null ? ctx.ws.clients : ctx.ws.clients.filter((c) => c.id === ctx.scope)).map((c) => ({ id: c.id, name: c.name, logo: c.logo || "" }));
-    return json({ calendars, bookings, staff, clients, scope: ctx.scope, canManage: ctx.canManage, ownOnly: ctx.ownOnly, isAdmin: ctx.admin, meId: ctx.me?.id || "", googleAvailable: googleSchedulingAvailable(), emailReady: Boolean(deps.sendEmail), publicBase: `${deps.baseUrl}/f/book/` });
+    return json({ calendars, bookings, staff, clients, scope: ctx.scope, canManage: ctx.canManage, ownOnly: ctx.ownOnly, isAdmin: ctx.admin, ownTeamIds: (ctx as { ownTeamIds?: string[] }).ownTeamIds || [], meId: ctx.me?.id || "", googleAvailable: googleSchedulingAvailable(), emailReady: Boolean(deps.sendEmail), publicBase: `${deps.baseUrl}/f/book/` });
   } catch (error) {
     return fail(error instanceof Error ? error.message : "Scheduling could not load.", error instanceof SchedulingError ? error.status : 500);
   }

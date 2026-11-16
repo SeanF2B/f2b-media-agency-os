@@ -18,7 +18,7 @@ type StaffReview = { id: string; author: string; rating: number; text: string; s
 type StaffProfile = { showReviews: boolean; showPhotos: boolean; title: string; bio: string; reviews: StaffReview[]; photos: Array<{ url: string; caption: string }>; payType?: "none" | "hourly" | "commission" | "salary"; payRate?: number };
 type Staff = { id: string; name: string; email?: string; role?: string; avatar?: string; profile?: StaffProfile | null; timezone?: string; weekly?: Partial<Record<DayKey, Window[]>>; blocked?: string[]; dailyLimit: number; google: string; feedUrl: string; canEdit: boolean };
 type Booking = { id: string; clientId: string; calendarId: string; start: string; end: string; status: "booked" | "cancelled" | "completed" | "no_show"; staffIds: string[]; contactId: string | null; name: string; email: string; phone: string; answers: Array<{ label: string; value: string }>; notes: string; source: string; channel: string; meetLink: string; createdBy: string; createdAt: string };
-type Data = { calendars: Calendar[]; bookings: Booking[]; staff: Staff[]; clients: Array<{ id: string; name: string; logo: string }>; scope: string | null; canManage: boolean; isAdmin: boolean; meId: string; googleAvailable: boolean; emailReady: boolean; publicBase: string };
+type Data = { calendars: Calendar[]; bookings: Booking[]; staff: Staff[]; clients: Array<{ id: string; name: string; logo: string }>; scope: string | null; canManage: boolean; isAdmin: boolean; ownTeamIds?: string[]; meId: string; googleAvailable: boolean; emailReady: boolean; publicBase: string };
 type Slot = { start: string; end: string; staffIds: string[] };
 
 const DAY_LIST: Array<[DayKey, string]> = [["mon", "Monday"], ["tue", "Tuesday"], ["wed", "Wednesday"], ["thu", "Thursday"], ["fri", "Friday"], ["sat", "Saturday"], ["sun", "Sunday"]];
@@ -857,7 +857,7 @@ export function StaffSchedulingPanel({ staffId, staffName = "", scope = "" }: { 
 }
 
 /** Dashboard panel for appointment-based businesses: staff selector, Day (appointments + availability) and Week calendar. */
-export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, clientName = "" }: { scopeClientId: string; onOpen: () => void; sample?: boolean; clientName?: string }) {
+export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, clientName = "", periodStart = "", periodEnd = "", periodLabel = "" }: { scopeClientId: string; onOpen: () => void; sample?: boolean; clientName?: string; periodStart?: string; periodEnd?: string; periodLabel?: string }) {
   const [realData, setData] = useState<Data | null>(null);
   const [err, setErr] = useState("");
   const [view, setView] = useState<"day" | "week" | "month">(() => { try { const v = localStorage.getItem("f2b-dash-appt-view"); return v === "week" || v === "month" ? v : "day"; } catch { return "day"; } });
@@ -945,8 +945,8 @@ export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, c
               <div className="sch-tl-track">
                 {hours.map((h) => <i key={h} className="sch-tl-grid" style={{ left: pct(h) }} />)}
                 {windows.map((w, i) => <i key={`w${i}`} className="sch-tl-free" style={{ left: pct(mins(w[0])), width: `calc(${pct(mins(w[1]))} - ${pct(mins(w[0]))})` }} />)}
-                {items.map((b) => { const s0 = new Date(b.start), e0 = new Date(b.end); const a0 = s0.getHours() * 60 + s0.getMinutes(), z0 = e0.getHours() * 60 + e0.getMinutes(); const cal = calById.get(b.calendarId); const wide = (z0 - a0) / span > 0.1;
-                  return <button key={b.id} type="button" className={`sch-tl-item ${b.status}${wide ? "" : " narrow"}`} style={{ left: pct(a0), width: `calc(${pct(z0)} - ${pct(a0)})`, ["--c" as string]: cal?.color || "var(--brand-primary,#2563eb)" }} title={`${time(b.start)}–${time(b.end)} · ${b.name} · ${cal?.name || ""}`} onClick={() => setDetail(b)} aria-label={`${time(b.start)} ${b.name}`}>{wide ? <><b>{time(b.start)}</b><span>{b.name.split(" ")[0]}</span></> : null}</button>; })}
+                {items.map((b) => { const s0 = new Date(b.start), e0 = new Date(b.end); const a0 = s0.getHours() * 60 + s0.getMinutes(), z0 = e0.getHours() * 60 + e0.getMinutes(); const cal = calById.get(b.calendarId); const wide = (z0 - a0) / span > 0.08;
+                  return <button key={b.id} type="button" className={`sch-tl-item ${b.status}${wide ? "" : " narrow"}`} style={{ left: pct(a0), width: `calc(${pct(z0)} - ${pct(a0)})`, ["--c" as string]: cal?.color || "var(--brand-primary,#2563eb)" }} title={`${time(b.start)}–${time(b.end)} · ${b.name} · ${cal?.name || ""}`} onClick={() => setDetail(b)} data-short={(b.name || "?").trim().slice(0, 1).toUpperCase()} aria-label={`${time(b.start)} ${b.name}`}>{wide ? <><b>{time(b.start)}</b><span>{b.name.split(" ")[0]}</span></> : null}</button>; })}
                 {isToday && nowM > from && nowM < to && <i className="sch-tl-now" style={{ left: pct(nowM) }} />}
               </div>
               <span className={`sch-avail-pill ${!windows.length ? "off" : !items.length ? "free" : free ? "some" : "full"}`}>{summary}</span>
@@ -964,7 +964,7 @@ export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, c
       <button type="button" className="sch-dash-wday-head" onClick={() => { setDay(d); setMode("day"); }}><small>{d.toLocaleDateString("en-IE", { weekday: "short" })}</small><b>{d.getDate()}</b>{list.length > 0 && <em>{list.length}</em>}</button>
       <div className="sch-dash-wday-body">{list.length ? list.slice(0, 6).map((b) => { const cal = calById.get(b.calendarId); return <button type="button" key={b.id} className="sch-dash-chip" style={{ ["--c" as string]: cal?.color || "#2563eb" }} onClick={() => setDetail(b)} title={`${time(b.start)} ${b.name} · ${cal?.name || ""}`}><span className="sch-chip-top"><b>{time(b.start)}</b><span className="sch-chip-avs">{b.staffIds.slice(0, 2).map((id) => <Avatar key={id} person={personOf(id)} size={20} />)}</span></span><span>{b.name}</span>{(() => { const pic = bookingPhoto(b); return pic ? <img className="sch-chip-img" src={pic} alt="" loading="lazy" onError={(ev) => { (ev.currentTarget as HTMLImageElement).style.display = "none"; }} /> : null; })()}</button>; }) : <span className="sch-dash-free">Free</span>}{list.length > 6 && <small className="iv-small">+{list.length - 6} more</small>}</div>
     </div>; })}</div>}
-    {data && realData?.isAdmin && <StaffHoursPanel data={data} scopeClientId={scopeClientId} sample={sample} />}
+    {data && realData?.isAdmin && <StaffHoursPanel data={data} scopeClientId={scopeClientId} sample={sample} periodStart={periodStart} periodEnd={periodEnd} periodLabel={periodLabel} />}
     {detail && data && <AppointmentDetail key={detail.id} data={data} scope={scopeClientId} booking={detail} onClose={() => setDetail(null)} onSaved={(msg) => { setDetail(null); void msg; setRefresh((n) => n + 1); }} />}
   </section>;
 }
@@ -984,10 +984,12 @@ function useSiteSample(scope: string, enabled: boolean): SiteSample {
   return site;
 }
 function sampleSchedule(real: Data | null, week: Date, clientName: string, site: SiteSample = EMPTY_SITE): Data {
-  const fallbackStaff: Staff[] = [["s1", "Aoife Murphy", "Senior consultant"], ["s2", "Ciarán Walsh", "Technician"], ["s3", "Niamh Byrne", "Bookings"]].map(([id, name, role]) => ({ id, name, role, dailyLimit: 0, google: "", feedUrl: "", canEdit: false, weekly: { mon: [["09:00", "17:30"]], tue: [["09:00", "17:30"]], wed: [["09:00", "17:30"]], thu: [["09:00", "17:30"]], fri: [["09:00", "16:00"]] } as Partial<Record<DayKey, Window[]>>, blocked: [] }));
+  const fallbackStaff: Staff[] = (/tattoo|\bink\b|piercing/i.test(clientName) ? [["s1", "Aoife Murphy", "Tattoo artist"], ["s2", "Ciarán Walsh", "Tattoo artist"], ["s3", "Niamh Byrne", "Piercer"]] : [["s1", "Aoife Murphy", "Senior consultant"], ["s2", "Ciarán Walsh", "Technician"], ["s3", "Niamh Byrne", "Bookings"]]).map(([id, name, role]) => ({ id, name, role, dailyLimit: 0, google: "", feedUrl: "", canEdit: false, weekly: { mon: [["09:00", "17:30"]], tue: [["09:00", "17:30"]], wed: [["09:00", "17:30"]], thu: [["09:00", "17:30"]], fri: [["09:00", "16:00"]] } as Partial<Record<DayKey, Window[]>>, blocked: [] }));
   const siteStaff: Staff[] = site.team.map((name, i) => ({ ...fallbackStaff[0], id: `site-staff-${i}`, name, role: /tattoo|ink/i.test(clientName) ? "Artist" : "", avatar: site.photos?.[name] || "" }));
   // The team named on the client's website wins; otherwise their account team; otherwise demo names.
-  const staff = (siteStaff.length >= 2 ? siteStaff : real?.staff.length ? real.staff : siteStaff.length ? siteStaff : fallbackStaff).slice(0, 6).map((p) => ({ ...p, weekly: p.weekly && Object.keys(p.weekly).length ? p.weekly : fallbackStaff[0].weekly }));
+  // Inside a client sub-account, agency staff never appear in sample data: only that client's own people (or demo names).
+  const realTeam = real?.scope ? (real.staff || []).filter((p) => (real.ownTeamIds || []).includes(p.id)) : (real?.staff || []);
+  const staff = (siteStaff.length >= 2 ? siteStaff : realTeam.length ? realTeam : siteStaff.length ? siteStaff : fallbackStaff).slice(0, 6).map((p) => ({ ...p, weekly: p.weekly && Object.keys(p.weekly).length ? p.weekly : fallbackStaff[0].weekly }));
   const trade = site.services.length >= 2 ? site.services.slice(0, 3) : /roof/i.test(clientName) ? ["Roof survey", "Repair quote", "Gutter check"] : /interior|kitchen|design/i.test(clientName) ? ["Design consultation", "Site measure", "Showroom visit"] : /ink|tattoo/i.test(clientName) ? ["Tattoo consultation", "Session", "Touch-up"] : ["Consultation", "Site visit", "Follow-up call"];
   const colours = ["#2563eb", "#16a34a", "#d97706"];
   const calendars = trade.map((name, i) => ({ id: `sample-cal-${i}`, clientId: "", name, slug: `sample-${i}`, kind: i === 0 ? "consultation" : "service", description: "", durationMin: /consult|touch|check|call|piercing|quote|measure/i.test(name) ? 30 : /tattoo|session|sleeve|realism|cover|black|colour|color|fine line|anime|portrait/i.test(name) ? 180 : /survey|visit|install|repair/i.test(name) ? 90 : 60, bufferBefore: 0, bufferAfter: 15, slotInterval: 30, minNoticeMin: 0, maxDaysAhead: 60, dailyLimit: 0, locationType: "onsite", locationDetail: "", price: 0, currency: "EUR", color: colours[i], assignMode: "customer_pick", staffIds: staff.map((p) => p.id), questions: [], stageId: "", confirmationMessage: "", redirectUrl: "", active: true, timezone: "Europe/Dublin" } as Calendar));
@@ -1033,11 +1035,17 @@ export function QuickBook({ scopeClientId, prefill, onClose, onBooked }: { scope
 
 // Staff hours & earnings from appointments: pick a period (day / week / month / custom dates) and a person.
 // Earnings use each person's pay setting (hourly rate or % commission of the appointment price).
-function StaffHoursPanel({ data: base, scopeClientId, sample }: { data: Data; scopeClientId: string; sample: boolean }) {
+function StaffHoursPanel({ data: base, scopeClientId, sample, periodStart = "", periodEnd = "", periodLabel = "" }: { data: Data; scopeClientId: string; sample: boolean; periodStart?: string; periodEnd?: string; periodLabel?: string }) {
   const [period, setPeriod] = useState<"day" | "week" | "month" | "custom">(() => { try { const v = localStorage.getItem("f2b-staff-hours-period2"); return v === "day" || v === "week" || v === "custom" ? v : "month"; } catch { return "month"; } });
   const [anchor, setAnchor] = useState(() => new Date());
   const [from, setFrom] = useState(() => ymd(addDays(new Date(), -30)));
   const [to, setTo] = useState(() => ymd(new Date()));
+  // On the Dashboard this follows the top-bar period; the Day / Week / Month / Dates buttons still work until it changes again.
+  useEffect(() => {
+    if (!periodEnd) return;
+    const end = periodEnd, start = periodStart || ymd(addDays(new Date(`${periodEnd}T00:00:00`), -365 * 3));
+    setFrom(start); setTo(end); setPeriod("custom");
+  }, [periodStart, periodEnd]); // eslint-disable-line react-hooks/exhaustive-deps
   const [who, setWho] = useState("");
   const [own, setOwn] = useState<Data | null>(null);
   const [pay, setPay] = useState<Record<string, { payType: "none" | "hourly" | "commission" | "salary"; payRate: number }>>({});
