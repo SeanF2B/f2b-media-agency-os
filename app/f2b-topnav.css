@@ -2077,3 +2077,34 @@ html body .crm-detail { width: min(760px, 100%) !important; height: auto !import
 html body .crm-detail-body { min-height: 0; }
 @keyframes crm-pop { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: none; } }
 @media (max-width: 700px) { html body .crm-detail-backdrop { padding: 0; align-items: flex-end !important; } html body .crm-detail { max-height: 92vh !important; border-radius: 18px 18px 0 0; } }
+/* Task cards: compact on the board (logo, title, type, date, repeat, person); click opens the full card in a popup */
+html body .app-shell .pipeline-card.is-compact { padding: 10px 12px !important; gap: 8px !important; cursor: pointer; }
+html body .app-shell .pipeline-card.is-compact :is(.task-card-instructions-preview, .task-card-note, .task-card-attachments, .task-checklist-editor, .move-task-label, .task-note-book, .task-duplicate, .task-quick-move, .pipeline-card-expand-label, .pipeline-card-expand-company, .task-footer-estimate, .pipeline-card-expanded, .task-card-campaign) { display: none !important; }
+html body .app-shell .pipeline-card.is-compact .pipeline-card-details > summary { list-style: none; padding: 0 !important; border: 0 !important; background: transparent !important; }
+html body .app-shell .pipeline-card.is-compact .pipeline-card-details > summary::-webkit-details-marker { display: none; }
+html body .app-shell .pipeline-card.is-compact .pipeline-card-summary-main { display: flex; align-items: center; gap: 10px; }
+html body .app-shell .pipeline-card.is-compact .task-client-mark { width: 34px !important; height: 34px !important; min-width: 34px; border-radius: 9px !important; }
+html body .app-shell .pipeline-card.is-compact .pipeline-card-summary-copy b { font-size: 13.5px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+html body .app-shell .pipeline-card.is-compact .pipeline-card-footer { padding-top: 6px !important; margin: 0 !important; border-top: 1px solid rgba(127,138,160,.15); display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap; }
+html body .app-shell .pipeline-card.is-compact .assignee-chip span:last-child { font-size: 11.5px; }
+html body .app-shell .pipeline-card.is-compact .priority { font-size: 10.5px; padding: 2px 8px; }
+html body .app-shell .pipeline-card.is-compact .service-chip { font-size: 10.5px; padding: 2px 8px; }
+.task-popup-backdrop { position: fixed; inset: 0; z-index: 4000; background: rgba(8,14,20,.45); display: flex; align-items: center; justify-content: center; padding: 24px; animation: f2b-fade-in .15s ease; }
+.task-popup { position: relative; width: min(640px, 100%); max-height: 88vh; overflow-y: auto; border-radius: 18px; background: #fff; box-shadow: 0 30px 80px rgba(0,0,0,.3); animation: crm-pop .2s cubic-bezier(.2,.8,.2,1); }
+.task-popup .pipeline-card { margin: 0 !important; border: 0 !important; box-shadow: none !important; border-radius: 18px !important; padding: 18px 20px 20px !important; cursor: default; }
+.task-popup-close { position: sticky; top: 10px; float: right; margin: 10px 10px -40px 0; z-index: 3; width: 32px; height: 32px; border-radius: 50%; border: 1px solid #dce3e7; background: #fff; font-size: 18px; line-height: 1; cursor: pointer; }
+.app-shell.dark-mode .task-popup, .dark-mode .task-popup { background: #1b2227; }
+@media (max-width: 700px) { .task-popup-backdrop { padding: 0; align-items: flex-end; } .task-popup { max-height: 92vh; border-radius: 18px 18px 0 0; } }
+/* Pipeline cards: logo/initials, service-type tag, source tag and tiny icon details */
+html body .crm-opportunity .crm-card-top { display: flex; align-items: center; gap: 8px; }
+html body .crm-opportunity .crm-card-logo { width: 28px; height: 28px; min-width: 28px; border-radius: 8px; overflow: hidden; display: grid; place-items: center; border: 1px solid #e6ebef; background: #fff; }
+html body .crm-opportunity .crm-card-logo img { width: 100%; height: 100%; object-fit: contain; }
+html body .crm-opportunity .crm-card-initials { color: #fff; font-size: 11px; font-weight: 800; border: 0; letter-spacing: .02em; }
+html body .crm-card-tags { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-top: 2px; }
+html body .crm-card-type, html body .crm-card-src { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 800; padding: 2px 8px; border-radius: 999px; white-space: nowrap; max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+html body .crm-card-type { background: #ede9fe; color: #5b21b6; }
+html body .crm-card-src { background: #f1f4f6; color: #475467; }
+html body .crm-card-src.src-google-ads { background: #e0ecff; color: #1d4ed8; } html body .crm-card-src.src-website-form, html body .crm-card-src.src-website-estimate { background: #dcfce7; color: #166534; } html body .crm-card-src.src-meta { background: #e7f0ff; color: #1e40af; } html body .crm-card-src.src-referral { background: #fef3c7; color: #92400e; }
+html body .crm-card-icons { display: inline-flex; align-items: center; gap: 7px; margin-left: auto; color: #8a96a3; font-size: 11px; font-weight: 600; }
+html body .crm-card-icons > span { display: inline-flex; align-items: center; gap: 3px; }
+html body .app-shell.dark-mode .crm-card-src { background: #26313a; color: #c3ccd4; } html body .app-shell.dark-mode .crm-card-type { background: #2e2850; color: #c4b5fd; }
