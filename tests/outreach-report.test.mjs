@@ -38,3 +38,20 @@ test("small samples aren't judged on rates; low placement is", () => {
   const none = buildDeliverabilityReport({ auth: passAuth, stats: { sent: 100 } });
   assert.ok(none.actions.some((text) => /Placement/.test(text)));
 });
+
+import { summariseWarmup, externalWarmupProgress } from "../lib/outreach/providers/instantly.mjs";
+
+test("Instantly warm-up numbers are normalised, tolerating missing or text-only fields", () => {
+  const out = summariseWarmup({ aggregate_data: { "A@x.ie": { sent: 15, received: 15, landed_inbox: 13, landed_spam: 2, health_score: 87 }, "b@x.ie": { sent: 4, received: 3, landed_inbox: 3, health_score_label: "91%" } } });
+  assert.deepEqual(out["a@x.ie"], { sent: 15, received: 15, inbox: 13, spam: 2, inboxRate: 13 / 15, healthScore: 87 });
+  assert.equal(out["b@x.ie"].spam, 0); assert.equal(out["b@x.ie"].healthScore, 91);
+  assert.deepEqual(summariseWarmup(null), {});
+});
+
+test("external warm-up counts days and unlocks after day 14", () => {
+  const start = Date.parse("2026-11-01T10:00:00Z");
+  assert.deepEqual(externalWarmupProgress("2026-11-01T10:00:00Z", start + 3600_000), { day: 1, days: 14, progress: 0, ready: false });
+  assert.equal(externalWarmupProgress("2026-11-01T10:00:00Z", start + 13.5 * 86_400_000).ready, false);
+  assert.equal(externalWarmupProgress("2026-11-01T10:00:00Z", start + 14.1 * 86_400_000).ready, true);
+  assert.equal(externalWarmupProgress(null).ready, false);
+});

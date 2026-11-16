@@ -9,6 +9,7 @@ export type DeliverabilityReport = {
   rates: Array<{ key: string; label: string; value: string; tone?: string }>;
   placement: { completedAt: string; inboxRate: number | null; results: Array<{ provider: string; placement: string; seed?: string }> } | null;
   throttle: { band: string; limitToday: number | null; rampDay: number | null };
+  externalWarmup: { provider: string; day: number; days: number; ready: boolean; paused: boolean; stats: { sent: number; received: number; inbox: number; spam: number; inboxRate: number | null; healthScore: number | null } | null } | null;
   findings: Array<{ tone: "good" | "info" | "warn" | "bad"; text: string }>;
   actions: string[];
 };

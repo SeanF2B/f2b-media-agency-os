@@ -322,3 +322,10 @@
 .ox-findings .bad { color: #c2413a; } .ox-findings .warn { color: #b7791f; } .ox-findings .good { color: #1f8a5b; }
 .dark-mode .ox-findings .bad { color: #ff8a80; } .dark-mode .ox-findings .warn { color: #f0b75a; } .dark-mode .ox-findings .good { color: #4fd19a; }
 @media (max-width: 700px) { .ox-rate-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Instantly warm-up */
+.ox-flame-cell { display: grid; gap: 3px; justify-items: start; }
+.ox-flame-cell > small { font-size: 11px; }
+.ox-signin { display: inline-grid; gap: 4px; }
+.ox-signin a { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+.ox-warm-results li.connect { border-color: color-mix(in srgb, var(--ox-p, #2878a8) 50%, transparent); }
