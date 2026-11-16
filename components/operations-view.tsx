@@ -115,7 +115,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
   const { tab, sub } = normalizeOpsTab(rawTab === "overview" ? "clients" : rawTab);
   const [workroom, setWorkroom] = useState(false); // client workroom (full client profile) open inside the Clients tab
   const [siteMode, setSiteMode] = useState<SiteMode>("sites");
-  const [reportMode, setReportMode] = useState<"audits" | "reports">("reports");
+  const [reportMode, setReportMode] = useState<"audits" | "reports" | "report-keywords">("reports");
   const [seoMode, setSeoMode] = useState<SeoMode>("pages");
   const [adsMode, setAdsMode] = useState<AdsMode | null>(null); // null = Performance for connected accounts, Setup otherwise
   const [sitesTab, setSitesTab] = useState<SitesTab>("overview");
@@ -125,7 +125,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
   useEffect(() => {
     if (!sub) return;
     if (tab === "seo") setSeoMode(sub as SeoMode);
-    else if (tab === "reports") { if (sub === "keywords") { onTab("seo"); setSeoMode("keywords"); } else setReportMode(sub as "audits"); }
+    else if (tab === "reports") setReportMode(sub === "keywords" ? "report-keywords" : sub as "audits");
     else if (tab === "sites") {
       if (sub === "forms" || sub === "submissions") { setSitesTab("forms"); setFormsView(sub); }
       else if (sub === "domains" || sub === "dns") setSitesTab("domains");
@@ -246,7 +246,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
     {tab === "onboarding" && <><button type="button" className="text-button ops-back" onClick={() => onTab("clients")}>← Back to clients</button>{onboarding}</>}
 
     {tab === "reports" && renderTool && selected && <>
-      <div className="ops-subbar">{seg(reportMode, setReportMode, [["reports", "Client reports"], ["audits", "Audits"]], "Reports sections")}</div>
+      <div className="ops-subbar">{seg(reportMode, setReportMode, [["reports", "Client reports"], ["audits", "Audits"], ["report-keywords", "Keywords"]], "Reports sections")}</div>
       <div className="ops-embed" key={`rep-${reportMode}-${selected.id}`}>{renderTool(reportMode, selected.id)}</div>
     </>}
     {tab === "seo" && seoMode === "ai" && selected && <>
