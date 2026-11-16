@@ -33,10 +33,10 @@ function Tile({ icon, label, value, note, tone = "", children }: { icon: ReactNo
   return <div className={`dh-tile ${tone}`}><span className="dh-tile-icon">{icon}</span><div className="dh-tile-body"><small>{label}</small><b>{value}</b>{children}{note && <em>{note}</em>}</div></div>;
 }
 
-export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate, onAddTask, onOpenTask }: { scopeClientId: string; clients: HubClient[]; tasks: HubTask[]; staff: HubStaff[]; onNavigate: (page: string) => void; onAddTask: () => void; onOpenTask?: (id: string) => void }) {
+export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate, onAddTask, onOpenTask, adsPanel }: { adsPanel?: ReactNode; scopeClientId: string; clients: HubClient[]; tasks: HubTask[]; staff: HubStaff[]; onNavigate: (page: string) => void; onAddTask: () => void; onOpenTask?: (id: string) => void }) {
   const [pickedClient, setPickedClient] = useState(() => { try { return localStorage.getItem("f2b-dash-client") || ""; } catch { return ""; } });
   // Agency view defaults to all clients' Google Ads; a client can be picked for their full results.
-  const clientId = scopeClientId || (pickedClient === "all" || clients.some((c) => c.id === pickedClient) ? pickedClient || "all" : "all");
+  const clientId = scopeClientId || (clients.some((c) => c.id === pickedClient) ? pickedClient : (clients.find((c) => c.googleAdsAccountId) || clients[0])?.id || "");
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(false);
   const [showAi, setShowAi] = useState(() => { try { return localStorage.getItem("f2b-dash-ai") !== "0"; } catch { return true; } });
@@ -70,9 +70,10 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
   return <div className="dh">
     <section className="dh-actions" aria-label="Quick actions">{actions.map((a) => <button type="button" key={a.label} className={`dh-action ${a.tint}`} onClick={a.run}><span className="dh-action-icon">{a.icon}</span><span><b>{a.label}</b><small>{a.hint}</small></span></button>)}</section>
 
+    {adsPanel}
     <section className="panel dh-panel" aria-label="Website and marketing results">
       <div className="dh-head"><div><p className="eyebrow">📈 MARKETING · LAST 30 DAYS</p><h2>Website & search results</h2></div>
-        {!scopeClientId && clients.length > 0 && <label className="dh-client"><span>Client</span><select value={clientId} onChange={(e) => { setPickedClient(e.target.value); try { localStorage.setItem("f2b-dash-client", e.target.value); } catch { /* ignore */ } }}><option value="all">All clients · Google Ads</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}{c.googleAdsAccountId ? " · Ads" : ""}</option>)}</select></label>}
+        {!scopeClientId && clients.length > 0 && <label className="dh-client"><span>Client</span><select value={clientId} onChange={(e) => { setPickedClient(e.target.value); try { localStorage.setItem("f2b-dash-client", e.target.value); } catch { /* ignore */ } }}>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>}
       </div>
       {loading && !m ? <p className="dh-muted">Loading results…</p> : !m ? <p className="dh-muted">Results appear here once a client is chosen and you can view reports.</p> : <>
         <div className="dh-tiles">
@@ -81,24 +82,6 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
           <Tile icon={<BrandIcon id="business-profile" size={22} fallback={<MousePointerClick size={18} />} />} label="Profile website clicks" value={m.profileClicks ? num(m.profileClicks.value) : "—"} note={m.profileClicks ? "" : m.businessNote}><Delta now={m.profileClicks?.value} before={m.profileClicks?.previous} /></Tile>
           <Tile icon={<UserPlus size={18} />} label="Leads generated" value={m.leads ? num(m.leads.value) : "—"} tone={m.leads && m.leads.value > 0 ? "good" : ""} />
         </div>
-        <h3 className="dh-sub"><BrandIcon id="google-ads" size={16} fallback={null} /> Google Ads{m.scope === "all" && m.linkedAccounts ? ` · ${m.accounts || 0} of ${m.linkedAccounts} accounts` : ""}</h3>
-        <div className="dh-tiles">
-          <Tile icon={<BrandIcon id="google-ads" size={22} fallback={<BarChart3 size={18} />} />} label="Ad spend" value={m.adSpend ? money(m.adSpend.value, cur) : "—"} note={m.adSpend ? "Expense" : m.adsNote} tone="expense" />
-          <Tile icon={<MousePointerClick size={18} />} label="Clicks" value={m.adClicks ? num(m.adClicks.value) : "—"} tone={m.adClicks && m.adClicks.previous != null && m.adClicks.value > m.adClicks.previous ? "good" : ""}><Delta now={m.adClicks?.value} before={m.adClicks?.previous} /></Tile>
-          <Tile icon={<BarChart3 size={18} />} label="Impressions" value={m.impressions ? num(m.impressions.value) : "—"}><Delta now={m.impressions?.value} before={m.impressions?.previous} /></Tile>
-          <Tile icon={<span className="dh-cur">€</span>} label="Avg. CPC" value={m.cpc ? money2(m.cpc.value, cur) : "—"}><Delta now={m.cpc?.value} before={m.cpc?.previous} lowerIsBetter /></Tile>
-          <Tile icon={<CheckCircle2 size={18} />} label="Conversions" value={m.conversions ? num(m.conversions.value) : "—"} tone={m.conversions && m.conversions.value > 0 ? "good" : ""}><Delta now={m.conversions?.value} before={m.conversions?.previous} /></Tile>
-          <Tile icon={<UserPlus size={18} />} label="Cost per conversion" value={m.costPerConversion ? money2(m.costPerConversion.value, cur) : "—"}><Delta now={m.costPerConversion?.value} before={m.costPerConversion?.previous} lowerIsBetter /></Tile>
-        </div>
-        <h3 className="dh-sub"><BrandIcon id="meta-ads" size={16} fallback={null} /> Meta Ads{m.meta && m.scope === "all" ? ` · ${m.meta.accounts} of ${m.meta.linkedAccounts} accounts` : ""}</h3>
-        {m.meta ? <div className="dh-tiles">
-          <Tile icon={<BrandIcon id="meta-ads" size={22} fallback={<BarChart3 size={18} />} />} label="Ad spend" value={money(m.meta.spend, cur)} note="Expense" tone="expense" />
-          <Tile icon={<MousePointerClick size={18} />} label="Clicks" value={num(m.meta.clicks)} />
-          <Tile icon={<BarChart3 size={18} />} label="Impressions" value={num(m.meta.impressions)} />
-          <Tile icon={<span className="dh-cur">€</span>} label="Avg. CPC" value={m.meta.cpc != null ? money2(m.meta.cpc, cur) : "—"} />
-          <Tile icon={<UserPlus size={18} />} label="Leads" value={num(m.meta.leads)} tone={m.meta.leads > 0 ? "good" : ""} />
-          <Tile icon={<CheckCircle2 size={18} />} label="Cost per lead" value={m.meta.costPerLead != null ? money2(m.meta.costPerLead, cur) : "—"} />
-        </div> : <p className="dh-muted">{m.metaNote || "No Meta Ads data"}</p>}
         {m.scope !== "all" && <><h3 className="dh-sub">Where you show up</h3>
         <div className="dh-ranks">
           <div className="dh-rank"><div className="dh-rank-logos"><BrandIcon id="google" size={24} fallback={<span>G</span>} /><span className="dh-rank-also" title="Chrome and Safari use Google search"><BrandIcon id="chrome" size={14} fallback={null} /><BrandIcon id="safari" size={14} fallback={null} /></span></div><small>Google · Chrome & Safari</small><b>{m.google?.position != null ? `#${m.google.position}` : "—"}</b>{m.google ? <em>avg of {m.google.tracked} keywords · {m.google.top3} in top 3 <Delta now={m.google.position} before={m.google.previous} lowerIsBetter suffix="" /></em> : <em>{m.rankNote || "Not tracked yet"}</em>}</div>

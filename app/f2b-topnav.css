@@ -1131,3 +1131,13 @@ body.f2b-dark :is(.app-shell .dh-delta.bad, #f2b-dh-x) { color: #ff9b94 !importa
 body.f2b-dark .app-shell .dh-delta.good { background: #1d3a2a !important; } body.f2b-dark .app-shell .dh-delta.bad { background: #3a1f1f !important; }
 body.f2b-dark .app-shell .dh-list li:hover { background: #222a30 !important; }
 html body .app-shell .dh-sub { display: flex; align-items: center; gap: 6px; } html body .app-shell .dh-cur { font-weight: 700; color: #475467; }
+/* Ad spend report: spend in soft red (expense), conversions/leads in green */
+html body .app-shell .ad-report-stats > div.ad-stat-expense, html body .app-shell .ad-report-stats > div.ad-stat-good { border-radius: 10px; padding: 6px 8px; }
+html body .app-shell .ad-report-stats > div.ad-stat-expense { background: #fff2f2; }
+html body .app-shell .ad-report-stats > div.ad-stat-expense b { color: #b42318 !important; }
+html body .app-shell .ad-report-stats > div.ad-stat-good { background: #effaf3; }
+html body .app-shell .ad-report-stats > div.ad-stat-good b { color: #157a43 !important; }
+body.f2b-dark .app-shell .ad-report-stats > div.ad-stat-expense { background: #2c1a1a !important; }
+body.f2b-dark .app-shell .ad-report-stats > div.ad-stat-good { background: #15291e !important; }
+body.f2b-dark :is(.app-shell .ad-report-stats > div.ad-stat-expense b, #f2b-ad-x) { color: #ff9b94 !important; -webkit-text-fill-color: #ff9b94 !important; }
+body.f2b-dark :is(.app-shell .ad-report-stats > div.ad-stat-good b, #f2b-ad-x) { color: #6fdc9b !important; -webkit-text-fill-color: #6fdc9b !important; }
