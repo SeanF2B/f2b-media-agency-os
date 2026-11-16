@@ -1375,3 +1375,9 @@ html body .app-shell .cv-back { display: none; }
   html body .app-shell .cv-compose { position: sticky; bottom: 0; }
   html body .app-shell .crm-notice, html body .app-shell .cv-banner { font-size: 12px !important; padding: 8px 10px !important; }
 }
+@media (max-width: 860px) {
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions > :is(button, a)[title]:not([aria-label])::after { content: attr(title); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions .activity-quick-trigger { display: flex !important; }
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions .activity-quick-trigger::after { content: "Recent activity" !important; }
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions .profile-trigger::after { content: "Profile" !important; }
+}
