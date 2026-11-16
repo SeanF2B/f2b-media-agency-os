@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 export type CampaignOption = { value: string; name: string; client?: string; logo?: string; spend?: number; status?: string };
 const isActive = (o: CampaignOption) => !/paus|remov|disabl|archiv|delet|end/i.test(o.status || "") || (o.spend || 0) > 0;
@@ -9,7 +10,16 @@ export function CampaignPicker({ options, value, onChange, currency = "EUR", lab
   const [open, setOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (!open) return; const close = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); }; document.addEventListener("mousedown", close); return () => document.removeEventListener("mousedown", close); }, [open]);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number; width: number; up: boolean } | null>(null);
+  // The menu floats above everything (never clipped by the card it sits in).
+  useEffect(() => {
+    if (!open) return;
+    const place = () => { const r = ref.current?.getBoundingClientRect(); if (!r) return; const width = Math.min(440, window.innerWidth - 16); const left = Math.max(8, Math.min(r.right - width, window.innerWidth - width - 8)); const up = window.innerHeight - r.bottom < 300 && r.top > window.innerHeight - r.bottom; setPos({ top: up ? r.top - 6 : r.bottom + 6, left, width, up }); };
+    place(); window.addEventListener("resize", place); window.addEventListener("scroll", place, true);
+    return () => { window.removeEventListener("resize", place); window.removeEventListener("scroll", place, true); };
+  }, [open]);
+  useEffect(() => { if (!open) return; const close = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node) && !menuRef.current?.contains(e.target as Node)) setOpen(false); }; document.addEventListener("mousedown", close); return () => document.removeEventListener("mousedown", close); }, [open]);
   const money = (n: number) => { try { return new Intl.NumberFormat("en-IE", { style: "currency", currency, maximumFractionDigits: 0 }).format(n); } catch { return `€${Math.round(n)}`; } };
   const active = options.filter(isActive);
   const list = (showAll ? options : active).slice().sort((a, b) => (b.spend || 0) - (a.spend || 0));
@@ -20,11 +30,11 @@ export function CampaignPicker({ options, value, onChange, currency = "EUR", lab
     <button type="button" className="cp-trigger" aria-haspopup="listbox" aria-expanded={open} aria-label={label} onClick={() => setOpen((v) => !v)}>
       {current ? <><Logo o={current} /><span className="cp-name">{current.client ? `${current.client} · ` : ""}{current.name}</span>{current.spend != null && <b className="cp-spend">{money(current.spend)}</b>}</> : <><span className="cp-name">All active campaigns ({active.length})</span>{total > 0 && <b className="cp-spend">{money(total)}</b>}</>}<span className="cp-caret" aria-hidden="true">▾</span>
     </button>
-    {open && <div className="cp-menu" role="listbox">
+    {open && pos && createPortal(<div className="cp-menu cp-menu-float" role="listbox" ref={menuRef} style={{ position: "fixed", left: pos.left, width: pos.width, ...(pos.up ? { bottom: window.innerHeight - pos.top } : { top: pos.top }) }}>
       <button type="button" role="option" aria-selected={!value} className={`cp-opt ${!value ? "is-on" : ""}`} onClick={() => { onChange(""); setOpen(false); }}><span className="cp-logo cp-logo-fb">∑</span><span className="cp-name">All active campaigns ({active.length})</span>{total > 0 && <b className="cp-spend">{money(total)}</b>}</button>
       {list.map((o) => <button type="button" role="option" key={o.value} aria-selected={o.value === value} className={`cp-opt ${o.value === value ? "is-on" : ""} ${isActive(o) ? "" : "is-paused"}`} onClick={() => { onChange(o.value); setOpen(false); }}><Logo o={o} /><span className="cp-name"><span>{o.name}</span>{o.client && <small>{o.client}{isActive(o) ? "" : " · paused"}</small>}</span><b className="cp-spend">{o.spend != null ? money(o.spend) : ""}</b></button>)}
       {!list.length && <p className="cp-empty">No active campaigns in this period.</p>}
       {options.length > active.length && <button type="button" className="cp-toggle" onClick={() => setShowAll((v) => !v)}>{showAll ? "Hide paused campaigns" : `Show paused (${options.length - active.length})`}</button>}
-    </div>}
+    </div>, document.body)}
   </div>;
 }
