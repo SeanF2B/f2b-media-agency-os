@@ -1625,3 +1625,24 @@ html body .app-shell .tt-table tbody tr.tt-row:hover td { background: color-mix(
 html body .app-shell .tt-row:last-child td:first-child, html body .app-shell .tt-row:last-child td:last-child { border-radius: 0 !important; }
 /* Task group toggle: no box on hover/focus/click */
 html body .app-shell :is(.tt-group-toggle, .tt-group-toggle:hover, .tt-group-toggle:focus, .tt-group-toggle:active, .tt-group-toggle:focus-visible, #f2b-tt-tg) { border: 0 !important; outline: 0 !important; box-shadow: none !important; background: transparent !important; transform: none !important; padding: 0 !important; }
+/* ===== Mobile: nothing wider than the screen ===== */
+@media (max-width: 860px) {
+  html body .app-shell.topnav-layout .tn-bar { margin-left: 0 !important; margin-right: 0 !important; }
+  html body .app-shell .main-area, html body .app-shell .main-area > * { max-width: 100% !important; min-width: 0 !important; box-sizing: border-box; }
+  html body .app-shell .main-area :is(section, .panel, .iv-card, .studio-panel, .crm-workspace, .task-table-view) { max-width: 100%; min-width: 0; box-sizing: border-box; }
+  html body .app-shell .tt-toolbar, html body .app-shell .tt-views { display: flex !important; flex-wrap: wrap !important; max-width: 100% !important; gap: 6px; }
+  html body .app-shell .tt-views { flex-wrap: nowrap !important; overflow-x: auto !important; scrollbar-width: none; }
+  html body .app-shell .tt-views::-webkit-scrollbar { display: none; }
+  html body .app-shell .tt-wrap { max-width: 100% !important; overflow-x: hidden !important; }
+  /* task table becomes a simple list: task + status only */
+  html body .app-shell .tt-table { table-layout: auto !important; width: 100% !important; min-width: 0 !important; }
+  html body .app-shell .tt-table :is(th, td):nth-child(n+3):not(:nth-child(4)) { display: none !important; }
+  html body .app-shell .tt-table .tt-group td { display: table-cell !important; }
+  html body .app-shell .tt-table :is(th, td):first-child { width: 34px; padding-left: 10px !important; }
+  html body .app-shell .tt-table td:nth-child(2) { white-space: normal !important; word-break: break-word; }
+  html body .app-shell .tt-table td:nth-child(4) select { max-width: 112px; }
+  html body .app-shell .ai-approval-tab, html body .app-shell .task-view-switch-row { max-width: 100%; flex-wrap: wrap; }
+  html body .app-shell .task-view-switch-row, html body .app-shell [class*="task-tabs"], html body .app-shell [class*="view-tabs"] { overflow-x: auto; scrollbar-width: none; }
+  html body .app-shell .pipeline-toolbar { flex-wrap: wrap !important; max-width: 100%; }
+  html body .app-shell .pipeline-toolbar select { max-width: 100% !important; }
+}
