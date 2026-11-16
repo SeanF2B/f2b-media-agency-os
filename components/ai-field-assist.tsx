@@ -51,9 +51,14 @@ function selectedClientName(el: Target): string {
 }
 
 function scopedClientId(): string {
-  try { const match = document.cookie.match(/(?:^|;\s*)f2b_client=([^;]+)/); const value = match ? decodeURIComponent(match[1]) : ""; return value && value !== "agency" ? value : ""; } catch { return ""; }
+  // Inside a sub-account the cookie names the client; in the agency view the client picked in the top bar does.
+  try { const match = document.cookie.match(/(?:^|;\s*)f2b_client=([^;]+)/); const value = match ? decodeURIComponent(match[1]) : ""; if (value && value !== "agency") return value; return window.localStorage.getItem("f2b-focus-client") || window.localStorage.getItem("f2b-ops-client") || ""; } catch { return ""; }
 }
 
+// Remembers what was typed in each field (per client) so it can be reused next time with one click.
+const rememberKey = (el: Target) => `f2b-remember:${scopedClientId() || "agency"}:${labelFor(el).toLowerCase().slice(0, 80)}`;
+function rememberValue(el: Target) { try { const v = el.value.trim(); if (v && v.length <= 2000) window.localStorage.setItem(rememberKey(el), v); } catch { /* storage unavailable */ } }
+function recalled(el: Target) { try { return window.localStorage.getItem(rememberKey(el)) || ""; } catch { return ""; } }
 function setNativeValue(el: Target, value: string) {
   const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
   Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(el, value);
@@ -71,7 +76,7 @@ export function AiFieldAssist() {
 
   useEffect(() => {
     const onFocus = (event: FocusEvent) => { const el = event.target as Element; if (eligible(el)) { window.clearTimeout(hideTimer.current); setTarget(el); setRect(el.getBoundingClientRect()); setMessage(""); } };
-    const onBlur = () => { hideTimer.current = window.setTimeout(() => { if (!busy) { setTarget(null); setUndo(null); } }, 180); };
+    const onBlur = (event: FocusEvent) => { const el = event.target as Element; if (eligible(el)) rememberValue(el); hideTimer.current = window.setTimeout(() => { if (!busy) { setTarget(null); setUndo(null); } }, 180); };
     document.addEventListener("focusin", onFocus); document.addEventListener("focusout", onBlur);
     return () => { document.removeEventListener("focusin", onFocus); document.removeEventListener("focusout", onBlur); };
   }, [busy]);
@@ -104,11 +109,13 @@ export function AiFieldAssist() {
 
   if (!target || !rect || rect.width < 120) return null;
   const empty = !target.value.trim();
+  const last = empty ? recalled(target) : "";
   const top = Math.max(4, rect.top - 30), left = Math.min(window.innerWidth - 230, Math.max(4, rect.right - 220));
   return <div className="ai-field-assist" style={{ top, left }} onMouseDown={(event) => event.preventDefault()}>
     <button type="button" className="ai-field-assist-btn" disabled={busy} onClick={() => void run()} title={empty ? "Let AI suggest a value for this field" : "Let AI polish what you've written"}>
       <span aria-hidden="true">✨</span>{busy ? "Thinking…" : empty ? "AI suggest" : "AI polish"}
     </button>
+    {last && !busy && <button type="button" className="ai-field-assist-undo" title={last} onClick={() => { setUndo({ el: target, value: "" }); setNativeValue(target, last); target.focus(); setMessage("Filled from last time"); }}>↺ Last used</button>}
     {undo && undo.el === target && !busy && <button type="button" className="ai-field-assist-undo" onClick={() => { setNativeValue(undo.el, undo.value); setUndo(null); setMessage("Undone"); }}>Undo</button>}
     {message && <span className="ai-field-assist-msg" role="status">{message}</span>}
   </div>;

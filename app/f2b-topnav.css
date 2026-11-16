@@ -2321,3 +2321,11 @@ html body .app-shell .cfolder-pri { text-transform: uppercase; font-size: 10px; 
 html body .app-shell .cfolder-pri.high { color: #b42318; }
 html body .app-shell .cfolder-kw { width: 100%; border-collapse: collapse; font-size: 13px; }
 html body .app-shell .cfolder-kw th, html body .app-shell .cfolder-kw td { text-align: left; padding: 4px 6px; border-bottom: 1px solid rgba(127,138,160,.18); }
+/* Operations embeds: one heading only (the Operations tabs). Embedded screens drop their own big
+   title/eyebrow/description so every section looks like the rest of the CRM; their buttons stay. */
+html body .app-shell .ops-centre .ops-embed :is(.page-heading, .welcome-row, .ml-head, .studio-head) :is(.eyebrow, h1, p.muted, .muted:not(button)) { display: none !important; }
+html body .app-shell .ops-centre .ops-embed :is(.page-heading, .welcome-row) { margin-bottom: 8px !important; justify-content: flex-start !important; }
+html body .app-shell .ops-centre .ops-embed :is(.page-heading, .welcome-row):not(:has(button, a, input, select)) { display: none !important; }
+html body .app-shell .ops-centre .ops-embed :is(.primary-button, .secondary-button) { padding: 6px 12px !important; font-size: 13px !important; min-height: 0 !important; }
+html body .app-shell .ops-centre .ops-embed .ml-heading :is(.eyebrow, h1, p) { display: none !important; }
+html body .app-shell .ops-centre .ops-embed .ml-heading { margin-bottom: 6px !important; }

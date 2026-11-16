@@ -224,7 +224,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
     {tab === "seo" && seoMode === "ai" && selected && <>
       <div className="ops-embed" key={`ai-${selected.id}`}><AiVisibilityPanel clientId={selected.id} clientName={selected.name} area={seoLocation} services={(selected.services || []).map((service) => service.name).concat((selected as OpsClient & { seoServices?: string[] }).seoServices || [])} /></div>
     </>}
-    {tab === "websites" && siteMode === "media" && renderTool && <div className="ops-embed">{renderTool("media", "")}</div>}
+    {tab === "websites" && siteMode === "media" && renderTool && <div className="ops-embed">{renderTool("media", selected?.id || "")}</div>}
     {tab === "websites" && renderTool && selected && (siteMode === "settings" || siteMode === "landing") && <>{siteMode === "settings" && <button type="button" className="text-button ops-back" onClick={() => setSiteMode("sites")}>← All websites</button>}<div className="ops-embed" key={`site-${siteMode}`}>{renderTool(siteMode === "landing" ? "landing" : "site-settings", selected.id)}</div></>}
     {tab === "websites" && renderTool && siteMode === "surveys" && <div className="ops-embed">{renderTool("surveys", "")}</div>}
     {tab === "websites" && renderTool && siteMode === "submissions" && <div className="ops-embed">{renderTool("submissions", "")}</div>}
