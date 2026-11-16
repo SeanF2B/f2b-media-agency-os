@@ -117,7 +117,7 @@ export async function GET(request: Request) {
       const bind = scope === null ? [ownerId, since] : [ownerId, since, scope];
       const recent = (await db.prepare(`SELECT m.body, m.created_at, t.contact, t.contact_name FROM conv_messages m JOIN conv_threads t ON t.id=m.thread_id WHERE m.owner_id=?1 AND t.channel='email' AND m.direction='out' AND m.created_at>=?2${where} ORDER BY m.created_at DESC LIMIT 6`).bind(...bind).all<{ body: string; created_at: string; contact: string; contact_name: string }>()).results || [];
       const total = (await db.prepare(`SELECT COUNT(*) AS n FROM conv_messages m JOIN conv_threads t ON t.id=m.thread_id WHERE m.owner_id=?1 AND t.channel='email' AND m.direction='out' AND m.created_at>=?2${where}`).bind(...bind).first<{ n: number }>())?.n || 0;
-      return { total, recent: recent.map((r) => ({ to: r.contact_name || r.contact, subject: (r.body.split("\n")[0] || "").slice(0, 90), at: r.created_at })) };
+      return { total, recent: recent.map((r) => ({ to: r.contact_name || r.contact, subject: (r.body.split("\n")[0] || "").replace(/^subject:\s*/i, "").slice(0, 90), at: r.created_at })) };
     } catch { return { total: 0, recent: [] }; }
   };
   const [m, a, e] = await Promise.all([marketing(), appointments(), emails()]);
