@@ -2551,3 +2551,22 @@ html body .app-shell.dark-mode .timesheet-person-filter span { color: #98a2b3; }
 html body .app-shell .client-tax-stats { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)) !important; }
 html body .app-shell .client-tax-stats .client-tax-wages b { color: #6941c6; }
 html body .app-shell.dark-mode .client-tax-stats .client-tax-wages b { color: #bdb4fe; }
+
+/* Tasks: choose who approves (card), approver decides on the card */
+.app-shell .workflow-submit-review-controls.is-compact { position: relative; }
+.app-shell .approver-picker { position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 30; min-width: 220px; display: grid; gap: 2px; padding: 8px; border-radius: 12px; background: #fff; border: 1px solid #d8dfe3; box-shadow: 0 12px 32px rgba(15, 23, 42, .18); }
+.app-shell .approver-picker > b { font-size: 11px; color: #68747d; padding: 2px 6px 6px; }
+.app-shell .approver-picker button { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 6px; border: 0; border-radius: 8px; background: transparent; color: #26313a; font-size: 12.5px; font-weight: 650; cursor: pointer; transition: background .15s, transform .15s; }
+.app-shell .approver-picker button:hover { background: color-mix(in srgb, var(--secondary, #0b7bb8) 12%, transparent); transform: translateY(-1px); }
+.app-shell .approver-picker button span { display: grid; line-height: 1.2; }
+.app-shell .approver-picker button small { font-size: 10.5px; font-weight: 500; color: #68747d; }
+.app-shell .approver-picker .approver-picker-avatar { width: 26px; height: 26px; border-radius: 50%; flex: none; }
+.app-shell.dark-mode .approver-picker { background: #202024; border-color: #45464c; }
+.app-shell.dark-mode .approver-picker button { color: #f4f5f7; }
+.app-shell.dark-mode .approver-picker button small, .app-shell.dark-mode .approver-picker > b { color: #b8bcc5; }
+.app-shell .workflow-review-decide { display: inline-flex; gap: 6px; }
+.app-shell .workflow-review-decide button { padding: 6px 11px; border-radius: 8px; font-size: 11.5px; font-weight: 750; cursor: pointer; border: 1px solid; transition: transform .15s; }
+.app-shell .workflow-review-decide button:hover { transform: translateY(-1px); }
+.app-shell .workflow-review-approve { background: #16a34a; border-color: #16a34a !important; color: #fff; }
+.app-shell .workflow-review-changes { background: #fff7ed; border-color: #fdba74 !important; color: #9a3412; }
+.app-shell.dark-mode .workflow-review-changes { background: #3a2a1c; color: #fed7aa; }

@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "../../../chatgpt-auth";
 import { getTeamPermissions, type TeamPermissions } from "@/lib/access-permissions";
 import { isAiAssignedTask } from "@/lib/ai-task-access";
+import { logSystemEmail } from "@/lib/email-log";
 
 export const dynamic = "force-dynamic";
 
@@ -99,7 +100,28 @@ export async function POST(request: Request) {
     const next = { ...data, tasks: data.tasks.map((item: ReviewTask) => item.id === task.id ? nextTask : item), activity: [event, ...(data.activity || [])].slice(0, 100) };
     const saved = await env.DB.prepare("UPDATE workspace_documents SET data = ?1, updated_at = ?2 WHERE id = ?3 AND updated_at = ?4")
       .bind(JSON.stringify(next), `staff-review-${crypto.randomUUID()}`, "f2b-agency", row.updated_at).run();
-    if (saved.meta.changes === 1) return Response.json({ task: nextTask, event }, { headers: { "Cache-Control": "no-store" } });
+    if (saved.meta.changes === 1) {
+      // Tell the right person: the approver when it's sent, the worker when it's decided.
+      const recipient = (data.staff || []).find((member: Staff) => member.id === (action === "submit" ? nextTask.reviewApproverId : task.assigneeId)) as Staff | undefined;
+      const clientName = data.clients?.find((client: any) => client.id === task.clientId)?.name || "Internal";
+      const appUrl = String(env.TASK_APP_URL || new URL(request.url).origin).replace(/\/$/, "");
+      if (recipient?.email && recipient.id !== profile?.id) {
+        const subject = action === "submit" ? `Approval needed: ${task.title} (${clientName})` : action === "approve" ? `Approved: ${task.title}` : `Changes requested: ${task.title}`;
+        const text = action === "submit"
+          ? `Hi ${recipient.name.split(" ")[0]},\n\n${actor} sent “${task.title}” (${clientName}) for your approval.${note ? `\n\nNote: ${note}` : ""}\n\nApprove it from your Dashboard (Team approvals) or the task card: ${appUrl}/?page=Tasks`
+          : action === "approve"
+            ? `Hi ${recipient.name.split(" ")[0]},\n\n${actor} approved “${task.title}” (${clientName}). It’s marked done.`
+            : `Hi ${recipient.name.split(" ")[0]},\n\n${actor} asked for changes on “${task.title}” (${clientName}):\n\n${note}\n\nOpen it: ${appUrl}/?page=Tasks`;
+        try {
+          if (env.RESEND_API_KEY && env.TASK_NOTIFICATION_FROM) {
+            const sent = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json", "Idempotency-Key": `review-${entry.id}` }, body: JSON.stringify({ from: env.TASK_NOTIFICATION_FROM, to: [recipient.email], subject, text }), signal: AbortSignal.timeout(15_000) });
+            if (sent.ok) await logSystemEmail(env.DB as never, { ownerId: data.ownerId, clientId: task.clientId || null, to: recipient.email, name: recipient.name, subject, text, kind: "Task approvals" });
+            else console.error("Approval email rejected", sent.status);
+          }
+        } catch (error) { console.error("Approval email failed", error instanceof Error ? error.message : "unknown"); }
+      }
+      return Response.json({ task: nextTask, event }, { headers: { "Cache-Control": "no-store" } });
+    }
   }
   return Response.json({ error: "The task changed while review was being saved. Refresh and try again." }, { status: 409 });
 }
