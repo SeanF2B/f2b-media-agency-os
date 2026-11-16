@@ -1612,3 +1612,14 @@ html body .modal-delete-button:hover { background: #fde4e4; }
 body.f2b-dark .modal-delete-button { background: rgba(229,72,77,.12); border-color: rgba(229,72,77,.35); color: #ff9b94; }
 html body .crm-modal footer, html body .modal-actions { display: flex; align-items: center; gap: 8px; }
 html body .app-shell .crm-opportunity .crm-card-top { padding-right: 40px !important; }
+/* Task table: clean group rows, visible caret, zebra rows */
+html body .app-shell .tt-group td { background: transparent !important; box-shadow: none !important; border: 0 !important; }
+html body .app-shell .tt-group-toggle { outline: none !important; box-shadow: none !important; border-radius: 8px; }
+html body .app-shell .tt-group-toggle:focus-visible { box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-primary, #1f6feb) 45%, transparent) !important; }
+html body .app-shell .tt-group-toggle::before { display: none !important; }
+html body .app-shell .tt-group-toggle .tt-caret { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 7px; font-size: 13px !important; line-height: 1; color: #344054 !important; -webkit-text-fill-color: #344054 !important; background: rgba(127,138,160,.14); }
+body.f2b-dark :is(.app-shell .tt-group-toggle .tt-caret, #f2b-caret-x) { color: #e6eaee !important; -webkit-text-fill-color: #e6eaee !important; background: rgba(255,255,255,.1) !important; }
+html body .app-shell .tt-table tbody tr.tt-row:nth-child(odd) td { background: rgba(127,138,160,.06); }
+html body .app-shell .tt-table tbody tr.tt-row:nth-child(even) td { background: transparent; }
+html body .app-shell .tt-table tbody tr.tt-row:hover td { background: color-mix(in srgb, var(--brand-primary, #1f6feb) 8%, transparent) !important; }
+html body .app-shell .tt-row:last-child td:first-child, html body .app-shell .tt-row:last-child td:last-child { border-radius: 0 !important; }
