@@ -11,6 +11,7 @@ import {
   SchedulingError, availableSlots, createBooking, deleteCalendar, getBooking, getCalendar, getStaffSettings, listBookings, listCalendars,
   saveCalendar, saveStaffSettings, staffFeedToken, updateBooking, getStaffProfiles, saveStaffProfile, reviewLinkToken,
 } from "@/lib/scheduling/server";
+import { getPayroll, savePayrollEmployer, savePayrollPerson, issuePayslip, deletePayslip } from "@/lib/scheduling/payroll-store";
 
 export const dynamic = "force-dynamic";
 const json = (data: unknown, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
@@ -150,6 +151,21 @@ export async function POST(request: Request) {
         const staffId = str(body.staffId, 120);
         if (!ctx.ws.staff.some((s) => s.id === staffId) || !(ctx.admin || ctx.canManage || ctx.me?.id === staffId)) return fail("You can only change your own booking profile.", 403);
         return json({ profile: await saveStaffProfile(db, ownerId, staffId, body.profile) });
+      }
+      // Payroll & payslips: admins only (PPS numbers and pay are never sent to anyone else).
+      case "getPayroll": case "savePayrollEmployer": case "savePayrollPerson": case "previewPayslip": case "issuePayslip": case "deletePayslip": {
+        if (!ctx.admin) return fail("Only admins can see payroll.", 403);
+        const scope = ctx.scope || "";
+        try {
+          if (body.action === "getPayroll") { const year = Math.max(2020, Math.min(2100, Number(body.year) || new Date().getFullYear())); return json(await getPayroll(db, ownerId, scope, ctx.staff.map((s) => s.id), year)); }
+          if (body.action === "savePayrollEmployer") return json({ employer: await savePayrollEmployer(db, ownerId, scope, body.employer) });
+          const staffId = str(body.staffId, 120);
+          if (body.action === "deletePayslip") { await deletePayslip(db, ownerId, scope, str(body.key, 200)); return json({ ok: true }); }
+          const person = ctx.staff.find((s) => s.id === staffId);
+          if (!person) return fail("Team member not found.", 404);
+          if (body.action === "savePayrollPerson") return json({ person: await savePayrollPerson(db, ownerId, scope, staffId, body.person) });
+          return json({ slip: await issuePayslip(db, ownerId, scope, person, body as Record<string, unknown>, body.action === "issuePayslip") });
+        } catch (error) { return fail(error instanceof Error ? error.message : "Payroll couldn't be saved.", 400); }
       }
       case "rotateFeed": case "createFeed": {
         const staffId = str(body.staffId, 120);

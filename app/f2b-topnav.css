@@ -1487,7 +1487,7 @@ html body .app-shell .crm-stage-arrow.next { justify-content: flex-end; backgrou
 html body .app-shell .crm-stage-arrow span { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 html body .app-shell .crm-stage-arrow:disabled { opacity: .35; cursor: default; }
 /* Top bar in dark mode: logo on white tile, picker matches dark bar */
-body.f2b-dark .app-shell.topnav-layout :is(.tn-brand .tn-logo-client, #f2b-tn-logo) { background: #fff !important; border-color: rgba(255,255,255,.2) !important; }
+body.f2b-dark .app-shell.topnav-layout :is(.tn-brand .tn-logo-client, #f2b-tn-logo) { background: transparent !important; border-color: transparent !important; box-shadow: none !important; }
 body.f2b-dark .app-shell.topnav-layout .tn-left :is(.client-scope-trigger, #f2b-tn-pick) { background: rgba(255,255,255,.07) !important; border: 1px solid rgba(255,255,255,.16) !important; color: #f2f4f7 !important; -webkit-text-fill-color: #f2f4f7 !important; box-shadow: none !important; }
 body.f2b-dark .app-shell.topnav-layout .tn-left .client-scope-trigger :is(span, svg, #f2b-tn-pick) { color: #f2f4f7 !important; -webkit-text-fill-color: #f2f4f7 !important; }
 /* Leads by source: icon per source, headers aligned */
@@ -2463,3 +2463,24 @@ html body .app-shell .ads-findings li > div { flex: 1; display: grid; }
 html body .app-shell .ads-findings li small { opacity: .7; }
 html body .app-shell .ads-finding-pri { font-size: 10.5px; font-weight: 800; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; background: #fef0c7; color: #93370d; }
 html body .app-shell .ads-finding-pri.high { background: #fee4e2; color: #b42318; }
+
+/* ===== Sample data switch in the top bar ===== */
+html body .app-shell.topnav-layout .tn-sample { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 11px 0 8px; margin-right: 6px; border-radius: 999px; border: 1px solid rgba(127,138,160,.28); background: rgba(255,255,255,.55); cursor: pointer; user-select: none; font-size: 12.5px; transition: transform .15s ease, border-color .15s ease, background .15s ease; }
+html body .app-shell.topnav-layout .tn-sample:hover { transform: translateY(-1px); border-color: var(--brand-secondary, #8b5cf6); }
+html body .app-shell.topnav-layout .tn-sample input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+html body .app-shell.topnav-layout .tn-sample b { font-weight: 700; color: inherit; }
+html body .app-shell.topnav-layout .tn-sample-track { position: relative; width: 28px; height: 16px; border-radius: 999px; background: rgba(127,138,160,.45); transition: background .2s ease; }
+html body .app-shell.topnav-layout .tn-sample-track i { position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .2s ease; }
+html body .app-shell.topnav-layout .tn-sample.on { border-color: #f59e0b; background: rgba(245,158,11,.14); }
+html body .app-shell.topnav-layout .tn-sample.on .tn-sample-track { background: #f59e0b; }
+html body .app-shell.topnav-layout .tn-sample.on .tn-sample-track i { transform: translateX(12px); }
+html body .app-shell.topnav-layout .tn-sample:has(input:focus-visible) { outline: 2px solid var(--brand-secondary, #8b5cf6); outline-offset: 2px; }
+html body .app-shell.dark-mode.topnav-layout .tn-sample { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.16); color: #fff; }
+@media (max-width: 860px) { html body .app-shell.topnav-layout .tn-sample b { display: none; } html body .app-shell.topnav-layout .tn-sample { padding: 0 8px; } }
+
+/* ===== Dark mode logos: no white tiles (logos are recoloured for dark mode instead) — final say ===== */
+html body.f2b-dark .app-shell.topnav-layout .tn-bar .tn-brand .tn-logo-client,
+html body .app-shell.dark-mode.topnav-layout .tn-bar .tn-brand .tn-logo-client,
+html body .app-shell.dark-mode.topnav-layout .tn-bar .tn-brand .tn-logo-client:has(img[data-ink]),
+html body.f2b-dark .app-shell.topnav-layout #f2b-tn-logo { background: transparent !important; box-shadow: none !important; border-color: transparent !important; }
+html body .app-shell.dark-mode img[data-dark-logo] { background: transparent !important; }

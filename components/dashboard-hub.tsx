@@ -63,7 +63,7 @@ export function DashboardHub({ activityPanel = null, scopeClientId, clients, tas
   const [loading, setLoading] = useState(false);
   const [apprOpen, setApprOpen] = useState<"" | "ai" | "human">("");
   const [rankOpen, setRankOpen] = useState<"" | "google" | "chatgpt">("");
-  const [sample, setSample] = useSampleData();
+  const [sample] = useSampleData();
   const [apptRange, setApptRange] = useState<"today" | "tomorrow" | "week" | "all" | "date">("today");
   const [apptDate, setApptDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [gReviews, setGReviews] = useState<{ total: number | null; averageRating: number | null } | null>(null);
@@ -120,8 +120,7 @@ export function DashboardHub({ activityPanel = null, scopeClientId, clients, tas
   ];
 
   return <div className="dh">
-    {<label className={`task-ai-toggle dh-sample-toggle ${sample ? "is-on" : ""}`} title="Show demo figures on the dashboard (nothing is saved)"><input type="checkbox" role="switch" checked={sample} onChange={(e) => setSample(e.target.checked)} /><span className="task-ai-toggle-track" aria-hidden="true"><span className="task-ai-toggle-thumb" /></span><b>Sample data</b></label>}
-    {sample && <div className="dh-sample-banner">Showing sample figures for demos — turn off “Sample data” for your real numbers.</div>}
+    {sample && <div className="dh-sample-banner">Showing sample figures for demos — turn off “Sample” in the top bar for your real numbers.</div>}
     <section className="dh-actions" aria-label="Quick actions">{actions.map((a) => <button type="button" key={a.label} className={`dh-action ${a.tint}`} onClick={a.run}><span className="dh-action-icon">{a.icon}</span><span><b>{a.label}</b><small>{a.hint}</small></span></button>)}</section>
 
     <section className="dh-approvals" aria-label="Pending approvals">

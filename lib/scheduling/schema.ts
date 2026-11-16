@@ -89,6 +89,20 @@ CREATE TABLE IF NOT EXISTS sched_staff_profiles (
   PRIMARY KEY (owner_id, staff_id)
 );
 
+-- Payroll (admins only): employer details, each person's payroll details (PPS, RPN figures) and issued payslips.
+CREATE TABLE IF NOT EXISTS sched_payroll (
+  owner_id TEXT NOT NULL,
+  scope TEXT NOT NULL DEFAULT '',
+  kind TEXT NOT NULL CHECK (kind IN ('employer','person','slip')),
+  key TEXT NOT NULL,
+  staff_id TEXT NOT NULL DEFAULT '',
+  pay_date TEXT NOT NULL DEFAULT '',
+  data TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (owner_id, scope, kind, key)
+);
+CREATE INDEX IF NOT EXISTS sched_payroll_staff_idx ON sched_payroll(owner_id, scope, kind, staff_id, pay_date);
+
 -- Shareable "leave a review" link per staff member.
 CREATE TABLE IF NOT EXISTS sched_review_links (
   token TEXT PRIMARY KEY NOT NULL,

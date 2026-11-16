@@ -2,6 +2,7 @@
 import { AiEyesIcon } from "./ai-eyes-icon";
 
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useSampleData } from "@/hooks/use-sample-data";
 const QuickBook = lazy(() => import("./scheduling-view").then((m) => ({ default: m.QuickBook })));
 const MEDIA_RE = /(https:\/\/\S+\.(?:jpe?g|png|webp|gif)(?:\?\S*)?|\/api\/marketing-public\/media\?f=\S+)/gi;
 const photosIn = (body: string) => [...body.matchAll(MEDIA_RE)].map((m) => m[1]);
@@ -57,7 +58,7 @@ export function ConversationsView({ scopeClientId, clients }: { scopeClientId: s
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [booking, setBooking] = useState<null | { name: string; phone: string; email: string; images: string[]; notes: string }>(null);
   const [zoom, setZoom] = useState("");
-  const [sample, setSample] = useState(() => { try { return localStorage.getItem("f2b-dash-sample") === "1"; } catch { return false; } });
+  const [sample] = useSampleData();
   const [demo, setDemo] = useState<{ threads: Thread[]; messages: Record<string, Msg[]> } | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   // Fit the inbox to the window so the reply box is always visible without scrolling the page.
@@ -105,7 +106,7 @@ export function ConversationsView({ scopeClientId, clients }: { scopeClientId: s
 
   return <section className="cv" aria-label="Conversations">
     <header className="cv-head"><div><p className="eyebrow">💬 CONVERSATIONS{scopeClientId ? ` · ${clientName(scopeClientId).toUpperCase()}` : ""}</p><h1>Customer conversations</h1><p>SMS, WhatsApp and every email the system sends, in one inbox.</p></div>
-      <div className="cv-head-actions"><label className={`task-ai-toggle dh-sample-toggle ${sample ? "is-on" : ""}`} title="Show demo conversations (nothing is sent)"><input type="checkbox" role="switch" checked={sample} onChange={(e) => { setSample(e.target.checked); try { localStorage.setItem("f2b-dash-sample", e.target.checked ? "1" : "0"); } catch { /* optional */ } if (!e.target.checked && activeId.startsWith("sample-thread-")) { setActiveId(""); setActive(null); } }} /><span className="task-ai-toggle-track" aria-hidden="true"><span className="task-ai-toggle-thumb" /></span><b>Sample data</b></label><button type="button" className="secondary-button" onClick={() => setSettingsOpen(true)}>⚙️ Conversation settings</button></div></header>
+      <div className="cv-head-actions"><button type="button" className="secondary-button" onClick={() => setSettingsOpen(true)}>⚙️ Conversation settings</button></div></header>
     {error && <div className="cv-error" role="alert">{error}</div>}
     {loading ? <div className="empty-state" role="status">Loading conversations…</div> : <>{!configured && <div className="cv-banner">💬 Emails the system sends show here already. To also text and WhatsApp customers, <button type="button" className="text-button" onClick={() => setSettingsOpen(true)}>connect Twilio</button>.</div>}
     <div className={`cv-grid ${active ? "has-thread" : ""}`} ref={gridRef}>

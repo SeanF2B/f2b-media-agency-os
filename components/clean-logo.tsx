@@ -81,3 +81,63 @@ export function CleanLogo({ src, alt, className }: { src: string; alt: string; c
   const clean = useCleanLogo(src);
   return clean ? <img className={className} src={clean} alt={alt} data-ink={inkCache.get(src) || "mid"} /> : null;
 }
+
+// ---------- Dark mode: logos without white tiles ----------
+// Dark-mode copy of a logo: background removed (as above), then near-black / grey ink turned light so it reads on a
+// dark bar. Coloured parts (brand colours) are left as they are. Cached per source.
+const darkCache = new Map<string, Promise<string>>();
+async function loadImage(src: string) {
+  const img = new Image(); img.crossOrigin = "anonymous"; img.decoding = "async";
+  await new Promise<void>((resolve, reject) => { img.onload = () => resolve(); img.onerror = () => reject(new Error("load")); img.src = src; });
+  return img;
+}
+export function darkReadyLogo(src: string): Promise<string> {
+  const hit = darkCache.get(src); if (hit) return hit;
+  const job = (async () => {
+    const stripped = cache.get(src) || await stripBackground(src).catch(() => src);
+    cache.set(src, stripped);
+    const img = await loadImage(stripped);
+    const w = img.naturalWidth || 1, h = img.naturalHeight || 1;
+    const canvas = document.createElement("canvas"); canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true }); if (!ctx) return stripped;
+    ctx.drawImage(img, 0, 0);
+    const data = ctx.getImageData(0, 0, w, h); const px = data.data;
+    let opaque = 0, changed = 0;
+    for (let i = 0; i < px.length; i += 4) {
+      if (px[i + 3] < 24) continue; opaque++;
+      const r = px[i], g = px[i + 1], b = px[i + 2];
+      const max = Math.max(r, g, b), min = Math.min(r, g, b);
+      const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      if (max - min < 60 && lum < 150) { const v = Math.round(255 - lum * 0.85); px[i] = px[i + 1] = px[i + 2] = v; changed++; }
+    }
+    if (!opaque || changed / opaque < 0.04) return stripped; // nothing dark to lift
+    ctx.putImageData(data, 0, 0);
+    return canvas.toDataURL("image/png");
+  })().catch(() => src);
+  darkCache.set(src, job);
+  return job;
+}
+
+const LOGO_SELECTOR = "img[class*='logo'], [class*='logo'] img, [class*='Logo'] img";
+const SKIP = ".brand-icon-image, [data-keep-logo], .bot-icon img, .ai-icon img";
+/** Mounted once by the app: while dark mode is on, every logo image is swapped for its dark-ready copy (no white boxes). */
+export function DarkLogoFixer({ dark }: { dark: boolean }) {
+  useEffect(() => {
+    const restore = () => document.querySelectorAll<HTMLImageElement>("img[data-light-src]").forEach((img) => { const orig = img.dataset.lightSrc || ""; delete img.dataset.lightSrc; delete img.dataset.darkLogo; if (orig) img.src = orig; });
+    if (!dark) { restore(); return; }
+    const fix = (img: HTMLImageElement) => {
+      if (img.matches(SKIP) || img.closest("[data-keep-logo]")) return;
+      const current = img.getAttribute("src") || "";
+      if (!current || img.dataset.darkLogo === current) return; // already our copy
+      if (/\.svg(\?|$)/i.test(current)) return;
+      img.dataset.lightSrc = current;
+      void darkReadyLogo(current).then((out) => { if (img.getAttribute("src") === current && out !== current) { img.dataset.darkLogo = out; img.src = out; } });
+    };
+    const scan = (root: ParentNode) => { if (root instanceof HTMLImageElement) { if (root.matches(LOGO_SELECTOR)) fix(root); return; } root.querySelectorAll?.<HTMLImageElement>(LOGO_SELECTOR).forEach(fix); };
+    scan(document);
+    const mo = new MutationObserver((list) => { for (const m of list) { if (m.type === "attributes" && m.target instanceof HTMLImageElement) { if (m.target.matches(LOGO_SELECTOR)) fix(m.target); } else m.addedNodes.forEach((n) => { if (n instanceof Element) scan(n); }); } });
+    mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["src"] });
+    return () => { mo.disconnect(); restore(); };
+  }, [dark]);
+  return null;
+}

@@ -5,6 +5,8 @@ import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ImagePlus, Sparkles, CalendarDays, ChevronLeft, ChevronRight, Clock, Copy, Link2, MapPin, Plus, RefreshCw, Settings2, Trash2, UserRound, Users, Video, Phone, Building2 } from "lucide-react";
 import "./scheduling.css";
+import { computePayslip, maskPps, normalisePps, validPps, DEFAULT_PERSON, EMPTY_YTD, type PayrollEmployer, type PayrollPerson } from "@/lib/scheduling/payroll";
+import type { PayLine, PayslipRecord } from "@/lib/scheduling/payroll-store";
 
 type DayKey = "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
 type Window = [string, string];
@@ -64,7 +66,7 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
   const weekRef = useRef<HTMLDivElement>(null);
   const [PX_PER_MIN, setPpm] = useState(PX_DEFAULT);
   const [realData, setData] = useState<Data | null>(null);
-  const [sample, setSample] = useSampleData();
+  const [sample] = useSampleData();
   const [sampleMoves, setSampleMoves] = useState<Record<string, string>>({});
   const site = useSiteSample(scopeClientId, sample);
   const sampleClientName = realData?.clients.find((c) => c.id === scopeClientId)?.name || "";
@@ -152,7 +154,7 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
 
   return <section className="sch" aria-label="Scheduling">
     <header className="iv-head"><div><p className="eyebrow">SCHEDULING</p><h1>Appointments &amp; bookings</h1><p>Service calendars, consultations and staff availability, synced with Google Calendar and Apple / Outlook.</p></div>
-      <div className="iv-head-actions"><label className={`task-ai-toggle dh-sample-toggle sch-sample-switch ${sample ? "is-on" : ""}`} title="Show demo appointments (nothing is saved)"><input type="checkbox" role="switch" checked={sample} onChange={(e) => setSample(e.target.checked)} /><span className="task-ai-toggle-track" aria-hidden="true"><span className="task-ai-toggle-thumb" /></span><b>Sample data</b></label>{data.canManage && <button type="button" className="secondary-button" onClick={() => setEditCal(blankCalendar(data))}><Plus size={15} /> New booking calendar</button>}<button type="button" className="primary-button" onClick={() => setNewAppt({ date: ymd(new Date()), time: "" })}><Plus size={15} /> New appointment</button></div></header>
+      <div className="iv-head-actions">{data.canManage && <button type="button" className="secondary-button" onClick={() => setEditCal(blankCalendar(data))}><Plus size={15} /> New booking calendar</button>}<button type="button" className="primary-button" onClick={() => setNewAppt({ date: ymd(new Date()), time: "" })}><Plus size={15} /> New appointment</button></div></header>
     {error && <div className="iv-error" role="alert">{error}</div>}{note && <div className="iv-note" role="status">{note}</div>}
     {sample && <div className="dh-sample-banner">Showing sample appointments{site.team.length ? ` with ${sampleClientName || "the client"}’s own team${site.gallery?.length || Object.keys(site.work || {}).length ? " and photos of their work" : ""}` : site.services.length ? ` built from ${sampleClientName || "the client"}’s website` : ""} — drag, open and demo freely; nothing is saved. Turn off “Sample data” for real bookings.{scopeClientId && !site.team.length && !site.services.length ? " Add the client’s website to their profile to show their real team and services." : ""}</div>}
     {!data.emailReady && <div className="iv-warn">Email isn't set up on the server, so confirmations and reminders won't send yet. Bookings still save.</div>}
@@ -960,7 +962,7 @@ export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, c
       <button type="button" className="sch-dash-wday-head" onClick={() => { setDay(d); setMode("day"); }}><small>{d.toLocaleDateString("en-IE", { weekday: "short" })}</small><b>{d.getDate()}</b>{list.length > 0 && <em>{list.length}</em>}</button>
       <div className="sch-dash-wday-body">{list.length ? list.slice(0, 6).map((b) => { const cal = calById.get(b.calendarId); return <button type="button" key={b.id} className="sch-dash-chip" style={{ ["--c" as string]: cal?.color || "#2563eb" }} onClick={() => setDetail(b)} title={`${time(b.start)} ${b.name} · ${cal?.name || ""}`}><span className="sch-chip-top"><b>{time(b.start)}</b><span className="sch-chip-avs">{b.staffIds.slice(0, 2).map((id) => <Avatar key={id} person={personOf(id)} size={20} />)}</span></span><span>{b.name}</span>{(() => { const pic = bookingPhoto(b); return pic ? <img className="sch-chip-img" src={pic} alt="" loading="lazy" onError={(ev) => { (ev.currentTarget as HTMLImageElement).style.display = "none"; }} /> : null; })()}</button>; }) : <span className="sch-dash-free">Free</span>}{list.length > 6 && <small className="iv-small">+{list.length - 6} more</small>}</div>
     </div>; })}</div>}
-    {data && <StaffHoursPanel data={data} scopeClientId={scopeClientId} sample={sample} />}
+    {data && realData?.isAdmin && <StaffHoursPanel data={data} scopeClientId={scopeClientId} sample={sample} />}
     {detail && data && <AppointmentDetail key={detail.id} data={data} scope={scopeClientId} booking={detail} onClose={() => setDetail(null)} onSaved={(msg) => { setDetail(null); void msg; setRefresh((n) => n + 1); }} />}
   </section>;
 }
@@ -1042,7 +1044,6 @@ function StaffHoursPanel({ data: base, scopeClientId, sample }: { data: Data; sc
   const [coverMsg, setCoverMsg] = useState("");
   const [covering, setCovering] = useState(false);
   const [tick, setTick] = useState(0);
-  const [slips, setSlips] = useState(false);
   const [std, setStd] = useState<{ payType: "none" | "hourly" | "commission"; payRate: number }>({ payType: "commission", payRate: 70 });
   const [editStd, setEditStd] = useState(false);
   useEffect(() => { if (sample) return; let live = true; api<{ payType: "none" | "hourly" | "commission"; payRate: number }>(scopeClientId, { action: "getDefaultPay" }).then((r) => { if (live) setStd({ payType: r.payType, payRate: r.payRate }); }).catch(() => undefined); return () => { live = false; }; }, [sample, scopeClientId]);
@@ -1097,7 +1098,7 @@ function StaffHoursPanel({ data: base, scopeClientId, sample }: { data: Data; sc
   const rule = (pr: { payType: string; payRate: number; standard?: boolean }) => pr.payType === "hourly" ? `${money(pr.payRate)}/h` : pr.payType === "commission" ? `${pr.payRate}% / ${100 - pr.payRate}%${pr.standard ? " · standard" : ""}` : "No pay set";
   return <section className="sch-earn" aria-label="Staff hours and earnings">
     <div className="sch-earn-head">
-      <div><p className="eyebrow">⏱ STAFF HOURS &amp; EARNINGS</p><h3>{label}</h3></div>
+      <div><p className="eyebrow">⏱ STAFF HOURS &amp; EARNINGS <span className="admin-badge" title="Only admins can see staff pay and business profit">ADMIN</span></p><h3>{label}</h3></div>
       <div className="sch-dash-panel-tools">
         <label className="sch-select"><Users size={14} /><select aria-label="Staff member" value={who} onChange={(e) => setWho(e.target.value)}><option value="">Everyone</option>{data.staff.map((p) => <option key={p.id} value={p.id}>{p.name.split("|")[0].trim()}</option>)}</select></label>
         <div className="sch-seg" role="tablist" aria-label="Period">{(["day", "week", "month", "custom"] as const).map((k) => <button key={k} type="button" role="tab" aria-selected={period === k} className={period === k ? "on" : ""} onClick={() => setP(k)}>{k === "custom" ? "Dates" : k[0].toUpperCase() + k.slice(1)}</button>)}</div>
@@ -1111,9 +1112,9 @@ function StaffHoursPanel({ data: base, scopeClientId, sample }: { data: Data; sc
       <div className="lost"><small>Lost</small><b>{money(tot.lost)}</b><em>no-shows &amp; cancellations</em></div>
       <div><small>Deposits paid</small><b>{money(tot.dep)}</b><em>held on bookings</em></div>
       <div className="earn"><small>Staff pay</small><b>{money(tot.earn)}</b><em>+{money(tot.earnS)} when scheduled work is done</em></div>
+      <div className="profit"><small>Business profit <span className="admin-badge" title="Only admins see this">ADMIN</span></small><b>{money(tot.rev - tot.earn)}</b><em>{tot.rev > 0 ? `${Math.round(((tot.rev - tot.earn) / tot.rev) * 100)}% of earned · ` : ""}+{money(Math.max(0, tot.sched - tot.earnS))} scheduled</em></div>
     </div>
-    <div className="sch-earn-split"><span>Standard split</span>{editStd ? <PayEditor value={std} onSave={(v) => void saveStd(v)} onCancel={() => setEditStd(false)} /> : <button type="button" className="sch-earn-chip" onClick={() => setEditStd(true)}>{std.payType === "commission" ? `Staff ${std.payRate}% · Business ${100 - std.payRate}%` : std.payType === "hourly" ? `${money(std.payRate)} per hour` : "Set split"} ✎</button>}<small>Used for everyone unless you set their own.</small><span style={{ flex: 1 }} /><button type="button" className="sch-earn-chip" onClick={() => setSlips(true)}>🧾 Payslips</button><button type="button" className="sch-earn-chip" disabled={!tot.earn} onClick={() => { if (sample) { setCoverMsg("Sample data — nothing added to Books."); return; } window.dispatchEvent(new CustomEvent("f2b-staff-pay-expense", { detail: { entries: rows.filter((r) => r.earned > 0).map((r) => ({ id: `staffpay-${r.p.id}-${ymd(range.a)}-${ymd(range.b)}`, description: `Staff pay · ${r.p.name.split("|")[0].trim()} · ${label}`, amount: r.earned, date: ymd(addDays(range.b, -1) < new Date() ? addDays(range.b, -1) : new Date()), clientId: data.scope || scopeClientId || "" })) } })); setCoverMsg(`Staff pay for ${label} sent to Books (Staff wages).`); }}>➕ Add pay to Books</button></div>
-    {slips && <PayslipMaker base={data} scopeClientId={scopeClientId} sample={sample} payOf={payOf} onClose={() => setSlips(false)} />}
+    <div className="sch-earn-split"><span>Standard split</span>{editStd ? <PayEditor value={std} onSave={(v) => void saveStd(v)} onCancel={() => setEditStd(false)} /> : <button type="button" className="sch-earn-chip" onClick={() => setEditStd(true)}>{std.payType === "commission" ? `Staff ${std.payRate}% · Business ${100 - std.payRate}%` : std.payType === "hourly" ? `${money(std.payRate)} per hour` : "Set split"} ✎</button>}<small>Used for everyone unless you set their own.</small><span style={{ flex: 1 }} /><button type="button" className="sch-earn-chip" onClick={() => window.dispatchEvent(new CustomEvent("f2b-open-books-tab", { detail: "payslips" }))} title="Open Books → Payslips">🧾 Payslips →</button><button type="button" className="sch-earn-chip" disabled={!tot.earn} onClick={() => { if (sample) { setCoverMsg("Sample data — nothing added to Books."); return; } window.dispatchEvent(new CustomEvent("f2b-staff-pay-expense", { detail: { entries: rows.filter((r) => r.earned > 0).map((r) => ({ id: `staffpay-${r.p.id}-${ymd(range.a)}-${ymd(range.b)}`, description: `Staff pay · ${r.p.name.split("|")[0].trim()} · ${label}`, amount: r.earned, date: ymd(addDays(range.b, -1) < new Date() ? addDays(range.b, -1) : new Date()), clientId: data.scope || scopeClientId || "" })) } })); setCoverMsg(`Staff pay for ${label} sent to Books (Staff wages).`); }}>➕ Add pay to Books</button></div>
     {coverMsg && <p className="sch-earn-note" role="status">{coverMsg}</p>}
     {cover && (() => { const person = data.staff.find((p) => p.id === cover.staffId); const a = new Date(`${cover.from}T00:00:00`).getTime(), z = addDays(new Date(`${cover.until}T00:00:00`), 1).getTime();
       const affected = data.bookings.filter((b) => b.status === "booked" && b.staffIds.includes(cover.staffId) && Date.parse(b.start) >= a && Date.parse(b.start) < z);
@@ -1164,64 +1165,296 @@ function PayEditor({ value, onSave, onCancel }: { value: { payType: "none" | "ho
   return <span className="sch-pay-edit"><select value={t} onChange={(e) => setT(e.target.value as "hourly" | "commission")}><option value="commission">% of price</option><option value="hourly">Per hour</option></select><input type="number" min={0} step="0.5" value={rate} placeholder={t === "hourly" ? "€/h" : "%"} onChange={(e) => setRate(e.target.value)} autoFocus /><button type="button" className="iv-btn ok" onClick={() => onSave({ payType: Number(rate) > 0 ? t : "none", payRate: Number(rate) || 0 })}>Save</button><button type="button" className="iv-btn" onClick={onCancel}>×</button></span>;
 }
 
-// Payslips: pick a staff member and a period, preview a payslip built from their appointments, print / save as PDF, add to Books.
-function PayslipMaker({ base, scopeClientId, sample, payOf, onClose }: { base: Data; scopeClientId: string; sample: boolean; payOf: (p: Staff) => { payType: "none" | "hourly" | "commission"; payRate: number }; onClose: () => void }) {
-  const [who, setWho] = useState(base.staff[0]?.id || "");
-  const [period, setPeriod] = useState<"thisWeek" | "lastWeek" | "thisMonth" | "lastMonth" | "custom">("lastMonth");
-  const [from, setFrom] = useState(() => ymd(new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1)));
-  const [to, setTo] = useState(() => ymd(new Date(new Date().getFullYear(), new Date().getMonth(), 0)));
-  const [data, setData] = useState<Data | null>(null);
-  const [note, setNote] = useState("");
-  const [msg, setMsg] = useState("");
-  const range = useMemo(() => { const now = new Date(); const wk = mondayOf(now);
-    if (period === "thisWeek") return { a: wk, b: addDays(wk, 7) }; if (period === "lastWeek") return { a: addDays(wk, -7), b: wk };
-    if (period === "thisMonth") return { a: new Date(now.getFullYear(), now.getMonth(), 1), b: new Date(now.getFullYear(), now.getMonth() + 1, 1) };
-    if (period === "lastMonth") return { a: new Date(now.getFullYear(), now.getMonth() - 1, 1), b: new Date(now.getFullYear(), now.getMonth(), 1) };
-    const a = new Date(`${from}T00:00:00`); return { a, b: addDays(new Date(`${to}T00:00:00`), 1) }; }, [period, from, to]);
-  const generate = async () => { setMsg(""); if (sample) { setData(base); return; } try { setData(await api<Data>(scopeClientId, undefined, `&from=${range.a.toISOString()}&to=${range.b.toISOString()}`)); } catch (e) { setMsg(errText(e, "Couldn't load appointments.")); } };
-  const d = data;
-  const person = (d || base).staff.find((p) => p.id === who);
-  const cal = new Map((d || base).calendars.map((c) => [c.id, c]));
-  const cur = (d || base).calendars[0]?.currency || "EUR";
-  const money = (n: number) => new Intl.NumberFormat("en-IE", { style: "currency", currency: cur }).format(n);
-  const priceOf = (b: Booking) => { const n = Number((b.answers.find((x) => /^price$/i.test(x.label))?.value || "").replace(/[^0-9.]/g, "")); return n > 0 ? n : (cal.get(b.calendarId)?.price || 0); };
-  const depositOf = (b: Booking) => Number((b.answers.find((x) => /^deposit/i.test(x.label))?.value || "").replace(/[^0-9.]/g, "")) || 0;
-  const lines = d && person ? d.bookings.filter((b) => b.staffIds.includes(who) && Date.parse(b.start) >= range.a.getTime() && Date.parse(b.start) < range.b.getTime() && (b.status === "completed" || (b.status === "booked" && Date.parse(b.end) < Date.now()))).sort((x, y) => x.start.localeCompare(y.start)) : [];
-  const pr = person ? payOf(person) : { payType: "none" as const, payRate: 0 };
-  const rows = lines.map((b) => { const share = 1 / Math.max(1, b.staffIds.length); const hours = (Date.parse(b.end) - Date.parse(b.start)) / 3_600_000; const value = priceOf(b) * share; return { b, hours, value, pay: pr.payType === "hourly" ? hours * pr.payRate : pr.payType === "commission" ? value * pr.payRate / 100 : 0, deposit: depositOf(b) * share }; });
-  const total = rows.reduce((t, r) => ({ h: t.h + r.hours, v: t.v + r.value, pay: t.pay + r.pay, dep: t.dep + r.deposit }), { h: 0, v: 0, pay: 0, dep: 0 });
-  const business = (d || base).clients.find((c) => c.id === (d || base).scope)?.name || (d || base).clients[0]?.name || "Business";
-  const periodLabel = `${range.a.toLocaleDateString("en-IE", { day: "numeric", month: "short", year: "numeric" })} – ${addDays(range.b, -1).toLocaleDateString("en-IE", { day: "numeric", month: "short", year: "numeric" })}`;
-  const name = person?.name.split("|")[0].trim() || "";
-  const print = () => {
-    const el = document.getElementById("payslip-doc"); if (!el) return;
-    const w = window.open("", "_blank", "width=820,height=1000"); if (!w) { setMsg("Allow pop-ups to print the payslip."); return; }
-    w.document.write(`<!doctype html><html><head><title>Payslip · ${name} · ${periodLabel}</title><style>body{font-family:Inter,Arial,sans-serif;color:#101828;margin:32px}h1{font-size:22px;margin:0}table{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #e6ebef}th{font-size:10px;text-transform:uppercase;color:#667085}td.r,th.r{text-align:right}.ps-top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #101828;padding-bottom:10px}.ps-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}.ps-meta div{border:1px solid #e6ebef;border-radius:8px;padding:8px}.ps-meta small{display:block;font-size:10px;color:#667085;text-transform:uppercase}.ps-total{margin-top:14px;display:flex;justify-content:flex-end}.ps-total div{border:2px solid #101828;border-radius:8px;padding:10px 16px;text-align:right}.ps-total b{font-size:22px}.ps-note{margin-top:14px;font-size:12px;color:#475467}.ps-foot{margin-top:24px;font-size:10px;color:#98a2b3}</style></head><body>${el.innerHTML}<script>window.onload=()=>{window.print()}<\/script></body></html>`);
-    w.document.close();
-  };
-  const toBooks = () => { if (!total.pay) return; if (sample) { setMsg("Sample data — nothing added to Books."); return; } window.dispatchEvent(new CustomEvent("f2b-staff-pay-expense", { detail: { entries: [{ id: `staffpay-${who}-${ymd(range.a)}-${ymd(range.b)}`, description: `Staff pay · ${name} · ${periodLabel}`, amount: total.pay, date: ymd(addDays(range.b, -1)), clientId: (d || base).scope || scopeClientId || "" }] } })); setMsg(sample ? "Sample: added to Books (you can delete it there)." : "Added to Books under Staff wages."); };
-  return <div className="bt-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-    <div className="bt ps" role="dialog" aria-modal="true" aria-label="Payslips">
-      <header className="bt-head"><div><p className="eyebrow">🧾 PAYSLIPS</p><h2>Generate a payslip</h2><p>Built from the staff member's finished appointments and their pay split.</p></div><button type="button" className="bt-x" aria-label="Close" onClick={onClose}>×</button></header>
-      <div className="ps-controls">
-        <label>Staff member<select value={who} onChange={(e) => { setWho(e.target.value); }}>{base.staff.map((p) => <option key={p.id} value={p.id}>{p.name.split("|")[0].trim()}</option>)}</select></label>
-        <label>Period<select value={period} onChange={(e) => setPeriod(e.target.value as typeof period)}><option value="thisWeek">This week</option><option value="lastWeek">Last week</option><option value="thisMonth">This month</option><option value="lastMonth">Last month</option><option value="custom">Custom dates</option></select></label>
-        {period === "custom" && <><label>From<input type="date" value={from} max={to} onChange={(e) => e.target.value && setFrom(e.target.value)} /></label><label>To<input type="date" value={to} min={from} onChange={(e) => e.target.value && setTo(e.target.value)} /></label></>}
-        <span className="ps-range">{periodLabel}</span>
-        <button type="button" className="primary-button" onClick={() => void generate()}>Generate preview</button>
-      </div>
-      <div className="ps-body">{!d ? <p className="bt-loading">Pick a staff member and a period, then Generate preview.</p> : <>
-        <div id="payslip-doc" className="ps-doc">
-          <div className="ps-top"><div><h1>Payslip</h1><div>{business}</div></div><div style={{ textAlign: "right" }}><b>{name}</b><div>{person?.role || ""}</div><div>{periodLabel}</div></div></div>
-          <div className="ps-meta"><div><small>Appointments</small><b>{rows.length}</b></div><div><small>Hours</small><b>{total.h.toFixed(1)}h</b></div><div><small>Work value</small><b>{money(total.v)}</b></div><div><small>Pay basis</small><b>{pr.payType === "hourly" ? `${money(pr.payRate)} / hour` : pr.payType === "commission" ? `${pr.payRate}% of work value` : "Not set"}</b></div></div>
-          <table><thead><tr><th>Date</th><th>Service</th><th>Client</th><th className="r">Hours</th><th className="r">Value</th><th className="r">Pay</th></tr></thead><tbody>{rows.map((r) => <tr key={r.b.id}><td>{new Date(r.b.start).toLocaleDateString("en-IE", { day: "numeric", month: "short" })}</td><td>{cal.get(r.b.calendarId)?.name || "Appointment"}</td><td>{r.b.name}</td><td className="r">{r.hours.toFixed(1)}</td><td className="r">{money(r.value)}</td><td className="r">{money(r.pay)}</td></tr>)}{!rows.length && <tr><td colSpan={6}>No finished appointments in this period.</td></tr>}</tbody></table>
-          <div className="ps-total"><div><small>Gross pay</small><br /><b>{money(total.pay)}</b>{total.dep > 0 && <div style={{ fontSize: 11, color: "#667085" }}>Deposits taken on these bookings: {money(total.dep)}</div>}</div></div>
-          {note && <p className="ps-note">{note}</p>}
-          <p className="ps-foot">Generated {new Date().toLocaleDateString("en-IE", { day: "numeric", month: "long", year: "numeric" })} from appointment records. Gross figures before any tax or deductions.</p>
-        </div>
-        <label className="ps-notelabel">Note on the payslip (optional)<input value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Paid by bank transfer on 30 Nov" /></label>
-      </>}</div>
-      <footer className="bt-foot"><span className="bt-status">{msg}</span><span style={{ flex: 1 }} /><button type="button" className="secondary-button" disabled={!d || !total.pay} onClick={toBooks}>Add to Books</button><button type="button" className="primary-button" disabled={!d} onClick={print}>Print / save PDF</button></footer>
+
+// ================= Payslips (Books → Payslips, admins only) =================
+// Built from each person's finished appointments and pay split, with Irish PAYE / USC / PRSI worked out from their
+// payroll details (PPS number, RPN tax credits and cut-off point). Issued payslips go into a register for year-to-date figures.
+type PayRule = { payType: "none" | "hourly" | "commission"; payRate: number };
+type Business = { name: string; logo: string };
+const PERIOD_PRESETS = [["thisMonth", "This month"], ["lastMonth", "Last month"], ["thisWeek", "This week"], ["lastWeek", "Last week"], ["custom", "Custom dates"]] as const;
+type PeriodKey = typeof PERIOD_PRESETS[number][0];
+const fmtDate = (s: string) => s ? new Date(`${s}T12:00:00`).toLocaleDateString("en-IE", { day: "numeric", month: "short", year: "numeric" }) : "";
+const firstName = (n: string) => n.split("|")[0].trim();
+// Demo PPS numbers with a correct check letter (sample mode only).
+const demoPps = (i: number) => { const d = String(2345678 + i * 1111).slice(0, 7); let sum = 0; for (let k = 0; k < 7; k++) sum += Number(d[k]) * (8 - k); const rem = sum % 23; return `${d}${rem === 0 ? "W" : String.fromCharCode(64 + rem)}`; };
+
+function periodRange(key: PeriodKey, from: string, to: string) {
+  const now = new Date(); const wk = mondayOf(now);
+  if (key === "thisWeek") return { a: wk, b: addDays(wk, 6) };
+  if (key === "lastWeek") return { a: addDays(wk, -7), b: addDays(wk, -1) };
+  if (key === "thisMonth") return { a: new Date(now.getFullYear(), now.getMonth(), 1), b: new Date(now.getFullYear(), now.getMonth() + 1, 0) };
+  if (key === "lastMonth") return { a: new Date(now.getFullYear(), now.getMonth() - 1, 1), b: new Date(now.getFullYear(), now.getMonth(), 0) };
+  const a = new Date(`${from}T00:00:00`), b = new Date(`${to}T00:00:00`); return { a, b: b < a ? a : b };
+}
+
+export function PayslipsView({ scopeClientId, business }: { scopeClientId: string; business: Business }) {
+  const [sample] = useSampleData();
+  const [tab, setTab] = useState<"create" | "issued" | "people" | "employer">("create");
+  const [real, setReal] = useState<Data | null>(null);
+  const [err, setErr] = useState("");
+  const [payroll, setPayroll] = useState<{ employer: PayrollEmployer; people: Record<string, PayrollPerson>; slips: PayslipRecord[] } | null>(null);
+  const [std, setStd] = useState<PayRule>({ payType: "commission", payRate: 70 });
+  const [demoSlips, setDemoSlips] = useState<PayslipRecord[]>([]);
+  const [demoPeople, setDemoPeople] = useState<Record<string, PayrollPerson>>({});
+  const [demoEmployer, setDemoEmployer] = useState<PayrollEmployer | null>(null);
+  const [view, setView] = useState<PayslipRecord | null>(null);
+  const year = new Date().getFullYear();
+  const site = useSiteSample(scopeClientId, sample);
+  const load = useCallback(async () => {
+    try {
+      const from = new Date(year - 1, 11, 1), to = addDays(new Date(), 2);
+      const [d, p, s] = await Promise.all([
+        api<Data>(scopeClientId, undefined, `&from=${from.toISOString()}&to=${to.toISOString()}`),
+        api<{ employer: PayrollEmployer; people: Record<string, PayrollPerson>; slips: PayslipRecord[] }>(scopeClientId, { action: "getPayroll", year }),
+        api<PayRule>(scopeClientId, { action: "getDefaultPay" }).catch(() => null),
+      ]);
+      setReal(d); setPayroll(p); if (s) setStd({ payType: s.payType, payRate: s.payRate }); setErr("");
+    } catch (e) { setErr(errText(e, "Payroll couldn't load.")); }
+  }, [scopeClientId, year]);
+  useEffect(() => { void load(); }, [load]);
+  const data = useMemo(() => sample ? sampleSchedule(real, mondayOf(new Date()), business.name, site) : real, [sample, real, business.name, site]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (err && !sample) return <section className="panel ps-view"><p className="dh-muted">{err}</p></section>;
+  if (!data || (!payroll && !sample)) return <section className="panel ps-view"><p className="dh-muted">Loading payroll…</p></section>;
+  const employer: PayrollEmployer = sample ? (demoEmployer || { name: business.name, address: "12 Main Street, Galway, H91 X2Y3", employerNo: "1234567FA", phone: "091 555 0100", email: "" }) : { ...payroll!.employer, name: payroll!.employer.name || business.name };
+  const people: Record<string, PayrollPerson> = sample ? Object.fromEntries(data.staff.map((p, i) => [p.id, demoPeople[p.id] || { ...DEFAULT_PERSON, pps: demoPps(i), employeeNo: `E${String(i + 1).padStart(3, "0")}` }])) : payroll!.people;
+  const slips = sample ? demoSlips : payroll!.slips;
+  const payOf = (p: Staff): PayRule => p.profile?.payType && p.profile.payType !== "none" ? { payType: p.profile.payType, payRate: p.profile.payRate || 0 } : std;
+  const currency = data.calendars[0]?.currency || "EUR";
+  const tabs = [["create", "New payslip"], ["issued", `Issued${slips.length ? ` · ${slips.length}` : ""}`], ["people", "Employees"], ["employer", "Employer details"]] as const;
+  const missing = data.staff.filter((p) => people[p.id]?.employment !== "contractor" && !validPps(people[p.id]?.pps || "")).length;
+  return <section className="panel ps-view" aria-label="Payslips">
+    <div className="ps-view-head">
+      <div><p className="eyebrow">🧾 PAYSLIPS <span className="admin-badge" title="Only admins can see payroll">ADMIN</span></p><h2>Payslips</h2><p className="muted">Built from finished appointments and each person's pay split, with PAYE, USC and PRSI.</p></div>
+      <div className="sch-seg" role="tablist" aria-label="Payslip sections">{tabs.map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{l}</button>)}</div>
     </div>
+    {sample && <p className="ps-banner">Sample data: demo PPS numbers and figures. Nothing is saved.</p>}
+    {!sample && (!employer.employerNo || missing > 0) && <p className="ps-banner warn">{!employer.employerNo ? "Add your Revenue employer registration number under Employer details. " : ""}{missing > 0 ? `${missing} ${missing === 1 ? "person needs" : "people need"} a PPS number under Employees (without one, emergency tax applies).` : ""}</p>}
+    {tab === "create" && <PayslipCreator data={data} people={people} employer={employer} business={business} slips={slips} payOf={payOf} currency={currency} sample={sample} scopeClientId={scopeClientId}
+      onIssued={(rec) => { if (sample) setDemoSlips((list) => [rec, ...list.filter((s) => s.key !== rec.key)]); else setPayroll((cur) => cur ? { ...cur, slips: [rec, ...cur.slips.filter((s) => s.key !== rec.key)] } : cur); }} />}
+    {tab === "issued" && <div className="ps-register">
+      {!slips.length ? <p className="dh-muted">No payslips issued in {year} yet. Create one under New payslip.</p> : <div className="ps-reg-table" role="table">
+        <div className="ps-reg-row head" role="row"><span>No.</span><span>Employee</span><span>Period</span><span>Pay date</span><span className="r">Gross</span><span className="r">Deductions</span><span className="r">Net pay</span><span /></div>
+        {[...slips].sort((a, b) => b.payDate.localeCompare(a.payDate) || b.number - a.number).map((s) => <div key={s.key} className="ps-reg-row" role="row">
+          <span>#{s.number}</span><span><b>{s.staffName}</b><small>{s.result.employment === "contractor" ? "Contractor" : `PPS ${maskPps(s.person.pps) || "—"}`}</small></span><span>{fmtDate(s.periodStart)} – {fmtDate(s.periodEnd)}</span><span>{fmtDate(s.payDate)}</span>
+          <span className="r">{moneyOf(s.result.gross, currency)}</span><span className="r">{moneyOf(s.result.totalDeductions, currency)}</span><span className="r"><b>{moneyOf(s.result.net, currency)}</b></span>
+          <span className="ps-reg-actions"><button type="button" className="sch-earn-chip sm" onClick={() => setView(s)}>View</button><button type="button" className="sch-earn-chip sm" onClick={() => printPayslip(s, business, currency)}>Print</button><button type="button" className="sch-earn-chip sm danger" onClick={async () => { if (!(await appConfirm(`Delete payslip #${s.number} for ${s.staffName}? Year-to-date figures on later payslips will change when they're reissued.`))) return; if (sample) { setDemoSlips((l) => l.filter((x) => x.key !== s.key)); return; } try { await api(scopeClientId, { action: "deletePayslip", key: s.key }); setPayroll((cur) => cur ? { ...cur, slips: cur.slips.filter((x) => x.key !== s.key) } : cur); } catch (e) { await appAlert(errText(e, "Couldn't delete it.")); } }}>Delete</button></span>
+        </div>)}
+      </div>}
+    </div>}
+    {tab === "people" && <PayrollPeople staff={data.staff} people={people} sample={sample} onSave={async (id, person) => { if (sample) { setDemoPeople((m) => ({ ...m, [id]: person })); return person; } const r = await api<{ person: PayrollPerson }>(scopeClientId, { action: "savePayrollPerson", staffId: id, person }); setPayroll((cur) => cur ? { ...cur, people: { ...cur.people, [id]: r.person } } : cur); return r.person; }} />}
+    {tab === "employer" && <PayrollEmployerForm value={employer} business={business} onSave={async (v) => { if (sample) { setDemoEmployer(v); return; } const r = await api<{ employer: PayrollEmployer }>(scopeClientId, { action: "savePayrollEmployer", employer: v }); setPayroll((cur) => cur ? { ...cur, employer: r.employer } : cur); }} />}
+    {view && <div className="bt-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setView(null); }}><div className="bt ps" role="dialog" aria-modal="true" aria-label="Payslip">
+      <header className="bt-head"><div><p className="eyebrow">🧾 PAYSLIP #{view.number}</p><h2>{view.staffName}</h2></div><button type="button" className="bt-x" aria-label="Close" onClick={() => setView(null)}>×</button></header>
+      <div className="ps-body"><PayslipDoc rec={view} business={business} currency={currency} /></div>
+      <footer className="bt-foot"><span style={{ flex: 1 }} /><button type="button" className="primary-button" onClick={() => printPayslip(view, business, currency)}>Print / save PDF</button></footer>
+    </div></div>}
+  </section>;
+}
+
+const moneyOf = (n: number, currency: string) => { try { return new Intl.NumberFormat("en-IE", { style: "currency", currency }).format(n); } catch { return `€${n.toFixed(2)}`; } };
+
+function PayslipCreator({ data, people, employer, business, slips, payOf, currency, sample, scopeClientId, onIssued }: { data: Data; people: Record<string, PayrollPerson>; employer: PayrollEmployer; business: Business; slips: PayslipRecord[]; payOf: (p: Staff) => PayRule; currency: string; sample: boolean; scopeClientId: string; onIssued: (rec: PayslipRecord) => void }) {
+  const [who, setWho] = useState(data.staff[0]?.id || "");
+  const [period, setPeriod] = useState<PeriodKey>(sample ? "thisMonth" : "lastMonth");
+  const [from, setFrom] = useState(() => ymd(addDays(new Date(), -30)));
+  const [to, setTo] = useState(() => ymd(new Date()));
+  const range = periodRange(period, from, to);
+  const [payDate, setPayDate] = useState("");
+  const [extras, setExtras] = useState<PayLine[]>([]);
+  const [cuts, setCuts] = useState<PayLine[]>([]);
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [preview, setPreview] = useState<PayslipRecord | null>(null);
+  useEffect(() => { setPreview(null); setMsg(""); }, [who, period, from, to]);
+  const person = data.staff.find((p) => p.id === who);
+  const details = people[who] || { ...DEFAULT_PERSON };
+  const periodStart = ymd(range.a), periodEnd = ymd(range.b), pay = payDate || periodEnd;
+  const cal = new Map(data.calendars.map((c) => [c.id, c]));
+  const priceOf = (b: Booking) => { const n = Number((b.answers.find((x) => /^price$/i.test(x.label))?.value || "").replace(/[^0-9.]/g, "")); return n > 0 ? n : (cal.get(b.calendarId)?.price || 0); };
+  const rule = person ? payOf(person) : { payType: "none" as const, payRate: 0 };
+  const done = person ? data.bookings.filter((b) => b.staffIds.includes(who) && ymd(new Date(b.start)) >= periodStart && ymd(new Date(b.start)) <= periodEnd && (b.status === "completed" || (b.status === "booked" && Date.parse(b.end) < Date.now()))) : [];
+  // One earnings line per service: count, hours and value at this person's split.
+  const groups = new Map<string, { n: number; h: number; v: number }>();
+  for (const b of done) { const share = 1 / Math.max(1, b.staffIds.length); const k = cal.get(b.calendarId)?.name || "Appointments"; const g = groups.get(k) || { n: 0, h: 0, v: 0 }; g.n++; g.h += (Date.parse(b.end) - Date.parse(b.start)) / 3_600_000 * share; g.v += priceOf(b) * share; groups.set(k, g); }
+  const workLines: PayLine[] = [...groups.entries()].map(([k, g]) => ({ label: k, detail: rule.payType === "hourly" ? `${g.n} appt${g.n === 1 ? "" : "s"} · ${g.h.toFixed(1)}h @ ${moneyOf(rule.payRate, currency)}/h` : `${g.n} appt${g.n === 1 ? "" : "s"} · ${g.h.toFixed(1)}h · ${moneyOf(g.v, currency)} work @ ${rule.payRate}%`, amount: Math.round((rule.payType === "hourly" ? g.h * rule.payRate : rule.payType === "commission" ? g.v * rule.payRate / 100 : 0) * 100) / 100 })).filter((l) => l.amount > 0);
+  const earnings = [...workLines, ...extras.filter((l) => l.label && l.amount)];
+  const deductions = cuts.filter((l) => l.label && l.amount);
+  const localCompute = (): PayslipRecord => {
+    const key = `${who}:${periodStart}:${periodEnd}`;
+    const ytd = slips.filter((s) => s.staffId === who && s.key !== key && s.payDate.slice(0, 4) === pay.slice(0, 4) && (s.payDate < pay || (s.payDate === pay && s.key < key))).reduce((t, s) => ({ gross: t.gross + s.result.gross, taxable: t.taxable + s.result.taxable, paye: t.paye + s.result.paye, usc: t.usc + s.result.usc, prsi: t.prsi + s.result.prsiEE, net: t.net + s.result.net, pension: t.pension + s.result.pension }), { ...EMPTY_YTD });
+    const result = computePayslip({ person: details, gross: earnings.reduce((n, l) => n + l.amount, 0), otherDeductions: deductions.reduce((n, l) => n + Math.abs(l.amount), 0), payDate: pay, periodStart, periodEnd, ytd });
+    const existing = slips.find((s) => s.key === key);
+    return { key, number: existing?.number || slips.reduce((m, s) => Math.max(m, s.number || 0), 0) + 1, staffId: who, staffName: firstName(person?.name || ""), role: person?.role || "", payDate: pay, periodStart, periodEnd, issuedAt: new Date().toISOString(), note, earnings, deductions, employer, person: details, result };
+  };
+  const show = () => { setMsg(""); setPreview(localCompute()); };
+  const issue = async () => {
+    if (!person) return; setBusy(true); setMsg("");
+    try {
+      const rec = sample ? localCompute() : (await api<{ slip: PayslipRecord }>(scopeClientId, { action: "issuePayslip", staffId: who, payDate: pay, periodStart, periodEnd, earnings, deductions, note })).slip;
+      setPreview(rec); onIssued(rec);
+      if (!sample && rec.result.gross > 0) {
+        const entries = [{ id: `payslip-${rec.key}`, description: `Wages · ${rec.staffName} · payslip #${rec.number} (${fmtDate(periodStart)} – ${fmtDate(periodEnd)})`, amount: rec.result.gross, date: rec.payDate, clientId: data.scope || scopeClientId || "" }];
+        if (rec.result.prsiER > 0) entries.push({ id: `payslip-er-${rec.key}`, description: `Employer PRSI · ${rec.staffName} · payslip #${rec.number}`, amount: rec.result.prsiER, date: rec.payDate, clientId: data.scope || scopeClientId || "" });
+        window.dispatchEvent(new CustomEvent("f2b-staff-pay-expense", { detail: { entries } }));
+      }
+      setMsg(sample ? "Sample: payslip issued here only (nothing saved or added to Books)." : `Payslip #${rec.number} issued and added to Books (wages${rec.result.prsiER > 0 ? " + employer PRSI" : ""}).`);
+    } catch (e) { setMsg(errText(e, "Couldn't issue the payslip.")); }
+    setBusy(false);
+  };
+  const lineEditor = (list: PayLine[], set: (l: PayLine[]) => void, kind: "pay" | "cut") => <div className="ps-lines">
+    {list.map((l, i) => <div key={i} className="ps-line"><input aria-label="Description" value={l.label} placeholder={kind === "pay" ? "e.g. Tips, bonus, holiday pay" : "e.g. Advance repaid"} maxLength={120} onChange={(e) => set(list.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} /><input aria-label="Amount" type="number" step="0.01" min={0} value={l.amount || ""} placeholder="0.00" onChange={(e) => set(list.map((x, j) => j === i ? { ...x, amount: Number(e.target.value) || 0 } : x))} /><button type="button" className="iv-btn" aria-label="Remove" onClick={() => set(list.filter((_, j) => j !== i))}>×</button></div>)}
+    <button type="button" className="text-button" onClick={() => set([...list, { label: "", detail: "", amount: 0 }])}>+ {kind === "pay" ? "Add pay (tips, bonus, holiday pay)" : "Add deduction after tax"}</button>
+  </div>;
+  return <div className="ps-create">
+    <div className="ps-controls">
+      <label>Employee<select value={who} onChange={(e) => setWho(e.target.value)}>{data.staff.map((p) => <option key={p.id} value={p.id}>{firstName(p.name)}</option>)}</select></label>
+      <label>Period<select value={period} onChange={(e) => setPeriod(e.target.value as PeriodKey)}>{PERIOD_PRESETS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
+      {period === "custom" && <><label>From<input type="date" value={from} max={to} onChange={(e) => e.target.value && setFrom(e.target.value)} /></label><label>To<input type="date" value={to} min={from} onChange={(e) => e.target.value && setTo(e.target.value)} /></label></>}
+      <label>Pay date<input type="date" value={pay} onChange={(e) => setPayDate(e.target.value)} /></label>
+    </div>
+    <div className="ps-summary">
+      <span><small>Appointments done</small><b>{done.length}</b></span>
+      <span><small>Pay basis</small><b>{rule.payType === "hourly" ? `${moneyOf(rule.payRate, currency)}/h` : rule.payType === "commission" ? `${rule.payRate}% of work` : "Not set"}</b></span>
+      <span><small>Employment</small><b>{details.employment === "contractor" ? "Contractor" : `PAYE · ${details.frequency}`}</b></span>
+      <span><small>PPS</small><b>{details.employment === "contractor" ? "n/a" : validPps(details.pps) ? maskPps(details.pps) : "Missing"}</b></span>
+    </div>
+    <div className="ps-two">
+      <div><h4>Extra pay</h4>{lineEditor(extras, setExtras, "pay")}</div>
+      <div><h4>Other deductions</h4>{lineEditor(cuts, setCuts, "cut")}<label className="ps-notelabel">Note on the payslip<input value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Paid by bank transfer" /></label></div>
+    </div>
+    <div className="ps-actions"><span className="bt-status" role="status">{msg}</span><span style={{ flex: 1 }} /><button type="button" className="secondary-button" disabled={!person} onClick={show}>Preview</button>{preview && <button type="button" className="secondary-button" onClick={() => printPayslip(preview, business, currency)}>Print / save PDF</button>}<button type="button" className="primary-button" disabled={!person || busy || !earnings.length} onClick={() => void issue()}>{busy ? "Issuing…" : "Issue payslip"}</button></div>
+    {!earnings.length && person && <p className="dh-muted">No finished appointments for {firstName(person.name)} in this period. Add extra pay to issue a payslip anyway.</p>}
+    {preview && <PayslipDoc rec={preview} business={business} currency={currency} />}
+  </div>;
+}
+
+function PayslipDoc({ rec, business, currency }: { rec: PayslipRecord; business: Business; currency: string }) {
+  const r = rec.result; const m = (n: number) => moneyOf(n, currency);
+  const contractor = r.employment === "contractor";
+  const basisLabel = r.basis === "cumulative" ? "Cumulative" : r.basis === "week1" ? (rec.person.frequency === "monthly" ? "Month 1" : "Week 1") : "Emergency";
+  const logo = business.logo && /^(https?:|data:image\/|\/)/.test(business.logo) ? business.logo : "";
+  return <div className="ps-doc" id={`payslip-${rec.key}`}>
+    <div className="ps-top">
+      <div className="ps-brand">{logo ? <img src={logo} alt={rec.employer.name || business.name} data-keep-logo="" /> : null}<div><b>{rec.employer.name || business.name}</b>{rec.employer.address && <div>{rec.employer.address}</div>}{rec.employer.employerNo && <div>Employer reg. no. {rec.employer.employerNo}</div>}</div></div>
+      <div className="ps-title"><h1>{contractor ? "Payment statement" : "Payslip"}</h1><div>No. {rec.number}</div><div>Pay date {fmtDate(rec.payDate)}</div></div>
+    </div>
+    <div className="ps-meta">
+      <div><small>Employee</small><b>{rec.staffName}</b>{rec.role && <em>{rec.role}</em>}</div>
+      <div><small>PPS number</small><b>{contractor ? "n/a" : (rec.person.pps || "Not provided")}</b>{rec.person.employeeNo && <em>Employee no. {rec.person.employeeNo}</em>}</div>
+      <div><small>Pay period</small><b>{fmtDate(rec.periodStart)} – {fmtDate(rec.periodEnd)}</b><em>{contractor ? "Self-employed" : `${rec.person.frequency[0].toUpperCase()}${rec.person.frequency.slice(1)} · period ${r.period} of ${r.periods}`}</em></div>
+      <div><small>Tax details</small><b>{contractor ? "Not on PAYE" : `${basisLabel} basis · PRSI ${r.prsiClass}${r.prsiWeeks ? ` (${r.prsiWeeks} wk${r.prsiWeeks === 1 ? "" : "s"})` : ""}`}</b><em>{contractor ? "" : `USC ${rec.person.uscStatus}`}</em></div>
+    </div>
+    <div className="ps-cols">
+      <table><thead><tr><th>Earnings</th><th className="r">Amount</th></tr></thead><tbody>
+        {rec.earnings.map((l, i) => <tr key={i}><td>{l.label}{l.detail && <small>{l.detail}</small>}</td><td className="r">{m(l.amount)}</td></tr>)}
+        <tr className="tot"><td>Gross pay</td><td className="r">{m(r.gross)}</td></tr>
+      </tbody></table>
+      <table><thead><tr><th>Deductions</th><th className="r">Amount</th></tr></thead><tbody>
+        {!contractor && <><tr><td>PAYE income tax{r.payeHigher > 0 && r.payeStandard > 0 ? <small>20%: {m(r.payeStandard)} · 40%: {m(r.payeHigher)}</small> : null}</td><td className="r">{m(r.paye)}</td></tr>
+        <tr><td>USC</td><td className="r">{m(r.usc)}</td></tr>
+        <tr><td>PRSI (employee, class {r.prsiClass})</td><td className="r">{m(r.prsiEE)}</td></tr>
+        {r.pension > 0 && <tr><td>Pension ({rec.person.pensionPct}%)</td><td className="r">{m(r.pension)}</td></tr>}</>}
+        {rec.deductions.map((l, i) => <tr key={i}><td>{l.label}</td><td className="r">{m(Math.abs(l.amount))}</td></tr>)}
+        <tr className="tot"><td>Total deductions</td><td className="r">{m(r.totalDeductions)}</td></tr>
+      </tbody></table>
+    </div>
+    <div className="ps-net"><div><small>Net pay</small><b>{m(r.net)}</b><em>{rec.person.paymentMethod}</em></div></div>
+    {!contractor && <div className="ps-cols ps-small">
+      <table><thead><tr><th colSpan={2}>This period</th></tr></thead><tbody>
+        <tr><td>Tax credits</td><td className="r">{m(r.taxCredits)}</td></tr>
+        <tr><td>Standard rate cut-off point</td><td className="r">{m(r.srcop)}</td></tr>
+        <tr><td>Taxable pay</td><td className="r">{m(r.taxable)}</td></tr>
+        <tr><td>Employer PRSI (paid by employer)</td><td className="r">{m(r.prsiER)}</td></tr>
+      </tbody></table>
+      <table><thead><tr><th colSpan={2}>Year to date ({rec.payDate.slice(0, 4)})</th></tr></thead><tbody>
+        <tr><td>Gross pay</td><td className="r">{m(r.ytd.gross)}</td></tr>
+        <tr><td>PAYE</td><td className="r">{m(r.ytd.paye)}</td></tr>
+        <tr><td>USC</td><td className="r">{m(r.ytd.usc)}</td></tr>
+        <tr><td>Employee PRSI</td><td className="r">{m(r.ytd.prsi)}</td></tr>
+        <tr><td>Net pay</td><td className="r">{m(r.ytd.net)}</td></tr>
+      </tbody></table>
+    </div>}
+    {rec.note && <p className="ps-note">{rec.note}</p>}
+    {r.notes.map((n, i) => <p key={i} className="ps-note warn">{n}</p>)}
+    <p className="ps-foot">Issued {new Date(rec.issuedAt).toLocaleDateString("en-IE", { day: "numeric", month: "long", year: "numeric" })} · Earnings from appointment records. {contractor ? "" : `PAYE, USC and PRSI worked out with ${rec.payDate.slice(0, 4)} Irish rates from the tax credits and cut-off point on file. Check them against the employee's Revenue Payroll Notification (RPN) and report each payment to Revenue.`}</p>
+  </div>;
+}
+
+function printPayslip(rec: PayslipRecord, business: Business, currency: string) {
+  const host = document.createElement("div"); host.style.position = "fixed"; host.style.left = "-10000px"; document.body.appendChild(host);
+  import("react-dom/client").then(({ createRoot }) => {
+    const root = createRoot(host); root.render(<PayslipDoc rec={rec} business={business} currency={currency} />);
+    window.setTimeout(() => {
+      const html = host.innerHTML; root.unmount(); host.remove();
+      const w = window.open("", "_blank", "width=860,height=1100"); if (!w) { void appAlert("Allow pop-ups to print the payslip."); return; }
+      w.document.write(`<!doctype html><html><head><title>Payslip ${rec.number} · ${rec.staffName.replace(/[<>]/g, "")}</title><style>${PAYSLIP_PRINT_CSS}</style></head><body>${html}<script>window.onload=()=>{setTimeout(()=>window.print(),250)}<\/script></body></html>`);
+      w.document.close();
+    }, 60);
+  }).catch(() => { host.remove(); });
+}
+
+const PAYSLIP_PRINT_CSS = `body{font-family:Inter,Arial,sans-serif;color:#101828;margin:28px;font-size:12px}.ps-doc{max-width:780px;margin:0 auto}.ps-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:2px solid #101828;padding-bottom:12px}.ps-brand{display:flex;gap:12px;align-items:center}.ps-brand img{max-height:56px;max-width:160px;object-fit:contain}.ps-brand b{font-size:15px}.ps-title{text-align:right}.ps-title h1{font-size:22px;margin:0 0 4px}.ps-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0}.ps-meta div{border:1px solid #e4e7ec;border-radius:8px;padding:8px}.ps-meta small{display:block;font-size:9.5px;color:#667085;text-transform:uppercase;letter-spacing:.04em}.ps-meta b{display:block;font-size:12px}.ps-meta em{display:block;font-style:normal;color:#667085;font-size:10.5px}.ps-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #eaecf0;vertical-align:top}th{font-size:9.5px;text-transform:uppercase;color:#667085;letter-spacing:.04em}td small{display:block;color:#667085;font-size:10px}.r{text-align:right;white-space:nowrap}tr.tot td{font-weight:700;border-top:1.5px solid #101828}.ps-net{display:flex;justify-content:flex-end;margin:14px 0}.ps-net div{border:2px solid #101828;border-radius:10px;padding:10px 18px;text-align:right}.ps-net small{display:block;font-size:10px;text-transform:uppercase;color:#667085}.ps-net b{font-size:24px}.ps-net em{display:block;font-style:normal;color:#667085;font-size:10.5px}.ps-small td,.ps-small th{font-size:11px}.ps-note{margin:10px 0 0;color:#475467}.ps-note.warn{color:#b54708}.ps-foot{margin-top:20px;font-size:9.5px;color:#98a2b3}`;
+
+function PayrollPeople({ staff, people, sample, onSave }: { staff: Staff[]; people: Record<string, PayrollPerson>; sample: boolean; onSave: (id: string, p: PayrollPerson) => Promise<PayrollPerson> }) {
+  const [edit, setEdit] = useState("");
+  const [form, setForm] = useState<PayrollPerson>({ ...DEFAULT_PERSON });
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  const open = (id: string) => { setEdit(id); setForm({ ...DEFAULT_PERSON, ...(people[id] || {}) }); setMsg(""); };
+  const set = <K extends keyof PayrollPerson>(k: K, v: PayrollPerson[K]) => setForm((f) => ({ ...f, [k]: v }));
+  const save = async () => {
+    const pps = normalisePps(form.pps);
+    if (form.employment === "employee" && pps && !validPps(pps)) { setMsg("That PPS number isn't valid. It's 7 digits then one or two letters, e.g. 1234567TA."); return; }
+    setBusy(true); try { await onSave(edit, { ...form, pps }); setEdit(""); } catch (e) { setMsg(errText(e, "Couldn't save.")); } setBusy(false);
+  };
+  return <div className="ps-people">
+    <div className="ps-reg-table" role="table">
+      <div className="ps-reg-row head people" role="row"><span>Employee</span><span>PPS</span><span>Type</span><span>Paid</span><span>Tax credits / cut-off</span><span /></div>
+      {staff.map((p) => { const d = people[p.id]; return <div key={p.id} className="ps-reg-row people" role="row">
+        <span className="sch-tl-who"><Avatar person={p} size={28} /><b>{firstName(p.name)}</b></span>
+        <span>{d?.employment === "contractor" ? "n/a" : d?.pps ? (validPps(d.pps) ? maskPps(d.pps) : "Invalid") : <em className="ps-missing">Missing</em>}</span>
+        <span>{d?.employment === "contractor" ? "Contractor" : "Employee (PAYE)"}</span><span>{(d?.frequency || "monthly").replace(/^./, (c) => c.toUpperCase())}</span>
+        <span>{d?.employment === "contractor" ? "—" : `€${(d?.taxCredits ?? DEFAULT_PERSON.taxCredits).toLocaleString("en-IE")} / €${(d?.srcop ?? DEFAULT_PERSON.srcop).toLocaleString("en-IE")}`}</span>
+        <span><button type="button" className="sch-earn-chip sm" onClick={() => open(p.id)}>Edit</button></span>
+      </div>; })}
+    </div>
+    {edit && <div className="bt-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setEdit(""); }}><div className="bt ps ps-form" role="dialog" aria-modal="true" aria-label="Payroll details">
+      <header className="bt-head"><div><p className="eyebrow">PAYROLL DETAILS <span className="admin-badge">ADMIN</span></p><h2>{firstName(staff.find((p) => p.id === edit)?.name || "")}</h2><p>Copy the tax credits, cut-off point and USC status from their Revenue Payroll Notification (RPN).</p></div><button type="button" className="bt-x" aria-label="Close" onClick={() => setEdit("")}>×</button></header>
+      <div className="ps-body"><div className="form-grid ps-grid">
+        <label>Employment<select value={form.employment} onChange={(e) => set("employment", e.target.value as PayrollPerson["employment"])}><option value="employee">Employee (PAYE)</option><option value="contractor">Self-employed contractor</option></select></label>
+        <label>PPS number<input value={form.pps} maxLength={12} autoComplete="off" placeholder="1234567TA" onChange={(e) => set("pps", e.target.value.toUpperCase())} /></label>
+        <label>Employee / works no.<input value={form.employeeNo} maxLength={30} onChange={(e) => set("employeeNo", e.target.value)} /></label>
+        <label>Pay frequency<select value={form.frequency} onChange={(e) => set("frequency", e.target.value as PayrollPerson["frequency"])}><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select></label>
+        {form.employment === "employee" && <>
+          <label>Tax basis<select value={form.basis} onChange={(e) => set("basis", e.target.value as PayrollPerson["basis"])}><option value="cumulative">Cumulative</option><option value="week1">Week 1 / Month 1</option><option value="emergency">Emergency</option></select></label>
+          <label>Annual tax credits (€)<input type="number" min={0} step="1" value={form.taxCredits} onChange={(e) => set("taxCredits", Number(e.target.value) || 0)} /></label>
+          <label>Annual cut-off point (€)<input type="number" min={0} step="1" value={form.srcop} onChange={(e) => set("srcop", Number(e.target.value) || 0)} /></label>
+          <label>USC status<select value={form.uscStatus} onChange={(e) => set("uscStatus", e.target.value as PayrollPerson["uscStatus"])}><option value="ordinary">Ordinary</option><option value="reduced">Reduced (medical card)</option><option value="exempt">Exempt</option></select></label>
+          <label>PRSI class<select value={form.prsiClass} onChange={(e) => set("prsiClass", e.target.value as PayrollPerson["prsiClass"])}><option value="A">A (most employees)</option><option value="S">S (proprietary director)</option><option value="M">M (no PRSI)</option></select></label>
+          <label>Pension contribution (%)<input type="number" min={0} max={100} step="0.5" value={form.pensionPct} onChange={(e) => set("pensionPct", Number(e.target.value) || 0)} /></label>
+        </>}
+        <label>Start date<input type="date" value={form.startDate} onChange={(e) => set("startDate", e.target.value)} /></label>
+        <label>Payment method<input value={form.paymentMethod} maxLength={60} onChange={(e) => set("paymentMethod", e.target.value)} /></label>
+      </div>{sample && <p className="iv-small">Sample data: changes stay on this screen only.</p>}</div>
+      <footer className="bt-foot"><span className="bt-status">{msg}</span><span style={{ flex: 1 }} /><button type="button" className="secondary-button" onClick={() => setEdit("")}>Cancel</button><button type="button" className="primary-button" disabled={busy} onClick={() => void save()}>{busy ? "Saving…" : "Save"}</button></footer>
+    </div></div>}
+  </div>;
+}
+
+function PayrollEmployerForm({ value, business, onSave }: { value: PayrollEmployer; business: Business; onSave: (v: PayrollEmployer) => Promise<void> }) {
+  const [form, setForm] = useState<PayrollEmployer>(value);
+  const [msg, setMsg] = useState("");
+  const set = (k: keyof PayrollEmployer, v: string) => setForm((f) => ({ ...f, [k]: v }));
+  return <div className="ps-employer">
+    <div className="ps-brand-preview">{business.logo ? <img src={business.logo} alt="" data-keep-logo="" /> : <span className="dh-muted">No logo</span>}<small>The logo comes from this account's branding.</small></div>
+    <div className="form-grid ps-grid">
+      <label>Business name on payslips<input value={form.name} placeholder={business.name} maxLength={120} onChange={(e) => set("name", e.target.value)} /></label>
+      <label>Employer registration no. (Revenue)<input value={form.employerNo} placeholder="e.g. 1234567FA" maxLength={20} onChange={(e) => set("employerNo", e.target.value.toUpperCase())} /></label>
+      <label className="span2">Business address<input value={form.address} maxLength={300} onChange={(e) => set("address", e.target.value)} /></label>
+      <label>Phone<input value={form.phone} maxLength={40} onChange={(e) => set("phone", e.target.value)} /></label>
+      <label>Email<input type="email" value={form.email} maxLength={120} onChange={(e) => set("email", e.target.value)} /></label>
+    </div>
+    <div className="ps-actions"><span className="bt-status" role="status">{msg}</span><span style={{ flex: 1 }} /><button type="button" className="primary-button" onClick={async () => { try { await onSave(form); setMsg("Saved."); } catch (e) { setMsg(errText(e, "Couldn't save.")); } }}>Save employer details</button></div>
   </div>;
 }
