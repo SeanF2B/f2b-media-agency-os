@@ -61,11 +61,6 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
   // Stretch the day so 07:00–21:00 fills the window (calendar always in full view).
   const weekRef = useRef<HTMLDivElement>(null);
   const [PX_PER_MIN, setPpm] = useState(PX_DEFAULT);
-  useEffect(() => {
-    const fit = () => { const el = weekRef.current; if (!el) return; const top = el.getBoundingClientRect().top; const room = window.innerHeight - top - 52 - 24; setPpm(Math.max(1.05, Math.min(2.2, room / ((HOURS_TO - HOURS_FROM) * 60)))); };
-    fit(); const t = window.setTimeout(fit, 250); window.addEventListener("resize", fit);
-    return () => { window.clearTimeout(t); window.removeEventListener("resize", fit); };
-  }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
   const [realData, setData] = useState<Data | null>(null);
   const [sample, setSampleState] = useState(() => { try { return localStorage.getItem("f2b-dash-sample") === "1"; } catch { return false; } });
   const setSample = (on: boolean) => { setSampleState(on); try { localStorage.setItem("f2b-dash-sample", on ? "1" : "0"); } catch { /* optional */ } };
@@ -78,6 +73,11 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
     return { ...demo, canManage: realData.canManage, isAdmin: realData.isAdmin, meId: realData.meId, googleAvailable: realData.googleAvailable, bookings: demo.bookings.map((b) => sampleMoves[b.id] ? { ...b, start: sampleMoves[b.id], end: new Date(Date.parse(sampleMoves[b.id]) + Date.parse(b.end) - Date.parse(b.start)).toISOString() } : b) };
   }, [sample, realData, sampleClientName, site, sampleMoves]);
   const [tab, setTab] = useState<"dashboard" | "calendar" | "appointments" | "calendars" | "availability">("dashboard");
+  useEffect(() => {
+    const fit = () => { const el = weekRef.current; if (!el) return; const top = el.getBoundingClientRect().top; const room = window.innerHeight - top - 52 - 24; setPpm(Math.max(1.05, Math.min(2.2, room / ((HOURS_TO - HOURS_FROM) * 60)))); };
+    fit(); const t = window.setTimeout(fit, 250); window.addEventListener("resize", fit);
+    return () => { window.clearTimeout(t); window.removeEventListener("resize", fit); };
+  }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
   const [dashDate, setDashDate] = useState(() => new Date());
   const [week, setWeek] = useState(() => mondayOf(new Date()));
   const [staffFilter, setStaffFilter] = useState("");
