@@ -27,7 +27,9 @@ async function context(request: Request) {
   const requested = (crmScopeFrom(request) as { clientId: string | null } | null)?.clientId ?? null;
   if (admin) {
     const scope = requested && ws.clients.some((c) => c.id === requested) ? requested : null; // null = agency view (everything)
-    return { user, ws, me, admin, canManage: true, ownOnly: false, scope, staff: ws.staff };
+    // Inside a client's account, show that client's own team (people with access to it); agency view shows everyone.
+    const clientTeam = scope ? ws.staffRaw.filter((s) => (s.clientAccessIds || []).includes(scope)).map(({ id, name, email, role, avatar }) => ({ id, name, email, role, avatar })) : [];
+    return { user, ws, me, admin, canManage: true, ownOnly: false, scope, staff: clientTeam.length ? clientTeam : ws.staff };
   }
   // Everyone else goes by their Scheduling permissions (Team → permissions).
   const perms = me ? getMemberPermissions(me as never, ws.ownerId) : null;

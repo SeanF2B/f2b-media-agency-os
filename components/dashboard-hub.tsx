@@ -100,7 +100,7 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
     <section className="dh-approvals" aria-label="Pending approvals">
       {[{ key: "ai", label: "AI approvals", n: aiPending, icon: <Sparkles size={18} />, hint: "Changes the AI wants you to approve" }, { key: "human", label: "Team approvals", n: humanPending, icon: <Users size={18} />, hint: "Work your team submitted for review" }].map((a) => <button type="button" key={a.key} className={`dh-approval ${a.n ? "waiting" : "clear"}`} onClick={() => onNavigate("Tasks")}><span className="dh-approval-icon">{a.icon}</span><span className="dh-approval-text"><b>{a.label}</b><small>{a.n ? a.hint : "All done"}</small></span><span className="dh-approval-n">{a.n ? a.n : "✓"}</span></button>)}
     </section>
-    {showAppts && <Suspense fallback={null}><AppointmentsDashboard key={scopeClientId || "agency"} scopeClientId={scopeClientId} onOpen={() => onNavigate("Scheduling")} /></Suspense>}
+    {showAppts && <Suspense fallback={null}><AppointmentsDashboard key={scopeClientId || "agency"} scopeClientId={scopeClientId} sample={sample} clientName={clients.find((c) => c.id === scopeClientId)?.name || ""} onOpen={() => onNavigate("Scheduling")} /></Suspense>}
     {valuePanel}
     <section className="panel dh-panel" aria-label="Website and marketing results">
       <div className="dh-head"><div><p className="eyebrow">📈 {periodLabel.toUpperCase()}</p><h2>Marketing</h2></div>

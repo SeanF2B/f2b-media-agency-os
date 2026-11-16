@@ -741,8 +741,8 @@ export function StaffSchedulingPanel({ staffId, staffName = "", scope = "" }: { 
 }
 
 /** Dashboard panel for appointment-based businesses: staff selector, Day (appointments + availability) and Week calendar. */
-export function AppointmentsDashboard({ scopeClientId, onOpen }: { scopeClientId: string; onOpen: () => void }) {
-  const [data, setData] = useState<Data | null>(null);
+export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, clientName = "" }: { scopeClientId: string; onOpen: () => void; sample?: boolean; clientName?: string }) {
+  const [realData, setData] = useState<Data | null>(null);
   const [err, setErr] = useState("");
   const [view, setView] = useState<"day" | "week">(() => { try { return localStorage.getItem("f2b-dash-appt-view") === "week" ? "week" : "day"; } catch { return "day"; } });
   const [staffId, setStaffId] = useState("");
@@ -755,7 +755,8 @@ export function AppointmentsDashboard({ scopeClientId, onOpen }: { scopeClientId
     api<Data>(scopeClientId, undefined, `&from=${from.toISOString()}&to=${to.toISOString()}`).then((d) => { if (live) { setData(d); setErr(""); } }).catch((e) => { if (live) setErr(errText(e, "Appointments couldn't load.")); });
     return () => { live = false; };
   }, [scopeClientId, ymd(week)]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (err && !data) return null; // no Scheduling access: hide quietly
+  const data = useMemo(() => sample ? sampleSchedule(realData, week, clientName) : realData, [sample, realData, ymd(week), clientName]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (err && !realData && !sample) return null; // no Scheduling access: hide quietly
   const setMode = (m: "day" | "week") => { setView(m); try { localStorage.setItem("f2b-dash-appt-view", m); } catch { /* optional */ } };
   const bookings = (data?.bookings || []).filter((b) => b.status !== "cancelled" && (!staffId || b.staffIds.includes(staffId)));
   const staff = (data?.staff || []).filter((p) => !staffId || p.id === staffId);
@@ -779,7 +780,7 @@ export function AppointmentsDashboard({ scopeClientId, onOpen }: { scopeClientId
   const showRate = ov.done + ov.noShow ? Math.round((ov.done / (ov.done + ov.noShow)) * 100) : null;
   return <section className="panel sch-dash-panel" aria-label="Appointments">
     <div className="sch-dash-panel-head">
-      <div><p className="eyebrow">📅 APPOINTMENTS</p><h2>{view === "day" ? (isToday ? "Today" : day.toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "short" })) : `Week of ${week.toLocaleDateString("en-IE", { day: "numeric", month: "short" })}`}</h2></div>
+      <div><p className="eyebrow">📅 APPOINTMENTS{sample && <span className="sch-sample-tag">Sample data</span>}</p><h2>{view === "day" ? (isToday ? "Today" : day.toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "short" })) : `Week of ${week.toLocaleDateString("en-IE", { day: "numeric", month: "short" })}`}</h2></div>
       <div className="sch-dash-panel-tools">
         <label className="sch-select"><Users size={14} /><select aria-label="Staff member" value={staffId} onChange={(e) => setStaffId(e.target.value)}><option value="">Everyone</option>{(data?.staff || []).map((p) => <option key={p.id} value={p.id}>{p.name.split("|")[0].trim()}</option>)}</select></label>
         <div className="sch-seg" role="tablist" aria-label="View"><button type="button" role="tab" aria-selected={view === "day"} className={view === "day" ? "on" : ""} onClick={() => setMode("day")}>Day</button><button type="button" role="tab" aria-selected={view === "week"} className={view === "week" ? "on" : ""} onClick={() => setMode("week")}>Week</button></div>
@@ -816,4 +817,30 @@ export function AppointmentsDashboard({ scopeClientId, onOpen }: { scopeClientId
       <div className="sch-dash-wday-body">{list.length ? list.slice(0, 6).map((b) => { const cal = calById.get(b.calendarId); return <button type="button" key={b.id} className="sch-dash-chip" style={{ ["--c" as string]: cal?.color || "#2563eb" }} onClick={onOpen} title={`${time(b.start)} ${b.name} · ${cal?.name || ""}`}><b>{time(b.start)}</b><span>{b.name}</span></button>; }) : <span className="sch-dash-free">Free</span>}{list.length > 6 && <small className="iv-small">+{list.length - 6} more</small>}</div>
     </div>; })}</div>}
   </section>;
+}
+
+// Demo schedule for the Dashboard "Sample data" toggle (never saved). Uses the account's real team when there is one.
+function sampleSchedule(real: Data | null, week: Date, clientName: string): Data {
+  const fallbackStaff: Staff[] = [["s1", "Aoife Murphy", "Senior consultant"], ["s2", "Ciarán Walsh", "Technician"], ["s3", "Niamh Byrne", "Bookings"]].map(([id, name, role]) => ({ id, name, role, dailyLimit: 0, google: "", feedUrl: "", canEdit: false, weekly: { mon: [["09:00", "17:30"]], tue: [["09:00", "17:30"]], wed: [["09:00", "17:30"]], thu: [["09:00", "17:30"]], fri: [["09:00", "16:00"]] } as Partial<Record<DayKey, Window[]>>, blocked: [] }));
+  const staff = (real?.staff.length ? real.staff : fallbackStaff).slice(0, 6).map((p) => ({ ...p, weekly: p.weekly && Object.keys(p.weekly).length ? p.weekly : fallbackStaff[0].weekly }));
+  const trade = /roof/i.test(clientName) ? ["Roof survey", "Repair quote", "Gutter check"] : /interior|kitchen|design/i.test(clientName) ? ["Design consultation", "Site measure", "Showroom visit"] : /ink|tattoo/i.test(clientName) ? ["Tattoo consultation", "Session", "Touch-up"] : ["Consultation", "Site visit", "Follow-up call"];
+  const colours = ["#2563eb", "#16a34a", "#d97706"];
+  const calendars = trade.map((name, i) => ({ id: `sample-cal-${i}`, clientId: "", name, slug: `sample-${i}`, kind: i === 0 ? "consultation" : "service", description: "", durationMin: i === 2 ? 30 : 60, bufferBefore: 0, bufferAfter: 15, slotInterval: 30, minNoticeMin: 0, maxDaysAhead: 60, dailyLimit: 0, locationType: "onsite", locationDetail: "", price: 0, currency: "EUR", color: colours[i], assignMode: "customer_pick", staffIds: staff.map((p) => p.id), questions: [], stageId: "", confirmationMessage: "", redirectUrl: "", active: true, timezone: "Europe/Dublin" } as Calendar));
+  const people = ["Mary Burke", "Tom Walsh", "Sinéad Kelly", "John Doyle", "Emma Ryan", "Patrick Nolan", "Orla Gallagher", "Dave Kennedy", "Ciara Moran", "Liam O'Brien", "Grace Lynch", "Seán Fitzgerald"];
+  const bookings: Booking[] = [];
+  const now = Date.now();
+  let seed = Number(ymd(week).replace(/-/g, "")) % 9973;
+  const rand = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+  for (let d = -35; d < 14; d++) {
+    const day = addDays(week, d); if (day.getDay() === 0) continue;
+    const count = day.getDay() === 6 ? 1 : 2 + Math.floor(rand() * 3);
+    for (let n = 0; n < count; n++) {
+      const cal = calendars[Math.floor(rand() * calendars.length)]; const person = staff[Math.floor(rand() * staff.length)];
+      const start = new Date(day); start.setHours(9 + Math.floor(rand() * 7), rand() < 0.5 ? 0 : 30, 0, 0);
+      const end = new Date(start.getTime() + cal.durationMin * 60_000);
+      const past = end.getTime() < now; const r = rand();
+      bookings.push({ id: `sample-${d}-${n}`, clientId: "", calendarId: cal.id, start: start.toISOString(), end: end.toISOString(), status: past ? (r < 0.08 ? "no_show" : r < 0.13 ? "cancelled" : "completed") : (r < 0.05 ? "cancelled" : "booked"), staffIds: [person.id], contactId: null, name: people[Math.floor(rand() * people.length)], email: "", phone: "", answers: [], notes: "", source: "public", channel: rand() < 0.5 ? "Google Ads" : "Google search", meetLink: "", createdBy: "", createdAt: start.toISOString() });
+    }
+  }
+  return { calendars, bookings, staff, clients: real?.clients || [], scope: real?.scope ?? null, canManage: false, isAdmin: false, meId: "", googleAvailable: false, emailReady: true, publicBase: real?.publicBase || "" };
 }
