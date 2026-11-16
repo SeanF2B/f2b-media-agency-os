@@ -438,18 +438,22 @@ async function guessSiteFromName(name: string): Promise<string> {
   if (guessCache.has(key)) return guessCache.get(key) || "";
   const words = key.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/&/g, "and").replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter(Boolean);
   const core = words.filter((w) => !/^(the|ltd|limited|llc|inc|co)$/.test(w));
-  const slugs = [...new Set([words.join(""), core.join(""), core.join("-")])].filter((x) => x.length >= 4);
-  const tlds = [".ie", ".com", ".co.uk", ".uk"];
+  const roots = [...new Set([words.join(""), core.join(""), core.join("-")])].filter((x) => x.length >= 4);
+  const trades = ["", "tattoo", "tattoos", "tattooparlour", "tattoostudio", "studio", "salon", "clinic"];
+  const tlds = [".ie", ".com", ".co.uk"];
   const mark = core.filter((w) => w.length >= 4);
+  const candidates = [...new Set(roots.flatMap((r) => trades.map((t) => `${r}${t}`)))].flatMap((slug) => tlds.map((tld) => `https://${slug}${tld}`)).slice(0, 48);
+  // Check them all at once; first page that names the business wins.
+  const tryOne = async (url: string) => {
+    const r = await fetch(url, { headers: { "user-agent": "Mozilla/5.0 (compatible; F2B Agency OS sample data)", accept: "text/html" }, signal: AbortSignal.timeout(4000), redirect: "follow" });
+    if (!r.ok) throw new Error("no");
+    const html = (await r.text()).slice(0, 200_000).toLowerCase();
+    if (!(mark.length && mark.every((w) => html.includes(w))) || /domain (is )?for sale|parked|buy this domain/.test(html)) throw new Error("no");
+    return r.url || url;
+  };
   let found = "";
-  outer: for (const slug of slugs) for (const tld of tlds) {
-    const url = `https://${slug}${tld}`;
-    try {
-      const r = await fetch(url, { headers: { "user-agent": "Mozilla/5.0 (compatible; F2B Agency OS sample data)", accept: "text/html" }, signal: AbortSignal.timeout(3500), redirect: "follow" });
-      if (!r.ok) continue;
-      const html = (await r.text()).slice(0, 200_000).toLowerCase();
-      if (mark.length && mark.every((w) => html.includes(w)) && !/domain (is )?for sale|parked|buy this domain/.test(html)) { found = r.url || url; break outer; }
-    } catch { /* try the next one */ }
+  for (let i = 0; i < candidates.length && !found; i += 12) {
+    try { found = await Promise.any(candidates.slice(i, i + 12).map(tryOne)); } catch { /* none in this batch */ }
   }
   guessCache.set(key, found);
   return found;
