@@ -2,7 +2,7 @@
 
 import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Sparkles, CalendarDays, ChevronLeft, ChevronRight, Clock, Copy, Link2, MapPin, Plus, RefreshCw, Settings2, Trash2, UserRound, Users, Video, Phone, Building2 } from "lucide-react";
+import { ImagePlus, Sparkles, CalendarDays, ChevronLeft, ChevronRight, Clock, Copy, Link2, MapPin, Plus, RefreshCw, Settings2, Trash2, UserRound, Users, Video, Phone, Building2 } from "lucide-react";
 import "./scheduling.css";
 
 type DayKey = "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
@@ -404,6 +404,24 @@ function NewAppointment({ data, scope, initial, onClose, onSaved, onCalendarsCha
   const [form, setForm] = useState({ name: initial.name || "", email: initial.email || "", phone: initial.phone || "", notes: initial.notes || "" });
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [location, setLocation] = useState("");
+  const [duration, setDuration] = useState(0); // 0 = the appointment type's own length
+  const [price, setPrice] = useState("");
+  const [images, setImages] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(0);
+  const uploadImages = async (files: FileList | null) => {
+    const list = [...(files || [])].filter((f) => f.type.startsWith("image/")).slice(0, 3 - images.length);
+    for (const file of list) {
+      setUploading((n) => n + 1);
+      try {
+        const q = new URLSearchParams({ scope: scope || "agency", folder: "Appointment photos", name: file.name.slice(0, 120) });
+        const res = await fetch(`/api/media-library?${q}`, { method: "PUT", headers: { "Content-Type": file.type || "application/octet-stream" }, body: file });
+        const out = await res.json().catch(() => ({})) as { item?: { url: string }; error?: string };
+        if (!res.ok || !out.item?.url) throw new Error(out.error || "Upload failed");
+        setImages((cur) => [...cur, out.item!.url].slice(0, 3));
+      } catch (e) { setErr(errText(e, "That image couldn't be uploaded.")); }
+      finally { setUploading((n) => n - 1); }
+    }
+  };
   const [notify, setNotify] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -428,12 +446,12 @@ function NewAppointment({ data, scope, initial, onClose, onSaved, onCalendarsCha
       if (!form.name.trim()) throw new Error("Add the customer's name.");
       if (!start) throw new Error("Pick a time.");
       if (custom && !staffIds.length) throw new Error("Choose who the appointment is with.");
-      await api(scope, { action: "book", calendarId, start, staffIds, force: custom, ...form, answers, location: showLocation ? location : "", notify });
+      await api(scope, { action: "book", calendarId, start, staffIds, force: custom, ...form, answers, location: showLocation ? location : "", durationMin: duration || undefined, price: Number(price) || undefined, images, notify });
       onSaved(`Booked: ${form.name} · ${when}.`);
     } catch (e) { setErr(errText(e, "Couldn't book this appointment.")); }
     finally { setBusy(false); }
   };
-  return <Modal title="New appointment" wide onClose={onClose} footer={<><span className="sch-foot-summary">{when ? <>📅 {when}</> : "Pick a time"}</span><span style={{ flex: 1 }} /><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button type="button" className="primary-button" disabled={busy || !form.name.trim() || !calendarId || (!custom && !slot)} onClick={() => void save()}>{busy ? "Booking…" : "Book appointment"}</button></>}>
+  return <Modal title="New appointment" wide onClose={onClose} footer={<><span className="sch-foot-summary">{when ? <>📅 {when}</> : "Pick a time"}</span><span style={{ flex: 1 }} /><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button type="button" className="primary-button" disabled={busy || uploading > 0 || !form.name.trim() || !calendarId || (!custom && !slot)} onClick={() => void save()}>{busy ? "Booking…" : "Book appointment"}</button></>}>
     {err && <div className="iv-error" role="alert">{err}</div>}
     <h3 className="sch-h3">1 · Who's it for?</h3>
     <div className="iv-grid">
@@ -456,6 +474,12 @@ function NewAppointment({ data, scope, initial, onClose, onSaved, onCalendarsCha
     {custom ? <div className="sch-inline"><input type="time" aria-label="Time" value={customTime} onChange={(e) => setCustomTime(e.target.value)} /><button type="button" className="iv-btn" onClick={() => setCustom(false)}>Show free times instead</button></div>
       : cal ? <><SlotPicker data={data} scope={scope} calendarId={calendarId} staffIds={staffIds} date={date} value={slot} onPick={(s) => setSlot(s.start)} /><button type="button" className="sch-linkbtn" onClick={useAnyTime}>Need a time that isn't listed? Pick any time</button></> : null}
     {cal?.questions.length ? <><h3 className="sch-h3">Details</h3><div className="iv-grid">{cal.questions.map((q) => <Field key={q.id} label={q.label}>{q.type === "select" ? <select value={answers[q.id] || ""} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}><option value="">Choose…</option>{(q.options || []).map((o) => <option key={o}>{o}</option>)}</select> : <input value={answers[q.id] || ""} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })} />}</Field>)}</div></> : null}
+    {cal && <><h3 className="sch-h3">Length, price &amp; photos</h3><div className="iv-grid">
+      <Field label="How long?"><select value={duration} onChange={(e) => setDuration(Number(e.target.value))}><option value={0}>Default ({cal.durationMin} min)</option>{[15, 30, 45, 60, 90, 120, 180, 240, 300, 360, 480].filter((m) => m !== cal.durationMin).map((m) => <option key={m} value={m}>{m < 60 ? `${m} min` : `${m / 60 % 1 ? (m / 60).toFixed(1) : m / 60} hour${m === 60 ? "" : "s"}`}</option>)}</select></Field>
+      <Field label={`Price (${cal.currency || "EUR"})`}><input type="number" inputMode="decimal" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} placeholder={cal.price ? String(cal.price) : "Optional"} /></Field>
+    </div>
+    <div className="sch-appt-photos">{images.map((u) => <span key={u} className="sch-appt-photo"><img src={u} alt="" /><button type="button" aria-label="Remove photo" onClick={() => setImages(images.filter((x) => x !== u))}>×</button></span>)}
+      {images.length < 3 && <label className="sch-appt-photo add">{uploading ? "Uploading…" : <><ImagePlus size={18} /><small>Add image</small></>}<input type="file" accept="image/*" multiple hidden onChange={(e) => { void uploadImages(e.target.files); e.target.value = ""; }} /></label>}</div></>}
     {showLocation && <Field label={cal!.locationType === "phone" ? "Location (optional)" : cal!.locationType === "office" ? "Location (leave blank for your office)" : "Location / site address"}><input value={location} onChange={(e) => setLocation(e.target.value)} maxLength={300} placeholder={cal!.locationType === "office" ? cal!.locationDetail || "Your office" : "e.g. 12 Main St, Oranmore, H91 X2Y3"} /></Field>}
     <Field label="Notes (only your team sees these)"><textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} maxLength={2000} /></Field>
     {(form.email.trim() || !form.phone) && <label className="iv-check iv-small"><input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} /> Email the customer a confirmation</label>}
@@ -489,7 +513,7 @@ function AppointmentDetail({ data, scope, booking, onClose, onSaved }: { data: D
       <div><small>Customer</small><b>{booking.name}</b>{booking.phone && <a href={`tel:${booking.phone}`}>{booking.phone}</a>}{booking.email && <a href={`mailto:${booking.email}`}>{booking.email}</a>}</div>
       <div><small>Where</small><b>{cal ? (cal.locationType === "onsite" ? "On-site" : cal.locationType === "video" ? "Google Meet" : cal.locationType === "phone" ? "Phone call" : "Office") : "—"}</b>{booking.meetLink && <a href={booking.meetLink} target="_blank" rel="noopener noreferrer">Join Meet</a>}</div>
       <div><small>Source</small><b>{booking.source === "public" ? "Online booking" : `Added by ${booking.createdBy || "team"}`}</b>{booking.channel && <span className="iv-small">{booking.channel}</span>}</div>
-      {booking.answers.filter((a) => a.value).map((a) => <div key={a.label}><small>{a.label}</small><b>{a.value}</b></div>)}
+      {booking.answers.filter((a) => a.value).map((a) => <div key={a.label}><small>{a.label}</small>{/^Photo/.test(a.label) && /^(https:\/\/|\/media\/)/.test(a.value) ? <a href={a.value} target="_blank" rel="noopener noreferrer"><img className="sch-detail-photo" src={a.value} alt="" /></a> : <b>{a.value}</b>}</div>)}
     </div>
     <h3 className="sch-h3">With</h3>
     <div className="sch-staff-pick compact">{data.staff.filter((s) => cal?.staffIds.includes(s.id) || staffIds.includes(s.id) || data.isAdmin).map((s) => { const on = staffIds.includes(s.id); return <button key={s.id} type="button" disabled={!live} className={on ? "on" : ""} aria-pressed={on} onClick={() => setStaffIds(on ? staffIds.filter((x) => x !== s.id) : [...staffIds, s.id])}><Avatar person={s} size={26} /><span><b>{s.name}</b></span></button>; })}</div>

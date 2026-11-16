@@ -162,11 +162,15 @@ export async function POST(request: Request) {
         // Several people picked by hand = book them together (only when all are free).
         const together = !force && staffIds.length > 1;
         const result = await createBooking(deps, {
-          cal: { ...cal, minNoticeMin: 0, maxDaysAhead: 730, dailyLimit: force ? 0 : cal.dailyLimit, ...(together ? { assignMode: "collective" as const, staffIds } : { staffIds: [...new Set([...cal.staffIds, ...staffIds])] }) },
+          cal: { ...cal, minNoticeMin: 0, maxDaysAhead: 730, ...(Number(body.durationMin) >= 5 && Number(body.durationMin) <= 720 ? { durationMin: Math.round(Number(body.durationMin)) } : {}), dailyLimit: force ? 0 : cal.dailyLimit, ...(together ? { assignMode: "collective" as const, staffIds } : { staffIds: [...new Set([...cal.staffIds, ...staffIds])] }) },
           start: str(body.start, 40), staffId: !force && staffIds.length === 1 ? staffIds[0] : undefined, staffIds, skipAvailability: force,
           name: str(body.name, 120), email: str(body.email, 160), phone: str(body.phone, 40), notes: str(body.notes, 2000),
           answers: (body.answers && typeof body.answers === "object" ? body.answers : {}) as Record<string, unknown>,
           location: typeof body.location === "string" ? body.location : "",
+          extraAnswers: [
+            ...(Number(body.price) > 0 ? [{ label: "Price", value: `${cal.currency === "GBP" ? "£" : cal.currency === "USD" ? "$" : "€"}${(Math.round(Number(body.price) * 100) / 100).toFixed(2)}` }] : []),
+            ...(Array.isArray(body.images) ? (body.images as unknown[]).map(String).filter((u) => /^(https:\/\/|\/media\/)/.test(u)).slice(0, 3).map((u, i) => ({ label: i ? `Photo ${i + 1}` : "Photo", value: u })) : []),
+          ],
           source: "internal", createdBy: by, workspace: workspaceFor(ctx), notifyCustomer: body.notify !== false,
         });
         return json({ booking: result.booking });

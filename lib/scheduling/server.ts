@@ -206,7 +206,7 @@ function normPhone(v: string) {
 
 export type BookInput = {
   cal: CalendarConfig; start: string; staffId?: string; staffIds?: string[]; name: string; email?: string; phone?: string;
-  answers?: Record<string, unknown>; location?: string; notes?: string; source: "public" | "internal"; createdBy?: string; workspace: WorkspaceLite;
+  answers?: Record<string, unknown>; location?: string; extraAnswers?: Array<{ label: string; value: string }>; notes?: string; source: "public" | "internal"; createdBy?: string; workspace: WorkspaceLite;
   attribution?: Record<string, string>; pageUrl?: string; skipAvailability?: boolean; notifyCustomer?: boolean;
 };
 
@@ -225,6 +225,7 @@ export async function createBooking(deps: Deps, input: BookInput) {
   const answers = cal.questions.map((q) => ({ label: q.label, value: clean(input.answers?.[q.id], 1000) }));
   const location = clean(input.location, 300);
   if (location && !answers.some((a) => /address|eircode|location/i.test(a.label) && a.value)) answers.push({ label: "Location", value: location });
+  for (const extra of (input.extraAnswers || []).slice(0, 4)) { const value = clean(extra.value, 600); if (value) answers.push({ label: clean(extra.label, 40), value }); }
   if (input.source === "public") { const missing = cal.questions.find((q, i) => q.required && !answers[i].value); if (missing) throw new SchedulingError(`Please answer: ${missing.label}`); }
 
   // Re-check the slot on the server: never trust the time the browser sent.
@@ -361,7 +362,7 @@ export async function updateBooking(deps: Deps, ownerId: string, id: string, cha
   const reassigned = newStaff.join(",") !== prevStaff.join(",");
   if ((moved || reassigned) && row.status === "booked") {
     if (!Number.isFinite(newStart)) throw new SchedulingError("Choose a valid time.");
-    const end = newStart + cal.durationMin * 60_000;
+    const end = newStart + Math.max(5 * 60_000, (Date.parse(row.end_at) - Date.parse(row.start_at)) || cal.durationMin * 60_000); // keep the appointment's own length
     const clash = await bookedBusy(db, ownerId, newStaff, newStart - cal.bufferBefore * 60_000, end + cal.bufferAfter * 60_000, id);
     const hit = clash.find((b) => b.start < end + cal.bufferAfter * 60_000 && b.end > newStart - cal.bufferBefore * 60_000);
     if (hit) throw new SchedulingError(`${workspace.staff.find((s) => s.id === hit.staffId)?.name || "That person"} already has an appointment then.`, 409);

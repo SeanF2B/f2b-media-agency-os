@@ -281,3 +281,10 @@ html body .app-shell.dark-mode .sch-dash-panel-tools .sch-seg button.on{backgrou
 .sch-drop-hint{position:absolute;left:3px;right:3px;height:2px;background:var(--brand-primary,#2563eb);border-radius:2px;pointer-events:none;z-index:6}
 .sch-drop-hint b{position:absolute;left:0;top:-11px;font-style:normal;font-size:10.5px;font-weight:800;background:var(--brand-primary,#2563eb);color:#fff;border-radius:6px;padding:1px 6px}
 .sch-sample-switch{margin-right:4px}
+.sch-appt-photos{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 10px}
+.sch-appt-photo{position:relative;width:84px;height:84px;border-radius:12px;overflow:hidden;border:1px solid #dce3e7;display:grid;place-items:center;background:#f6f8fa}
+.sch-appt-photo img{width:100%;height:100%;object-fit:cover}
+.sch-appt-photo button{position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;border:0;background:rgba(16,24,40,.7);color:#fff;font-size:14px;line-height:1;cursor:pointer}
+.sch-appt-photo.add{cursor:pointer;border-style:dashed;color:#5b6773;text-align:center;gap:2px;align-content:center;font-size:12px}
+.sch-appt-photo.add small{font-size:11px;font-weight:700}
+.sch-detail-photo{width:120px;height:90px;object-fit:cover;border-radius:10px;display:block;margin-top:4px}
