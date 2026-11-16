@@ -124,6 +124,19 @@ export function AiChatWidget({ page, pageName, clientId, avatar, enabled, onComm
     return () => window.clearTimeout(timer);
   }, [enabled]);
 
+  // Pop-ups only mention things that belong to the page you're on.
+  const TOAST_FOCUS: Record<string, RegExp | null> = { Overview: /./, CRM: /lead|follow|conversation|reply/i, Conversations: /conversation|reply|message|lead|follow/i, Tasks: /approv|overdue|task|review/i, Bookkeeping: /invoice|expense|income|receipt|payment/i, Scheduling: /appointment|booking|book/i };
+  const pageRef = useRef(page); pageRef.current = page;
+  // A short, page-relevant offer of help (once per page per session).
+  const PAGE_NUDGE: Record<string, string> = { Overview: "need a hand with anything today?", CRM: "need help adding or following up a lead?", Conversations: "want me to draft a reply?", Tasks: "need some help setting up a task?", Bookkeeping: "want me to log an expense or receipt?", Scheduling: "want to book an appointment in?", Operations: "need a hand with a client’s marketing?", "Media Library": "want to upload job photos?", "Lead Factory": "want me to find new businesses to contact?" };
+  useEffect(() => {
+    setToast((current) => current && !/tour/i.test(current.text) ? null : current);
+    if (!enabled || !PAGE_NUDGE[page]) return;
+    let seen = ""; try { seen = window.sessionStorage.getItem(`f2b-ai-nudge-${page}`) || ""; } catch { /* ignore */ }
+    if (seen) return;
+    const timer = window.setTimeout(() => { try { window.sessionStorage.setItem(`f2b-ai-nudge-${page}`, "1"); } catch { /* ignore */ } setToast((current) => current || { text: `Hey boss 👋 ${PAGE_NUDGE[page]}`, action: { label: "Yes please", run: () => openChat() } }); }, 4000);
+    return () => window.clearTimeout(timer);
+  }, [page, enabled]); // eslint-disable-line react-hooks/exhaustive-deps
   // Notifications: what's waiting (approvals, new leads, unread messages). Checked on load and every 10 minutes.
   useEffect(() => {
     if (!enabled) return;
@@ -132,8 +145,10 @@ export function AiChatWidget({ page, pageName, clientId, avatar, enabled, onComm
       const response = await fetch(`/api/task-suggestions${clientId ? `?clientId=${encodeURIComponent(clientId)}` : ""}`, { cache: "no-store" }).catch(() => null);
       const json = response && response.ok ? await response.json().catch(() => null) as { suggestions?: Suggestion[] } | null : null;
       if (stop || !json) return;
-      const list = json.suggestions || [];
-      setSuggestions(list);
+      const all = json.suggestions || [];
+      setSuggestions(all);
+      const focus = TOAST_FOCUS[pageRef.current] ?? null;
+      const list = focus ? all.filter((item) => focus.test(`${item.source || ""} ${item.title} ${item.why}`)) : [];
       const key = list.map((item) => item.title).join("|");
       let dismissed = ""; try { dismissed = window.sessionStorage.getItem("f2b-ai-toast") || ""; } catch { /* ignore */ }
       if (list.length && key !== lastKey && key !== dismissed) {
