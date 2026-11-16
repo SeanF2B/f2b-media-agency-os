@@ -70,13 +70,19 @@ const STEP_GUIDE: Record<string, string> = {
 };
 
 async function askAi(ownerId: string, instructions: string, input: unknown) {
-  const provider = await resolveAiProvider(env, ownerId);
-  if (!aiConfigured(env, provider)) throw new Error("Connect an AI provider in Settings → API Keys to use AI.");
-  const response = await fetch(aiEndpoint(env, "responses", provider)!, { method: "POST", headers: aiHeaders(env, provider)!, body: JSON.stringify({ model: aiModel(env, undefined, provider), instructions, input: JSON.stringify(input), max_output_tokens: 7000, ...(provider?.name === "OpenRouter" ? { reasoning: { effort: "low" } } : {}), store: false }), signal: AbortSignal.timeout(110_000) });
-  const payload = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(payload?.error?.message || "The AI provider didn’t respond. Try again.");
-  const raw = outputText(payload).trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
-  return JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1)) as Record<string, unknown>;
+  const saved = await resolveAiProvider(env, ownerId);
+  if (!aiConfigured(env, saved)) throw new Error("Connect an AI provider in Settings → API Keys to use AI.");
+  // If the saved provider fails for billing/credit reasons, fall back to the server's own OpenAI key.
+  const fallback = env.OPENAI_API_KEY && saved?.name !== "OpenAI" ? { name: "OpenAI" as const, apiKey: String(env.OPENAI_API_KEY), baseUrl: "https://api.openai.com/v1", model: String(env.OPENAI_MODEL || "gpt-6-luna"), imageModel: "gpt-image-1.5" } : null;
+  let lastError = "The AI provider didn’t respond. Try again.";
+  for (const provider of [saved, fallback].filter(Boolean)) {
+    const response = await fetch(aiEndpoint(env, "responses", provider)!, { method: "POST", headers: aiHeaders(env, provider)!, body: JSON.stringify({ model: aiModel(env, undefined, provider), instructions, input: JSON.stringify(input), max_output_tokens: 7000, ...(provider?.name === "OpenRouter" ? { reasoning: { effort: "low" } } : {}), store: false }), signal: AbortSignal.timeout(110_000) });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) { lastError = payload?.error?.message || lastError; if (response.status === 402 || response.status === 401 || response.status === 429 || /credit|quota|billing|afford/i.test(lastError)) continue; throw new Error(lastError); }
+    const raw = outputText(payload).trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
+    return JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1)) as Record<string, unknown>;
+  }
+  throw new Error(/credit|afford|quota|billing/i.test(lastError) ? "The AI account is out of credit. Top up OpenRouter (Settings → API Keys) and try again." : lastError);
 }
 
 export async function POST(request: Request) {
