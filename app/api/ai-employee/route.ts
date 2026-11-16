@@ -119,7 +119,7 @@ export async function POST(request: Request) {
     employee === "bookkeeper" ? "Point out this is guidance, not tax advice, only when giving tax-related answers." : "",
     "DATA:", data.context || "(no data available)", data.note ? `Missing/limits: ${data.note}` : ""].filter(Boolean).join("\n");
   const isOpenRouter = /openrouter/i.test(JSON.stringify(provider ?? "")) || /openrouter/i.test(aiEndpoint(env as never, "responses", provider)!);
-  const models = [employee === "copywriter" && isOpenRouter ? "anthropic/claude-sonnet-4.5" : "", aiModel(env as never, undefined, provider) || ""].filter(Boolean);
+  const models = [employee === "copywriter" && isOpenRouter ? "anthropic/claude-sonnet-5.5" : "", aiModel(env as never, undefined, provider) || ""].filter(Boolean);
   let lastError = "";
   for (const model of models) {
     try {

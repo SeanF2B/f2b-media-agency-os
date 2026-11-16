@@ -1,4 +1,5 @@
 // AI calls for Outreach through the existing OpenRouter configuration, recording real usage.
+// Email writing (copy, openers, replies) uses Claude; reply sorting and analysis use the default model.
 import { env } from "cloudflare:workers";
 import { aiEndpoint, aiHeaders, aiModel, resolveAiProvider } from "@/lib/ai-provider";
 import { recordAiUsage } from "./store";
@@ -20,8 +21,9 @@ export async function aiText(ownerId: string, feature: "copy" | "classify" | "re
   if (!provider || !endpoint || !headers) throw new Error("AI isn't connected. Add the OpenRouter key in Settings → API keys.");
   const instructions = messages.filter((message) => message.role === "system").map((message) => message.content).join("\n\n");
   const input = messages.filter((message) => message.role !== "system").map((message) => ({ role: message.role, content: message.content }));
-  const response = await fetch(endpoint, { method: "POST", headers, body: JSON.stringify({ model: aiModel(env as never, undefined, provider), instructions, input, max_output_tokens: maxOutputTokens, usage: { include: true } }), signal: AbortSignal.timeout(timeoutMs) });
+  const response = await fetch(endpoint, { method: "POST", headers, body: JSON.stringify({ model: aiModel(env as never, feature === "classify" || feature === "analyse" ? undefined : String((env as unknown as Record<string, string | undefined>).OUTREACH_COPY_MODEL || "anthropic/claude-sonnet-5.5"), provider), instructions, input, max_output_tokens: maxOutputTokens, usage: { include: true } }), signal: AbortSignal.timeout(timeoutMs) });
   const payload = await response.json().catch(() => ({})) as any;
+  if (response.status === 402) throw new Error("Your OpenRouter account is out of credit, so the AI can't write right now. Top it up at openrouter.ai/settings/credits, then try again.");
   if (!response.ok) throw new Error(`The AI provider returned an error (${response.status}). ${String(payload?.error?.message || "").slice(0, 160)}`.trim());
   const usage = payload?.usage || {};
   await recordAiUsage(ownerId, feature, {
