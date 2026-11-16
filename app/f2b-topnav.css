@@ -2399,3 +2399,75 @@ html body .app-shell .client-tool { width: 34px; height: 32px; border-radius: 10
 html body .app-shell .client-card-extras .ops-conn { flex-wrap: nowrap; gap: 8px; align-items: center; }
 html body .app-shell.dark-mode .client-tool { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.12); }
 html body .app-shell.dark-mode .client-tool i { border-color: #1b2128; }
+html body .app-shell .ops-site-status { font-size: 12.5px; font-weight: 700; padding: 2px 9px; border-radius: 999px; }
+html body .app-shell .ops-site-status.ok { background: #dcfae6; color: #067647; }
+html body .app-shell .ops-site-status.wp { background: #e0f2fe; color: #075985; }
+html body .app-shell .ops-site-status.none { background: #eef1f4; color: #475467; }
+html body .app-shell .ops-forms-toggle { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+/* Section tabs (Google Ads, SEO, Sites, Reports) sit directly under the Operations tabs, same edge and spacing */
+html body .app-shell .ops-centre > .ops-subbar { margin: 10px 0 10px !important; padding: 0 !important; }
+/* SEO Research: simple keyword form; source + filters tucked away */
+html body .app-shell .kw-f-paid { display: inline-flex; align-items: center; font-size: 12.5px; }
+html body .app-shell .kw-f-paid .seo-report-charge-ack { margin: 0 !important; }
+html body .app-shell .kw-source-label { margin: 6px 0; font-size: 12.5px; opacity: .8; }
+html body .app-shell .kw-advanced > summary { cursor: pointer; font-size: 13px; font-weight: 700; margin: 4px 0 8px; }
+/* SEO → Performance → Pages */
+html body .app-shell .spp { display: grid; gap: 10px; }
+html body .app-shell .spp-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+html body .app-shell .spp-bar select, html body .app-shell .spp-search { border: 1px solid var(--f2b-border, #d9dee3); border-radius: 10px; background: var(--f2b-white, #fff); padding: 7px 10px; font: inherit; font-size: 13.5px; color: inherit; }
+html body .app-shell .spp-search { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; min-width: 220px; padding: 0 10px; }
+html body .app-shell .spp-search input { border: 0 !important; background: transparent !important; padding: 7px 0 !important; box-shadow: none !important; width: 100%; }
+html body .app-shell .spp-period { font-size: 12.5px; opacity: .7; }
+html body .app-shell .spp-connect { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 14px; border-radius: 12px; background: #fff7e6; border: 1px solid #fde3b0; font-size: 13.5px; color: #4a3500; }
+html body .app-shell .spp-connect > div { display: grid; gap: 2px; }
+html body .app-shell .spp-connect.small { padding: 10px 12px; }
+html body .app-shell .spp-totals { display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap; font-size: 13.5px; }
+html body .app-shell .spp-totals b { font-size: 18px; }
+html body .app-shell .spp-totals .up { color: #067647; font-weight: 700; } html body .app-shell .spp-totals .down { color: #b42318; font-weight: 700; }
+html body .app-shell .spp-totals small { margin-left: auto; opacity: .6; }
+html body .app-shell .spp-filters { display: flex; gap: 6px; flex-wrap: wrap; }
+html body .app-shell .spp-filters button { border: 1px solid var(--f2b-border, #d9dee3); background: var(--f2b-white, #fff); color: inherit; border-radius: 999px; padding: 4px 11px; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; display: inline-flex; gap: 6px; }
+html body .app-shell .spp-filters button i { font-style: normal; opacity: .6; }
+html body .app-shell .spp-filters button.on { background: var(--brand-primary, #0b74b8); color: #fff; border-color: transparent; }
+html body .app-shell .spp-filters button.up:not(.on) { color: #067647; } html body .app-shell .spp-filters button.down:not(.on) { color: #b42318; }
+html body .app-shell .spp-table-wrap { overflow-x: auto; border: 1px solid var(--f2b-border, #d9dee3); border-radius: 12px; background: var(--f2b-white, #fff); }
+html body .app-shell.dark-mode :is(.spp-table-wrap, .spp-filters button, .spp-bar select, .spp-search) { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.14); }
+html body .app-shell .spp-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+html body .app-shell .spp-table th { text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: .03em; opacity: .65; padding: 9px 12px; border-bottom: 1px solid var(--f2b-border, #d9dee3); }
+html body .app-shell .spp-table td { padding: 9px 12px; border-bottom: 1px solid rgba(127,138,160,.15); vertical-align: middle; }
+html body .app-shell .spp-table tbody tr { cursor: pointer; }
+html body .app-shell .spp-table tbody tr:hover, html body .app-shell .spp-table tbody tr.on { background: color-mix(in srgb, var(--brand-primary, #0b74b8) 6%, transparent); }
+html body .app-shell .spp-table td small { display: block; opacity: .6; font-size: 12px; }
+html body .app-shell .spp-table .num { text-align: right; white-space: nowrap; }
+html body .app-shell .spp-table.compact td, html body .app-shell .spp-table.compact th { padding: 6px 8px; }
+html body .app-shell .spp-table tr.target td { background: color-mix(in srgb, #12b76a 9%, transparent); font-weight: 700; }
+html body .app-shell .spp-kw { display: inline-block; padding: 2px 9px; border-radius: 999px; background: #ede9fe; color: #5b21b6; font-size: 12.5px; font-weight: 700; }
+html body .app-shell .spp-kw.suggested { background: #eef1f4; color: #475467; font-weight: 600; }
+html body .app-shell .spp-add { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--brand-primary, #0b74b8); font-weight: 700; }
+html body .app-shell .spp-na { opacity: .55; font-size: 12.5px; }
+html body .app-shell .spp-delta { display: inline-flex; align-items: center; gap: 2px; font-weight: 800; }
+html body .app-shell .spp-delta.up { color: #067647; } html body .app-shell .spp-delta.down { color: #b42318; }
+html body .spp-drawer-backdrop { position: fixed; inset: 0; z-index: 4000; background: rgba(8,14,20,.35); display: flex; justify-content: flex-end; animation: f2b-fade-in .15s ease; }
+html body .spp-drawer { width: min(560px, 100%); height: 100%; overflow-y: auto; background: #fff; color: #1f2328; box-shadow: -20px 0 60px rgba(0,0,0,.2); padding: 16px 18px; display: grid; align-content: start; gap: 14px; }
+html body .dark-mode .spp-drawer, html body.f2b-dark .spp-drawer { background: #1b2227; color: #f2f4f7; }
+html body .spp-drawer header { display: flex; justify-content: space-between; gap: 10px; }
+html body .spp-drawer header div { display: grid; gap: 2px; min-width: 0; }
+html body .spp-drawer header b { font-size: 17px; }
+html body .spp-drawer header a { font-size: 12.5px; opacity: .75; word-break: break-all; }
+html body .spp-close { border: 0; background: transparent; cursor: pointer; color: inherit; padding: 4px; height: fit-content; }
+html body .spp-section { display: grid; gap: 8px; border: 1px solid #e3e8ee; border-radius: 14px; padding: 12px 14px; }
+html body .spp-section h4 { margin: 0; font-size: 14px; } html body .spp-section h4 small { font-weight: 500; opacity: .6; margin-left: 6px; }
+html body .spp-section label { display: grid; gap: 4px; font-size: 12.5px; font-weight: 700; }
+html body .spp-section :is(input, textarea) { border: 1px solid #d0d5dd; border-radius: 9px; padding: 8px 10px; font: inherit; font-size: 14px; background: transparent; color: inherit; }
+html body .spp-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+html body .spp-saved { font-size: 12.5px; font-weight: 700; color: #067647; }
+html body .spp-hint { font-size: 12px; opacity: .75; } html body .spp-hint.ok { color: #067647; opacity: 1; }
+html body .spp-note { font-size: 12px; opacity: .65; }
+@media (max-width: 760px) { html body .app-shell .spp-search { margin-left: 0; width: 100%; } html body .app-shell .spp-table th:nth-child(4), html body .app-shell .spp-table td:nth-child(4) { display: none; } }
+/* Google Ads Performance: audit findings */
+html body .app-shell .ads-findings ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+html body .app-shell .ads-findings li { display: flex; gap: 10px; align-items: flex-start; }
+html body .app-shell .ads-findings li > div { flex: 1; display: grid; }
+html body .app-shell .ads-findings li small { opacity: .7; }
+html body .app-shell .ads-finding-pri { font-size: 10.5px; font-weight: 800; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; background: #fef0c7; color: #93370d; }
+html body .app-shell .ads-finding-pri.high { background: #fee4e2; color: #b42318; }

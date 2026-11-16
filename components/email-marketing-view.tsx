@@ -118,8 +118,8 @@ function EmailBuilder({ doc, onChange, clientId, extra }: { doc: Doc; onChange: 
 }
 
 /* ---------------- Main view ---------------- */
-export function EmailMarketingView({ clientId, clientName, clientLogo, clientColor, automations, initialMode = "campaigns" }: { clientId: string; clientName: string; clientLogo?: string; clientColor?: string; automations?: React.ReactNode; initialMode?: "campaigns" | "builder" | "automations" | "system" }) {
-  const [mode, setMode] = useState<"campaigns" | "builder" | "automations" | "system">(initialMode === "automations" && !automations ? "campaigns" : initialMode);
+export function EmailMarketingView({ clientId, clientName, clientLogo, clientColor, automations, initialMode = "campaigns" }: { clientId: string; clientName: string; clientLogo?: string; clientColor?: string; automations?: React.ReactNode; initialMode?: "campaigns" | "builder" | "automations" | "system" | "settings" }) {
+  const [mode, setMode] = useState<"campaigns" | "builder" | "automations" | "system" | "settings">(initialMode === "automations" && !automations ? "campaigns" : initialMode);
   type Data = { templates: Template[]; campaigns: Campaign[]; sending: boolean; me: string };
   const [error, setError] = useState("");
   const names = useRef(new Map<string, { name: string; style: EmailStyle }>());
@@ -149,12 +149,16 @@ export function EmailMarketingView({ clientId, clientName, clientLogo, clientCol
 
   return <div className="em">
     <div className="ops-subbar em-subbar">
-      <span className="ops-seg" role="tablist" aria-label="Email sections">{([["campaigns", "Campaigns"], ["builder", "Email builder"], ...(automations ? [["automations", "Automations"]] : []), ["system", "System emails"]] as Array<[typeof mode, string]>).map(([key, text]) => <button key={key} type="button" role="tab" aria-selected={mode === key} className={mode === key ? "active" : ""} onClick={() => setMode(key)}>{text}</button>)}</span>
+      <span className="ops-seg" role="tablist" aria-label="Email sections">{([["campaigns", "Campaigns"], ...(automations ? [["automations", "Automations"]] : [])] as Array<[typeof mode, string]>).map(([key, text]) => <button key={key} type="button" role="tab" aria-selected={mode === key} className={mode === key ? "active" : ""} onClick={() => setMode(key)}>{text}</button>)}</span>
+      <button type="button" className={`secondary-button em-settings-btn${mode === "settings" || mode === "system" || mode === "builder" ? " on" : ""}`} onClick={() => setMode(mode === "settings" || mode === "system" || mode === "builder" ? "campaigns" : "settings")}>Email settings</button>
       {data && !data.sending && (mode === "campaigns" || mode === "builder") && <span className="em-warn">Sending isn’t set up on the server yet (Resend). You can still build and save.</span>}
     </div>
     {error && <p className="ops-empty" role="alert">{error}</p>}
     {mode === "automations" && automations}
-    {mode === "system" && <SystemEmailsView />}
+    {(mode === "settings" || mode === "system" || mode === "builder") && <div className="em-settings">
+      <div className="ops-seg" role="tablist" aria-label="Email settings">{([["settings", "System emails"], ["builder", "Saved emails"]] as const).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={(key === "settings" && (mode === "settings" || mode === "system")) || mode === key} className={(key === "settings" && (mode === "settings" || mode === "system")) || mode === key ? "active" : ""} onClick={() => setMode(key)}>{label}</button>)}</div>
+      {(mode === "settings" || mode === "system") && <SystemEmailsView />}
+    </div>}
     {(mode === "campaigns" || mode === "builder") && !data && <div className="page-loading" role="status" aria-label="Loading email…"><i /></div>}
     {(mode === "builder" || mode === "campaigns") && data && <div className={`em-pane${stale ? " em-stale" : ""}`} aria-busy={stale}>
       {mode === "builder" && <TemplatesPane key={shownId} clientId={shownId} clientName={shown.name} templates={data.templates} baseStyle={shown.style} me={data.me} onChanged={load} />}
@@ -202,8 +206,8 @@ function CampaignsPane({ clientId, clientName, campaigns, templates, baseStyle, 
   if (wizard) return <CampaignWizard clientId={clientId} clientName={clientName} onCancel={() => setWizard(false)} onReady={(campaign) => { setWizard(false); setCurrent({ ...campaign, style: baseStyle, footer: campaign.footer || clientName, fromName: campaign.fromName || clientName }); }} />;
   const blankCampaign = (): Campaign => ({ id: "", name: "", goal: "", status: "draft", audience: { tags: [], tagMode: "any" }, steps: [{ id: uid(), subject: "", preheader: "", waitDays: 0, blocks: [] }], style: baseStyle, fromName: clientName, replyTo: "", footer: clientName, stats: {}, updatedAt: "" });
   return <div className="em-list">
-    <div className="ops-toolbar"><b className="em-title">Email campaigns · {clientName}</b><button type="button" className="secondary-button" onClick={() => setCurrent(blankCampaign())}><Plus size={15} /> Blank campaign</button><button type="button" className="primary-button" onClick={() => setWizard(true)}><Sparkles size={15} /> New campaign with AI</button></div>
-    {!campaigns.length ? <div className="em-empty-card"><Sparkles size={28} aria-hidden="true" /><p>Tell AI what you want to achieve and it plans the whole campaign: the emails, the wait between them and the copy. You review, tweak in the builder, pick who gets it and press launch.</p><button type="button" className="primary-button" onClick={() => setWizard(true)}><Sparkles size={15} /> Create a campaign with AI</button></div>
+    {campaigns.length > 0 && <div className="ops-toolbar"><b className="em-title">Email campaigns · {clientName}</b><button type="button" className="secondary-button" onClick={() => setCurrent(blankCampaign())}><Plus size={15} /> Start from scratch</button><button type="button" className="primary-button" onClick={() => setWizard(true)}><Sparkles size={15} /> Create with AI</button></div>}
+    {!campaigns.length ? <div className="em-empty-card compact"><Mail size={22} aria-hidden="true" /><div><b>No email campaigns for {clientName} yet</b><p>AI plans the emails, timing and copy for you to review, or build one yourself in the email builder.</p></div><span className="em-empty-actions"><button type="button" className="primary-button" onClick={() => setWizard(true)}><Sparkles size={15} /> Create with AI</button><button type="button" className="secondary-button" onClick={() => setCurrent(blankCampaign())}><Plus size={15} /> Start from scratch</button></span></div>
       : <div className="ops-table-wrap"><table className="ops-table em-table"><thead><tr><th>Campaign</th><th>Status</th><th>Emails</th><th>Contacts</th><th>Sent</th><th>Unsubscribed</th><th>Last edited</th></tr></thead>
         <tbody>{campaigns.map((c) => <tr key={c.id} className="em-click" onClick={() => setCurrent(c)}><td><b>{c.name}</b>{c.goal && <small className="em-sub">{c.goal.slice(0, 90)}</small>}</td><td><span className={`em-pill ${c.status}`}>{STATUS_LABEL[c.status]}</span></td><td>{c.steps.length}</td><td>{c.stats.enrolled ?? "—"}</td><td>{c.stats.sent ?? 0}{c.stats.failed ? <small className="em-sub em-bad">{c.stats.failed} failed</small> : null}</td><td>{c.stats.unsubscribed ?? 0}</td><td>{new Date(c.updatedAt).toLocaleDateString("en-IE", { day: "numeric", month: "short" })}</td></tr>)}</tbody></table></div>}
   </div>;

@@ -62,10 +62,10 @@ function livePageUrl(siteUrl?: string, slug?: string) {
 }
 
 
-export async function openBuilder(clientId: string, name: string) {
-  const w = window as unknown as { f2bSiteBuilder?: { open: (o: { clientId: string; name: string }) => void } };
+export async function openBuilder(clientId: string, name: string, page?: string) {
+  const w = window as unknown as { f2bSiteBuilder?: { open: (o: { clientId: string; name: string; page?: string }) => void } };
   if (!w.f2bSiteBuilder) await new Promise<void>((ok, bad) => { const el = document.createElement("script"); el.src = "/f2b-site-builder.js"; el.onload = () => ok(); el.onerror = () => bad(new Error("Could not load the builder")); document.head.appendChild(el); });
-  w.f2bSiteBuilder?.open({ clientId, name });
+  w.f2bSiteBuilder?.open({ clientId, name, ...(page ? { page } : {}) });
 }
 export function SitesView({ focusClientId = "", clients, active, initialSection = "website", hideSectionTabs = false, vaultEntries, vaultUnlocked, pageMetadata = [], landingDomainChecks = [], onUnlockVault, onSavePageMetadata, onSaveLandingDomainCheck, onCreateTask }: { clients: ClientSite[]; active: boolean; initialSection?: "website" | "landing"; hideSectionTabs?: boolean; vaultEntries: SavedLogin[]; vaultUnlocked: boolean; pageMetadata?: SitePageMetadata[]; landingDomainChecks?: SiteLandingDomainCheck[]; onUnlockVault: () => void; onSavePageMetadata: (metadata: SitePageMetadata) => void; onSaveLandingDomainCheck: (check: SiteLandingDomainCheck) => void; onCreateTask: (clientId: string, title: string, notes: string, checklist: string, service?: string, sitePagePlan?: SitePagePlan) => void; focusClientId?: string }) {
   const available = useMemo(() => clients.filter((client) => client.wordpressSiteUrl), [clients]);

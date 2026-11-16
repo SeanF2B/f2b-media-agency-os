@@ -3,7 +3,7 @@ import { getChatGPTUser } from "../../../chatgpt-auth";
 import { getTeamPermissions } from "@/lib/access-permissions";
 import { compareGoogleAdsTotals, googleAdsPerformanceWindow, summarizeGoogleAdsBreakdown, summarizeGoogleAdsRows, type GoogleAdsBreakdown, type GoogleAdsMetricRow, type GoogleAdsRange } from "@/lib/google-ads-performance";
 import { listDailyMarketingSnapshots, loadCachedMarketingData, saveDailyMarketingSnapshot } from "@/lib/marketing-data-history";
-import { getGoogleAdsAdGroupPerformance, getGoogleAdsCampaignMetrics, getGoogleAdsKeywordPerformance, getGoogleAdsSearchTerms, listGoogleAdsCampaignAssets, listGoogleAdsCampaigns, listGoogleAdsResponsiveSearchAds } from "@/lib/google-ads-direct";
+import { getGoogleAdsAdGroupPerformance, getGoogleAdsCampaignMetrics, getGoogleAdsKeywordPerformance, getGoogleAdsSearchTerms, listGoogleAdsCampaignAssets, listGoogleAdsCampaigns, listGoogleAdsResponsiveSearchAds, getGoogleAdsNegativeKeywords } from "@/lib/google-ads-direct";
 
 export const dynamic = "force-dynamic";
 const respond = (error: string, status = 400) => Response.json({ error }, { status, headers: { "Cache-Control": "no-store" } });
@@ -110,9 +110,15 @@ export async function GET(request: Request) {
 
   try {
     const section = url.searchParams.get("section") as GoogleAdsWorkspaceSection | null;
-    if (section && !["ad_groups", "keywords", "search_terms", "ads", "assets"].includes(section)) return respond("Choose ad groups, keywords, search terms, ads or assets.");
+    if (section && !["ad_groups", "keywords", "search_terms", "ads", "assets", "negatives"].includes(section as string)) return respond("Choose ad groups, keywords, search terms, ads, assets or negatives.");
     if (section) {
       const campaignId = url.searchParams.get("campaignId") || undefined;
+      if ((section as string) === "negatives") {
+        // Manage → Negatives: live negative keywords (read-only list; changes still go through approval).
+        if (!useDirectApi) return Response.json({ status: "missing_connection", section, message: "Negative keywords need a connected Google login and Google Ads API access." }, { headers: { "Cache-Control": "no-store" } });
+        const result = await getGoogleAdsNegativeKeywords(cacheScope.ownerId, accountId, campaignId && /^\d{3,20}$/.test(campaignId) ? campaignId : undefined);
+        return Response.json({ status: result.count ? "connected" : "no_data", source: result.source, section, accountId, negatives: result.negatives }, { headers: { "Cache-Control": "no-store" } });
+      }
       if (section === "ads" || section === "assets") {
         if (!useDirectApi) return Response.json({ status: "missing_connection", section, message: "Ad copy and campaign assets need a connected Google login and Google Ads API access enabled for its Cloud project." }, { headers: { "Cache-Control": "no-store" } });
         if (campaignId && !/^\d{3,20}$/.test(campaignId)) return respond("Choose a valid campaign before loading its ads.");

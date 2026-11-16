@@ -78,3 +78,7 @@
   .sw-fields { grid-template-columns: 1fr 1fr; }
   .sw-actions .primary-button { width: 100%; justify-content: center; }
 }
+.sw-badge.new { background: #e0f2fe; color: #075985; }
+.sw-card-top { gap: 6px; }
+.sw-card-top .sw-del { margin-left: auto; }
+.sw-diff { margin: 0; font-size: 13px; padding: 6px 10px; border-radius: 9px; background: color-mix(in srgb, #0b74b8 7%, transparent); }

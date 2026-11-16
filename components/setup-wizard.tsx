@@ -58,9 +58,16 @@ async function loadLive(kind: SetupKind, stepId: string, clientId: string): Prom
     }
     if (stepId === "conversions") {
       const response = await fetch("/api/setup-drafts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "live-conversions", kind, clientId }) });
-      const json = await response.json().catch(() => ({})) as { actions?: Array<{ name: string; status: string; category: string }>; adsError?: string; forms?: Array<{ form: string; count: number; adsLeads: number }> };
-      const items: LiveItem[] = [...(json.actions || []).map((a) => ({ item: a.name, kind: `Google Ads · ${a.category.toLowerCase().replace(/_/g, " ")}`, detail: a.status })), ...(json.forms || []).map((f) => ({ item: f.form, kind: "Website form (OS)", detail: `${f.count} leads in 90 days · ${f.adsLeads} from Google Ads` }))];
-      return { status: items.length ? "ready" : "none", message: [json.adsError, !(json.forms || []).length ? "No website form leads recorded in the last 90 days." : ""].filter(Boolean).join(" "), source: "Live · Google Ads + OS form log", items, columns: [["item", "Conversion / form"], ["kind", "Type"], ["detail", "Status / data"]], summary: { actions: json.actions || [], forms: json.forms || [], note: json.adsError || "" } };
+      const json = await response.json().catch(() => ({})) as { actions?: Array<{ name: string; status: string; category: string; origin?: string; recorded?: number }>; adsError?: string; forms?: Array<{ form: string; count: number; adsLeads: number }> };
+      // Three separate groups: website form submissions, phone-button taps, completed calls.
+      const group = (a: { name: string; category: string; origin?: string }) => /CALL_FROM_ADS|GOOGLE_HOSTED/.test(a.origin || "") || /call(s)? from ads|call asset|call extension|completed call/i.test(a.name) ? "Completed calls" : /PHONE_CALL_LEAD/.test(a.category) || /tap|click.?to.?call|phone (click|button)|tel/i.test(a.name) ? "Phone-button taps" : /SUBMIT_LEAD_FORM|CONTACT|REQUEST_QUOTE|BOOK_APPOINTMENT/.test(a.category) || /form|submit|enquir|quote|contact|thank/i.test(a.name) ? "Website form submissions" : "Other conversions";
+      const items: LiveItem[] = [
+        ...(json.forms || []).map((f) => ({ group: "Website form submissions", item: f.form, kind: "Recorded in the OS", detail: `${f.count} leads in 90 days · ${f.adsLeads} from Google Ads` })),
+        ...(json.actions || []).map((a) => ({ group: group(a), item: a.name, kind: `Google Ads · ${a.status.toLowerCase()}`, detail: a.recorded ? `${a.recorded} recorded in 90 days (verified)` : "None recorded in 90 days (configured, needs testing)" })),
+      ].sort((x, y) => ["Website form submissions", "Phone-button taps", "Completed calls", "Other conversions"].indexOf(String(x.group)) - ["Website form submissions", "Phone-button taps", "Completed calls", "Other conversions"].indexOf(String(y.group)));
+      const has = (g: string) => items.some((i) => i.group === g);
+      const missing = ["Website form submissions", "Phone-button taps", "Completed calls"].filter((g) => !has(g));
+      return { status: items.length ? "ready" : "none", message: [json.adsError, missing.length ? `Nothing tracked yet for: ${missing.join(", ")}.` : ""].filter(Boolean).join(" "), source: "Live · Google Ads + OS form log", items, columns: [["group", "Group"], ["item", "Conversion / form"], ["kind", "Where"], ["detail", "Status"]], summary: { actions: json.actions || [], forms: json.forms || [], missing, note: json.adsError || "" } };
     }
   }
   if (stepId === "keywords" || stepId === "content") {
@@ -94,7 +101,7 @@ function importRows(stepId: string, live: Live): SetupRow[] {
   return [];
 }
 
-export function SetupWizard({ kind, clientId, clientName, onOpenTab, onEditClient }: { kind: SetupKind; clientId: string; clientName: string; onOpenTab?: (tab: string) => void; onEditClient?: () => void }) {
+export function SetupWizard({ kind, clientId, clientName, onOpenTab, onEditClient, initialStep }: { kind: SetupKind; clientId: string; clientName: string; onOpenTab?: (tab: string) => void; onEditClient?: () => void; initialStep?: string }) {
   const steps = stepsFor(kind);
   const [draft, setDraft] = useState<SetupDraft | null>(null);
   const [loadError, setLoadError] = useState("");
@@ -119,7 +126,7 @@ export function SetupWizard({ kind, clientId, clientName, onOpenTab, onEditClien
       loadedFor.current = clientId;
       setDraft({ brief: { ...emptyBrief(), ...json.draft.brief }, steps: json.draft.steps || {} }); setSavedAt(json.draft.updatedAt || "");
       const firstOpen = steps.find((st) => (json.draft!.steps?.[st.id]?.status || "empty") !== "reviewed");
-      setStepId(firstOpen?.id || steps[0].id);
+      setStepId(initialStep && steps.some((st) => st.id === initialStep) ? initialStep : firstOpen?.id || steps[0].id);
       const b = json.draft.brief || emptyBrief(); setBriefOpen(!b.website || !b.services || !b.locations);
     }).catch(() => { if (!cancelled) setLoadError("Setup couldn’t load."); });
     return () => { cancelled = true; };
@@ -199,6 +206,12 @@ export function SetupWizard({ kind, clientId, clientName, onOpenTab, onEditClien
   if (!draft) return <div className="page-loading" role="status" aria-label="Loading setup…"><i /></div>;
   const nextStep = steps.find((st) => (draft.steps[st.id]?.status || "empty") !== "reviewed");
   const liveData = live[stepId];
+  // Exact proposed changes: which planned items are new vs already in the live account.
+  const norm = (v: unknown) => String(v || "").toLowerCase().replace(/\s+/g, " ").trim();
+  const liveKeys = new Set((liveData?.status === "ready" ? liveData.items : []).map((i) => kind === "ads" && stepId === "structure" ? norm(i.adGroup || i.campaign) : kind === "ads" && stepId === "keywords" ? norm(i.keyword) : "").filter(Boolean));
+  const existsLive = (row: SetupRow) => liveKeys.size > 0 && liveKeys.has(stepId === "structure" ? norm(row.adGroup) : norm(row.keyword));
+  const compared = kind === "ads" && (stepId === "structure" || stepId === "keywords") && liveKeys.size > 0;
+  const newCount = compared ? state.rows.filter((r) => !existsLive(r)).length : 0;
   const problems = kind === "ads" ? state.rows.map((r) => ({ id: r.id, list: adsRowProblems(stepId, r) })).filter((p) => p.list.length) : [];
 
   return <div className="sw">
@@ -232,7 +245,8 @@ export function SetupWizard({ kind, clientId, clientName, onOpenTab, onEditClien
       {(note || state.note) && <p className="sw-note"><Sparkles size={13} /> {note || state.note}</p>}
       {error && <p className="sw-error" role="alert">{error}</p>}
 
-      {state.rows.length ? <div className="sw-rows">{state.rows.map((row) => <RowCard key={row.id} def={step} row={row} problems={problems.find((p) => p.id === row.id)?.list || []} onChange={(patch) => setRows(state.rows.map((r) => r.id === row.id ? { ...r, ...patch } : r))} onDelete={() => setRows(state.rows.filter((r) => r.id !== row.id))} />)}</div>
+      {compared && state.rows.length > 0 && <p className="sw-diff"><b>Proposed changes:</b> {newCount} new · {state.rows.length - newCount} already in the account (won’t be duplicated)</p>}
+      {state.rows.length ? <div className="sw-rows">{state.rows.map((row) => <RowCard key={row.id} def={step} row={row} existing={compared ? existsLive(row) : undefined} problems={problems.find((p) => p.id === row.id)?.list || []} onChange={(patch) => setRows(state.rows.map((r) => r.id === row.id ? { ...r, ...patch } : r))} onDelete={() => setRows(state.rows.filter((r) => r.id !== row.id))} />)}</div>
         : <div className="sw-empty">Nothing planned yet. Draft it with AI{liveData?.importable && liveData.items.length ? ", add the live data above" : ""} or add rows yourself.</div>}
 
       <footer className="sw-actions">
@@ -259,9 +273,9 @@ function LivePanel({ def, live, onImport, onRefresh, onOpenTab, kind }: { def: S
   </div>;
 }
 
-function RowCard({ def, row, problems, onChange, onDelete }: { def: SetupStepDef; row: SetupRow; problems: string[]; onChange: (patch: Record<string, string>) => void; onDelete: () => void }) {
+function RowCard({ def, row, problems, onChange, onDelete, existing }: { def: SetupStepDef; row: SetupRow; problems: string[]; onChange: (patch: Record<string, string>) => void; onDelete: () => void; existing?: boolean }) {
   return <article className={`sw-card ${problems.length ? "bad" : ""}`}>
-    <div className="sw-card-top"><span className={`sw-badge ${row.source === AI_SOURCE ? "ai" : row.source.startsWith("Live") ? "live" : "you"}`}>{row.source === AI_SOURCE ? "AI suggestion" : row.source}</span><button type="button" className="sw-del" aria-label="Remove row" onClick={onDelete}><Trash2 size={14} /></button></div>
+    <div className="sw-card-top"><span className={`sw-badge ${row.source === AI_SOURCE ? "ai" : row.source.startsWith("Live") ? "live" : "you"}`}>{row.source === AI_SOURCE ? "AI suggestion" : row.source}</span>{existing !== undefined && <span className={`sw-badge ${existing ? "you" : "new"}`}>{existing ? "Already in account" : "New"}</span>}<button type="button" className="sw-del" aria-label="Remove row" onClick={onDelete}><Trash2 size={14} /></button></div>
     <div className="sw-fields">{def.columns.map((col) => {
       const value = String(row[col.key] || "");
       if (col.type === "metric") return <label key={col.key} className="metric"><span>{col.label}</span><b title={value ? "From live data" : "No verified data"}>{value ? Number(value).toLocaleString("en-IE") : "—"}</b></label>;

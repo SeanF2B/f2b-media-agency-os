@@ -148,6 +148,15 @@ export async function getGoogleAdsConversionActions(ownerId: string, customerId:
   return rows.map((row) => ({ id: String(row.conversionAction?.id || ""), name: String(row.conversionAction?.name || ""), status: String(row.conversionAction?.status || "UNKNOWN"), category: String(row.conversionAction?.category || "UNKNOWN"), origin: String(row.conversionAction?.origin || "UNKNOWN"), includedInConversions: Boolean(row.conversionAction?.includeInConversionsMetric), primaryForGoal: Boolean(row.conversionAction?.primaryForGoal) })).filter((item) => item.id);
 }
 
+/** Conversions recorded per conversion action over the last 90 days (to tell "configured" from "verified"). */
+export async function getGoogleAdsConversionCounts(ownerId: string, customerId: string) {
+  const { payload } = await googleAdsPost(ownerId, customerId, "googleAds:searchStream", { query: "SELECT segments.conversion_action_name, metrics.all_conversions FROM customer WHERE segments.date DURING LAST_90_DAYS" });
+  const rows = (payload as Array<{ results?: Array<any> }>).flatMap((batch) => batch.results || []);
+  const totals = new Map<string, number>();
+  for (const row of rows) { const name = String(row.segments?.conversionActionName || ""); if (name) totals.set(name, (totals.get(name) || 0) + Number(row.metrics?.allConversions || 0)); }
+  return totals;
+}
+
 export async function getGoogleAdsCampaignChangeEvents(ownerId: string, customerId: string, campaignId?: string) {
   const cleanCampaignId = campaignId?.replace(/\D/g, "");
   if (campaignId && !/^\d{3,20}$/.test(cleanCampaignId || "")) throw new Error("The Google Ads campaign ID is not valid.");

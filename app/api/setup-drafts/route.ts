@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "../../chatgpt-auth";
 import { aiConfigured, aiEndpoint, aiHeaders, aiModel, resolveAiProvider } from "@/lib/ai-provider";
 import { AI_SOURCE, emptyBrief, newRowId, stepsFor, type SetupDraft, type SetupKind, type SetupRow } from "@/lib/setup-steps";
-import { getGoogleAdsConversionActions, googleAdsConnectionReady } from "@/lib/google-ads-direct";
+import { getGoogleAdsConversionActions, getGoogleAdsConversionCounts, googleAdsConnectionReady } from "@/lib/google-ads-direct";
 
 // Google Ads / SEO → Setup: AI-guided setup drafts, saved per client and section (resume after refresh).
 // AI generation, paid research and live publishing stay separate: this route only drafts and saves;
@@ -62,7 +62,7 @@ const STEP_GUIDE: Record<string, string> = {
   "ads:negatives": "Suggest negative keywords. When real search terms are provided, prefer terms that spent money without conversions or are clearly irrelevant (jobs, DIY, free, courses, wrong services, wrong towns) and say so in the reason; otherwise suggest a sensible starter list. Give match type, level and a short reason.",
   "ads:ads": "Write one responsive search ad per ad group: 10-15 headlines of at most 30 characters each and 4 descriptions of at most 90 characters, one per line, no exclamation marks in headlines, include the service and location, a clear call to action and real proof points from the brief only. Final URL = the ad group's landing page. Paths max 15 characters.",
   "ads:assets": "Suggest assets: 4-6 sitelinks (text max 25, two description lines max 35, a real destination URL on the client's site), 6-8 callouts (max 25), 1-2 structured snippets (header + at least 3 values, each max 25, header is one of Services, Types, Brands, Neighborhoods, Destinations, Courses, Models, Styles, Amenities, Insurance coverage, Degree programs, Featured hotels, Shows), a call asset with the business phone if known, and image asset ideas (describe the photo).",
-  "ads:conversions": "Plan conversion tracking for: website form submissions, phone number taps on mobile, and completed calls from ads (call assets, calls lasting 60s+). Use the live conversion actions and form data provided to set the status: Verified only if data shows recorded conversions, Configured if the action exists but has no data, Missing otherwise. Explain how each is tracked and the next step to test or fix it.",
+  "ads:conversions": "Return exactly three rows, in this order, with action set to: 'Website form submissions', 'Phone-button taps', 'Completed calls'. Website form submissions = thank-you page or form-submit event; Phone-button taps = clicks on tel: links on the website (mobile); Completed calls = calls from ads/call assets lasting 60s+ (Google forwarding number). Use the live conversion actions and form data provided to set the status: Verified only if data shows recorded conversions, Configured if the action exists but has no data, Missing otherwise. Explain how each is tracked and the next step to test or fix it.",
   "seo:keywords": "Plan keyword research by service, location and intent. 15-30 keywords. For each priority topic give the target page on the client's site (existing URL if known, otherwise a suggested new page path). Never output search volumes or rankings.",
   "seo:competitors": "Suggest likely local competitors and the topics/pages where they probably win, framed as hypotheses to verify with the paid competitor check. Never invent metrics. Mark the gap and the page type worth investigating.",
   "seo:content": "Plan content: service pages, location pages, blog posts and advice articles. Give a clear title, the target keyword (prefer keywords from the keyword research step), a 2-3 sentence brief and 2-4 internal links (existing pages or other planned pages).",
@@ -104,9 +104,15 @@ export async function POST(request: Request) {
     }
     if (body.action === "live-conversions") {
       // Live evidence for the conversion step: Google Ads conversion actions (when connected) and OS form leads.
-      let actions: Array<{ name: string; status: string; category: string }> = []; let adsError = "";
+      let actions: Array<{ name: string; status: string; category: string; origin?: string; recorded?: number }> = []; let adsError = "";
       if (client.googleAdsAccountId) {
-        try { if (await googleAdsConnectionReady(ctx.ownerId)) actions = (await getGoogleAdsConversionActions(ctx.ownerId, client.googleAdsAccountId.replace(/\D/g, ""))).map((a) => ({ name: a.name, status: a.status, category: a.category })).slice(0, 40); else adsError = "Google Ads isn’t connected directly, so conversion actions can’t be read."; }
+        try {
+          if (await googleAdsConnectionReady(ctx.ownerId)) {
+            const customer = client.googleAdsAccountId.replace(/\D/g, "");
+            const [list, counts] = await Promise.all([getGoogleAdsConversionActions(ctx.ownerId, customer), getGoogleAdsConversionCounts(ctx.ownerId, customer).catch(() => new Map<string, number>())]);
+            actions = list.map((a) => ({ name: a.name, status: a.status, category: a.category, origin: a.origin, recorded: Math.round((counts.get(a.name) || 0) * 10) / 10 })).slice(0, 40);
+          } else adsError = "Google Ads isn’t connected directly, so conversion actions can’t be read.";
+        }
         catch (e) { adsError = e instanceof Error ? e.message.slice(0, 200) : "Conversion actions couldn’t be read."; }
       } else adsError = "No Google Ads account is linked to this client.";
       let forms: Array<{ form: string; count: number; adsLeads: number }> = [];
