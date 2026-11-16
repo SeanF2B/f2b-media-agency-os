@@ -1824,3 +1824,17 @@ html body .app-shell .dh-reviews { display: grid; grid-template-columns: repeat(
 html body .app-shell .dh-review { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 13px; border: 1px solid rgba(127,138,160,.18); background: rgba(127,138,160,.05); }
 html body .app-shell .dh-review span { display: grid; } html body .app-shell .dh-review b { font-size: 20px; color: #b07800; } html body .app-shell .dh-review small { font-size: 12px; opacity: .75; }
 body.f2b-dark :is(.app-shell .dh-review b, #f2b-rv) { color: #f5c46b !important; -webkit-text-fill-color: #f5c46b !important; }
+
+/* Inline DataForSEO connection (Operations → SEO) */
+html body .app-shell .dfs-connect { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px 12px; align-items: end; padding: 14px 16px; margin: 12px 0; border-radius: 14px; background: var(--surface, #fff); border: 1px solid color-mix(in srgb, var(--accent, #0b7cb0) 35%, transparent); box-shadow: 0 6px 18px rgba(0,0,0,.06); }
+html body .app-shell .dfs-connect-head { grid-column: 1 / -1; display: grid; gap: 2px; }
+html body .app-shell .dfs-connect-head b { font-size: 15px; }
+html body .app-shell .dfs-connect-head span, html body .app-shell .dfs-connect small { font-size: 12.5px; opacity: .8; }
+html body .app-shell .dfs-connect label { display: grid; gap: 4px; font-size: 12.5px; font-weight: 600; }
+html body .app-shell .dfs-connect small { grid-column: 1 / -1; }
+html body .app-shell .dfs-connect-error { grid-column: 1 / -1; margin: 0; color: #b42318; font-size: 13px; }
+html body .app-shell .dfs-connect-ok { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-size: 13px; font-weight: 600; }
+html body .app-shell .dfs-connect-dot { width: 8px; height: 8px; border-radius: 50%; background: #12b76a; box-shadow: 0 0 0 3px rgba(18,183,106,.2); }
+body.f2b-dark .app-shell .dfs-connect { background: rgba(255,255,255,.04); }
+body.f2b-dark .app-shell .dfs-connect-error { color: #fda29b; }
+@media (max-width: 720px) { html body .app-shell .dfs-connect { grid-template-columns: 1fr; } }
