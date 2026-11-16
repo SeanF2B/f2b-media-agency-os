@@ -1229,3 +1229,26 @@ html body .app-shell .dh-ads-embed { margin-top: 14px; }
 html body .app-shell .dh-ads-embed > .panel { margin: 0 !important; padding: 0 !important; background: transparent !important; border: 0 !important; box-shadow: none !important; backdrop-filter: none !important; }
 html body .app-shell .dh-ads-embed .panel-heading .eyebrow { display: none; }
 html body .app-shell .dh-ads-embed .panel-heading h2 { font-size: 14px !important; }
+/* ===== Mobile top bar: sticky, compact, no AI button (the chat widget is the assistant) ===== */
+@media (max-width: 860px) {
+  html body .app-shell.topnav-layout .tn-bar { position: sticky !important; top: 0; z-index: 1200; margin: 0 -12px 10px !important; padding: calc(8px + env(safe-area-inset-top, 0px)) 10px 8px !important; border-radius: 0 0 18px 18px !important; background: color-mix(in srgb, var(--surface, #fff) 82%, transparent) !important; backdrop-filter: blur(16px) saturate(1.4); -webkit-backdrop-filter: blur(16px) saturate(1.4); display: flex !important; align-items: center; gap: 8px; flex-wrap: nowrap !important; }
+  html body.f2b-dark .app-shell.topnav-layout .tn-bar { background: rgba(18,22,27,.82) !important; }
+  html body .app-shell.topnav-layout .tn-brand .tn-bot-logo, html body .app-shell.topnav-layout .ai-assistant-quick-link { display: none !important; }
+  html body .app-shell.topnav-layout .tn-brand .tn-logo:not(.tn-logo-client) { display: grid !important; place-items: center; width: 36px; height: 36px; overflow: hidden; border-radius: 10px; }
+  html body .app-shell.topnav-layout .tn-brand .tn-logo img { max-width: 34px !important; max-height: 34px !important; object-fit: contain; }
+  html body .app-shell.topnav-layout .tn-left { display: flex !important; align-items: center; gap: 6px; min-width: 0; flex: 1 1 auto; }
+  html body .app-shell.topnav-layout .tn-left .client-scope { min-width: 0; flex: 0 1 auto; }
+  html body .app-shell.topnav-layout .tn-left .client-scope > label { display: none !important; }
+  html body .app-shell.topnav-layout .tn-left .client-scope-trigger { display: inline-flex !important; align-items: center; gap: 4px; max-width: 118px; height: 36px; padding: 0 10px !important; border-radius: 12px !important; font-size: 13px !important; }
+  html body .app-shell.topnav-layout .tn-left .client-scope-trigger svg { flex: none; width: 14px; height: 14px; }
+  html body .app-shell.topnav-layout .tn-left .client-scope-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  html body .app-shell.topnav-layout .tn-left .client-scope-caret { flex: none; position: static !important; margin: 0 !important; }
+  html body .app-shell.topnav-layout .tn-right { flex: none; display: flex !important; align-items: center; gap: 4px; }
+  html body .app-shell.topnav-layout .tn-right .top-actions { display: flex !important; gap: 4px; }
+  html body .app-shell.topnav-layout .tn-right .icon-button, html body .app-shell.topnav-layout .tn-right .profile-trigger { width: 34px !important; height: 34px !important; min-width: 34px; padding: 0 !important; border-radius: 10px !important; }
+  html body .app-shell.topnav-layout .tn-right :is(.install-app-button, .notes-quick-trigger, .theme-toggle) { display: none !important; }
+}
+@media (max-width: 420px) {
+  html body .app-shell.topnav-layout .tn-left .client-scope-trigger { max-width: 96px; }
+  html body .app-shell.topnav-layout .tn-right .activity-quick-trigger { display: none !important; }
+}
