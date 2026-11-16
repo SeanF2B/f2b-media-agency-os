@@ -1980,3 +1980,8 @@ html body .app-shell.dark-mode .crm-stage-pop-list button { background: #12171b;
 html body .app-shell .crm-opportunity .crm-card-actions { grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)) !important; }
 html body .app-shell .crm-opportunity .crm-card-actions > button { min-width: 0; width: 100%; justify-content: center; }
 html body .app-shell .crm-opportunity .crm-card-stage-btn { justify-content: space-between; }
+/* Lead popups sit above the mobile dock, AI bubbles and top bar */
+html body .crm-detail-backdrop { z-index: 5000 !important; }
+html body .crm-stage-pop-backdrop { z-index: 5010 !important; }
+html body .crm-lightbox { z-index: 5020 !important; }
+@media (max-width: 640px) { html body .crm-stage-pop { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); } }
