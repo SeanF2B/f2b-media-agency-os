@@ -39,6 +39,12 @@ async function api<T>(scope: string, body?: unknown, qs = ""): Promise<T> {
   return json;
 }
 
+// A reference photo attached to the booking (e.g. the tattoo design), shown on the calendar.
+function bookingPhoto(b: Booking): string {
+  const v = b.answers.find((a) => /^Photo/i.test(a.label) && /^(https:\/\/|\/media\/)/.test(a.value))?.value || "";
+  return v;
+}
+
 function Avatar({ person, size = 28 }: { person?: { name: string; avatar?: string }; size?: number }) {
   const ok = person?.avatar && /^(https:|data:image\/)/.test(person.avatar);
   return <span className="sch-avatar" style={{ width: size, height: size, fontSize: Math.round(size * 0.38) }} title={person?.name}>{ok ? <img src={person!.avatar} alt="" /> : initials(person?.name || "?")}</span>;
@@ -146,7 +152,7 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
     <header className="iv-head"><div><p className="eyebrow">SCHEDULING</p><h1>Appointments &amp; bookings</h1><p>Service calendars, consultations and staff availability, synced with Google Calendar and Apple / Outlook.</p></div>
       <div className="iv-head-actions"><label className={`task-ai-toggle dh-sample-toggle sch-sample-switch ${sample ? "is-on" : ""}`} title="Show demo appointments (nothing is saved)"><input type="checkbox" role="switch" checked={sample} onChange={(e) => setSample(e.target.checked)} /><span className="task-ai-toggle-track" aria-hidden="true"><span className="task-ai-toggle-thumb" /></span><b>Sample data</b></label>{data.canManage && <button type="button" className="secondary-button" onClick={() => setEditCal(blankCalendar(data))}><Plus size={15} /> New booking calendar</button>}<button type="button" className="primary-button" onClick={() => setNewAppt({ date: ymd(new Date()), time: "" })}><Plus size={15} /> New appointment</button></div></header>
     {error && <div className="iv-error" role="alert">{error}</div>}{note && <div className="iv-note" role="status">{note}</div>}
-    {sample && <div className="dh-sample-banner">Showing sample appointments{site.services.length ? ` built from ${sampleClientName || "the client"}’s website` : ""} — drag, open and demo freely; nothing is saved. Turn off “Sample data” for real bookings.</div>}
+    {sample && <div className="dh-sample-banner">Showing sample appointments{site.team.length ? ` with ${sampleClientName || "the client"}’s own team${site.gallery?.length || Object.keys(site.work || {}).length ? " and photos of their work" : ""}` : site.services.length ? ` built from ${sampleClientName || "the client"}’s website` : ""} — drag, open and demo freely; nothing is saved. Turn off “Sample data” for real bookings.{scopeClientId && !site.team.length && !site.services.length ? " Add the client’s website to their profile to show their real team and services." : ""}</div>}
     {!data.emailReady && <div className="iv-warn">Email isn't set up on the server, so confirmations and reminders won't send yet. Bookings still save.</div>}
 
     <AiBar scope={scopeClientId} data={data} onCalendar={(c) => setEditCal(c)} onCreateCalendar={async (c) => Boolean(await act({ action: "saveCalendar", calendar: c }, `“${c.name}” created. Copy its booking link from Booking calendars.`))} onAppointment={(a) => setNewAppt(a)} onHours={async (hours) => { for (const h of hours) { const person = data.staff.find((x) => x.id === h.staffId); await act({ action: "saveAvailability", staffId: h.staffId, weekly: h.weekly, blocked: [...new Set([...(person?.blocked || []), ...h.daysOff])], dailyLimit: h.dailyLimit || person?.dailyLimit || 0, timezone: person?.timezone || "Europe/Dublin" }); } setNote("Working hours updated."); setTab("availability"); }} />
@@ -229,7 +235,7 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
                   onDragStart={(ev) => { const r = (ev.currentTarget as HTMLElement).getBoundingClientRect(); dragRef.current = { id: b.id, grabMin: (ev.clientY - r.top) / PX_PER_MIN }; ev.dataTransfer.effectAllowed = "move"; ev.dataTransfer.setData("text/plain", b.id); (ev.currentTarget as HTMLElement).classList.add("dragging"); }}
                   onDragEnd={(ev) => { (ev.currentTarget as HTMLElement).classList.remove("dragging"); dragRef.current = null; setDropHint(null); }}
                   onClick={() => setDetail(b)} title={`${time(b.start)} ${cal?.name || ""} · ${b.name}`}>
-                  <span className="sch-block-avs">{b.staffIds.slice(0, 3).map((id) => <Avatar key={id} person={staffById.get(id) || { name: "?" }} size={20} />)}</span><b>{time(b.start)} {b.name}</b><span>{cal?.name}</span><em>{b.staffIds.map((id) => staffById.get(id)?.name.split(" ")[0]).filter(Boolean).join(", ")}</em></button>; })}
+                  <span className="sch-block-avs">{b.staffIds.slice(0, 3).map((id) => <Avatar key={id} person={staffById.get(id) || { name: "?" }} size={20} />)}</span><b>{time(b.start)} {b.name}</b><span>{cal?.name}</span><em>{b.staffIds.map((id) => staffById.get(id)?.name.split(" ")[0]).filter(Boolean).join(", ")}</em>{height >= 72 && (() => { const pic = bookingPhoto(b); return pic ? <img className="sch-block-img" src={pic} alt="" loading="lazy" draggable={false} onError={(ev) => { (ev.currentTarget as HTMLImageElement).style.display = "none"; }} /> : null; })()}</button>; })}
             </div></div>; })}
       </div>
     </div>}
@@ -883,28 +889,28 @@ export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, c
           <span className={`sch-avail-pill ${!windows.length ? "off" : !booked.length ? "free" : free ? "some" : "full"}`}>{summary}</span></div>; })}</div>
     </div> : <div className="sch-dash-week">{Array.from({ length: 7 }, (_, i) => addDays(week, i)).map((d) => { const k = ymd(d); const list = bookings.filter((b) => ymd(new Date(b.start)) === k).sort((a, b) => a.start.localeCompare(b.start)); return <div key={k} className={`sch-dash-wday${k === ymd(new Date()) ? " today" : ""}`}>
       <button type="button" className="sch-dash-wday-head" onClick={() => { setDay(d); setMode("day"); }}><small>{d.toLocaleDateString("en-IE", { weekday: "short" })}</small><b>{d.getDate()}</b>{list.length > 0 && <em>{list.length}</em>}</button>
-      <div className="sch-dash-wday-body">{list.length ? list.slice(0, 6).map((b) => { const cal = calById.get(b.calendarId); return <button type="button" key={b.id} className="sch-dash-chip" style={{ ["--c" as string]: cal?.color || "#2563eb" }} onClick={onOpen} title={`${time(b.start)} ${b.name} · ${cal?.name || ""}`}><span className="sch-chip-top"><b>{time(b.start)}</b><span className="sch-chip-avs">{b.staffIds.slice(0, 2).map((id) => <Avatar key={id} person={personOf(id)} size={20} />)}</span></span><span>{b.name}</span></button>; }) : <span className="sch-dash-free">Free</span>}{list.length > 6 && <small className="iv-small">+{list.length - 6} more</small>}</div>
+      <div className="sch-dash-wday-body">{list.length ? list.slice(0, 6).map((b) => { const cal = calById.get(b.calendarId); return <button type="button" key={b.id} className="sch-dash-chip" style={{ ["--c" as string]: cal?.color || "#2563eb" }} onClick={onOpen} title={`${time(b.start)} ${b.name} · ${cal?.name || ""}`}><span className="sch-chip-top"><b>{time(b.start)}</b><span className="sch-chip-avs">{b.staffIds.slice(0, 2).map((id) => <Avatar key={id} person={personOf(id)} size={20} />)}</span></span><span>{b.name}</span>{(() => { const pic = bookingPhoto(b); return pic ? <img className="sch-chip-img" src={pic} alt="" loading="lazy" onError={(ev) => { (ev.currentTarget as HTMLImageElement).style.display = "none"; }} /> : null; })()}</button>; }) : <span className="sch-dash-free">Free</span>}{list.length > 6 && <small className="iv-small">+{list.length - 6} more</small>}</div>
     </div>; })}</div>}
   </section>;
 }
 
 // Demo schedule for the Dashboard "Sample data" toggle (never saved). Uses the account's real team when there is one.
-type SiteSample = { services: string[]; locations: string[]; team: string[]; photos?: Record<string, string> };
-const EMPTY_SITE: SiteSample = { services: [], locations: [], team: [], photos: {} };
+type SiteSample = { services: string[]; locations: string[]; team: string[]; photos?: Record<string, string>; work?: Record<string, string[]>; gallery?: string[] };
+const EMPTY_SITE: SiteSample = { services: [], locations: [], team: [], photos: {}, work: {}, gallery: [] };
 // The client's real services, areas and team (from their profile + website) to make demo data look like their business.
 function useSiteSample(scope: string, enabled: boolean): SiteSample {
   const [site, setSite] = useState<SiteSample>(EMPTY_SITE);
   useEffect(() => {
     if (!enabled || !scope) { setSite(EMPTY_SITE); return; }
     let live = true;
-    fetch(`/api/scheduling?clientId=${encodeURIComponent(scope)}&view=site`, { credentials: "same-origin" }).then((r) => r.ok ? r.json() : EMPTY_SITE).then((v: SiteSample) => { if (live) setSite({ services: v.services || [], locations: v.locations || [], team: v.team || [], photos: v.photos || {} }); }).catch(() => undefined);
+    fetch(`/api/scheduling?clientId=${encodeURIComponent(scope)}&view=site`, { credentials: "same-origin" }).then((r) => r.ok ? r.json() : EMPTY_SITE).then((v: SiteSample) => { if (live) setSite({ services: v.services || [], locations: v.locations || [], team: v.team || [], photos: v.photos || {}, work: v.work || {}, gallery: v.gallery || [] }); }).catch(() => undefined);
     return () => { live = false; };
   }, [scope, enabled]);
   return site;
 }
 function sampleSchedule(real: Data | null, week: Date, clientName: string, site: SiteSample = EMPTY_SITE): Data {
   const fallbackStaff: Staff[] = [["s1", "Aoife Murphy", "Senior consultant"], ["s2", "Ciarán Walsh", "Technician"], ["s3", "Niamh Byrne", "Bookings"]].map(([id, name, role]) => ({ id, name, role, dailyLimit: 0, google: "", feedUrl: "", canEdit: false, weekly: { mon: [["09:00", "17:30"]], tue: [["09:00", "17:30"]], wed: [["09:00", "17:30"]], thu: [["09:00", "17:30"]], fri: [["09:00", "16:00"]] } as Partial<Record<DayKey, Window[]>>, blocked: [] }));
-  const siteStaff: Staff[] = site.team.map((name, i) => ({ ...fallbackStaff[0], id: `site-staff-${i}`, name, role: "", avatar: site.photos?.[name] || "" }));
+  const siteStaff: Staff[] = site.team.map((name, i) => ({ ...fallbackStaff[0], id: `site-staff-${i}`, name, role: /tattoo|ink/i.test(clientName) ? "Artist" : "", avatar: site.photos?.[name] || "" }));
   // The team named on the client's website wins; otherwise their account team; otherwise demo names.
   const staff = (siteStaff.length >= 2 ? siteStaff : real?.staff.length ? real.staff : siteStaff.length ? siteStaff : fallbackStaff).slice(0, 6).map((p) => ({ ...p, weekly: p.weekly && Object.keys(p.weekly).length ? p.weekly : fallbackStaff[0].weekly }));
   const trade = site.services.length >= 2 ? site.services.slice(0, 3) : /roof/i.test(clientName) ? ["Roof survey", "Repair quote", "Gutter check"] : /interior|kitchen|design/i.test(clientName) ? ["Design consultation", "Site measure", "Showroom visit"] : /ink|tattoo/i.test(clientName) ? ["Tattoo consultation", "Session", "Touch-up"] : ["Consultation", "Site visit", "Follow-up call"];
@@ -923,7 +929,10 @@ function sampleSchedule(real: Data | null, week: Date, clientName: string, site:
       const start = new Date(day); start.setHours(9 + Math.floor(rand() * 7), rand() < 0.5 ? 0 : 30, 0, 0);
       const end = new Date(start.getTime() + cal.durationMin * 60_000);
       const past = end.getTime() < now; const r = rand();
-      bookings.push({ id: `sample-${d}-${n}`, clientId: "", calendarId: cal.id, start: start.toISOString(), end: end.toISOString(), status: past ? (r < 0.08 ? "no_show" : r < 0.13 ? "cancelled" : "completed") : (r < 0.05 ? "cancelled" : "booked"), staffIds: [person.id], contactId: null, name: people[Math.floor(rand() * people.length)], email: "", phone: "", answers: site.locations.length && !/tattoo|ink|piercing/i.test(clientName) ? [{ label: "Location", value: site.locations[Math.floor(rand() * site.locations.length)] }] : [], notes: "", source: "public", channel: rand() < 0.5 ? "Google Ads" : "Google search", meetLink: "", createdBy: "", createdAt: start.toISOString() });
+      const pics = site.work?.[person.name]?.length ? site.work[person.name] : site.gallery || [];
+      const photo = pics.length ? pics[Math.floor(rand() * pics.length)] : "";
+      const where = site.locations.length && !/tattoo|ink|piercing/i.test(clientName) ? [{ label: "Location", value: site.locations[Math.floor(rand() * site.locations.length)] }] : [];
+      bookings.push({ id: `sample-${d}-${n}`, clientId: "", calendarId: cal.id, start: start.toISOString(), end: end.toISOString(), status: past ? (r < 0.08 ? "no_show" : r < 0.13 ? "cancelled" : "completed") : (r < 0.05 ? "cancelled" : "booked"), staffIds: [person.id], contactId: null, name: people[Math.floor(rand() * people.length)], email: "", phone: "", answers: [...where, ...(photo ? [{ label: /tattoo|ink|piercing/i.test(clientName + trade.join(" ")) ? "Photo of the design" : "Photo", value: photo }] : [])], notes: "", source: "public", channel: rand() < 0.5 ? "Google Ads" : "Google search", meetLink: "", createdBy: "", createdAt: start.toISOString() });
     }
   }
   return { calendars, bookings, staff, clients: real?.clients || [], scope: real?.scope ?? null, canManage: false, isAdmin: false, meId: "", googleAvailable: false, emailReady: true, publicBase: real?.publicBase || "" };

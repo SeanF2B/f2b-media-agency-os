@@ -6,6 +6,7 @@ import { getMemberPermissions } from "@/lib/access-permissions";
 import { googleSchedulingAvailable, startGoogleConnect, disconnectGoogle } from "@/lib/scheduling/google";
 import { aiConfigured, aiEndpoint, aiHeaders, aiModel, getAiProvider, resolveAiProvider, type AiProvider } from "@/lib/ai-provider";
 import { sanitizeCalendar, sanitizeWeekly } from "@/lib/scheduling/core";
+import { findGalleryHref, findTeamHref, parseGallery, parseTeam } from "@/lib/scheduling/site-sample";
 import {
   SchedulingError, availableSlots, createBooking, deleteCalendar, getBooking, getCalendar, getStaffSettings, listBookings, listCalendars,
   saveCalendar, saveStaffSettings, staffFeedToken, updateBooking, getStaffProfiles, saveStaffProfile, reviewLinkToken,
@@ -352,7 +353,7 @@ async function suggest(ctx: Ctx) {
 }
 
 // ---- Sample-data helper: read the client's website once (cached) for service names, areas and team names.
-type SiteSampleOut = { services: string[]; locations: string[]; team: string[]; photos: Record<string, string> };
+type SiteSampleOut = { services: string[]; locations: string[]; team: string[]; photos: Record<string, string>; work?: Record<string, string[]>; gallery?: string[] };
 const siteCache = new Map<string, { at: number; value: SiteSampleOut }>();
 const SERVICE_WORDS = /(repair|install|replace|clean|survey|inspect|consult|design|fit|fitting|quote|service|maintenance|roof|gutter|chimney|kitchen|bathroom|tattoo|piercing|treatment|massage|facial|cut|colour|color|lesson|session|assessment|check|removal|painting|plaster|tiling|flooring|electrical|plumbing|heating|boiler|solar|window|door|garden|landscap|fencing|driveway|extension|renovat|cosmetic|whitening|implant|physio|therapy|training|coaching|valuation|viewing|measure)/i;
 const SKIP_WORDS = /^(home|about|about us|contact|contact us|blog|news|faq|faqs|gallery|reviews|testimonials|privacy|terms|cookie|careers|login|menu|services|our services|get a quote|call now|read more|learn more|book now|see more|view all)$/i;
@@ -411,36 +412,18 @@ async function siteSampleFor(client: { id: string; name: string; email?: string;
       const href = /href="([^"]+)"/i.exec(m[0])?.[1] || "";
       if ((SERVICE_WORDS.test(t) || /\/services?\//i.test(href)) && nice(t).split(/\s+/).length <= 4 && !/\b(shop|studio|near me|birmingham|dublin|galway|london|ireland|uk)\b/i.test(t)) found.push(nice(t));
     }
-    // Team: the home page plus the site's artists / team page, names with their photos.
-    const hrefs = [...html.matchAll(/href="([^"#]+)"/gi)].map((m) => m[1]);
-    const teamHref = hrefs.find((h) => /\/(meet-the-team|our-team|the-team|team|artists?|our-artists|staff|people)(\/|$|\?)/i.test(h)) || hrefs.find((h) => /\/about(-us)?(\/|$)/i.test(h));
-    const pages = [html]; if (teamHref) { const abs = new URL(teamHref, home.url).href; if (new URL(abs).host === new URL(home.url).host) pages.push((await get(abs)).html); }
-    const NAME = /^([A-Z][A-Za-zÀ-ÿ'’.-]{1,20}( [A-Z][A-Za-zÀ-ÿ'’.-]{1,20}){0,2}|[A-Z]{2,4})$/;
-    const notName = /^(Home|About|Contact|Book|Booking|Gallery|Shop|Blog|News|Reviews?|Services?|Prices?|Pricing|Faqs?|Team|Artists?|Our Team|Our Artists|Meet|Menu|Aftercare|Piercing|Piercings|Tattoo|Tattoos|Read More|Learn More|Instagram|Facebook|Tiktok|Email|Phone|Call|Opening Hours|Location|Find Us|Privacy|Terms|Cookie|Get In Touch|Follow Us|Studio|Welcome|Testimonials|Portfolio|Styles|View|Ireland|England|Birmingham|Dublin|Galway|Cork|London|Uk|Ie|Faq)$/i;
-    const team: string[] = []; const photos: Record<string, string> = {};
-    const absImg = (src: string, page: string) => { try { return new URL(src, page).href.replace(/^http:/, "https:"); } catch { return ""; } };
-    for (const [i, page] of pages.entries()) {
-      const pageUrl = i ? new URL(teamHref!, home.url).href : home.url;
-      const scope = i ? page : (/(meet (the|our) (team|artists)|our (team|artists)|the (team|artists)|resident artists?)[\s\S]{0,12000}/i.exec(page)?.[0] || "");
-      if (!scope) continue;
-      const imgs = [...scope.matchAll(/<img\b[^>]*>/gi)].map((m) => ({ at: m.index || 0, src: /(?:data-src|data-lazy-src|src)="([^"]+)"/i.exec(m[0])?.[1] || "", alt: /alt="([^"]*)"/i.exec(m[0])?.[1] || "" })).concat([...scope.matchAll(/background-image:\s*url\((?:&quot;|["'])?([^"')&]+)(?:&quot;|["'])?\)/gi)].map((m) => ({ at: m.index || 0, src: m[1], alt: "" }))).filter((x) => x.src && !/logo|icon|svg|sprite|placeholder|empty|blank|spacer|transparent|data:image/i.test(x.src));
-      let lastAt = -9999, dupAt = -1;
-      for (const m of scope.matchAll(/<(h2|h3|h4|h5|h6|strong|figcaption)\b[^>]*>([\s\S]{1,100}?)<\/\1>/gi)) {
-        let t = text(m[2]).replace(/\s*[-–|:].*$/, "").trim(); if (!NAME.test(t) || notName.test(t) || SERVICE_WORDS.test(t)) continue;
-        // "Adriana" + "Castillo" in back-to-back headings = one person.
-        if (dupAt >= 0 && (m.index || 0) - dupAt < 1400 && !t.includes(" ") && team.some((n) => n.endsWith(` ${t}`))) { dupAt = -1; continue; } // surname of a repeated person
-        const prev = team[team.length - 1]; if (prev && !prev.includes(" ") && !t.includes(" ") && !team.some((n) => n.split(" ")[0] === t) && /^[A-Z][a-z]/.test(t) && (m.index || 0) - lastAt < 1400) { const full = `${prev} ${t}`; team[team.length - 1] = full; if (photos[prev]) { photos[full] = photos[prev]; delete photos[prev]; } lastAt = m.index || 0; continue; }
-        if (team.includes(t) || team.some((n) => n.startsWith(`${t} `) || n.endsWith(` ${t}`))) { lastAt = m.index || 0; dupAt = m.index || 0; continue; }
-        lastAt = m.index || 0;
-        const at = m.index || 0; const used = new Set(Object.values(photos)); const near = imgs.find((x) => x.alt && x.alt.toLowerCase().includes(t.toLowerCase())) || imgs.filter((x) => Math.abs(x.at - at) < 1200 && !used.has(absImg(x.src, pageUrl))).sort((a, b) => Math.abs(a.at - at) - Math.abs(b.at - at))[0];
-        void t; t = t.trim(); team.push(t); if (near) photos[t] = absImg(near.src, pageUrl);
-        if (team.length >= 6) break;
-      }
-      for (const x of imgs) { const t = text(x.alt).replace(/\s*[-–|:].*$/, "").trim(); if (team.length < 6 && NAME.test(t) && !notName.test(t) && !team.includes(t) && !SERVICE_WORDS.test(t) && /artist|team|staff|tattoo/i.test(x.src + scope.slice(Math.max(0, x.at - 300), x.at + 300))) { team.push(t); photos[t] = absImg(x.src, pageUrl); } }
-      if (team.length >= 2) break;
-    }
+    // Team: the site's artists / team page (names, portraits and photos of their work), else the home page's team section.
+    const teamUrl = findTeamHref(html, home.url);
+    let crew = { team: [] as string[], photos: {} as Record<string, string>, work: {} as Record<string, string[]> };
+    if (teamUrl) { const page = await get(teamUrl); if (page.html) crew = parseTeam(page.html, page.url); }
+    if (crew.team.length < 2) { const scope = /(meet (the|our) (team|artists)|our (team|artists)|the (team|artists)|resident artists?)[\s\S]{0,12000}/i.exec(html)?.[0] || ""; if (scope) { const homeCrew = parseTeam(scope, home.url); if (homeCrew.team.length > crew.team.length) crew = homeCrew; } }
+    const team = crew.team, photos = crew.photos;
+    // Gallery: photos of their work for the calendar (only fetched when the team page didn't already give enough).
+    let gallery = [...new Set(Object.values(crew.work).flat())];
+    if (gallery.length < 6) { const galleryUrl = findGalleryHref(html, home.url); if (galleryUrl) { const page = await get(galleryUrl); if (page.html) gallery = [...new Set([...gallery, ...parseGallery(page.html, page.url)])]; } }
+    debugInfo.teamHref = teamUrl; debugInfo.team = team; debugInfo.gallery = gallery.length;
     const areas = [...new Set([...html.matchAll(/\b(?:in|across|serving|covering)\s+((?:Co\.\s)?[A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/g)].map((m) => m[1]).filter((a) => !/^(The|Our|Your|Ireland|Business|Touch|Jewellery)$/.test(a)))];
-    value = { services: [...new Set([...base.services.map(nice), ...found])].slice(0, 6), locations: [...new Set([...base.locations, ...areas])].slice(0, 6), team: [...new Set([...base.team, ...team])].slice(0, 6), photos };
+    value = { services: [...new Set([...base.services.map(nice), ...found])].slice(0, 6), locations: [...new Set([...base.locations, ...areas])].slice(0, 6), team: [...new Set([...team, ...base.team])].slice(0, 6), photos, work: crew.work, gallery: gallery.slice(0, 30) };
   } catch { /* site unreachable: fall back to the profile */ }
   siteCache.set(site, { at: Date.now(), value });
   return value;
