@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "../../chatgpt-auth";
 import { fullTeamPermissions, getTeamPermissions, type TeamPermissions } from "@/lib/access-permissions";
 import { buildClientReport } from "@/lib/client-report-data";
-import { listBookings } from "@/lib/scheduling/server";
+import { listBookings, listCalendars } from "@/lib/scheduling/server";
 import { metaAdsConnectionExists, readDirectMetaAdsInsights } from "@/lib/meta-ads-direct";
 import { summarizeMetaAdsRows, summarizeMetaAdsTotals } from "@/lib/meta-ads-performance";
 import { getGoogleAdsCallStats } from "@/lib/google-ads-direct";
@@ -158,8 +158,10 @@ export async function GET(request: Request) {
   };
   const appointments = async () => {
     try {
-      const list = await listBookings(db as never, ownerId, scope, new Date().toISOString(), new Date(Date.now() + 21 * 86_400_000).toISOString());
-      return list.filter((b) => !/cancel/i.test(b.status)).slice(0, 8).map((b) => ({ id: b.id, name: b.name, start: b.start, clientId: b.clientId, channel: b.channel, meetLink: b.meetLink }));
+      const from = new Date(); from.setHours(0, 0, 0, 0);
+      const [list, cals] = await Promise.all([listBookings(db as never, ownerId, scope, from.toISOString(), new Date(Date.now() + 32 * 86_400_000).toISOString()), listCalendars(db as never, ownerId, scope).catch(() => [])]);
+      const staffName = new Map((workspace.staff || []).map((s) => [s.id, String((s as { name?: string }).name || "")]));
+      return list.filter((b) => !/cancel/i.test(b.status)).slice(0, 80).map((b) => ({ id: b.id, name: b.name, start: b.start, end: b.end, status: b.status, clientId: b.clientId, channel: b.channel, meetLink: b.meetLink, calendar: (cals as Array<{ id: string; name: string }>).find((c) => c.id === b.calendarId)?.name || "", staff: b.staffIds.map((id) => staffName.get(id) || "").filter(Boolean).join(", ") }));
     } catch { return []; }
   };
   const emails = async () => {

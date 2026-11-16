@@ -15,7 +15,7 @@ type Marketing = {
 };
 type Gsc = { error?: string; property?: string; clicks?: number; previousClicks?: number | null; impressions?: number; position?: number | null; previousPosition?: number | null; queriesTracked?: number; pages?: Array<{ page: string; clicks: number; impressions: number; position: number | null }>; queries?: Array<{ query: string; clicks: number; impressions: number; position: number | null }>; trending?: Array<{ query: string; impressions: number; change: number }> };
 type Split = { organic: { clicks: number | null; visits: number | null; calls: number | null; leads: number | null }; paid: { clicks: number | null; calls: number | null; callConversions: number | null; leads: number | null; conversions: number | null }; otherLeads: number | null; notes: { organic: string; paid: string } };
-type Metrics = { clientId: string; marketing: Marketing | null; appointments: Array<{ id: string; name: string; start: string; clientId: string; channel: string }>; emails: { total: number; recent: Array<{ to: string; subject: string; at: string }> } };
+type Metrics = { clientId: string; marketing: Marketing | null; appointments: Array<{ id: string; name: string; start: string; end?: string; status?: string; clientId: string; channel: string; calendar?: string; staff?: string }>; emails: { total: number; recent: Array<{ to: string; subject: string; at: string }> } };
 
 const CACHE_MS = 15 * 60_000;
 // Demo figures for the agency dashboard's "Sample data" toggle (never saved anywhere).
@@ -24,7 +24,7 @@ const SAMPLE: Metrics = {
   marketing: { currency: "EUR", visits: { value: 1840, previous: 1510, metric: "Organic sessions" }, visitsNote: "", adSpend: { value: 1364, previous: 1290 }, adClicks: { value: 742, previous: 655 }, adsNote: "", calls: { value: 38, previous: 29 }, profileClicks: { value: 126, previous: 98 }, businessNote: "", leads: { value: 47, previous: null },
     split: { organic: { clicks: 912, visits: 1840, calls: 38, leads: 21 }, paid: { clicks: 742, calls: 17, callConversions: 17, leads: 19, conversions: 71 }, otherLeads: 7, notes: { organic: "", paid: "" } },
     google: { position: 4.2, previous: 5.8, tracked: 24, top3: 9 }, rankNote: "", chatgpt: { share: 42, previous: 30, prompts: 12, mentioned: 5 }, aiNote: "", bing: null, bingNote: "Sample: Bing tracking not set up" },
-  appointments: [{ id: "s1", name: "Kitchen survey · Mary Walsh", start: new Date(Date.now() + 3 * 3600_000).toISOString(), clientId: "", channel: "On site" }, { id: "s2", name: "Roof quote · John Byrne", start: new Date(Date.now() + 26 * 3600_000).toISOString(), clientId: "", channel: "Phone" }, { id: "s3", name: "Consultation · Aoife Kelly", start: new Date(Date.now() + 50 * 3600_000).toISOString(), clientId: "", channel: "Google Meet" }],
+  appointments: [{ id: "s1", name: "Mary Walsh", calendar: "Kitchen survey", start: new Date(new Date().setHours(10, 0, 0, 0)).toISOString(), end: new Date(new Date().setHours(11, 0, 0, 0)).toISOString(), status: "confirmed", clientId: "", channel: "On site", staff: "Pat" }, { id: "s2", name: "John Byrne", calendar: "Roof quote", start: new Date(new Date().setHours(11, 30, 0, 0)).toISOString(), status: "confirmed", clientId: "", channel: "Phone", staff: "Mick" }, { id: "s3", name: "Aoife Kelly", calendar: "Consultation", start: new Date(new Date().setHours(14, 30, 0, 0)).toISOString(), status: "pending", clientId: "", channel: "Google Meet", staff: "Sean" }, { id: "s4", name: "Daniel Brooks", calendar: "Site visit", start: new Date(new Date().setHours(16, 0, 0, 0)).toISOString(), status: "confirmed", clientId: "", channel: "On site", staff: "Pat" }],
   emails: { total: 64, recent: [{ to: "Mary Walsh", subject: "Your quote from Renew Electrical", at: new Date(Date.now() - 2 * 3600_000).toISOString() }, { to: "John Byrne", subject: "Booking confirmed for Thursday", at: new Date(Date.now() - 20 * 3600_000).toISOString() }, { to: "Aoife Kelly", subject: "Invoice INV-0012", at: new Date(Date.now() - 44 * 3600_000).toISOString() }] },
 };
 const money = (n: number, currency: string) => { try { return new Intl.NumberFormat("en-IE", { style: "currency", currency, maximumFractionDigits: 0 }).format(n); } catch { return `€${Math.round(n)}`; } };
@@ -52,13 +52,15 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(false);
   const [sample, setSample] = useState(() => { try { return localStorage.getItem("f2b-dash-sample") === "1"; } catch { return false; } });
+  const [apptRange, setApptRange] = useState<"today" | "tomorrow" | "week" | "all" | "date">("today");
+  const [apptDate, setApptDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [gCamp, setGCamp] = useState("");
   const [mCamp, setMCamp] = useState("");
   useEffect(() => { setGCamp(""); setMCamp(""); }, [clientId]);
   const [showAi, setShowAi] = useState(() => { try { return localStorage.getItem("f2b-dash-ai") !== "0"; } catch { return true; } });
 
   useEffect(() => {
-    const key = `f2b-dash-metrics-v3:${clientId}:${periodStart}:${periodEnd}`;
+    const key = `f2b-dash-metrics-v4:${clientId}:${periodStart}:${periodEnd}`;
     try { const cached = JSON.parse(sessionStorage.getItem(key) || "null") as { at: number; data: Metrics } | null; if (cached && Date.now() - cached.at < CACHE_MS) { setMetrics(cached.data); return; } } catch { /* no cache */ }
     let live = true; setLoading(true);
     fetch(`/api/dashboard-metrics?clientId=${encodeURIComponent(clientId)}&start=${periodStart}&end=${periodEnd}`).then((r) => r.ok ? r.json() as Promise<Metrics> : null).then((data) => { if (!live || !data) return; setMetrics(data); try { sessionStorage.setItem(key, JSON.stringify({ at: Date.now(), data })); } catch { /* full */ } }).catch(() => undefined).finally(() => { if (live) setLoading(false); });
@@ -153,9 +155,19 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
 
     {adsPanel && <div className="dh-ads-wrap">{adsPanel}</div>}
     <div className="dh-grid">
-      {showAppts && <section className="panel dh-panel"><div className="dh-head"><div><p className="eyebrow">📅 SCHEDULED</p><h2>Appointments</h2></div><button type="button" className="text-button" onClick={() => onNavigate("Scheduling")}>Open</button></div>
-        {view?.appointments?.length ? <ul className="dh-list">{view!.appointments.map((a) => <li key={a.id}>{logo(a.clientId)}<span><b>{a.name || "Appointment"}</b><small>{when(a.start)}{a.channel ? ` · ${a.channel}` : ""}</small></span></li>)}</ul> : <p className="dh-muted">{loading ? "Loading…" : "Nothing booked in the next 3 weeks."}</p>}
-      </section>}
+      {showAppts && (() => {
+        const all = view?.appointments || [];
+        const dayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        const today = new Date(); const tomorrow = new Date(Date.now() + 86_400_000); const weekEnd = new Date(Date.now() + 7 * 86_400_000);
+        const list = all.filter((a) => { const d = new Date(a.start); return apptRange === "today" ? dayKey(d) === dayKey(today) : apptRange === "tomorrow" ? dayKey(d) === dayKey(tomorrow) : apptRange === "week" ? d <= weekEnd : apptRange === "date" ? dayKey(d) === apptDate : true; });
+        const statusOf = (a: { start: string; end?: string; status?: string }) => { const now = Date.now(), st = Date.parse(a.start), en = Date.parse(a.end || a.start) || st + 3600_000; if (/no.?show/i.test(a.status || "")) return ["No-show", "bad"]; if (/done|complete|attended/i.test(a.status || "") || en < now) return ["Done", "done"]; if (st <= now && now <= en) return ["In progress", "live"]; if (/pending|request/i.test(a.status || "")) return ["Pending", "pending"]; return ["Confirmed", "ok"]; };
+        const confirmed = list.filter((a) => statusOf(a)[0] === "Confirmed").length;
+        const label = apptRange === "today" ? "Today’s appointments" : apptRange === "tomorrow" ? "Tomorrow" : apptRange === "week" ? "Next 7 days" : apptRange === "date" ? new Date(`${apptDate}T12:00:00`).toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short" }) : "Upcoming";
+        return <section className="panel dh-panel dh-appts"><div className="dh-head"><div><p className="eyebrow">📅 SCHEDULE</p><h2>{label}</h2></div><button type="button" className="text-button" onClick={() => onNavigate("Scheduling")}>View schedule →</button></div>
+          <div className="dh-appt-filters">{(["today", "tomorrow", "week", "all"] as const).map((r) => <button type="button" key={r} className={apptRange === r ? "is-on" : ""} onClick={() => setApptRange(r)}>{r === "today" ? "Today" : r === "tomorrow" ? "Tomorrow" : r === "week" ? "7 days" : "All"}</button>)}<input type="date" aria-label="Pick a date" value={apptDate} className={apptRange === "date" ? "is-on" : ""} onChange={(e) => { setApptDate(e.target.value); setApptRange("date"); }} /></div>
+          <div className="dh-appt-stats"><span><b>{list.length}</b> booked</span><span><b>{confirmed}</b> confirmed</span><span><b>{list.filter((a) => statusOf(a)[0] === "Done").length}</b> done</span></div>
+          {list.length ? <ul className="dh-appt-list">{list.slice(0, 8).map((a) => { const [st, tone] = statusOf(a); const d = new Date(a.start); return <li key={a.id}><time>{d.toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit" })}{apptRange !== "today" && apptRange !== "tomorrow" && <small>{d.toLocaleDateString("en-IE", { day: "numeric", month: "short" })}</small>}</time><span className="dh-appt-av">{(a.name || "?").slice(0, 1).toUpperCase()}</span><span className="dh-appt-who"><b>{a.name || "Appointment"}</b><small>{[a.calendar, a.channel].filter(Boolean).join(" · ")}</small>{a.staff && <small className="dh-appt-staff">{a.staff}</small>}</span><span className={`dh-appt-status ${tone}`}>{st}</span></li>; })}</ul> : <p className="dh-muted">{loading ? "Loading…" : "Nothing booked for this day."}</p>}
+        </section>; })()}
       <section className="panel dh-panel"><div className="dh-head"><div><p className="eyebrow"><ClipboardList size={12} /> COMING UP</p><h2>Upcoming tasks</h2></div><label className={`task-ai-toggle ${showAi ? "is-on" : ""}`} title="Include tasks the AI is handling"><input type="checkbox" role="switch" checked={showAi} onChange={(e) => { setShowAi(e.target.checked); try { localStorage.setItem("f2b-dash-ai", e.target.checked ? "1" : "0"); } catch { /* ignore */ } }} /><span className="task-ai-toggle-track" aria-hidden="true"><span className="task-ai-toggle-thumb" /></span><b>AI tasks</b></label></div>
         {upcoming.length ? <ul className="dh-list">{upcoming.map((t) => <li key={t.id} onClick={() => onOpenTask?.(t.id)} className={onOpenTask ? "clickable" : ""}>{logo(t.clientId)}<span><b>{t.title}</b><small>{when(t.dueAt || t.due) || "No due date"}{bots.has(t.assigneeId) ? " · 🤖 AI" : ""}</small></span></li>)}</ul> : <p className="dh-muted">You’re all caught up.</p>}
       </section>
