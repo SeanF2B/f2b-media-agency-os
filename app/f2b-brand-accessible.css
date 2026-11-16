@@ -9482,3 +9482,81 @@ html body.f2b-dark .f2b-on-light:is(input, textarea, #f2b-white-text-override)::
 .app-shell .lead-check input:focus-visible + .lead-check-box { box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary, #2563eb) 30%, transparent); }
 .app-shell .lead-check-text { display: grid; line-height: 1.2; } .app-shell .lead-check-text b { font-size: 13px; } .app-shell .lead-check-text small { font-size: 11px; color: #667085; }
 .app-shell.dark-mode .lead-check { background: #1b2128; border-color: rgba(255,255,255,.14); } .app-shell.dark-mode .lead-check-text small { color: #94a3b8; }
+
+/* ── Books → Get ready for filing ───────────────────────────────────────────
+   Pop-ups stay solid white (also in dark mode); text dark on white; hover lifts in the secondary colour. */
+.welcome-row .filing-open-button { align-self: center; margin-left: auto; }
+.filing-backdrop { z-index: 60; }
+.filing-modal, .filing-confirm { background: #fff !important; color: #1f2a33; backdrop-filter: none; }
+.filing-modal { width: min(820px, 100%); max-height: min(92vh, 900px); }
+.filing-modal .modal-head h2, .filing-confirm h2 { color: #1f2a33; }
+.filing-close { border: 0; background: transparent; color: #5b6872; cursor: pointer; border-radius: 8px; padding: 4px; height: fit-content; transition: transform .15s, background .15s; }
+.filing-close:hover { background: color-mix(in srgb, var(--brand-secondary, #328de0) 14%, #fff); transform: translateY(-1px); }
+.filing-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 0 0 16px; }
+.filing-summary div { background: #f5f7f9; border: 1px solid #e5eaee; border-radius: 10px; padding: 9px 11px; min-width: 0; }
+.filing-summary dt { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #6b7882; margin-bottom: 4px; }
+.filing-summary dd { margin: 0; font-size: 13px; font-weight: 600; color: #1f2a33; overflow-wrap: anywhere; }
+.filing-summary dd small { font-weight: 500; color: #5b6872; }
+.filing-summary select { width: 100%; font: inherit; font-size: 12px; padding: 4px 6px; border: 1px solid #d5dde3; border-radius: 7px; background: #fff; color: #1f2a33; }
+.filing-biz { display: flex; align-items: center; gap: 7px; }
+.filing-biz img, .filing-biz i { width: 22px; height: 22px; border-radius: 6px; object-fit: contain; flex: none; }
+.filing-biz i { display: grid; place-items: center; background: #e7edf2; font-style: normal; font-size: 11px; color: #1f2a33; }
+.filing-ask { background: #f7f9fb; border: 1px solid #e5eaee; border-radius: 12px; padding: 16px; }
+.filing-ask p { margin: 0 0 14px; font-size: 14px; line-height: 1.5; color: #1f2a33; }
+.filing-choice { display: flex; flex-wrap: wrap; gap: 10px; }
+.filing-choice .primary-button, .filing-choice .secondary-button { display: inline-flex; align-items: center; gap: 7px; text-decoration: none; }
+.filing-modal button:not(:disabled), .filing-modal a, .filing-confirm button:not(:disabled), .filing-modal select, .filing-modal input { transition: transform .15s ease, box-shadow .15s ease, background-color .15s ease; }
+.filing-modal .secondary-button:hover:not(:disabled), .filing-confirm .secondary-button:hover:not(:disabled), .filing-saved button:hover, .filing-trace:hover:not(:disabled), .filing-modal select:hover, .filing-modal input:hover { transform: translateY(-1px); box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-secondary, #328de0) 35%, transparent); }
+.filing-saved { margin-top: 16px; display: grid; gap: 8px; }
+.filing-saved h3, .filing-h3 { font-size: 13px; margin: 16px 0 8px; color: #1f2a33; display: flex; align-items: center; gap: 6px; }
+.filing-saved button { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; text-align: left; background: #fff; border: 1px solid #e0e6eb; border-radius: 10px; padding: 9px 12px; cursor: pointer; color: #1f2a33; }
+.filing-saved button small { grid-column: 1; color: #5b6872; font-size: 11px; }
+.filing-saved button span { grid-row: 1 / 3; grid-column: 2; align-self: center; font-size: 12px; font-weight: 600; color: var(--brand-secondary-ink, #1d5fa0); }
+.filing-muted { color: #5b6872; font-size: 12px; line-height: 1.5; margin: 8px 0; }
+.filing-panel { border: 1px solid #e0e6eb; background: #f7f9fb; border-radius: 12px; padding: 14px; margin-top: 14px; font-size: 13px; color: #1f2a33; }
+.filing-panel p { margin: 0 0 10px; display: flex; gap: 7px; align-items: flex-start; line-height: 1.5; }
+.filing-panel ul { margin: 0 0 10px 18px; padding: 0; }
+.filing-loading { display: flex; align-items: center; gap: 10px; }
+.filing-loading .spin { animation: spin .8s linear infinite; }
+.filing-unsupported { background: #fff8ec; border-color: #f1dfbd; }
+.filing-done { background: #ecf8f0; border-color: #c7e8d2; display: flex; gap: 8px; align-items: center; }
+.filing-error { background: #fff1ed; border: 1px solid #f0d7cc; color: #8a3f2c; border-radius: 8px; padding: 8px 10px; font-size: 12px; }
+.filing-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.filing-list li { border: 1px solid #e8edf1; border-radius: 9px; padding: 8px 10px; display: grid; gap: 4px; font-size: 12px; color: #1f2a33; }
+.filing-list li.done { opacity: .6; }
+.filing-rec { display: grid; grid-template-columns: 82px 1fr auto auto; gap: 8px; align-items: baseline; font-size: 12px; }
+.filing-rec span { color: #5b6872; } .filing-rec small { color: #6b7882; } .filing-rec strong.in { color: #1d7a44; } .filing-rec strong.out { color: #a2412a; }
+.filing-why { color: #5b6872; font-size: 11px; }
+.filing-evidence { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.filing-evidence a { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: var(--brand-secondary-ink, #1d5fa0); text-decoration: none; border-radius: 6px; padding: 2px 4px; }
+.filing-evidence a:hover { background: color-mix(in srgb, var(--brand-secondary, #328de0) 12%, #fff); transform: translateY(-1px); }
+.filing-evidence a small { font-weight: 500; color: #5b6872; }
+.filing-tag { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: #eef2f5; color: #3d4a54; width: fit-content; }
+.filing-tag.missing { background: #fde9e4; color: #8a3f2c; } .filing-tag.duplicate { background: #fff1d6; color: #7a5410; } .filing-tag.unclear, .filing-tag.unmatched_receipt { background: #ece9fb; color: #4a3c8c; }
+.filing-tag.skipped { background: #fff1d6; color: #7a5410; } .filing-tag.ok { background: #e3f4ea; color: #1d6a3e; }
+.filing-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+.filing-status { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: #eef2f5; color: #1f2a33; }
+.filing-status.filed { background: #1d7a44; color: #fff; }
+.filing-figures { width: 100%; border-collapse: collapse; font-size: 13px; }
+.filing-figures th, .filing-figures td { padding: 7px 6px; border-bottom: 1px solid #edf1f4; text-align: left; color: #1f2a33; font-weight: 500; }
+.filing-figures td { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.filing-figures td small { display: block; font-size: 10px; color: #6b7882; }
+.filing-figures th small { color: #6b7882; font-size: 11px; }
+.filing-total th, .filing-total td, .filing-estimate th, .filing-estimate td { font-weight: 700; }
+.filing-estimate th, .filing-estimate td { background: #f5f7f9; }
+.filing-sub th, .filing-sub td { font-size: 12px; color: #5b6872; padding-top: 4px; padding-bottom: 4px; }
+.filing-trace { border: 0; background: transparent; padding: 2px 4px; border-radius: 6px; font: inherit; color: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; text-align: left; }
+.filing-trace:disabled { cursor: default; opacity: .8; }
+.filing-trace-body td { text-align: left; background: #fafbfc; }
+.filing-trace-row { display: grid; gap: 2px; padding: 5px 0; border-bottom: 1px dashed #e5eaee; }
+.filing-resolve { display: flex; align-items: flex-start; gap: 6px; flex-wrap: wrap; cursor: pointer; }
+.filing-ack { margin: 10px 0; }
+.filing-restart { margin-top: 10px; font-size: 12px; }
+.filing-confirm-backdrop { z-index: 70; }
+.filing-confirm { width: min(520px, 100%); }
+.filing-confirm h2 { font-size: 20px; margin: 0 0 8px; }
+.filing-confirm > p { font-size: 13px; line-height: 1.55; color: #33414b; }
+.filing-warn { background: #fff8ec; border: 1px solid #f1dfbd; border-radius: 10px; padding: 10px 12px; font-size: 12px; color: #5a3f0c; }
+.filing-warn p { display: flex; gap: 6px; align-items: center; margin: 0 0 6px; }
+.filing-warn ul { margin: 0 0 0 18px; padding: 0; }
+@media (max-width: 720px) { .filing-summary { grid-template-columns: 1fr 1fr; } .filing-rec { grid-template-columns: 1fr auto; } }

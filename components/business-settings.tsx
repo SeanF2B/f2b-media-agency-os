@@ -6,14 +6,15 @@ import { DEFAULT_BRANDING, extractLogoColours, logoFileToDataUrl, normalizeBrand
 import { TAX_COUNTRIES, taxCountry, type BusinessType, type TaxCountry, type TaxSettings } from "@/lib/tax-rules";
 
 export type BusinessSettingsValue = { currency?: string; branding?: Partial<Branding>; tax?: TaxSettings };
-type Draft = { name: string; logo: string; primary: string; secondary: string; currency: string; country: TaxCountry; defaultBusinessType: "" | BusinessType; otherPersonalRate: string; otherCompanyRate: string };
+type Draft = { name: string; logo: string; primary: string; secondary: string; currency: string; country: TaxCountry; defaultBusinessType: "" | BusinessType; otherPersonalRate: string; otherCompanyRate: string; vatRegistered: boolean; vatNumber: string; usState: string; softwareName: string; softwareUrl: string; usStateFilingUrl: string };
 
 const PRESETS = ["#3b82f6", "#6366f1", "#8b5cf6", "#ec4899", "#ef4444", "#f97316", "#eab308", "#22c55e", "#14b8a6", "#0ea5e9", "#64748b"];
+const safeUrl = (value: string) => { const text = value.trim(); if (!text) return ""; try { const url = new URL(/^https?:\/\//i.test(text) ? text : `https://${text}`); return url.protocol === "https:" ? url.href : ""; } catch { return ""; } };
 const hex = (value: string) => /^#[0-9a-fA-F]{6}$/.test(value.trim()) ? value.trim().toLowerCase() : "";
 
 function toDraft(value: BusinessSettingsValue): Draft {
   const branding = normalizeBranding(value.branding);
-  return { name: branding.name, logo: branding.logo, primary: branding.primary, secondary: branding.secondary, currency: value.currency || "EUR", country: taxCountry(value.tax), defaultBusinessType: value.tax?.defaultBusinessType || "", otherPersonalRate: String(value.tax?.otherPersonalRate ?? 20), otherCompanyRate: String(value.tax?.otherCompanyRate ?? 20) };
+  return { name: branding.name, logo: branding.logo, primary: branding.primary, secondary: branding.secondary, currency: value.currency || "EUR", country: taxCountry(value.tax), defaultBusinessType: value.tax?.defaultBusinessType || "", otherPersonalRate: String(value.tax?.otherPersonalRate ?? 20), otherCompanyRate: String(value.tax?.otherCompanyRate ?? 20), vatRegistered: Boolean(value.tax?.vatRegistered), vatNumber: value.tax?.vatNumber || "", usState: value.tax?.usState || "", softwareName: value.tax?.filingSoftware?.name || "", softwareUrl: value.tax?.filingSoftware?.url || "", usStateFilingUrl: value.tax?.usStateFilingUrl || "" };
 }
 
 export function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
@@ -41,7 +42,7 @@ export function BusinessSettings({ value, onSave, part = "all" }: { value: Busin
       await onSave({
         currency: draft.currency,
         branding: draft.name || draft.logo || draft.primary !== DEFAULT_BRANDING.primary || draft.secondary !== DEFAULT_BRANDING.secondary ? { name: draft.name.trim(), logo: draft.logo, primary: draft.primary, secondary: draft.secondary } : undefined,
-        tax: { country: draft.country, defaultBusinessType: draft.defaultBusinessType || undefined, otherPersonalRate: Math.min(80, Math.max(0, Number(draft.otherPersonalRate) || 0)), otherCompanyRate: Math.min(80, Math.max(0, Number(draft.otherCompanyRate) || 0)) },
+        tax: { country: draft.country, defaultBusinessType: draft.defaultBusinessType || undefined, otherPersonalRate: Math.min(80, Math.max(0, Number(draft.otherPersonalRate) || 0)), otherCompanyRate: Math.min(80, Math.max(0, Number(draft.otherCompanyRate) || 0)), vatRegistered: draft.country === "US" ? undefined : draft.vatRegistered || undefined, vatNumber: draft.vatRegistered && draft.vatNumber.trim() ? draft.vatNumber.trim().toUpperCase() : undefined, usState: draft.country === "US" && draft.usState.trim() ? draft.usState.trim().toUpperCase().slice(0, 2) : undefined, filingSoftware: draft.softwareName.trim() && safeUrl(draft.softwareUrl) ? { name: draft.softwareName.trim(), url: safeUrl(draft.softwareUrl) } : undefined, usStateFilingUrl: draft.country === "US" && safeUrl(draft.usStateFilingUrl) ? safeUrl(draft.usStateFilingUrl) : undefined },
       });
       setSaved(draft); setJustSaved(true); window.setTimeout(() => setJustSaved(false), 2500);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not save. Please try again."); }
@@ -70,7 +71,20 @@ export function BusinessSettings({ value, onSave, part = "all" }: { value: Busin
           <div className="bs-field"><span className="bs-label">Default company type for clients</span>
             <div className="bs-seg" role="radiogroup" aria-label="Default company type">{([["", "Ask each time"], ["sole_trader", "Sole trader"], ["company", "Company"]] as const).map(([key, label]) => <button type="button" role="radio" aria-checked={draft.defaultBusinessType === key} key={key} className={draft.defaultBusinessType === key ? "on" : ""} onClick={() => set({ defaultBusinessType: key })}>{label}</button>)}</div></div>
           {draft.country === "OTHER" && <div className="bs-two"><label className="bs-field"><span className="bs-label">Personal tax rate (%)</span><input className="bs-input" inputMode="decimal" value={draft.otherPersonalRate} onChange={(event) => set({ otherPersonalRate: event.target.value.replace(/[^0-9.]/g, "") })} /></label><label className="bs-field"><span className="bs-label">Company tax rate (%)</span><input className="bs-input" inputMode="decimal" value={draft.otherCompanyRate} onChange={(event) => set({ otherCompanyRate: event.target.value.replace(/[^0-9.]/g, "") })} /></label></div>}
-          <small className="bs-hint">Ireland uses 2026 rates, the United Kingdom 2026/27. Tax figures are estimates, not tax advice.</small></div>}
+          <small className="bs-hint">Ireland uses 2026 rates, the United Kingdom 2026/27, the United States 2026 federal. Tax figures are estimates, not tax advice.</small></div>}
+        {part !== "brand" && draft.country !== "OTHER" && <div className="bs-group"><h3>Registrations &amp; filing</h3>
+          {draft.country !== "US" ? <div className="bs-two">
+            <div className="bs-field"><span className="bs-label">VAT registered</span><div className="bs-seg" role="radiogroup" aria-label="VAT registered">{([[false, "No"], [true, "Yes"]] as const).map(([key, label]) => <button type="button" role="radio" aria-checked={draft.vatRegistered === key} key={label} className={draft.vatRegistered === key ? "on" : ""} onClick={() => set({ vatRegistered: key })}>{label}</button>)}</div></div>
+            {draft.vatRegistered && <label className="bs-field"><span className="bs-label">VAT number</span><input className="bs-input" value={draft.vatNumber} maxLength={20} placeholder={draft.country === "GB" ? "GB123456789" : "IE1234567T"} onChange={(event) => set({ vatNumber: event.target.value })} /></label>}
+          </div> : <div className="bs-two">
+            <label className="bs-field"><span className="bs-label">State (for the state return)</span><input className="bs-input" value={draft.usState} maxLength={2} placeholder="e.g. NY" onChange={(event) => set({ usState: event.target.value.replace(/[^a-z]/gi, "") })} /></label>
+            {draft.usState && <label className="bs-field"><span className="bs-label">State filing link</span><input className="bs-input" value={draft.usStateFilingUrl} placeholder="Your state's official e-file page" onChange={(event) => set({ usStateFilingUrl: event.target.value })} /></label>}
+          </div>}
+          {(draft.country === "GB" || draft.country === "US") && <div className="bs-two">
+            <label className="bs-field"><span className="bs-label">{draft.country === "GB" ? "Filing software (MTD-compatible)" : "Filing provider"}</span><input className="bs-input" value={draft.softwareName} maxLength={60} placeholder={draft.country === "GB" ? "e.g. FreeAgent, Xero, QuickBooks" : "e.g. TaxAct, FreeTaxUSA"} onChange={(event) => set({ softwareName: event.target.value })} /></label>
+            <label className="bs-field"><span className="bs-label">Sign-in link</span><input className="bs-input" value={draft.softwareUrl} placeholder="https://…" onChange={(event) => set({ softwareUrl: event.target.value })} /></label>
+          </div>}
+          <small className="bs-hint">{draft.country === "IE" ? "Irish returns open in ROS. VAT registration adds the VAT3 return." : draft.country === "GB" ? "VAT returns and Company Tax Returns go through your connected software (HMRC's own CT600 service closed on 31 March 2026). Self Assessment opens on GOV.UK." : "Federal returns open in your filing provider (or IRS Free File if none is set). Companies need a provider."}</small></div>}
       </div>
       {part !== "money" && <aside className="bs-preview" style={preview} aria-label="Live preview"><span className="bs-label">Live preview</span>
         <div className="bs-mock"><div className="bs-mock-side"><span className="bs-mock-logo">{draft.logo ? <img src={draft.logo} alt="" /> : <img src="/f2b-home-icon.png" alt="" />}</span><b>{draft.name || "Your business"}</b><i className="on" /><i /><i /></div>

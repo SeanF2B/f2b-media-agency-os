@@ -62,3 +62,31 @@ export async function recentReceipts(saved: { encrypted_refresh_token: string; t
   }));
   return rows.filter((row): row is ReceiptEmail => Boolean(row));
 }
+
+export type PeriodReceiptEmail = ReceiptEmail & { snippet: string };
+const gmailDay = (isoDay: string, shiftDays: number) => { const d = new Date(`${isoDay}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + shiftDays); return `${d.getUTCFullYear()}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${String(d.getUTCDate()).padStart(2, "0")}`; };
+
+// Receipts and supplier invoices for a filing period (a week either side, since receipts often arrive before/after the charge).
+// Includes Gmail's snippet so amounts can be read without downloading attachments.
+export async function receiptsBetween(saved: { encrypted_refresh_token: string; token_iv: string }, start: string, end: string, max = 80): Promise<PeriodReceiptEmail[]> {
+  const token = await accessToken(saved);
+  const q = `after:${gmailDay(start, -7)} before:${gmailDay(end, 8)} (has:attachment OR invoice OR receipt) (invoice OR receipt OR bill OR "payment confirmation" OR "order confirmation" OR "payment received" OR total)`;
+  const ids: string[] = []; let pageToken = "";
+  for (let page = 0; page < 4 && ids.length < max; page += 1) {
+    const list = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?${new URLSearchParams({ q, maxResults: String(Math.min(50, max - ids.length)), ...(pageToken ? { pageToken } : {}) })}`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(12000) });
+    const body = await list.json() as { messages?: Array<{ id: string }>; nextPageToken?: string; error?: { message?: string } };
+    if (!list.ok) throw new Error(body.error?.message || "Gmail couldn't be read.");
+    ids.push(...(body.messages || []).map((m) => m.id));
+    if (!body.nextPageToken) break; pageToken = body.nextPageToken;
+  }
+  const rows: Array<PeriodReceiptEmail | null> = [];
+  for (let i = 0; i < ids.length; i += 10) rows.push(...await Promise.all(ids.slice(i, i + 10).map(async (id) => {
+    const r = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full&fields=id,internalDate,snippet,payload(headers,parts(filename,parts(filename)))`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(12000) });
+    if (!r.ok) return null;
+    const m = await r.json() as { id: string; internalDate?: string; snippet?: string; payload?: { headers?: Array<{ name: string; value: string }>; parts?: Array<{ filename?: string; parts?: Array<{ filename?: string }> }> } };
+    const header = (name: string) => m.payload?.headers?.find((h) => h.name.toLowerCase() === name)?.value || "";
+    const files = (m.payload?.parts || []).flatMap((part) => [part.filename || "", ...(part.parts || []).map((inner) => inner.filename || "")]).filter(Boolean);
+    return { id: m.id, from: header("from").replace(/<.*>/, "").replace(/"/g, "").trim() || header("from"), subject: header("subject"), date: m.internalDate ? new Date(Number(m.internalDate)).toISOString().slice(0, 10) : "", attachments: files, snippet: String(m.snippet || "").slice(0, 400) };
+  })));
+  return rows.filter((row): row is PeriodReceiptEmail => Boolean(row));
+}
