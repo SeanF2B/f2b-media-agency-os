@@ -13,6 +13,20 @@ export function AiVisibilityPanel({ clientId, clientName, area, services }: { cl
     return base.flatMap((topic) => [`Who is the best ${topic.toLowerCase()} company in ${area}?`, `Can you recommend a ${topic.toLowerCase()} near ${area}?`]).slice(0, 3).join("\n");
   }, [services, area]);
   const [prompts, setPrompts] = useState(suggestions);
+  const [drafting, setDrafting] = useState(false);
+  const generic = !services.some((item) => !/ads|seo|crm|marketing|web design|sites|automation|audit|research|setup/i.test(item));
+  // Fill the questions from the selected client automatically: when the services saved don't say what the
+  // business does, AI writes them from the client's details (name, website, industry, areas).
+  const draftQuestions = async (mode: "suggest" | "polish" = "suggest") => {
+    setDrafting(true);
+    try {
+      const response = await fetch("/api/ai-assist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId, clientName, page: "AI visibility", field: "Questions real customers would ask ChatGPT or Claude when looking for a business like this one (one per line, max 5, natural phrasing, include the town/area)", list: true, mode, current: mode === "polish" ? prompts : "", context: [{ label: "Location", value: location }] }) });
+      const json = await response.json().catch(() => ({})) as { text?: string };
+      const lines = String(json.text || "").split("\n").map((line) => line.replace(/^[-*•\d.)\s]+/, "").trim()).filter(Boolean).slice(0, 5);
+      if (response.ok && lines.length) setPrompts(lines.join("\n"));
+    } catch { /* keep the current questions */ } finally { setDrafting(false); }
+  };
+  useEffect(() => { setPrompts(suggestions); setLocation(area); if (generic) void draftQuestions(); }, [clientId]); // eslint-disable-line react-hooks/exhaustive-deps
   const [competitors, setCompetitors] = useState("");
   const [location, setLocation] = useState(area);
   const [webSearch, setWebSearch] = useState(true);
@@ -41,7 +55,7 @@ export function AiVisibilityPanel({ clientId, clientName, area, services }: { cl
 
   return <div className="aiv">
     <div className="aiv-form">
-      <label className="aiv-wide"><span>Questions customers might ask (one per line, max 5)</span><textarea rows={3} value={prompts} onChange={(event) => setPrompts(event.target.value)} /></label>
+      <label className="aiv-wide"><span>Questions customers might ask (one per line, max 5) <button type="button" className="text-button aiv-ai" disabled={drafting} onClick={(event) => { event.preventDefault(); void draftQuestions(prompts.trim() ? "polish" : "suggest"); }}>{drafting ? "✨ Writing…" : prompts.trim() ? "✨ AI polish" : "✨ AI suggest"}</button></span><textarea rows={3} value={prompts} onChange={(event) => setPrompts(event.target.value)} /></label>
       <label><span>Competitors to watch (comma-separated)</span><input value={competitors} onChange={(event) => setCompetitors(event.target.value)} placeholder="Name or website" /></label>
       <label><span>Location</span><input value={location} onChange={(event) => setLocation(event.target.value)} /></label>
       <label className="aiv-check"><input type="checkbox" checked={webSearch} onChange={(event) => setWebSearch(event.target.checked)} /> Let the AI search the web (closer to how people use it)</label>

@@ -420,6 +420,13 @@ export async function GET(request: Request) {
     const rows = await env.DB.prepare("SELECT client_id, backend, preview_url, repo, branch, updated_at FROM site_content_sites").all<{ client_id: string; backend: string; preview_url: string; repo: string; branch: string; updated_at: string }>().catch(() => ({ results: [] as Array<{ client_id: string; backend: string; preview_url: string; repo: string; branch: string; updated_at: string }> }));
     return Response.json({ sites: (rows.results || []).map((row) => ({ clientId: row.client_id, backend: row.backend, previewUrl: row.preview_url, repo: row.repo, branch: row.branch, updatedAt: row.updated_at })) }, { headers: { "Cache-Control": "no-store" } });
   }
+  if (params.get("templates") === "1") {
+    // Operations → Websites → Templates: every site built in the website builder can be reused as a template.
+    const rows = await env.DB.prepare("SELECT f.client_id AS client_id, COUNT(*) AS pages, MAX(f.updated_at) AS updated_at FROM site_content_files f WHERE f.path LIKE 'src/content/builder/%.json' AND f.path <> 'src/content/builder/_config.json' GROUP BY f.client_id").all<{ client_id: string; pages: number; updated_at: string }>().catch(() => ({ results: [] as Array<{ client_id: string; pages: number; updated_at: string }> }));
+    const sites = await env.DB.prepare("SELECT client_id, preview_url FROM site_content_sites").all<{ client_id: string; preview_url: string }>().catch(() => ({ results: [] as Array<{ client_id: string; preview_url: string }> }));
+    const preview = new Map((sites.results || []).map((row) => [row.client_id, row.preview_url]));
+    return Response.json({ templates: (rows.results || []).map((row) => ({ clientId: row.client_id, pages: Number(row.pages) || 0, updatedAt: row.updated_at || "", previewUrl: preview.get(row.client_id) || "" })) }, { headers: { "Cache-Control": "no-store" } });
+  }
   const client = access.data.clients?.find((item: Client) => item.id === params.get("clientId"));
   if (!client) return respond("Choose a client in this workspace.", 404);
   if (!client.wordpressSiteUrl) return respond("Add the WordPress website URL in this client’s profile first.", 422);

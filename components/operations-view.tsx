@@ -24,6 +24,29 @@ type OpsClient = {
 };
 type OpsTask = { id: string; clientId: string; title?: string; status: string; due?: string; dueAt?: string; repeat?: string; paused?: boolean; aiRunAt?: string; completedAt?: string; aiDismissedAt?: string; aiApprovals?: Array<{ status?: string }>; aiRunState?: string };
 
+// Websites → Templates: every site built in the website builder can be reused as a template for another
+// client (the builder offers it when a client's site has no pages yet).
+function SiteTemplatesPanel({ clients, onEdit }: { clients: OpsClient[]; onEdit: (client: OpsClient) => void }) {
+  const [rows, setRows] = useState<Array<{ clientId: string; pages: number; updatedAt: string; previewUrl: string }> | null>(null);
+  const [useFor, setUseFor] = useState<Record<string, string>>({});
+  useEffect(() => { void fetch("/api/sites?templates=1", { cache: "no-store" }).then((r) => r.json()).then((j: { templates?: never[] }) => setRows(j.templates || [])).catch(() => setRows([])); }, []);
+  const byId = (id: string) => clients.find((c) => c.id === id);
+  const empties = clients.filter((c) => !/^agency$/i.test(c.name.trim()) && c.status !== "Inactive" && c.status !== "Archived");
+  if (rows === null) return <div className="page-loading" role="status" aria-label="Loading templates…"><i /></div>;
+  return <div className="ops-templates">
+    <p className="ops-more">Any site you build becomes a template. Edit one to change the template; to use it, pick a client and open their builder (a client with no pages yet gets “Use the … template”).</p>
+    {!rows.length ? <p className="ops-empty">No builder sites yet. Open a client in Sites &amp; domains → Edit website to build the first one.</p>
+      : <div className="ops-template-grid">{rows.map((row) => { const client = byId(row.clientId); if (!client) return null; return <article key={row.clientId} className="ops-template-card">
+        <header><span className="ops-client">{client.logo ? <img src={client.logo} alt="" /> : <i style={{ background: client.color || "#d9dee3" }} />}<b>{client.name} template</b></span><small>{row.pages} page{row.pages === 1 ? "" : "s"}{row.updatedAt ? ` · edited ${new Date(row.updatedAt).toLocaleDateString("en-IE", { day: "numeric", month: "short" })}` : ""}</small></header>
+        <div className="ops-template-actions">
+          <button type="button" className="secondary-button" onClick={() => onEdit(client)}>Edit template</button>
+          {row.previewUrl && <a className="secondary-button" href={row.previewUrl} target="_blank" rel="noreferrer">Preview</a>}
+          <select aria-label={`Use the ${client.name} template for a client`} value={useFor[row.clientId] || ""} onChange={(event) => setUseFor((cur) => ({ ...cur, [row.clientId]: event.target.value }))}><option value="">Use for…</option>{empties.filter((c) => c.id !== client.id).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+          {useFor[row.clientId] && <button type="button" className="primary-button" onClick={() => { const target = byId(useFor[row.clientId]); if (target) onEdit(target); }}>Open builder</button>}
+        </div>
+      </article>; })}</div>}
+  </div>;
+}
 type SiteRow = { clientId: string; backend: string; previewUrl: string; repo: string; branch: string; updatedAt: string };
 // Where everything lives: Overview (performance, priorities, issues) · Google Ads (campaigns, optimisation,
 // conversions) · SEO & AI (SEO, AEO/GEO, keyword research, Business Profile, backlinks, AI visibility) ·
@@ -31,7 +54,7 @@ type SiteRow = { clientId: string; backend: string; previewUrl: string; repo: st
 const OPS_TABS: Array<[OperationsTab, string, LucideIcon]> = [["clients", "Clients", Briefcase], ["ads", "Google Ads", Megaphone], ["seo", "SEO & AI", Search], ["websites", "Websites", Globe], ["email", "Email", Mail], ["reports", "Reports", FileText]];
 export type OperationsTab = "overview" | "clients" | "ads" | "seo" | "websites" | "email" | "reports" | "onboarding";
 type SeoMode = "keywords" | "competitors" | "ranks" | "audit" | "backlinks" | "local" | "ai";
-type SiteMode = "sites" | "forms" | "media";
+type SiteMode = "sites" | "landing" | "forms" | "surveys" | "submissions" | "templates" | "media" | "settings";
 /** Older links/state used more tabs; map them onto the current areas (+ the sub-view they opened). */
 export function normalizeOpsTab(value: string): { tab: OperationsTab; sub?: string } {
   const legacy: Record<string, { tab: OperationsTab; sub?: string }> = { keywords: { tab: "seo", sub: "keywords" }, local: { tab: "seo", sub: "local" }, ai: { tab: "seo", sub: "ai" }, backlinks: { tab: "seo", sub: "backlinks" }, audits: { tab: "reports", sub: "audits" }, media: { tab: "websites", sub: "media" }, forms: { tab: "websites", sub: "forms" }, automations: { tab: "email", sub: "automations" }, "system-emails": { tab: "email", sub: "system" }, emails: { tab: "email" }, leadfactory: { tab: "overview" } };
@@ -70,7 +93,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
   onOpenPage: (page: string, clientId?: string) => void; onOpenWebsite: (client: OpsClient) => void; onOpenDns: () => void;
   onStartOnboarding?: (clientId: string) => void; onboarding?: React.ReactNode; automations?: React.ReactNode; hasLeadFactory?: boolean;
   onCreateGbpTask?: (clientId: string) => string; onCreateCommunityTask?: (clientId: string, results: CommunityResult[]) => string;
-  renderTool?: (tool: "keywords" | "seo-keywords" | "seo-competitors" | "seo-backlinks" | "seo-audit" | "audits" | "reports" | "media" | "ads", clientId: string) => React.ReactNode;
+  renderTool?: (tool: "keywords" | "seo-keywords" | "seo-competitors" | "seo-backlinks" | "seo-audit" | "audits" | "reports" | "media" | "ads" | "site-settings" | "landing" | "surveys" | "submissions", clientId: string) => React.ReactNode;
 }) {
   const [toolClientId, setToolClientIdState] = useState(() => { try { return window.localStorage.getItem("f2b-ops-client") || ""; } catch { return ""; } });
   useFocusClient((id) => { if (id) setToolClientIdState(id); });
@@ -168,7 +191,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
       </article>; })}</div>{!rows.length && <p className="ops-empty">No clients match.</p>}</>}
     </>}
 
-    {tab === "websites" && <div className="ops-subbar">{seg(siteMode, setSiteMode, [["sites", "Sites & domains"], ["forms", "Forms"], ["media", "Media library"]], "Websites sections")}</div>}
+    {tab === "websites" && <div className="ops-subbar">{seg(siteMode === "settings" ? "sites" : siteMode, setSiteMode, [["sites", "Sites & domains"], ["landing", "Landing pages"], ["forms", "Forms"], ["surveys", "Surveys"], ["submissions", "Submissions"], ["templates", "Templates"], ["media", "Media library"]], "Websites sections")}</div>}
     {tab === "websites" && siteMode === "sites" && <>
       <div className="ops-toolbar"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search clients…" aria-label="Search clients" /><button type="button" className="secondary-button" onClick={onOpenDns}>Domains & DNS</button></div>
       {siteError && <p className="ops-empty" role="alert">{siteError}</p>}
@@ -179,7 +202,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
           <td>{domain ? <a href={`https://${domain}`} target="_blank" rel="noreferrer">{domain}</a> : <span className="muted">No domain</span>}{site?.previewUrl && <small><a href={site.previewUrl} target="_blank" rel="noreferrer">Preview</a></small>}</td>
           <td>{sites === null ? <span className="muted">Loading…</span> : site ? (site.backend === "github" ? <span title={`${site.repo}${site.branch ? ` · ${site.branch}` : ""}`}>Astro · GitHub</span> : "Agency OS") : client.wordpressSiteUrl ? "WordPress" : <span className="muted">Not set up</span>}</td>
           <td>{site?.updatedAt ? new Date(site.updatedAt).toLocaleDateString("en-IE", { day: "numeric", month: "short" }) : "—"}</td>
-          <td className="ops-actions">{!site && client.wordpressSiteUrl ? <a className="secondary-button" href={wpAdminUrl(client.wordpressSiteUrl)} target="_blank" rel="noreferrer" title="Opens the WordPress editor in a new tab">Edit website</a> : <button type="button" className="secondary-button" onClick={() => onOpenWebsite(client)}>Edit website</button>}<button type="button" className="ops-icon-button" onClick={() => onOpenPage("Sites", client.id)} aria-label={`Site settings for ${client.name}`} title="Site settings"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg></button></td>
+          <td className="ops-actions">{!site && client.wordpressSiteUrl ? <a className="secondary-button" href={wpAdminUrl(client.wordpressSiteUrl)} target="_blank" rel="noreferrer" title="Opens the WordPress editor in a new tab">Edit website</a> : <button type="button" className="secondary-button" onClick={() => onOpenWebsite(client)}>Edit website</button>}<button type="button" className="ops-icon-button" onClick={() => { setToolClientId(client.id); setSiteMode("settings"); }} aria-label={`Site settings for ${client.name}`} title="Site settings"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg></button></td>
         </tr>; })}</tbody>
       </table></div>
     </>}
@@ -202,6 +225,10 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
       <div className="ops-embed" key={`ai-${selected.id}`}><AiVisibilityPanel clientId={selected.id} clientName={selected.name} area={seoLocation} services={(selected.services || []).map((service) => service.name).concat((selected as OpsClient & { seoServices?: string[] }).seoServices || [])} /></div>
     </>}
     {tab === "websites" && siteMode === "media" && renderTool && <div className="ops-embed">{renderTool("media", "")}</div>}
+    {tab === "websites" && renderTool && selected && (siteMode === "settings" || siteMode === "landing") && <>{siteMode === "settings" && <button type="button" className="text-button ops-back" onClick={() => setSiteMode("sites")}>← All websites</button>}<div className="ops-embed" key={`site-${siteMode}`}>{renderTool(siteMode === "landing" ? "landing" : "site-settings", selected.id)}</div></>}
+    {tab === "websites" && renderTool && siteMode === "surveys" && <div className="ops-embed">{renderTool("surveys", "")}</div>}
+    {tab === "websites" && renderTool && siteMode === "submissions" && <div className="ops-embed">{renderTool("submissions", "")}</div>}
+    {tab === "websites" && siteMode === "templates" && <SiteTemplatesPanel clients={clients} onEdit={(client) => onOpenWebsite(client)} />}
     {!selected && ["seo", "ads", "reports", "email"].includes(tab) && <p className="ops-empty">No active clients.</p>}
 
     {tab === "seo" && seoMode === "local" && <>

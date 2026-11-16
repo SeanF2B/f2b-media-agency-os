@@ -2139,7 +2139,10 @@ html body .app-shell .client-list .client-list-card { will-change: transform; tr
 html body .app-shell .client-list .client-list-card.no-match { opacity: .38; }
 
 /* ===== Tighter CRM: less wasted space on every page (final say) ===== */
-html body .app-shell .main-area .page-heading { margin-bottom: 12px !important; gap: 12px !important; align-items: center !important; }
+html body .app-shell .main-area .page-heading { margin-bottom: 12px !important; gap: 12px !important; }
+/* Headings always sit on the left (stacked headings like Operations were being centred) */
+html body .app-shell .main-area .page-heading { text-align: left !important; }
+html body .app-shell .main-area .ops-heading { align-items: flex-start !important; justify-content: flex-start !important; }
 html body .app-shell .main-area .page-heading h1 { font-size: clamp(24px, 2.2vw, 30px) !important; line-height: 1.1 !important; margin: 0 !important; }
 html body .app-shell .main-area .page-heading .eyebrow { margin: 0 0 3px !important; font-size: 10px !important; }
 html body .app-shell .main-area .page-heading p.muted { margin: 3px 0 0 !important; font-size: 13px !important; line-height: 1.35 !important; max-width: 70ch; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -2278,3 +2281,12 @@ html body .app-shell .ops-local-more[open] > summary { margin-bottom: 10px; }
 .dark-mode .sp, .dark-mode .sp-editor { background: #1b2227; color: #e7edf1; border-color: #2f3a41; } .dark-mode .sp-day { background: #161d22; border-color: #2a343b; } .dark-mode .sp-col input, .dark-mode .sp-col textarea { background: #11171b; color: #e7edf1; border-color: #3c4850; }
 @media (max-width: 760px) { .sp-grid { grid-template-columns: repeat(7, minmax(40px, 1fr)); overflow-x: auto; } .sp-day { min-height: 70px; } .sp-post small, .sp-post em { display: none; } .sp-editor-body { grid-template-columns: 1fr; } .sp-backdrop { padding: 0; align-items: flex-end; } .sp-editor { border-radius: 18px 18px 0 0; max-height: 96vh; } }
 /* redeploy 1794807215 */
+
+/* Operations → Websites → Templates */
+html body .app-shell .ops-template-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+html body .app-shell .ops-template-card { border: 1px solid var(--f2b-border, #d9dee3); border-radius: 14px; background: var(--f2b-white, #fff); padding: 12px 14px; display: grid; gap: 10px; }
+html body .app-shell.dark-mode .ops-template-card { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.14); }
+html body .app-shell .ops-template-card header { display: grid; gap: 4px; }
+html body .app-shell .ops-template-card small { opacity: .7; font-size: 12px; }
+html body .app-shell .ops-template-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+html body .app-shell .ops-template-actions select { padding: 6px 8px; border-radius: 9px; border: 1px solid var(--f2b-border, #d9dee3); font: inherit; font-size: 13px; background: transparent; color: inherit; }
