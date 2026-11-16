@@ -1543,3 +1543,25 @@ html body .app-shell .google-ads-view-heading.is-embedded .google-ads-view-contr
 html body .app-shell .google-ads-view-heading.is-embedded .google-ads-view-controls label { display: inline-flex !important; align-items: center; gap: 8px; flex-direction: row !important; }
 html body .app-shell .google-ads-view-heading.is-embedded .google-ads-view-controls label > span { white-space: nowrap; }
 html body .app-shell .google-ads-view-heading.is-embedded select { height: 34px; min-width: 170px; }
+/* Scheduling filters: one clean box (no select-inside-box double border) */
+html body .app-shell .sch-select { display: inline-flex !important; align-items: center; gap: 8px; height: 38px; padding: 0 10px !important; border-radius: 12px !important; border: 1px solid rgba(127,138,160,.35) !important; background: rgba(127,138,160,.06) !important; box-shadow: none !important; }
+html body .app-shell .sch-select select { border: 0 !important; background: transparent !important; box-shadow: none !important; outline: none !important; height: 34px !important; padding: 0 22px 0 0 !important; font-weight: 600; font-size: 13.5px; min-width: 120px; }
+/* Focus-client chip in top bar: readable logo */
+html body .app-shell .client-focus .client-scope-trigger.is-focused { gap: 8px; padding-left: 6px !important; }
+html body .app-shell .client-focus .client-dot.has-logo { width: 26px !important; height: 26px !important; border-radius: 8px !important; background: #fff !important; border: 1px solid rgba(127,138,160,.25); display: inline-grid; place-items: center; overflow: hidden; }
+html body .app-shell .client-focus .client-dot.has-logo img { width: 100% !important; height: 100% !important; object-fit: contain; }
+/* Desktop top bar: never overflow off-screen */
+@media (min-width: 861px) {
+  html body .app-shell.topnav-layout .tn-bar { gap: 12px; }
+  html body .app-shell.topnav-layout .tn-right { min-width: 0; flex-shrink: 1; display: flex; align-items: center; gap: 6px; }
+  html body .app-shell.topnav-layout .tn-right .top-actions { flex-wrap: nowrap; min-width: 0; }
+  html body .app-shell .tn-date select { max-width: 130px; }
+}
+/* Chevrons: no scrollbar line, full height */
+html body .app-shell .dh-chevrons::-webkit-scrollbar { display: none; }
+html body .app-shell .dh-chevron { min-height: 64px; align-content: center; }
+html body .app-shell .dh-chevron:only-child { clip-path: none; border-radius: 12px; padding: 10px 16px; }
+/* Leads by source: landing pages */
+html body .app-shell .src-label { display: grid; min-width: 0; position: relative; z-index: 1; }
+html body .app-shell .src-pages { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+html body .app-shell .src-pages small { font-size: 11px; font-weight: 500; padding: 1px 7px; border-radius: 999px; background: rgba(127,138,160,.12); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

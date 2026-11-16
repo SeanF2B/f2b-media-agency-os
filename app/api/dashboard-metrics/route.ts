@@ -102,7 +102,7 @@ export async function GET(request: Request) {
     const period = { start: clampStart, end: reqEnd };
     if (allClients) {
       // Agency view: Google Ads totals across every client with a linked account.
-      const linked = (workspace.clients || []).filter((c) => c.googleAdsAccountId);
+      const linked = (workspace.clients || []).filter((c) => c.googleAdsAccountId && !/^(inactive|archived)$/i.test(String((c as { status?: string }).status || "")));
       const reports = await Promise.all(linked.map((c) => buildClientReport(db as never, workspace as never, c.id, "ads", period).catch(() => null)));
       const zero = (): Totals => ({ spend: 0, clicks: 0, impressions: 0, conversions: 0 });
       const now = zero(), before = zero(); let withData = 0, withPrev = 0, leads = 0, currency = "EUR";
