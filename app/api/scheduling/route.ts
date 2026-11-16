@@ -424,12 +424,13 @@ async function siteSampleFor(client: { id: string; name: string; email?: string;
       const scope = i ? page : (/(meet (the|our) (team|artists)|our (team|artists)|the (team|artists)|resident artists?)[\s\S]{0,12000}/i.exec(page)?.[0] || "");
       if (!scope) continue;
       const imgs = [...scope.matchAll(/<img\b[^>]*>/gi)].map((m) => ({ at: m.index || 0, src: /(?:data-src|data-lazy-src|src)="([^"]+)"/i.exec(m[0])?.[1] || "", alt: /alt="([^"]*)"/i.exec(m[0])?.[1] || "" })).concat([...scope.matchAll(/background-image:\s*url\((?:&quot;|["'])?([^"')&]+)(?:&quot;|["'])?\)/gi)].map((m) => ({ at: m.index || 0, src: m[1], alt: "" }))).filter((x) => x.src && !/logo|icon|svg|sprite|placeholder|empty|blank|spacer|transparent|data:image/i.test(x.src));
-      let lastAt = -9999;
+      let lastAt = -9999, dupAt = -1;
       for (const m of scope.matchAll(/<(h2|h3|h4|h5|h6|strong|figcaption)\b[^>]*>([\s\S]{1,100}?)<\/\1>/gi)) {
         let t = text(m[2]).replace(/\s*[-–|:].*$/, "").trim(); if (!NAME.test(t) || notName.test(t) || SERVICE_WORDS.test(t)) continue;
         // "Adriana" + "Castillo" in back-to-back headings = one person.
+        if (dupAt >= 0 && (m.index || 0) - dupAt < 1400 && !t.includes(" ") && team.some((n) => n.endsWith(` ${t}`))) { dupAt = -1; continue; } // surname of a repeated person
         const prev = team[team.length - 1]; if (prev && !prev.includes(" ") && !t.includes(" ") && !team.some((n) => n.split(" ")[0] === t) && /^[A-Z][a-z]/.test(t) && (m.index || 0) - lastAt < 1400) { const full = `${prev} ${t}`; team[team.length - 1] = full; if (photos[prev]) { photos[full] = photos[prev]; delete photos[prev]; } lastAt = m.index || 0; continue; }
-        if (team.includes(t) || team.some((n) => n.startsWith(`${t} `) || n.endsWith(` ${t}`))) { lastAt = m.index || 0; continue; }
+        if (team.includes(t) || team.some((n) => n.startsWith(`${t} `) || n.endsWith(` ${t}`))) { lastAt = m.index || 0; dupAt = m.index || 0; continue; }
         lastAt = m.index || 0;
         const at = m.index || 0; const used = new Set(Object.values(photos)); const near = imgs.find((x) => x.alt && x.alt.toLowerCase().includes(t.toLowerCase())) || imgs.filter((x) => Math.abs(x.at - at) < 1200 && !used.has(absImg(x.src, pageUrl))).sort((a, b) => Math.abs(a.at - at) - Math.abs(b.at - at))[0];
         void t; t = t.trim(); team.push(t); if (near) photos[t] = absImg(near.src, pageUrl);
