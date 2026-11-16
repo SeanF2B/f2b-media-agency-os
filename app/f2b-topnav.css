@@ -1141,3 +1141,16 @@ body.f2b-dark .app-shell .ad-report-stats > div.ad-stat-expense { background: #2
 body.f2b-dark .app-shell .ad-report-stats > div.ad-stat-good { background: #15291e !important; }
 body.f2b-dark :is(.app-shell .ad-report-stats > div.ad-stat-expense b, #f2b-ad-x) { color: #ff9b94 !important; -webkit-text-fill-color: #ff9b94 !important; }
 body.f2b-dark :is(.app-shell .ad-report-stats > div.ad-stat-good b, #f2b-ad-x) { color: #6fdc9b !important; -webkit-text-fill-color: #6fdc9b !important; }
+/* Lead Factory: compact Find businesses card */
+html body .app-shell .lead-find-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin-top: 10px; }
+html body .app-shell .lead-find-field { display: grid; gap: 4px; font-size: 12px; font-weight: 600; }
+html body .app-shell .lead-find-field select { min-width: 190px; }
+html body .app-shell .lead-find-chip { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,.35); cursor: pointer; font-size: 13px; font-weight: 600; user-select: none; }
+html body .app-shell .lead-find-chip input { position: absolute; opacity: 0; pointer-events: none; }
+html body .app-shell .lead-find-chip.is-on { background: rgba(255,255,255,.95); color: #0b5c87; -webkit-text-fill-color: #0b5c87; border-color: transparent; }
+html body .app-shell .lead-find-spacer { flex: 1; }
+html body .app-shell .lead-find-import { cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+html body .app-shell .lead-find-help { margin-top: 10px; font-size: 12.5px; opacity: .9; }
+html body .app-shell .lead-find-help summary { cursor: pointer; font-weight: 600; width: fit-content; }
+html body .app-shell .lead-find-help p { margin: 6px 0 0; max-width: 760px; }
+@media (max-width: 700px) { html body .app-shell .lead-find-spacer { display: none; } html body .app-shell .lead-find-row > * { flex: 1 1 auto; } }
