@@ -1702,3 +1702,6 @@ html body .app-shell .tt-mobile-status { display: none; }
   html body .app-shell .tt-mobile-status { display: inline-block; margin-top: 6px; height: 28px; border: 0; border-radius: 999px; color: #fff; font-weight: 700; font-size: 12px; padding: 0 10px; }
   html body .app-shell .tt-table td:nth-child(2) { display: table-cell !important; }
 }
+/* Dashboard: remove duplicates of the new sections (tasks list, team list) */
+html body .app-shell .dh ~ * .panel.task-panel, html body .app-shell .dh ~ .panel.task-panel { display: none !important; }
+html body .app-shell .dh ~ .agency-directory-panel .directory-team-section, html body .app-shell .dh ~ * .directory-team-section { display: none !important; }
