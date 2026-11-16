@@ -2363,3 +2363,10 @@ html body .app-shell .dh-action small { font-size: 11px !important; white-space:
 @media (max-width: 700px) { html body .app-shell .dh-actions { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; grid-auto-flow: row; } html body .app-shell .dh-action small { display: none !important; } }
 html body .app-shell .dh-approvals { gap: 8px !important; } html body .app-shell .dh-approval { padding: 10px 12px !important; }
 @media (max-width: 760px) { html body .app-shell .ops-client-strip { gap: 6px 10px; } html body .app-shell .ops-strip-chips { margin-left: 0; width: 100%; } html body .app-shell .ops-strip-chips span { font-size: 11px; } }
+/* Selects inside rounded wrappers: no native grey box — draw our own chevron */
+html body .app-shell label:has(> svg) > select, html body .app-shell .sch-select > select {
+  -webkit-appearance: none !important; appearance: none !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23667085' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important; background-position: right 2px center !important; background-size: 12px !important; padding-right: 20px !important; cursor: pointer;
+}
+html body .app-shell.dark-mode label:has(> svg) > select, html body .app-shell.dark-mode .sch-select > select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23b6c2cc' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important; }

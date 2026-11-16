@@ -1028,7 +1028,7 @@ export function QuickBook({ scopeClientId, prefill, onClose, onBooked }: { scope
 // Staff hours & earnings from appointments: pick a period (day / week / month / custom dates) and a person.
 // Earnings use each person's pay setting (hourly rate or % commission of the appointment price).
 function StaffHoursPanel({ data: base, scopeClientId, sample }: { data: Data; scopeClientId: string; sample: boolean }) {
-  const [period, setPeriod] = useState<"day" | "week" | "month" | "custom">(() => { try { const v = localStorage.getItem("f2b-staff-hours-period"); return v === "day" || v === "month" || v === "custom" ? v : "week"; } catch { return "week"; } });
+  const [period, setPeriod] = useState<"day" | "week" | "month" | "custom">(() => { try { const v = localStorage.getItem("f2b-staff-hours-period2"); return v === "day" || v === "week" || v === "custom" ? v : "month"; } catch { return "month"; } });
   const [anchor, setAnchor] = useState(() => new Date());
   const [from, setFrom] = useState(() => ymd(addDays(new Date(), -30)));
   const [to, setTo] = useState(() => ymd(new Date()));
@@ -1079,7 +1079,7 @@ function StaffHoursPanel({ data: base, scopeClientId, sample }: { data: Data; sc
   const tot = rows.reduce((t, r) => ({ h: t.h + r.workedH, u: t.u + r.upcomingH, rev: t.rev + r.revenue, earn: t.earn + (r.earnings || 0), n: t.n + r.count, revA: t.revA + r.aheadRevenue, earnA: t.earnA + r.aheadEarnings }), { h: 0, u: 0, rev: 0, earn: 0, n: 0, revA: 0, earnA: 0 });
   const maxH = Math.max(1, ...rows.map((r) => r.workedH + r.upcomingH));
   const label = period === "custom" ? `${new Date(`${from}T12:00:00`).toLocaleDateString("en-IE", { day: "numeric", month: "short" })} – ${new Date(`${to}T12:00:00`).toLocaleDateString("en-IE", { day: "numeric", month: "short", year: "numeric" })}` : period === "day" ? range.a.toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short" }) : period === "week" ? `Week of ${range.a.toLocaleDateString("en-IE", { day: "numeric", month: "short" })}` : range.a.toLocaleDateString("en-IE", { month: "long", year: "numeric" });
-  const setP = (v: typeof period) => { setPeriod(v); try { localStorage.setItem("f2b-staff-hours-period", v); } catch { /* optional */ } };
+  const setP = (v: typeof period) => { setPeriod(v); try { localStorage.setItem("f2b-staff-hours-period2", v); } catch { /* optional */ } };
   const step = (dir: 1 | -1) => setAnchor(period === "month" ? new Date(anchor.getFullYear(), anchor.getMonth() + dir, 1) : addDays(anchor, (period === "day" ? 1 : 7) * dir));
   const savePay = async (p: Staff, v: { payType: "none" | "hourly" | "commission"; payRate: number }) => {
     setPay((cur) => ({ ...cur, [p.id]: v })); setEditPay("");
