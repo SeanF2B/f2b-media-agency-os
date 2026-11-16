@@ -352,7 +352,8 @@ async function suggest(ctx: Ctx) {
 }
 
 // ---- Sample-data helper: read the client's website once (cached) for service names, areas and team names.
-const siteCache = new Map<string, { at: number; value: { services: string[]; locations: string[]; team: string[] } }>();
+type SiteSampleOut = { services: string[]; locations: string[]; team: string[]; photos: Record<string, string> };
+const siteCache = new Map<string, { at: number; value: SiteSampleOut }>();
 const SERVICE_WORDS = /(repair|install|replace|clean|survey|inspect|consult|design|fit|fitting|quote|service|maintenance|roof|gutter|chimney|kitchen|bathroom|tattoo|piercing|treatment|massage|facial|cut|colour|color|lesson|session|assessment|check|removal|painting|plaster|tiling|flooring|electrical|plumbing|heating|boiler|solar|window|door|garden|landscap|fencing|driveway|extension|renovat|cosmetic|whitening|implant|physio|therapy|training|coaching|valuation|viewing|measure)/i;
 const SKIP_WORDS = /^(home|about|about us|contact|contact us|blog|news|faq|faqs|gallery|reviews|testimonials|privacy|terms|cookie|careers|login|menu|services|our services|get a quote|call now|read more|learn more|book now|see more|view all)$/i;
 type SiteDb = { prepare: (q: string) => { bind: (...a: unknown[]) => { all: <T>() => Promise<{ results?: T[] }>; first: <T>() => Promise<T | null> } } };
@@ -394,25 +395,45 @@ async function siteSampleFor(client: { id: string; name: string; email?: string;
   const emailDomain = /@([a-z0-9.-]+\.[a-z]{2,})$/i.exec(String(client.email || ""))?.[1] || "";
   const freeMail = /^(gmail|googlemail|hotmail|outlook|live|yahoo|icloud|me|aol|eircom|proton|protonmail)\./i.test(emailDomain);
   let site = String(client.website || "").trim() || own.url || (emailDomain && !freeMail ? emailDomain : "");
-  if (!site) return base;
+  if (!site) return { ...base, photos: {} };
   if (!/^https?:\/\//i.test(site)) site = `https://${site}`;
   const hit = siteCache.get(site); if (hit && Date.now() - hit.at < 6 * 3600_000) return hit.value;
-  let value = base;
+  let value: SiteSampleOut = { ...base, photos: {} };
   try {
-    const res = await fetch(site, { headers: { "user-agent": "Mozilla/5.0 (F2B Agency OS sample data)" }, signal: AbortSignal.timeout(6000), redirect: "follow" });
-    const html = res.ok ? (await res.text()).slice(0, 600_000) : "";
-    const text = (h: string) => h.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&#0?39;|&rsquo;/g, "'").replace(/&[a-z#0-9]+;/gi, " ").replace(/\s+/g, " ").trim();
+    const get = async (url: string) => { try { const r = await fetch(url, { headers: { "user-agent": "Mozilla/5.0 (compatible; F2B Agency OS sample data)", accept: "text/html" }, signal: AbortSignal.timeout(6000), redirect: "follow" }); return r.ok ? { html: (await r.text()).slice(0, 700_000), url: r.url || url } : { html: "", url }; } catch { return { html: "", url }; } };
+    const home = await get(site);
+    const html = home.html;
+    const text = (h: string) => h.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&#0?39;|&rsquo;|&#8217;/g, "'").replace(/&[a-z#0-9]+;/gi, " ").replace(/\s+/g, " ").trim();
+    const nice = (t: string) => t.replace(/\s+artists?$/i, "").replace(/\b(\w)(\w*)/g, (_, a: string, b: string) => a.toUpperCase() + b.toLowerCase()).replace(/\bAnd\b/g, "&").trim();
     const found: string[] = [];
     for (const m of html.matchAll(/<(a|h2|h3|h4|li)\b[^>]*>([\s\S]{1,200}?)<\/\1>/gi)) {
-      const t = text(m[2]); if (t.length < 4 || t.length > 40 || SKIP_WORDS.test(t) || /[@|©]|\d{5,}|http/i.test(t)) continue;
+      const t = text(m[2]); if (t.length < 4 || t.length > 40 || SKIP_WORDS.test(t) || /[@|©]|\d{5,}|http|styles?$|^(our|all|view|see|book|meet)\b/i.test(t)) continue;
       const href = /href="([^"]+)"/i.exec(m[0])?.[1] || "";
-      if (SERVICE_WORDS.test(t) || /\/services?\//i.test(href)) found.push(t.replace(/\b\w/g, (c) => c.toUpperCase()));
+      if (SERVICE_WORDS.test(t) || /\/services?\//i.test(href)) found.push(nice(t));
     }
-    const team: string[] = [];
-    const teamBlock = /(meet (the|our) team|our team|the team)[\s\S]{0,4000}/i.exec(html)?.[0] || "";
-    for (const m of teamBlock.matchAll(/<(h3|h4|h5|strong)\b[^>]*>([\s\S]{1,80}?)<\/\1>/gi)) { const t = text(m[2]); if (/^[A-Z][a-zà-ú'’-]+( [A-Z][a-zà-ú'’-]+){1,2}$/.test(t)) team.push(t); }
-    const areas = [...new Set([...html.matchAll(/\b(?:in|across|serving|covering)\s+((?:Co\.\s)?[A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/g)].map((m) => m[1]).filter((a) => !/^(The|Our|Your|Ireland|Business|Touch)$/.test(a)))];
-    value = { services: [...new Set([...base.services, ...found])].slice(0, 6), locations: [...new Set([...base.locations, ...areas])].slice(0, 6), team: [...new Set([...base.team, ...team])].slice(0, 5) };
+    // Team: the home page plus the site's artists / team page, names with their photos.
+    const teamHref = [...html.matchAll(/<a\b[^>]*href="([^"#]+)"[^>]*>([\s\S]{0,120}?)<\/a>/gi)].find((m) => /\/(artists?|team|our-team|meet-the-team|staff|people|about)(\/|$|\.)/i.test(m[1]) || /^(artists?|our artists|team|our team|meet the team|staff)$/i.test(text(m[2])))?.[1];
+    const pages = [html]; if (teamHref) { const abs = new URL(teamHref, home.url).href; if (new URL(abs).host === new URL(home.url).host) pages.push((await get(abs)).html); }
+    const NAME = /^([A-Z][A-Za-zÀ-ÿ'’.-]{1,20}( [A-Z][A-Za-zÀ-ÿ'’.-]{1,20}){0,2}|[A-Z]{2,4})$/;
+    const notName = /^(Home|About|Contact|Book|Booking|Gallery|Shop|Blog|News|Reviews?|Services?|Prices?|Pricing|Faqs?|Team|Artists?|Our Team|Our Artists|Meet|Menu|Aftercare|Piercing|Piercings|Tattoo|Tattoos|Read More|Learn More|Instagram|Facebook|Tiktok|Email|Phone|Call|Opening Hours|Location|Find Us|Privacy|Terms|Cookie|Get In Touch|Follow Us|Studio|Welcome|Testimonials|Portfolio|Styles|View|Ireland|England|Birmingham|Dublin|Galway|Cork|London|Uk|Ie|Faq)$/i;
+    const team: string[] = []; const photos: Record<string, string> = {};
+    const absImg = (src: string, page: string) => { try { return new URL(src, page).href.replace(/^http:/, "https:"); } catch { return ""; } };
+    for (const [i, page] of pages.entries()) {
+      const pageUrl = i ? new URL(teamHref!, home.url).href : home.url;
+      const scope = i ? page : (/(meet (the|our) (team|artists)|our (team|artists)|the (team|artists)|resident artists?)[\s\S]{0,12000}/i.exec(page)?.[0] || "");
+      if (!scope) continue;
+      const imgs = [...scope.matchAll(/<img\b[^>]*>/gi)].map((m) => ({ at: m.index || 0, src: /(?:data-src|data-lazy-src|src)="([^"]+)"/i.exec(m[0])?.[1] || "", alt: /alt="([^"]*)"/i.exec(m[0])?.[1] || "" })).filter((x) => x.src && !/logo|icon|svg|sprite|placeholder|data:image/i.test(x.src));
+      for (const m of scope.matchAll(/<(h2|h3|h4|h5|h6|strong|figcaption)\b[^>]*>([\s\S]{1,100}?)<\/\1>/gi)) {
+        const t = text(m[2]).replace(/\s*[-–|:].*$/, "").trim(); if (!NAME.test(t) || notName.test(t) || SERVICE_WORDS.test(t) || team.includes(t)) continue;
+        const at = m.index || 0; const near = imgs.filter((x) => Math.abs(x.at - at) < 1500).sort((a, b) => Math.abs(a.at - at) - Math.abs(b.at - at))[0] || imgs.find((x) => x.alt && x.alt.toLowerCase().includes(t.toLowerCase()));
+        team.push(t); if (near) photos[t] = absImg(near.src, pageUrl);
+        if (team.length >= 6) break;
+      }
+      for (const x of imgs) { const t = text(x.alt).replace(/\s*[-–|:].*$/, "").trim(); if (team.length < 6 && NAME.test(t) && !notName.test(t) && !team.includes(t) && !SERVICE_WORDS.test(t) && /artist|team|staff|tattoo/i.test(x.src + scope.slice(Math.max(0, x.at - 300), x.at + 300))) { team.push(t); photos[t] = absImg(x.src, pageUrl); } }
+      if (team.length >= 2) break;
+    }
+    const areas = [...new Set([...html.matchAll(/\b(?:in|across|serving|covering)\s+((?:Co\.\s)?[A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/g)].map((m) => m[1]).filter((a) => !/^(The|Our|Your|Ireland|Business|Touch|Jewellery)$/.test(a)))];
+    value = { services: [...new Set([...base.services.map(nice), ...found])].slice(0, 6), locations: [...new Set([...base.locations, ...areas])].slice(0, 6), team: [...new Set([...base.team, ...team])].slice(0, 6), photos };
   } catch { /* site unreachable: fall back to the profile */ }
   siteCache.set(site, { at: Date.now(), value });
   return value;

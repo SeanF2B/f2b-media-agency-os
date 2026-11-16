@@ -889,27 +889,27 @@ export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, c
 }
 
 // Demo schedule for the Dashboard "Sample data" toggle (never saved). Uses the account's real team when there is one.
-type SiteSample = { services: string[]; locations: string[]; team: string[] };
-const EMPTY_SITE: SiteSample = { services: [], locations: [], team: [] };
+type SiteSample = { services: string[]; locations: string[]; team: string[]; photos?: Record<string, string> };
+const EMPTY_SITE: SiteSample = { services: [], locations: [], team: [], photos: {} };
 // The client's real services, areas and team (from their profile + website) to make demo data look like their business.
 function useSiteSample(scope: string, enabled: boolean): SiteSample {
   const [site, setSite] = useState<SiteSample>(EMPTY_SITE);
   useEffect(() => {
     if (!enabled || !scope) { setSite(EMPTY_SITE); return; }
     let live = true;
-    fetch(`/api/scheduling?clientId=${encodeURIComponent(scope)}&view=site`, { credentials: "same-origin" }).then((r) => r.ok ? r.json() : EMPTY_SITE).then((v: SiteSample) => { if (live) setSite({ services: v.services || [], locations: v.locations || [], team: v.team || [] }); }).catch(() => undefined);
+    fetch(`/api/scheduling?clientId=${encodeURIComponent(scope)}&view=site`, { credentials: "same-origin" }).then((r) => r.ok ? r.json() : EMPTY_SITE).then((v: SiteSample) => { if (live) setSite({ services: v.services || [], locations: v.locations || [], team: v.team || [], photos: v.photos || {} }); }).catch(() => undefined);
     return () => { live = false; };
   }, [scope, enabled]);
   return site;
 }
 function sampleSchedule(real: Data | null, week: Date, clientName: string, site: SiteSample = EMPTY_SITE): Data {
   const fallbackStaff: Staff[] = [["s1", "Aoife Murphy", "Senior consultant"], ["s2", "Ciarán Walsh", "Technician"], ["s3", "Niamh Byrne", "Bookings"]].map(([id, name, role]) => ({ id, name, role, dailyLimit: 0, google: "", feedUrl: "", canEdit: false, weekly: { mon: [["09:00", "17:30"]], tue: [["09:00", "17:30"]], wed: [["09:00", "17:30"]], thu: [["09:00", "17:30"]], fri: [["09:00", "16:00"]] } as Partial<Record<DayKey, Window[]>>, blocked: [] }));
-  const siteStaff: Staff[] = site.team.map((name, i) => ({ ...fallbackStaff[0], id: `site-staff-${i}`, name, role: "" }));
+  const siteStaff: Staff[] = site.team.map((name, i) => ({ ...fallbackStaff[0], id: `site-staff-${i}`, name, role: "", avatar: site.photos?.[name] || "" }));
   // The team named on the client's website wins; otherwise their account team; otherwise demo names.
   const staff = (siteStaff.length >= 2 ? siteStaff : real?.staff.length ? real.staff : siteStaff.length ? siteStaff : fallbackStaff).slice(0, 6).map((p) => ({ ...p, weekly: p.weekly && Object.keys(p.weekly).length ? p.weekly : fallbackStaff[0].weekly }));
   const trade = site.services.length >= 2 ? site.services.slice(0, 3) : /roof/i.test(clientName) ? ["Roof survey", "Repair quote", "Gutter check"] : /interior|kitchen|design/i.test(clientName) ? ["Design consultation", "Site measure", "Showroom visit"] : /ink|tattoo/i.test(clientName) ? ["Tattoo consultation", "Session", "Touch-up"] : ["Consultation", "Site visit", "Follow-up call"];
   const colours = ["#2563eb", "#16a34a", "#d97706"];
-  const calendars = trade.map((name, i) => ({ id: `sample-cal-${i}`, clientId: "", name, slug: `sample-${i}`, kind: i === 0 ? "consultation" : "service", description: "", durationMin: i === 2 ? 30 : 60, bufferBefore: 0, bufferAfter: 15, slotInterval: 30, minNoticeMin: 0, maxDaysAhead: 60, dailyLimit: 0, locationType: "onsite", locationDetail: "", price: 0, currency: "EUR", color: colours[i], assignMode: "customer_pick", staffIds: staff.map((p) => p.id), questions: [], stageId: "", confirmationMessage: "", redirectUrl: "", active: true, timezone: "Europe/Dublin" } as Calendar));
+  const calendars = trade.map((name, i) => ({ id: `sample-cal-${i}`, clientId: "", name, slug: `sample-${i}`, kind: i === 0 ? "consultation" : "service", description: "", durationMin: /consult|touch|check|call|piercing|quote|measure/i.test(name) ? 30 : /tattoo|session|sleeve|realism|cover|black|colour|color|fine line|anime|portrait/i.test(name) ? 180 : /survey|visit|install|repair/i.test(name) ? 90 : 60, bufferBefore: 0, bufferAfter: 15, slotInterval: 30, minNoticeMin: 0, maxDaysAhead: 60, dailyLimit: 0, locationType: "onsite", locationDetail: "", price: 0, currency: "EUR", color: colours[i], assignMode: "customer_pick", staffIds: staff.map((p) => p.id), questions: [], stageId: "", confirmationMessage: "", redirectUrl: "", active: true, timezone: "Europe/Dublin" } as Calendar));
   const people = ["Mary Burke", "Tom Walsh", "Sinéad Kelly", "John Doyle", "Emma Ryan", "Patrick Nolan", "Orla Gallagher", "Dave Kennedy", "Ciara Moran", "Liam O'Brien", "Grace Lynch", "Seán Fitzgerald"];
   const bookings: Booking[] = [];
   const now = Date.now();
