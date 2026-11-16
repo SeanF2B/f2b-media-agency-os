@@ -293,6 +293,18 @@ export async function PUT(request: Request) {
         activity: mergeServerActivity(savedWorkspace.activity || [], current.activity || [], latestData.activity || [], 100),
         // Clock-ins are owned by /api/clock: always keep the server's latest, never an older browser copy.
         clockIns: latestData.clockIns || {},
+        // Google properties are linked automatically on the server: an older browser copy with an empty
+        // field must not unlink them. A value typed in the browser always wins.
+        clients: (savedWorkspace.clients as any[]).map((client: any) => {
+          const stored = (latestData.clients || []).find((item: any) => item?.id === client?.id);
+          if (!stored) return client;
+          const keep: Record<string, string> = {};
+          for (const field of ["googleSearchConsoleAccountId", "googleAnalyticsAccountId"]) {
+            if (!String(client[field] || "").trim() && String(stored[field] || "").trim()) keep[field] = stored[field];
+          }
+          if (!String(client.wordpressSiteUrl || "").trim() && String(stored.wordpressSiteUrl || "").trim() && keep.googleSearchConsoleAccountId) keep.wordpressSiteUrl = stored.wordpressSiteUrl;
+          return Object.keys(keep).length ? { ...client, ...keep } : client;
+        }),
       };
       const version = `workspace-${crypto.randomUUID()}`;
       const result = await env.DB!.prepare("UPDATE workspace_documents SET data = json_set(?1, '$.chessGames', json(COALESCE(json_extract(data, '$.chessGames'), '[]'))), updated_at = ?2 WHERE id = ?3 AND updated_at = ?4")

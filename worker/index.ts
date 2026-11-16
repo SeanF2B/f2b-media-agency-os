@@ -15,6 +15,7 @@ import { processDailyMarketingSnapshots } from "../lib/marketing-daily-sync";
 import { metaAdsConnectionExists, readDirectMetaAdsInsights } from "../lib/meta-ads-direct";
 import { hasGoogleSearchConsoleConnection, readGoogleSearchConsoleRows } from "../lib/google-search-console-direct";
 import { hasGoogleAnalyticsDirectConnection, readGoogleAnalyticsReport } from "../lib/google-analytics-direct";
+import { autoLinkGoogleProperties } from "../lib/google-auto-link";
 import { runWithConnectorBinding } from "../lib/connector-context";
 import type { ConnectorBinding } from "../lib/connector-contract.mjs";
 import { isMarketingDomainVerified, marketingCustomDomainPageUrl, normalizeMarketingHostname } from "../lib/marketing-custom-domain.js";
@@ -185,6 +186,8 @@ const worker = {
       // Operations → Email campaigns: next email to up to 80 due contacts, one Resend batch call.
       processEmailCampaigns(env as never, new Date(controller.scheduledTime)),
       keepGoogleAdsTokensFresh(env.DB!),
+      // Link every active client to its Search Console / GA4 property automatically (every 6 hours).
+      autoLinkGoogleProperties(env.DB, 6 * 3_600_000, new Date(controller.scheduledTime)),
       processDailyMarketingSnapshots({ ...env, isGoogleAdsDirect: googleAdsConnectionReady, readDirectGoogleAds: async (ownerId, accountId, window) => (await getGoogleAdsCampaignMetrics(ownerId, accountId, window)).rows, isMetaAdsDirect: metaAdsConnectionExists, readDirectMetaAds: (ownerId, accountId, window) => readDirectMetaAdsInsights(ownerId, accountId, window, "campaigns"), isSearchConsoleDirect: hasGoogleSearchConsoleConnection, readDirectSearchConsole: (ownerId, accountId, window) => readGoogleSearchConsoleRows(ownerId, accountId, window.start, window.end), isGoogleAnalyticsDirect: hasGoogleAnalyticsDirectConnection, readDirectGoogleAnalytics: async (ownerId, accountId, window) => {
         const [totals, channels] = await Promise.all([
           readGoogleAnalyticsReport(ownerId, accountId, window.start, window.end, [], ["sessions", "activeUsers", "engagedSessions", "keyEvents", "totalRevenue"]),

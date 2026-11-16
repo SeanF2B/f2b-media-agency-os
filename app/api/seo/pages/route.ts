@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "../../../chatgpt-auth";
+import { autoLinkGoogleProperties } from "@/lib/google-auto-link";
 import { hasGoogleSearchConsoleConnection, readGoogleSearchConsoleRows, type GoogleSearchConsoleRow } from "@/lib/google-search-console-direct";
 
 // SEO → Performance → Pages: every known page of a client's site with its target keywords (saved here,
@@ -22,8 +23,16 @@ async function context(request: Request) {
   if (!member) return { error: respond({ error: "Only workspace members can see SEO pages." }, 403) };
   const url = new URL(request.url);
   const clientId = url.searchParams.get("clientId") || "";
-  const client = (data.clients || []).find((c) => c.id === clientId);
+  let client = (data.clients || []).find((c) => c.id === clientId);
   if (!client) return { error: respond({ error: "Choose a client." }, 404) };
+  // Not linked yet: try the automatic Google property match now (throttled), then use the fresh value.
+  if (!String(client.googleSearchConsoleAccountId || "").trim()) {
+    try {
+      const summary = await autoLinkGoogleProperties(env.DB, 10 * 60_000);
+      const hit = summary?.linked.find((l) => l.clientId === client!.id && l.searchConsole);
+      if (hit) client = { ...client, googleSearchConsoleAccountId: hit.searchConsole };
+    } catch { /* fall through to the normal "not linked" message */ }
+  }
   ready ||= env.DB.prepare(TABLE).run().catch((e) => { ready = null; throw e; });
   await ready;
   return { db: env.DB, ownerId: row.owner_id, client, url };
