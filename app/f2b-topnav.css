@@ -1536,3 +1536,10 @@ html body .app-shell .sch-week-card .sch-week { overflow: visible !important; }
 html body .app-shell .dh-client-note { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; }
 html body .app-shell .dh-client-note img { width: 24px; height: 24px; border-radius: 7px; object-fit: contain; background: #fff; border: 1px solid rgba(127,138,160,.25); }
 html body .app-shell .dh-client-note small { font-weight: 500; opacity: .6; }
+/* Operations → Google Ads: compact controls row (no empty gap) */
+html body .app-shell .google-ads-view-heading.is-embedded { display: flex !important; justify-content: flex-end; align-items: center; margin: 6px 0 10px !important; padding: 0 !important; min-height: 0 !important; }
+html body .app-shell .google-ads-view-heading.is-embedded .google-ads-view-controls { display: flex !important; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; width: 100%; }
+html body .app-shell .google-ads-view-heading.is-embedded .google-ads-view-controls > * { margin: 0 !important; }
+html body .app-shell .google-ads-view-heading.is-embedded .google-ads-view-controls label { display: inline-flex !important; align-items: center; gap: 8px; flex-direction: row !important; }
+html body .app-shell .google-ads-view-heading.is-embedded .google-ads-view-controls label > span { white-space: nowrap; }
+html body .app-shell .google-ads-view-heading.is-embedded select { height: 34px; min-width: 170px; }
