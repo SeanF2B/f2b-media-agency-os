@@ -2128,3 +2128,12 @@ html body .app-shell .client-card-stats { display: flex; gap: 10px; flex-wrap: w
 html body .app-shell .client-card-stats b { color: #101828; font-size: 12.5px; }
 html body .app-shell .client-card-stats .warn b { color: #b07800; }
 html body .app-shell.dark-mode .client-card-stats b { color: #e7edf1; }
+/* Clients: the card list scrolls on its own (sticky beside the workroom) so a clicked card stays in
+   frame; live search floats matches to the top and fades the rest. */
+@media (min-width: 761px) {
+  html body .app-shell .clients-layout .client-list { position: sticky; top: 12px; max-height: calc(100vh - 140px); overflow-y: auto; overscroll-behavior: contain; align-content: start; padding: 2px 6px 12px 2px; scrollbar-width: thin; }
+}
+html body .app-shell .client-list .client-list-search { width: 100%; box-sizing: border-box; padding: 9px 12px; border-radius: 12px; border: 1px solid var(--f2b-border, #d9dee3); background: var(--f2b-white, #fff); font: inherit; font-size: 14px; color: inherit; position: sticky; top: 0; z-index: 2; }
+html body .app-shell.dark-mode .client-list .client-list-search { background: #1b2128; border-color: rgba(255,255,255,.16); }
+html body .app-shell .client-list .client-list-card { will-change: transform; transition: opacity .2s ease; }
+html body .app-shell .client-list .client-list-card.no-match { opacity: .38; }
