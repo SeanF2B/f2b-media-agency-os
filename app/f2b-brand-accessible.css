@@ -9294,6 +9294,33 @@ select.client-pick-native { position: absolute !important; width: 1px !important
 @media (max-width: 640px) { .rga { flex-direction: column; text-align: center; } .rga-progress { margin: 0 auto; width: 100%; } }
 .dark-mode .rga { background: linear-gradient(135deg, #1f262c, #1d2a24); border-color: #3a444d; color: #edf2f6; }
 .dark-mode .rga-step { color: #c9d3dc; }
+/* Payslip + accountant variants of the generating animation (currency symbol follows the tax country). */
+.rga-row { animation: rga-pop 2.4s ease-in-out infinite; }
+.rga-net { fill: #16a34a; animation: rga-pop 1.6s ease-in-out infinite; }
+.rga-coin { fill: #f2b21b; } .rga-coin-inner { fill: #f8cd52; stroke: #e2a10f; stroke-width: 1.5; }
+.rga-coin-sym { font: 800 26px/1 system-ui, sans-serif; fill: #8a5a00; } .rga-coin-sym.small { font-size: 16px; }
+.rga-coin-bob { animation: rga-bob 2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes rga-bob { 0%, 100% { transform: translateY(0) rotateY(0deg); } 50% { transform: translateY(-6px); } }
+.rga-stack { fill: #f2b21b; stroke: #d99a0b; stroke-width: 1; animation: rga-drop 2.4s ease-in-out infinite; }
+@keyframes rga-drop { 0% { opacity: 0; transform: translateY(-10px); } 30%, 85% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+.rga-desk { fill: #c7d0db; }
+.rga-paper { fill: #fff; stroke: #dbe5f3; stroke-width: 1.2; }
+.rga-receipt { animation: rga-float 3s ease-in-out infinite; transform-box: fill-box; }
+@keyframes rga-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+.rga-receipt-amt { font: 700 9px/1 system-ui, sans-serif; fill: #1c2330; }
+.rga-tick { opacity: 0; animation: rga-tick 3.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes rga-tick { 0%, 15% { opacity: 0; transform: scale(.4); } 25%, 85% { opacity: 1; transform: scale(1); } 100% { opacity: 0; } }
+.rga-tick-bg { fill: #16a34a; } .rga-tick-mark { fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.rga-glass { animation: rga-sweep 3.6s ease-in-out infinite; }
+@keyframes rga-sweep { 0%, 100% { transform: translate(0, 0); } 33% { transform: translate(52px, -8px); } 66% { transform: translate(104px, 4px); } }
+.rga-lens { fill: #dbeafe; opacity: .55; } .rga-lens-rim { fill: none; stroke: #1c2330; stroke-width: 4; } .rga-handle { fill: #1c2330; }
+.rga-calc { fill: #1c2330; } .rga-calc-screen { fill: #d9f2e3; }
+.rga-calc-digits { font: 700 13px/1 ui-monospace, SFMono-Regular, Menlo, monospace; fill: #14532d; }
+.rga-calc-count { animation: rga-pop .9s steps(2) infinite; }
+.rga-key { fill: #3b4554; animation: rga-key 1.4s ease-in-out infinite; } .rga-key.hot { fill: #2f6ff0; }
+@keyframes rga-key { 0%, 70%, 100% { opacity: 1; } 80% { opacity: .45; } }
+.dark-mode .rga-paper, .dark-mode .rga-tile { fill: #fff; }
+
 
 /* CRM contacts: dark-mode readability fix (dark mode forces white text, so every surface here must be dark) */
 :is(body.f2b-dark, .dark-mode) .cm-table tbody tr.is-selected td { background: color-mix(in srgb, var(--brand-primary, #1677c8) 22%, #1f262c) !important; }

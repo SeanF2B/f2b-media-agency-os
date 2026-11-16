@@ -2,16 +2,18 @@
 
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { AlertTriangle, ChevronDown, ChevronRight, CircleCheck, ClipboardCheck, ExternalLink, Loader2, Mail, Save, X } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, CircleCheck, ClipboardCheck, ExternalLink, Mail, Save, X } from "lucide-react";
 import type { BusinessType, TaxSettings } from "@/lib/tax-rules";
 import { taxCountry } from "@/lib/tax-rules";
 import { countryLabel, draftFigures, filingId, filingScope, filingRoute, inPeriod, periodsFor, RETURN_TYPES, returnTypesFor, unresolvedIssues, type BookRecord, type BooksContext, type FilingPeriod, type FilingReturn, type ReceiptCheckResult, type ReceiptIssue, type ReturnTypeId } from "@/lib/filing/model";
 import { flowReducer, initialFlow } from "@/lib/filing/flow";
+import { ReportGeneratingAnimation, currencySymbolFor } from "./report-generating-animation";
 
 type Props = { scopeId: string; businessName: string; logo?: string; tax?: TaxSettings; businessType?: BusinessType | ""; books?: BooksContext; records: BookRecord[]; currency?: string; onClose: () => void; onOpenSettings?: () => void };
 
 const QUESTION = "Would you like AI to check your connected email and Books export for this filing period? It’ll match receipts to transactions and flag anything missing, duplicated, or unclear.";
 const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+const SCAN_STEPS = ["Opening the connected inbox…", "Finding receipts and supplier invoices…", "Reading amounts and dates…", "Matching receipts to Books transactions…", "Asking AI about lookalike receipts…", "Checking for duplicates and gaps…", "Getting your review ready…"];
 const ISSUE_LABEL: Record<ReceiptIssue["type"], string> = { missing: "Missing receipt", duplicate: "Possible duplicate", unclear: "Unclear", unmatched_receipt: "Receipt with no transaction" };
 
 async function api<T>(body: Record<string, unknown>): Promise<T> {
@@ -124,7 +126,7 @@ export function FilingFlow({ scopeId: rawScopeId, businessName, logo, tax, busin
         {saved.some((s) => s.status === "filed") && <p className="filing-muted">Filed: {saved.filter((s) => s.status === "filed").slice(0, 3).map((s) => `${RETURN_TYPES[s.returnTypeId]?.short} ${s.periodLabel} (ack ${s.acknowledgement?.reference})`).join(" · ")}</p>}
       </>;
     }
-    if (flow.step === "scanning") return <div className="filing-panel filing-loading" role="status"><Loader2 size={18} className="spin" aria-hidden="true" /> Checking the connected inbox and Books for {period?.label}…</div>;
+    if (flow.step === "scanning") return <ReportGeneratingAnimation variant="accountant" symbol={currencySymbolFor(country, currency)} title={`Checking ${businessName}'s receipts for ${period?.label || "this period"}`} steps={SCAN_STEPS} />;
     if (flow.step === "email_disconnected") return <div className="filing-panel"><p><Mail size={14} aria-hidden="true" /> The bookkeeping email isn’t connected for {businessName}, so receipts can’t be checked.</p>
       <div className="filing-choice"><a className="primary-button" href={`/api/bookkeeping-email/connect?scope=${encodeURIComponent(scopeId)}`}>Connect email</a><button type="button" className="secondary-button" onClick={() => dispatch({ type: "CONTINUE_WITHOUT_SCAN" })}>Continue without scan</button></div></div>;
     if (flow.step === "scan_results" && check) return <>

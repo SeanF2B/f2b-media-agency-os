@@ -5,7 +5,7 @@ import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ImagePlus, Sparkles, CalendarDays, ChevronLeft, ChevronRight, Clock, Copy, Link2, MapPin, Plus, RefreshCw, Settings2, Trash2, UserRound, Users, Video, Phone, Building2 } from "lucide-react";
 import "./scheduling.css";
-import { ReportGeneratingAnimation } from "./report-generating-animation";
+import { ReportGeneratingAnimation, currencySymbolFor } from "./report-generating-animation";
 import { computePayslip, maskPps, normalisePps, validPps, DEFAULT_PERSON, EMPTY_YTD, type PayrollEmployer, type PayrollPerson } from "@/lib/scheduling/payroll";
 import type { PayLine, PayslipRecord } from "@/lib/scheduling/payroll-store";
 import { buildPayslipPdf, bytesToBase64, type PdfLogo } from "@/lib/scheduling/payslip-pdf";
@@ -1199,7 +1199,7 @@ function periodRange(key: PeriodKey, from: string, to: string) {
 }
 
 export type TimeEntryLite = { staffId: string; taskId: string; startAt: string; seconds: number };
-export function PayslipsView({ scopeClientId, business, timeEntries = [] }: { scopeClientId: string; business: Business; timeEntries?: TimeEntryLite[] }) {
+export function PayslipsView({ scopeClientId, business, timeEntries = [], country = "" }: { scopeClientId: string; business: Business; timeEntries?: TimeEntryLite[]; country?: string }) {
   const [sample] = useSampleData();
   const [real, setReal] = useState<Data | null>(null);
   const [err, setErr] = useState("");
@@ -1239,7 +1239,7 @@ export function PayslipsView({ scopeClientId, business, timeEntries = [] }: { sc
     {head}
     {sample && <p className="ps-banner">Sample data: demo PPS numbers and figures. Nothing is saved.</p>}
     {!sample && !employer.employerNo && <p className="ps-banner warn">Add your Revenue employer registration number under <button type="button" className="text-button" onClick={() => setEditEmployer(true)}>Employer details</button>.</p>}
-    <PayslipCreator timeEntries={timeEntries} onEmailed={(rec) => setPayroll((cur) => cur ? { ...cur, slips: cur.slips.map((s) => s.key === rec.key ? rec : s) } : cur)} data={data} people={people} employer={employer} business={business} slips={slips} payOf={payOf} currency={currency} sample={sample} scopeClientId={scopeClientId} onEditPerson={setEditPerson}
+    <PayslipCreator symbol={currencySymbolFor(country, currency)} timeEntries={timeEntries} onEmailed={(rec) => setPayroll((cur) => cur ? { ...cur, slips: cur.slips.map((s) => s.key === rec.key ? rec : s) } : cur)} data={data} people={people} employer={employer} business={business} slips={slips} payOf={payOf} currency={currency} sample={sample} scopeClientId={scopeClientId} onEditPerson={setEditPerson}
       onIssued={(rec) => { if (sample) setDemoSlips((list) => [rec, ...list.filter((s) => s.key !== rec.key)]); else setPayroll((cur) => cur ? { ...cur, slips: [rec, ...cur.slips.filter((s) => s.key !== rec.key)] } : cur); }} />
     <div className="crv-history">
       <h3>Saved payslips</h3>
@@ -1267,7 +1267,7 @@ export function PayslipsView({ scopeClientId, business, timeEntries = [] }: { sc
 
 const moneyOf = (n: number, currency: string) => { try { return new Intl.NumberFormat("en-IE", { style: "currency", currency }).format(n); } catch { return `€${n.toFixed(2)}`; } };
 
-function PayslipCreator({ data, people, employer, business, slips, payOf, currency, sample, scopeClientId, onIssued, onEditPerson, timeEntries, onEmailed }: { timeEntries: TimeEntryLite[]; onEmailed: (rec: PayslipRecord) => void; data: Data; people: Record<string, PayrollPerson>; employer: PayrollEmployer; business: Business; slips: PayslipRecord[]; payOf: (p: Staff) => PayRule; currency: string; sample: boolean; scopeClientId: string; onIssued: (rec: PayslipRecord) => void; onEditPerson: (id: string) => void }) {
+function PayslipCreator({ symbol = "€", data, people, employer, business, slips, payOf, currency, sample, scopeClientId, onIssued, onEditPerson, timeEntries, onEmailed }: { symbol?: string; timeEntries: TimeEntryLite[]; onEmailed: (rec: PayslipRecord) => void; data: Data; people: Record<string, PayrollPerson>; employer: PayrollEmployer; business: Business; slips: PayslipRecord[]; payOf: (p: Staff) => PayRule; currency: string; sample: boolean; scopeClientId: string; onIssued: (rec: PayslipRecord) => void; onEditPerson: (id: string) => void }) {
   const [who, setWho] = useState(data.staff[0]?.id || "");
   const [period, setPeriod] = useState<PeriodKey>(sample ? "thisMonth" : "lastMonth");
   const [from, setFrom] = useState(() => ymd(addDays(new Date(), -30)));
@@ -1364,7 +1364,7 @@ function PayslipCreator({ data, people, employer, business, slips, payOf, curren
       <span className="crv-range">{fmtDate(periodStart)} – {fmtDate(periodEnd)} · {rule.payType === "hourly" ? `${hours.toFixed(2)}h ${manualH !== null ? "entered by hand" : `from ${auto.src}`}` : rule.payType === "salary" ? "Salary" : `${done.length} finished appointment${done.length === 1 ? "" : "s"}`}{person ? <> · <button type="button" className="text-button" onClick={() => onEditPerson(who)}>{firstName(person.name)}&apos;s pay settings</button></> : null}</span>
       <button type="button" className="primary-button crv-go" disabled={!person || generating} onClick={generate}>{generating ? "Generating…" : shown ? "Regenerate" : "Generate preview"}</button>
     </div>
-    {generating && person && <ReportGeneratingAnimation title={`Generating ${firstName(person.name)}'s payslip`} steps={genSteps} />}
+    {generating && person && <ReportGeneratingAnimation variant="payslip" symbol={symbol} title={`Generating ${firstName(person.name)}'s payslip`} steps={genSteps} />}
     {preview && <div className="crv-preview ps-preview">
       <div className="crv-bar">
         <span className="crv-live">{already ? `Payslip #${already.number} already saved for this period — saving again replaces it` : "Preview · not saved yet"}</span>
