@@ -125,3 +125,9 @@
 
 .em-pane { display: grid; gap: 12px; transition: opacity .15s ease; }
 .em-stale { opacity: .55; pointer-events: none; }
+
+/* Block list scrolls inside itself so opening a card never moves the page */
+.em-blocks { max-height: min(62vh, 640px); overflow-y: auto; overscroll-behavior: contain; position: relative; padding: 6px 4px 6px 0; scrollbar-width: thin; }
+.em-block-bar { position: sticky; top: 0; z-index: 1; background: var(--em-card); border-radius: 12px; }
+@media (max-width: 1100px) { .em-blocks { max-height: 55vh; } }
+.app-shell.dark-mode .em-block-bar { background: #1b2128; }

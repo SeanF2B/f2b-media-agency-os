@@ -32,6 +32,19 @@ function EmailBuilder({ doc, onChange, clientId, extra }: { doc: Doc; onChange: 
   const [dropAt, setDropAt] = useState<number | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [brief, setBrief] = useState("");
+  const listRef = useRef<HTMLOListElement>(null);
+  // The block list scrolls on its own: the card you open is brought into view inside the list,
+  // so the page (and the live preview) never jumps.
+  useEffect(() => {
+    const list = listRef.current; if (!list || !selected) return;
+    const card = list.querySelector<HTMLElement>(`[data-block="${selected}"]`); if (!card) return;
+    const frame = window.requestAnimationFrame(() => {
+      const top = card.offsetTop, bottom = top + card.offsetHeight;
+      if (top < list.scrollTop) list.scrollTo({ top: Math.max(0, top - 6), behavior: "smooth" });
+      else if (bottom > list.scrollTop + list.clientHeight) list.scrollTo({ top: Math.min(top - 6, bottom - list.clientHeight + 6), behavior: "smooth" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [selected]);
   const set = (patch: Partial<Doc>) => onChange({ ...doc, ...patch });
   const setBlocks = (blocks: EmailBlock[]) => set({ blocks });
   const updateBlock = (id: string, patch: Record<string, unknown>) => setBlocks(doc.blocks.map((b) => b.id === id ? { ...b, ...patch } as EmailBlock : b));
@@ -71,9 +84,9 @@ function EmailBuilder({ doc, onChange, clientId, extra }: { doc: Doc; onChange: 
       </div>
       <div className="em-card em-ai"><Sparkles size={16} aria-hidden="true" /><input value={brief} onChange={(e) => setBrief(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !aiBusy) void writeWithAi(); }} placeholder={doc.blocks.length ? "Tell AI what to change, e.g. “shorter, warmer, add a winter offer”" : "Tell AI what this email is for, e.g. “spring roof check offer for past customers”"} aria-label="AI brief" /><button type="button" className="primary-button" disabled={aiBusy} onClick={() => void writeWithAi()}>{aiBusy ? "Writing…" : doc.blocks.length ? "Rewrite" : "Write it"}</button></div>
       <div className="em-palette" aria-label="Add a block">{BLOCK_TYPES.map(({ type, label: text }) => { const Icon = BLOCK_ICONS[type]; return <button key={type} type="button" draggable onDragStart={(e) => { e.dataTransfer.setData("text/em-new", type); setDragFrom(null); }} onClick={() => insert(type)} title={`Add ${text.toLowerCase()} (or drag it into place)`}><Icon size={15} aria-hidden="true" />{text}</button>; })}</div>
-      <ol className="em-blocks" onDragOver={(e) => { e.preventDefault(); if (!doc.blocks.length) setDropAt(0); }} onDrop={(e) => { e.preventDefault(); const type = e.dataTransfer.getData("text/em-new") as EmailBlock["type"]; const at = dropAt ?? doc.blocks.length; if (type) insert(type, at); else if (dragFrom !== null) move(dragFrom, at); setDragFrom(null); setDropAt(null); }} onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropAt(null); }}>
+      <ol ref={listRef} className="em-blocks" onDragOver={(e) => { e.preventDefault(); if (!doc.blocks.length) setDropAt(0); }} onDrop={(e) => { e.preventDefault(); const type = e.dataTransfer.getData("text/em-new") as EmailBlock["type"]; const at = dropAt ?? doc.blocks.length; if (type) insert(type, at); else if (dragFrom !== null) move(dragFrom, at); setDragFrom(null); setDropAt(null); }} onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropAt(null); }}>
         {!doc.blocks.length && <li className="em-empty">Drag blocks here, click one above, or let AI write the email.</li>}
-        {doc.blocks.map((block, index) => { const Icon = BLOCK_ICONS[block.type]; const open = selected === block.id; return <li key={block.id} className={`em-block${open ? " open" : ""}${dragFrom === index ? " dragging" : ""}${dropAt === index ? " drop-before" : ""}${dropAt === doc.blocks.length && index === doc.blocks.length - 1 ? " drop-after" : ""}`}
+        {doc.blocks.map((block, index) => { const Icon = BLOCK_ICONS[block.type]; const open = selected === block.id; return <li key={block.id} data-block={block.id} className={`em-block${open ? " open" : ""}${dragFrom === index ? " dragging" : ""}${dropAt === index ? " drop-before" : ""}${dropAt === doc.blocks.length && index === doc.blocks.length - 1 ? " drop-after" : ""}`}
           draggable onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", block.id); setDragFrom(index); }} onDragEnd={() => { setDragFrom(null); setDropAt(null); }}
           onDragOver={(e) => { e.preventDefault(); const r = e.currentTarget.getBoundingClientRect(); setDropAt(e.clientY < r.top + r.height / 2 ? index : index + 1); }}>
           <div className="em-block-bar" onClick={() => setSelected(open ? "" : block.id)}>
