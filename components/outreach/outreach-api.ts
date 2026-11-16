@@ -10,12 +10,12 @@ export type Job = { id: string; status: string; createdAt: string; input: any; p
 export type CheckResult = { spf?: string; dkim?: string; dmarc?: string; mx?: string; details?: string[]; allPass?: boolean; checkedAt?: string };
 export type Domain = { id: string; domain: string; host: string; protected: boolean; check: CheckResult; expiresAt: string | null; annualCostCents: number | null; dmarcStage: string };
 export type OutreachState = {
-  settings: { cooldownDays: number; bookingUrl: string; seatPriceCents: { microsoft: number | null; google: number | null; smtp: number | null }; workersPlanCents: number | null; instantlyPlanCents: number | null; defaultTargetDaily: number; dmarcReportEmail: string; senderAddress: string; appUrl: string };
+  settings: { cooldownDays: number; bookingUrl: string; seatPriceCents: { microsoft: number | null; google: number | null; smtp: number | null }; workersPlanCents: number | null; instantlyPlanCents: number | null; expenseSync: { enabled: boolean; mailboxes: boolean; instantly: boolean; domains: boolean; ai: boolean }; expensePostedMonth: string; defaultTargetDaily: number; dmarcReportEmail: string; senderAddress: string; appUrl: string };
   purchasesEnabled: boolean;
   connections: Array<{ provider: string; status: string; config: Record<string, any>; lastError: string; verifiedAt: string | null; fingerprint: string }>;
   range: { from: string; to: string; campaign: string };
   overview: { sent: number; positive: number; positiveRate: number | null; replies: number; qualified: number; meetings: number; activeCampaigns: number; activeMailboxes: number; warming: number; reviewQueue: number; health: number | null; issues: Array<{ level: "critical" | "warning"; text: string }> };
-  costs: { lines: Array<{ key: string; label: string; cents: number; source: string; complete: boolean; detail?: string }>; totalCents: number; complete: boolean; openRouterAccountMonthUsd: number | null; perMailboxCents: number | null };
+  costs: { currency: string; fxDate: string | null; lines: Array<{ key: string; label: string; cents: number; source: string; complete: boolean; detail?: string }>; totalCents: number; complete: boolean; openRouterAccountMonthUsd: number | null; perMailboxCents: number | null };
   mailboxes: Mailbox[]; domains: Domain[]; campaigns: Campaign[]; jobs: Job[];
   seeds: Array<{ id: string; provider: string; email: string; status: string; last_error: string }>;
   placementTests: Array<{ id: string; mailboxId: string; status: string; inboxRate: number | null; results: Array<{ seed: string; provider: string; placement: string }>; createdAt: string; completedAt: string | null }>;

@@ -25,6 +25,7 @@ import { mailHost, mailboxPassword, type HostName, type InboundMessage } from ".
 import { checkDomainAuth, ensureZone, planAndApply, findZone } from "./dns";
 import { signUnsubscribe } from "./unsubscribe";
 import { beginExternalWarmup, externalWarmupPass, instantlyFor } from "./instantly";
+import { postOutreachExpenses } from "./bookkeeping";
 import { alertOnce, audit, cloudflareAccountId, cloudflareToken, db, ensureOutreachSchema, getSettings, nowIso, parseJson, purchasesEnabled, telegramConfig, todayUtc, uuid, type OutreachSettings } from "./store";
 
 type Row = Record<string, any>;
@@ -44,6 +45,7 @@ export async function processOutreach(now = new Date()): Promise<Record<string, 
   await run("placement", () => checkPlacementTests(ownerId, now));
   if (now.getUTCMinutes() < 5) await run("health", () => healthPass(ownerId, settings, now));
   await run("warmups", () => pendingWarmups(ownerId, now));
+  if (now.getUTCMinutes() < 5) await run("expenses", () => postOutreachExpenses(ownerId, now));
   await run("instantly", () => externalWarmupPass(ownerId, now, (key, title, detail) => criticalAlert(ownerId, settings, key, title, detail)));
   await run("auth", () => authChecks(ownerId, now));
   return report;

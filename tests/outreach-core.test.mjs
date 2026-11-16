@@ -145,3 +145,15 @@ test("low confidence goes to review and doesn't notify; OOO doesn't stop the seq
   assert.equal(decide({ label: "out-of-office", confidence: 0.92 }).stopsSequence, false);
   assert.equal(decide(null).needsReview, true);
 });
+
+import { parsePeople, fillIdentities, slug } from "../lib/outreach/identities.mjs";
+
+test("auto-fill inboxes from real senders: unique, natural addresses", () => {
+  assert.equal(slug("Seán Ó Briain"), "seanobriain");
+  const people = parsePeople("Sean Murphy, Niamh Kelly");
+  assert.deepEqual(people, [{ firstName: "Sean", lastName: "Murphy" }, { firstName: "Niamh", lastName: "Kelly" }]);
+  const rows = fillIdentities(people, 5);
+  assert.deepEqual(rows.map((row) => row.local), ["sean", "niamh", "sean.murphy", "niamh.kelly", "seanm"]);
+  assert.equal(new Set(fillIdentities([{ firstName: "Pat", lastName: "" }], 8).map((row) => row.local)).size, 8, "never repeats an address");
+  assert.deepEqual(fillIdentities([], 3), []);
+});

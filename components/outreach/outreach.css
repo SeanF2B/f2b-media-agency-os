@@ -329,3 +329,6 @@
 .ox-signin { display: inline-grid; gap: 4px; }
 .ox-signin a { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
 .ox-warm-results li.connect { border-color: color-mix(in srgb, var(--ox-p, #2878a8) 50%, transparent); }
+
+.ox-autofill input { flex: 1; min-width: 240px; }
+.ox-autofill small { flex-basis: 100%; }

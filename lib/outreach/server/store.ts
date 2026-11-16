@@ -13,12 +13,15 @@ export type OutreachSettings = {
   dmarcReportEmail: string;
   senderAddress: string;           // postal address for the footer (CAN-SPAM / ePrivacy best practice)
   appUrl: string;
-  instantlyPlanCents: number | null; // what you pay Instantly per month (warm-up only), shown in costs
+  instantlyPlanCents: number | null; // what you pay Instantly per month, in US$ cents (Instantly bills in US$)
+  expenseSync: { enabled: boolean; mailboxes: boolean; instantly: boolean; domains: boolean; ai: boolean }; // post real costs to Books → Expenses
+  expensePostedMonth: string; // last month (YYYY-MM) whose monthly costs were posted
+  fx: { base: "USD"; date: string; rates: Record<string, number>; fetchedAt: string } | null; // cached ECB rates
 };
 
 export const DEFAULT_SETTINGS: OutreachSettings = {
   cooldownDays: 90, bookingUrl: "", seatPriceCents: { microsoft: 400, google: 700, smtp: null }, workersPlanCents: null,
-  defaultTargetDaily: 30, dmarcReportEmail: "", senderAddress: "", appUrl: "", instantlyPlanCents: 4700,
+  defaultTargetDaily: 30, dmarcReportEmail: "", senderAddress: "", appUrl: "", instantlyPlanCents: 4700, expenseSync: { enabled: true, mailboxes: true, instantly: true, domains: true, ai: false }, expensePostedMonth: "", fx: null,
 };
 
 let schemaReady: Promise<void> | null = null;
@@ -51,12 +54,12 @@ export async function getSettings(ownerId: string): Promise<OutreachSettings> {
   await ensureOutreachSchema();
   const row = await db().prepare("SELECT data FROM outreach_settings WHERE owner_id = ?1").bind(ownerId).first<{ data: string }>();
   const saved = parseJson<Partial<OutreachSettings>>(row?.data, {});
-  return { ...DEFAULT_SETTINGS, ...saved, seatPriceCents: { ...DEFAULT_SETTINGS.seatPriceCents, ...(saved.seatPriceCents || {}) } };
+  return { ...DEFAULT_SETTINGS, ...saved, seatPriceCents: { ...DEFAULT_SETTINGS.seatPriceCents, ...(saved.seatPriceCents || {}) }, expenseSync: { ...DEFAULT_SETTINGS.expenseSync, ...(saved.expenseSync || {}) } };
 }
 
 export async function saveSettings(ownerId: string, patch: Partial<OutreachSettings>): Promise<OutreachSettings> {
   const current = await getSettings(ownerId);
-  const next: OutreachSettings = { ...current, ...patch, seatPriceCents: { ...current.seatPriceCents, ...(patch.seatPriceCents || {}) } };
+  const next: OutreachSettings = { ...current, ...patch, seatPriceCents: { ...current.seatPriceCents, ...(patch.seatPriceCents || {}) }, expenseSync: { ...current.expenseSync, ...(patch.expenseSync || {}) } };
   next.cooldownDays = Math.max(0, Math.min(3650, Math.floor(Number(next.cooldownDays) || 0)));
   next.defaultTargetDaily = Math.max(1, Math.min(50, Math.floor(Number(next.defaultTargetDaily) || 30)));
   await db().prepare("INSERT INTO outreach_settings (owner_id, data, updated_at) VALUES (?1, ?2, ?3) ON CONFLICT(owner_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at").bind(ownerId, JSON.stringify(next), nowIso()).run();
