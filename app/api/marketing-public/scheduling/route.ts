@@ -6,7 +6,7 @@
 // POST {action:"book"|"cancel"|"reschedule"}
 import { env } from "cloudflare:workers";
 import { loadSchedulingWorkspace, schedulingDeps } from "@/lib/scheduling/context";
-import { SchedulingError, getStaffProfiles, publicProfile, availableSlots, cancelBooking, createBooking, getBookingByToken, getCalendar, getCalendarBySlug, icsFeed, updateBooking, bookingView } from "@/lib/scheduling/server";
+import { SchedulingError, getStaffProfiles, publicProfile, reviewLinkOwner, addCollectedReview, availableSlots, cancelBooking, createBooking, getBookingByToken, getCalendar, getCalendarBySlug, icsFeed, updateBooking, bookingView } from "@/lib/scheduling/server";
 import { chooseStaff, locationLabel, utcToLocal } from "@/lib/scheduling/core";
 
 export const dynamic = "force-dynamic";
@@ -58,6 +58,16 @@ export async function GET(request: Request) {
       if (!feed) return new Response("Not found", { status: 404 });
       return new Response(feed, { headers: { "Content-Type": "text/calendar; charset=utf-8", "Cache-Control": "private, max-age=300", "Content-Disposition": "inline; filename=\"f2b-bookings.ics\"" } });
     }
+    const review = url.searchParams.get("review");
+    if (review) {
+      const link = await reviewLinkOwner(env.DB as never, review);
+      const ws = link ? await loadSchedulingWorkspace() : null;
+      const person = ws?.staff.find((s) => s.id === link?.staff_id);
+      if (!link || !ws || !person) return fail("This review link isn't active any more.", 404);
+      const profile = (await getStaffProfiles(env.DB as never, link.owner_id, [person.id]))[person.id];
+      const reviews = profile?.reviews || [];
+      return json({ staff: { name: person.name.split("|")[0].trim(), title: profile?.title || (person.name.includes("|") ? person.name.split("|")[1].trim() : ""), bio: profile?.bio || "", avatar: /^(https:|data:image\/|\/media\/)/.test(person.avatar || "") ? person.avatar : "", rating: reviews.length ? Math.round((reviews.reduce((n, r) => n + r.rating, 0) / reviews.length) * 10) / 10 : 0, reviewCount: reviews.length, photos: profile?.showPhotos ? profile.photos.slice(0, 8) : [], recent: profile?.showReviews ? reviews.slice(0, 2).map((r) => ({ author: r.author, rating: r.rating, text: r.text })) : [] }, business: { name: ws.agencyName || "F2B Media" } });
+    }
     const manage = url.searchParams.get("manage");
     if (manage) {
       const row = await getBookingByToken(env.DB as never, manage);
@@ -104,6 +114,21 @@ export async function POST(request: Request) {
         source: "public", workspace: { ownerId: info.ws.ownerId, agencyName: info.ws.agencyName, clients: info.ws.clients, staff: info.ws.staff },
       });
       return json({ ok: true, manageUrl: `${deps.baseUrl}/f/book/manage?t=${result.manageToken}`, start: result.booking.start, staff: result.booking.staffIds.map((id) => info.ws.staff.find((s) => s.id === id)?.name).filter(Boolean), meetLink: result.booking.meetLink, redirectUrl: info.cal.redirectUrl });
+    }
+    if (body.action === "review") {
+      if (str(body.website)) return json({ ok: true }); // honeypot
+      const link = await reviewLinkOwner(env.DB as never, str(body.token, 80));
+      if (!link) return fail("This review link isn't active any more.", 404);
+      const rating = Math.round(Number(body.rating));
+      if (!(rating >= 1 && rating <= 5)) return fail("Tap the stars to give a rating.");
+      const author = str(body.author, 80);
+      if (author.length < 2) return fail("Please add your name.");
+      await addCollectedReview(env.DB as never, link.owner_id, link.staff_id, { author, rating, text: str(body.text, 800) });
+      // Let the staff member know (best effort).
+      const ws = await loadSchedulingWorkspace();
+      const person = ws?.staff.find((s) => s.id === link.staff_id);
+      if (deps.sendEmail && person?.email) await deps.sendEmail({ to: [person.email], subject: `New ${rating}★ review from ${author}`, html: `<p><b>${author.replace(/[<>&]/g, "")}</b> left you a ${"★".repeat(rating)} review:</p><blockquote>${str(body.text, 800).replace(/[<>&]/g, "") || "(no comment)"}</blockquote><p>It's been added to your booking profile.</p>`, text: `${author} left you a ${rating}-star review: ${str(body.text, 800) || "(no comment)"}`, fromName: ws?.agencyName || "F2B Media", idempotencyKey: `review/${link.staff_id}/${Date.now()}` }).catch(() => undefined);
+      return json({ ok: true });
     }
     if (body.action === "cancel" || body.action === "reschedule") {
       const row = await getBookingByToken(env.DB as never, str(body.token, 80));

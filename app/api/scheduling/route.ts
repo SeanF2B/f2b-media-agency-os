@@ -7,7 +7,7 @@ import { aiConfigured, aiEndpoint, aiHeaders, aiModel, getAiProvider, resolveAiP
 import { sanitizeCalendar, sanitizeWeekly } from "@/lib/scheduling/core";
 import {
   SchedulingError, availableSlots, createBooking, deleteCalendar, getBooking, getCalendar, getStaffSettings, listBookings, listCalendars,
-  saveCalendar, saveStaffSettings, staffFeedToken, updateBooking, getStaffProfiles, saveStaffProfile,
+  saveCalendar, saveStaffSettings, staffFeedToken, updateBooking, getStaffProfiles, saveStaffProfile, reviewLinkToken,
 } from "@/lib/scheduling/server";
 
 export const dynamic = "force-dynamic";
@@ -116,6 +116,12 @@ export async function POST(request: Request) {
         const staffId = str(body.staffId, 120);
         if (!ctx.ws.staff.some((s) => s.id === staffId)) return fail("Team member not found.", 404);
         return json({ profile: (await getStaffProfiles(db, ownerId, [staffId]))[staffId] || null });
+      }
+      case "reviewLink": {
+        const staffId = str(body.staffId, 120);
+        if (!ctx.ws.staff.some((s) => s.id === staffId) || !(ctx.admin || ctx.canManage || ctx.me?.id === staffId)) return fail("You can only share your own review link.", 403);
+        const t = await reviewLinkToken(db, ownerId, staffId, Boolean(body.rotate));
+        return json({ url: `${deps.baseUrl}/f/review/${t}` });
       }
       case "saveProfile": {
         const staffId = str(body.staffId, 120);

@@ -232,6 +232,7 @@ export function SchedulingView({ scopeClientId, onAddStaff }: { scopeClientId: s
           </div>
           {s.profile && (s.profile.reviews.length > 0 || s.profile.photos.length > 0) && <div className="sch-profile-sum">{s.profile.reviews.length > 0 && <span className={s.profile.showReviews ? "" : "muted"}>★ {(s.profile.reviews.reduce((n, r) => n + r.rating, 0) / s.profile.reviews.length).toFixed(1)} · {s.profile.reviews.length} review{s.profile.reviews.length === 1 ? "" : "s"}{s.profile.showReviews ? "" : " (hidden)"}</span>}{s.profile.photos.length > 0 && <span className={s.profile.showPhotos ? "" : "muted"}>{s.profile.photos.length} photo{s.profile.photos.length === 1 ? "" : "s"}{s.profile.showPhotos ? "" : " (hidden)"}</span>}</div>}
           {(s.canEdit || data.canManage) && <div className="iv-actions"><button type="button" className="iv-btn" onClick={() => setEditAvail(s)}><Clock size={13} /> Edit hours &amp; days off</button><button type="button" className="iv-btn" onClick={() => setEditProfile(s)}>★ Reviews &amp; photos</button></div>}
+          {(s.canEdit || data.canManage) && <ReviewLinkBar staffId={s.id} staffName={s.name} scope={scopeClientId} />}
         </div>; })}
       {onAddStaff && <button type="button" className="iv-card sch-staff sch-add-staff" onClick={onAddStaff}><span className="sch-add-plus">＋</span><b>Add staff</b><small>Invite a team member, then connect their calendar</small></button>}
     </div>}
@@ -240,7 +241,7 @@ export function SchedulingView({ scopeClientId, onAddStaff }: { scopeClientId: s
     {catchUpOpen && !detail && !newAppt && <CatchUp data={data} scope={scopeClientId} onClose={() => setCatchUpOpen(false)} onChanged={() => void load()} />}
     {detail && <AppointmentDetail key={detail.id} data={data} scope={scopeClientId} booking={detail} onClose={() => setDetail(null)} onSaved={async (msg) => { setDetail(null); setNote(msg); await load(); }} />}
     {editCal && <CalendarEditor data={data} value={editCal} busy={busy} onClose={() => setEditCal(null)} onSave={async (cal) => { const out = await act({ action: "saveCalendar", calendar: cal }, cal.id ? "Booking calendar saved." : "Booking calendar created. Copy its link or embed code to start taking bookings."); if (out) setEditCal(null); }} onDelete={editCal.id ? async () => { if (!(await appConfirm("Delete this booking calendar? Its booking link will stop working."))) return; const out = await act({ action: "deleteCalendar", id: editCal.id }, "Booking calendar deleted."); if (out) setEditCal(null); } : undefined} />}
-    {editProfile && <Modal title={`${editProfile.name.split("|")[0].trim()}: booking profile`} wide onClose={() => { setEditProfile(null); void load(); }} footer={<button type="button" className="primary-button" onClick={() => { setEditProfile(null); void load(); }}>Done</button>}><StaffShowcaseEditor staffId={editProfile.id} scope={scopeClientId} /></Modal>}
+    {editProfile && <Modal title={`${editProfile.name.split("|")[0].trim()}: booking profile`} wide onClose={() => { setEditProfile(null); void load(); }} footer={<button type="button" className="primary-button" onClick={() => { setEditProfile(null); void load(); }}>Done</button>}><StaffShowcaseEditor staffId={editProfile.id} scope={scopeClientId} staffName={editProfile.name} /></Modal>}
     {editAvail && <AvailabilityEditor staff={editAvail} busy={busy} onClose={() => setEditAvail(null)} onSave={async (v) => { const out = await act({ action: "saveAvailability", staffId: editAvail.id, ...v }, `${editAvail.name}'s availability saved.`); if (out) setEditAvail(null); }} />}
   </section>;
 }
@@ -587,7 +588,7 @@ function CatchUp({ data, scope, onClose, onChanged }: { data: Data; scope: strin
 }
 
 /** Reviews + photos customers see on the booking page. Used in the Team staff form and in Scheduling. Saves automatically. */
-export function StaffShowcaseEditor({ staffId, scope = "" }: { staffId: string; scope?: string }) {
+export function StaffShowcaseEditor({ staffId, scope = "", staffName = "" }: { staffId: string; scope?: string; staffName?: string }) {
   const [p, setP] = useState<StaffProfile | null>(null);
   const [status, setStatus] = useState("");
   const [paste, setPaste] = useState("");
@@ -646,6 +647,7 @@ export function StaffShowcaseEditor({ staffId, scope = "" }: { staffId: string; 
       <label className="sch-toggle"><input type="checkbox" checked={p.showReviews} onChange={(e) => update({ showReviews: e.target.checked })} /><span /> <b>Show reviews</b>{avg && <small>★ {avg} · {p.reviews.length}</small>}</label>
       <label className="sch-toggle"><input type="checkbox" checked={p.showPhotos} onChange={(e) => update({ showPhotos: e.target.checked })} /><span /> <b>Show photos</b>{p.photos.length > 0 && <small>{p.photos.length}</small>}</label>
     </div>
+    <ReviewLinkBar staffId={staffId} staffName={staffName || "this person"} scope={scope} />
     {p.showReviews && <div className="sch-showcase-block">
       <div className="sch-review-add">
         <input value={draft.author} onChange={(e) => setDraft({ ...draft, author: e.target.value })} placeholder="Customer name" maxLength={80} aria-label="Reviewer name" />
@@ -662,5 +664,36 @@ export function StaffShowcaseEditor({ staffId, scope = "" }: { staffId: string; 
         {p.photos.length < 16 && <label className="sch-photo-add"><input type="file" accept="image/*" multiple onChange={(e) => { void upload(e.target.files); e.target.value = ""; }} />{uploading ? `Uploading ${uploading}…` : <><Plus size={18} /><span>Add photos</span></>}</label>}</div>
       <small className="iv-small">Photos are saved to the Media Library (Staff photos folder).</small>
     </div>}
+  </div>;
+}
+
+/** "Request a review": a personal link per staff member, shared by copy / email / WhatsApp / text. */
+export function ReviewLinkBar({ staffId, staffName, scope = "" }: { staffId: string; staffName: string; scope?: string }) {
+  const [url, setUrl] = useState("");
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [err, setErr] = useState("");
+  const first = staffName.split("|")[0].trim().split(" ")[0] || "us";
+  const load = async () => {
+    setOpen(true); setErr("");
+    if (url) return;
+    try { setUrl((await api<{ url: string }>(scope, { action: "reviewLink", staffId })).url); } catch (e) { setErr(errText(e, "Couldn't create the review link.")); }
+  };
+  const message = `Hi! Thanks for choosing us. Would you mind leaving a quick review for ${first}? It takes 30 seconds: ${url}`;
+  const copy = async () => { try { await navigator.clipboard.writeText(url); } catch { const t = document.createElement("textarea"); t.value = url; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove(); } setCopied(true); window.setTimeout(() => setCopied(false), 1800); };
+  if (!open) return <button type="button" className="iv-btn" onClick={() => void load()}>⭐ Request a review</button>;
+  return <div className="sch-revlink">
+    <span className="sch-revlink-label">Review link for {first}</span>
+    {err ? <span className="iv-error">{err}</span> : !url ? <span className="iv-small">Creating link…</span> : <>
+      <code title={url}>{url.replace(/^https?:\/\//, "")}</code>
+      <div className="sch-revlink-actions">
+        <button type="button" className="iv-btn" onClick={() => void copy()}>{copied ? "✓ Copied" : "Copy link"}</button>
+        <a className="iv-btn" href={`mailto:?subject=${encodeURIComponent(`Could you review ${first}?`)}&body=${encodeURIComponent(message)}`}>Email</a>
+        <a className="iv-btn" href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>
+        <a className="iv-btn" href={`sms:?&body=${encodeURIComponent(message)}`}>Text</a>
+        <a className="iv-btn" href={url} target="_blank" rel="noopener noreferrer">Preview</a>
+      </div>
+      <small className="iv-small">Reviews left here appear on {first}'s booking profile straight away{""} and {first} gets an email.</small>
+    </>}
   </div>;
 }

@@ -524,3 +524,26 @@ export function publicProfile(p: StaffProfile | undefined) {
   const rating = reviews.length ? Math.round((reviews.reduce((n, r) => n + r.rating, 0) / reviews.length) * 10) / 10 : 0;
   return { title: p.title, bio: p.bio, rating, reviewCount: reviews.length, reviews: reviews.slice(0, 30).map(({ author, rating, text, source, date }) => ({ author, rating, text, source, date })), photos };
 }
+
+// ---------- review request links ----------
+export async function reviewLinkToken(db: Db, ownerId: string, staffId: string, rotate = false) {
+  await ensureSchedulingTables(db);
+  if (rotate) await db.prepare("DELETE FROM sched_review_links WHERE owner_id=?1 AND staff_id=?2").bind(ownerId, staffId).run();
+  const fresh = token().slice(0, 40);
+  await db.prepare("INSERT INTO sched_review_links (token, owner_id, staff_id, created_at) VALUES (?1,?2,?3,?4) ON CONFLICT(owner_id, staff_id) DO NOTHING").bind(fresh, ownerId, staffId, new Date().toISOString()).run();
+  const row = await db.prepare("SELECT token FROM sched_review_links WHERE owner_id=?1 AND staff_id=?2").bind(ownerId, staffId).first<{ token: string }>();
+  return row?.token || fresh;
+}
+
+export async function reviewLinkOwner(db: Db, linkToken: string) {
+  await ensureSchedulingTables(db);
+  if (!/^[a-f0-9]{32,64}$/.test(linkToken)) return null;
+  return db.prepare("SELECT owner_id, staff_id FROM sched_review_links WHERE token=?1").bind(linkToken).first<{ owner_id: string; staff_id: string }>();
+}
+
+/** A customer left a review through the link: add it to the top of that person's profile. */
+export async function addCollectedReview(db: Db, ownerId: string, staffId: string, review: { author: string; rating: number; text: string }) {
+  const current = (await getStaffProfiles(db, ownerId, [staffId]))[staffId] || { ...EMPTY_PROFILE };
+  const entry: StaffReview = { id: `rv${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, author: clean(review.author, 80) || "Customer", rating: Math.max(1, Math.min(5, Math.round(Number(review.rating) || 5))), text: clean(review.text, 800), source: "Review link", date: new Date().toISOString().slice(0, 10) };
+  return saveStaffProfile(db, ownerId, staffId, { ...current, reviews: [entry, ...current.reviews].slice(0, 60) });
+}

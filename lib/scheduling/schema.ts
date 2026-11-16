@@ -89,6 +89,15 @@ CREATE TABLE IF NOT EXISTS sched_staff_profiles (
   PRIMARY KEY (owner_id, staff_id)
 );
 
+-- Shareable "leave a review" link per staff member.
+CREATE TABLE IF NOT EXISTS sched_review_links (
+  token TEXT PRIMARY KEY NOT NULL,
+  owner_id TEXT NOT NULL,
+  staff_id TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS sched_review_links_staff_idx ON sched_review_links(owner_id, staff_id);
+
 CREATE TABLE IF NOT EXISTS sched_reminders (
   booking_id TEXT NOT NULL,
   kind TEXT NOT NULL,
