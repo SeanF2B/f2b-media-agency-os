@@ -1,5 +1,6 @@
 "use client";
 
+import { useSampleData } from "@/hooks/use-sample-data";
 import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ImagePlus, Sparkles, CalendarDays, ChevronLeft, ChevronRight, Clock, Copy, Link2, MapPin, Plus, RefreshCw, Settings2, Trash2, UserRound, Users, Video, Phone, Building2 } from "lucide-react";
@@ -62,8 +63,7 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
   const weekRef = useRef<HTMLDivElement>(null);
   const [PX_PER_MIN, setPpm] = useState(PX_DEFAULT);
   const [realData, setData] = useState<Data | null>(null);
-  const [sample, setSampleState] = useState(() => { try { return localStorage.getItem("f2b-dash-sample") === "1"; } catch { return false; } });
-  const setSample = (on: boolean) => { setSampleState(on); try { localStorage.setItem("f2b-dash-sample", on ? "1" : "0"); } catch { /* optional */ } };
+  const [sample, setSample] = useSampleData();
   const [sampleMoves, setSampleMoves] = useState<Record<string, string>>({});
   const site = useSiteSample(scopeClientId, sample);
   const sampleClientName = realData?.clients.find((c) => c.id === scopeClientId)?.name || "";
