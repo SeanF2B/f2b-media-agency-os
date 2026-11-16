@@ -82,6 +82,8 @@ async function completeSearchConsoleConnection(request: Request, ownerId: string
     const now = new Date().toISOString();
     await env.DB.prepare("INSERT INTO google_search_console_connections (id, owner_id, encrypted_refresh_token, token_iv, account_email, connected_at, updated_at, granted_scopes) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6, ?7) ON CONFLICT(owner_id) DO UPDATE SET encrypted_refresh_token = excluded.encrypted_refresh_token, token_iv = excluded.token_iv, account_email = excluded.account_email, granted_scopes = excluded.granted_scopes, updated_at = excluded.updated_at")
       .bind(crypto.randomUUID(), ownerId, encrypted.ciphertext, encrypted.iv, profile.email || "", now, tokens.scope || "").run();
+    // Add, verify and link every client's site straight away (no waiting for the next 6-hourly run).
+    try { const { autoLinkGoogleProperties } = await import("@/lib/google-auto-link"); await autoLinkGoogleProperties(env.DB, 0); } catch (error) { console.error("Google auto-link after connect failed", error instanceof Error ? error.message : "unknown"); }
     return finishSearchConsole(request, "connected");
   } catch (error) {
     console.error("Search Console OAuth callback failed", error instanceof Error ? error.message : "unknown");

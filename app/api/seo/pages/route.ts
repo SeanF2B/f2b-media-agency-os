@@ -8,7 +8,7 @@ import { hasGoogleSearchConsoleConnection, readGoogleSearchConsoleRows, type Goo
 // vs the previous equal period. Read-only towards Google and the website; only keyword targets are saved.
 export const dynamic = "force-dynamic";
 const respond = (body: Record<string, unknown>, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
-type Client = { id: string; name: string; website?: string; wordpressSiteUrl?: string; googleSearchConsoleAccountId?: string };
+type Client = { id: string; name: string; website?: string; wordpressSiteUrl?: string; googleSearchConsoleAccountId?: string; linkReason?: string };
 const TABLE = "CREATE TABLE IF NOT EXISTS seo_page_targets (owner_id TEXT NOT NULL, client_id TEXT NOT NULL, page_key TEXT NOT NULL, url TEXT NOT NULL, primary_kw TEXT NOT NULL DEFAULT '', supporting TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL, PRIMARY KEY (owner_id, client_id, page_key))";
 let ready: Promise<unknown> | null = null;
 
@@ -31,6 +31,7 @@ async function context(request: Request) {
       const summary = await autoLinkGoogleProperties(env.DB, 10 * 60_000);
       const hit = summary?.linked.find((l) => l.clientId === client!.id && l.searchConsole);
       if (hit) client = { ...client, googleSearchConsoleAccountId: hit.searchConsole };
+      else { const why = summary?.stillMissing.find((m) => m.clientId === client!.id)?.reason; if (why) client = { ...client, linkReason: why }; }
     } catch { /* fall through to the normal "not linked" message */ }
   }
   ready ||= env.DB.prepare(TABLE).run().catch((e) => { ready = null; throw e; });
@@ -56,7 +57,7 @@ const siteOrigin = (client: Client, previewUrl?: string) => { const raw = String
 
 async function searchConsole(ownerId: string, client: Client, range: { start: string; end: string }) {
   const property = String(client.googleSearchConsoleAccountId || "").trim();
-  if (!property) return { status: "not_mapped" as const, rows: [] as GoogleSearchConsoleRow[], message: "No Search Console property is linked to this client." };
+  if (!property) return { status: "not_mapped" as const, rows: [] as GoogleSearchConsoleRow[], message: client.linkReason || "No Search Console property is linked to this client." };
   if (!(await hasGoogleSearchConsoleConnection(ownerId))) return { status: "missing_connection" as const, rows: [] as GoogleSearchConsoleRow[], message: "Search Console isn’t connected." };
   try { return { status: "connected" as const, rows: await readGoogleSearchConsoleRows(ownerId, property, range.start, range.end), message: "" }; }
   catch (e) { return { status: "unavailable" as const, rows: [] as GoogleSearchConsoleRow[], message: e instanceof Error ? e.message.slice(0, 300) : "Search Console data couldn’t be read." }; }

@@ -6,7 +6,7 @@ export { normalizeSearchConsoleProperties, normalizeSearchConsoleRows };
 export type GoogleSearchConsoleProperty = { id: string; name: string; permissionLevel: string };
 export type GoogleSearchConsoleRow = { date: string; query: string; page: string; clicks: number; impressions: number; ctr: number; position: number };
 
-async function googleSearchConsoleAccessToken(ownerId: string) {
+export async function googleSearchConsoleAccessToken(ownerId: string) {
   if (!env.DB || !env.GOOGLE_ADS_CLIENT_ID || !env.GOOGLE_ADS_CLIENT_SECRET) throw new Error("Direct Search Console access is not configured on the app server.");
   const saved = await env.DB.prepare("SELECT encrypted_refresh_token, token_iv FROM google_search_console_connections WHERE owner_id = ?1").bind(ownerId).first<{ encrypted_refresh_token: string; token_iv: string }>();
   if (!saved) throw new Error("Google Search Console is not connected yet.");

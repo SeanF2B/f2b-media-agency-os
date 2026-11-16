@@ -21,7 +21,7 @@ export async function GET(request: Request) {
     client_id: env.GOOGLE_ADS_CLIENT_ID,
     redirect_uri: `${new URL(request.url).origin}/api/google-ads/callback`,
     response_type: "code",
-    scope: "https://www.googleapis.com/auth/webmasters.readonly https://www.googleapis.com/auth/analytics.readonly",
+    scope: "https://www.googleapis.com/auth/webmasters https://www.googleapis.com/auth/siteverification https://www.googleapis.com/auth/analytics.readonly",
     access_type: "offline",
     prompt: "consent",
     state: `searchConsole:${state}`,
