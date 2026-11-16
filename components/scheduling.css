@@ -418,3 +418,14 @@ html body .app-shell.dark-mode .sch-dash-panel-tools .sch-seg button.on{backgrou
 .sch-earn-rule:hover{color:var(--brand-primary,#2563eb)}
 .sch-earn-cover{justify-self:end}
 @media(max-width:900px){.sch-earn-totals{grid-template-columns:repeat(2,minmax(0,1fr))!important}.sch-earn-row{grid-template-columns:1fr 1fr!important}.sch-earn-row.head{display:none!important}.sch-earn-row .sch-tl-who{grid-column:1/-1}}
+/* Earnings v3 */
+.sch-earn-totals .lost b,.sch-earn-cell.lost b{color:#b42318}
+.sch-earn-totals .lost{background:#fff6f5;border-color:#fbd5d0}
+.sch-earn-split{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12.5px;color:#475467}
+.sch-earn-split>span{font-weight:800}.sch-earn-split small{color:#98a2b3}
+.sch-earn-chip{border:1px solid #dce3e7;background:#fff;border-radius:999px;padding:4px 12px;font:inherit;font-size:12.5px;font-weight:700;color:#101828;cursor:pointer}
+.sch-earn-chip:hover{border-color:var(--brand-primary,#2563eb)}
+.sch-earn-chip.sm{justify-self:start;padding:1px 8px;font-size:11px;color:#475467;margin-top:2px}
+.sch-earn-cell b small{font-size:11px;color:#667085;font-weight:600}
+.sch-earn-row{grid-template-columns:minmax(170px,1.5fr) repeat(4,minmax(70px,1fr)) minmax(110px,1.2fr) 86px!important}
+@media(max-width:1100px){.sch-earn-row{grid-template-columns:1fr 1fr 1fr!important}.sch-earn-row.head{display:none!important}.sch-earn-row .sch-tl-who{grid-column:1/-1}}
