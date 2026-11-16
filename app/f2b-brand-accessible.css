@@ -9587,3 +9587,22 @@ html body.f2b-dark .f2b-on-light:is(input, textarea, #f2b-white-text-override)::
 .filing-warn p { display: flex; gap: 6px; align-items: center; margin: 0 0 6px; }
 .filing-warn ul { margin: 0 0 0 18px; padding: 0; }
 @media (max-width: 720px) { .filing-summary { grid-template-columns: 1fr 1fr; } .filing-rec { grid-template-columns: 1fr auto; } }
+
+/* Lead Factory saved lists: country flag beside the date */
+.lead-list-head span .lead-flag { display: inline-block; vertical-align: -2px; margin-right: 6px; border-radius: 2px; box-shadow: 0 0 0 1px #0000001f; overflow: hidden; }
+.lead-flag-text { font-size: 9px; font-weight: 800; padding: 1px 3px; background: #eef2f5; color: #1f2a33; }
+
+/* Lead generation variant of the generating animation */
+.rga-map { fill: #e6f2ea; stroke: #cfe3d6; }
+.rga-road { fill: none; stroke: #fff; stroke-width: 4; stroke-linecap: round; } .rga-road.thin { stroke-width: 2.5; }
+.rga-pin { opacity: 0; animation: rga-pin 3.6s ease-out infinite; transform-box: fill-box; transform-origin: bottom; }
+@keyframes rga-pin { 0% { opacity: 0; transform: translateY(-14px); } 12% { opacity: 1; transform: translateY(0); } 18% { transform: scaleY(.85); } 24%, 85% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+.rga-pin-on { fill: #2f6ff0; } .rga-pin-off { fill: #94a3b8; }
+.rga-scan { animation: rga-scan 4s ease-in-out infinite; }
+@keyframes rga-scan { 0%, 100% { transform: translate(0, 0); } 30% { transform: translate(40px, -14px); } 60% { transform: translate(46px, 30px); } 80% { transform: translate(6px, 26px); } }
+.rga-lead { opacity: 0; animation: rga-lead 4.8s ease-out infinite; }
+@keyframes rga-lead { 0% { opacity: 0; transform: translateX(10px); } 10%, 88% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+.rga-avatar { fill: #9cc3fb; } .rga-avatar.off { fill: #cbd5e1; }
+.rga-verdict { opacity: 0; animation: rga-tick 4.8s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.rga-cross-bg { fill: #e05d44; }
+.rga-live { margin-top: 2px; }
