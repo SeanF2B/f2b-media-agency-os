@@ -39,7 +39,9 @@ export function TaskTable({ onQuickAdd, tasks, clients, staff, statuses, onStatu
   onBulkUpdate?: (ids: string[], patch: TaskPatch) => void; onBulkDelete?: (ids: string[]) => void; onDuplicate?: (id: string) => void;
   renderAvatar: (staffId: string) => ReactNode; onQuickAdd?: (clientId: string) => void;
 }) {
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  // Client groups start closed; you open the ones you want (remembered on this device).
+  const [expanded, setExpandedState] = useState<Set<string>>(() => { try { return new Set(JSON.parse(window.localStorage.getItem("f2b-task-table-open") || "[]")); } catch { return new Set(); } });
+  const setExpanded = (next: Set<string>) => { setExpandedState(next); try { window.localStorage.setItem("f2b-task-table-open", JSON.stringify([...next])); } catch { /* storage unavailable */ } };
   const [sort, setSort] = useState<"due" | "priority" | "status" | "title">("due");
   const [view, setView] = useState<"open" | "scheduled" | "done">("open");
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -62,7 +64,7 @@ export function TaskTable({ onQuickAdd, tasks, clients, staff, statuses, onStatu
   const visibleIds = groups.flatMap((group) => group.list.map((task) => task.id));
   const pickedIds = visibleIds.filter((id) => picked.has(id));
   const togglePick = (ids: string[], on: boolean) => setPicked((current) => { const next = new Set(current); ids.forEach((id) => on ? next.add(id) : next.delete(id)); return next; });
-  const toggleGroup = (id: string) => setCollapsed((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  const toggleGroup = (id: string) => { const next = new Set(expanded); if (next.has(id)) next.delete(id); else next.add(id); setExpanded(next); };
   const bulk = (patch: TaskPatch) => { if (!pickedIds.length) return; if (onBulkUpdate) onBulkUpdate(pickedIds, patch); else if (patch.status) pickedIds.forEach((id) => onStatus(id, patch.status!)); setPicked(new Set()); };
   const sortButton = (key: typeof sort, label: string) => <button type="button" className={`tt-sort ${sort === key ? "active" : ""}`} onClick={() => setSort(key)}>{label}{sort === key ? " ↓" : ""}</button>;
   const counts = { open: tasks.filter(isOpen).length, scheduled: tasks.filter((task) => isOpen(task) && isScheduled(task)).length, done: tasks.filter((task) => !isOpen(task)).length };
@@ -70,7 +72,7 @@ export function TaskTable({ onQuickAdd, tasks, clients, staff, statuses, onStatu
   return <section className="task-table-view" aria-label="Task table">
     <div className="tt-toolbar">
       <div className="tt-views" role="tablist" aria-label="Table views">{([["open", "Open"], ["scheduled", "Scheduled & recurring"], ["done", "Done"]] as const).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={view === key} className={view === key ? "active" : ""} onClick={() => { setView(key); setPicked(new Set()); }}>{label}<span>{counts[key]}</span></button>)}</div>
-      <button type="button" className="text-button tt-collapse" onClick={() => setCollapsed(collapsed.size ? new Set() : new Set(groups.map((group) => group.clientId)))}>{collapsed.size ? "Expand all" : "Collapse all"}</button>
+      <button type="button" className="text-button tt-collapse" onClick={() => setExpanded(expanded.size ? new Set() : new Set(groups.map((group) => group.clientId)))}>{expanded.size ? "Collapse all" : "Expand all"}</button>
     </div>
     {pickedIds.length > 0 && <div className="tt-bulk" role="toolbar" aria-label="Bulk actions">
       <b>{pickedIds.length} selected</b>
@@ -84,7 +86,7 @@ export function TaskTable({ onQuickAdd, tasks, clients, staff, statuses, onStatu
     <div className="tt-wrap"><table className="tt-table">
       <colgroup><col className="tt-c-check" /><col /><col className="tt-c-owner" /><col className="tt-c-pill" /><col className="tt-c-pill" /><col className="tt-c-date" /><col className="tt-c-repeat" /><col className="tt-c-service" /><col className="tt-c-est" /></colgroup>
       <thead><tr><th><input type="checkbox" aria-label="Select all shown" checked={visibleIds.length > 0 && pickedIds.length === visibleIds.length} onChange={(event) => togglePick(visibleIds, event.target.checked)} /></th><th>{sortButton("title", "Task")}</th><th>Owner</th><th>{sortButton("status", "Status")}</th><th>{sortButton("priority", "Priority")}</th><th>{sortButton("due", "Due")}</th><th>Repeats</th><th>Service</th><th className="num">Est.</th></tr></thead>
-      <tbody>{groups.map((group) => { const ids = group.list.map((task) => task.id); const open = !collapsed.has(group.clientId); return <Fragment key={group.clientId || "none"}>
+      <tbody>{groups.map((group) => { const ids = group.list.map((task) => task.id); const open = expanded.has(group.clientId); return <Fragment key={group.clientId || "none"}>
         <tr className="tt-group" style={{ ["--tt-group" as string]: group.colour }}>
           <td><input type="checkbox" aria-label={`Select all in ${group.name}`} checked={ids.every((id) => picked.has(id))} onChange={(event) => togglePick(ids, event.target.checked)} /></td>
           <td colSpan={8}><div className="tt-group-line"><button type="button" className="tt-group-toggle" aria-expanded={open} onClick={() => toggleGroup(group.clientId)}><span className="tt-caret" aria-hidden="true">{open ? "▾" : "▸"}</span>{group.logo ? <span className="tt-logo" aria-hidden="true"><img src={group.logo} alt="" /></span> : <span className="tt-chip" aria-hidden="true" />}<b>{group.name}</b></button><span className="tt-group-meta">{group.list.length} task{group.list.length === 1 ? "" : "s"}</span>{onQuickAdd && <button type="button" className="tt-quick-add" title={`Add a task for ${group.name}`} aria-label={`Add a task for ${group.name}`} onClick={() => onQuickAdd(group.clientId)}>＋</button>}{(() => { const total = group.list.length || 1; const R = 10, C = 2 * Math.PI * R; let offset = 0; const parts = statuses.map((item) => ({ item, n: group.list.filter((task) => task.status === item.value).length })).filter((p) => p.n); return <span className="tt-group-ring" title={parts.map((p) => `${p.item.label}: ${p.n}`).join(" · ")}><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><circle cx="12" cy="12" r={R} fill="none" stroke="rgba(127,138,160,.2)" strokeWidth="2.5" />{parts.map((p) => { const len = p.n / total * C; const el = <circle key={p.item.value} cx="12" cy="12" r={R} fill="none" stroke={STATUS_COLOURS[p.item.value] || "#999"} strokeWidth="2.5" strokeDasharray={`${len} ${C}`} strokeDashoffset={-offset} transform="rotate(-90 12 12)" />; offset += len; return el; })}</svg><b className="tt-ring-n">{group.list.length}</b><small>{parts.map((p) => <i key={p.item.value} style={{ background: STATUS_COLOURS[p.item.value] || "#999" }} title={p.item.label}>{p.n}</i>)}</small></span>; })()}</div></td>
