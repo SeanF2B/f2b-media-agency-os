@@ -2099,6 +2099,8 @@ html body .crm-card-src { background: #f1f4f6; color: #475467; }
 html body .crm-card-src.src-google-ads { background: #e0ecff; color: #1d4ed8; } html body .crm-card-src.src-website-form, html body .crm-card-src.src-website-estimate { background: #dcfce7; color: #166534; } html body .crm-card-src.src-meta { background: #e7f0ff; color: #1e40af; } html body .crm-card-src.src-referral { background: #fef3c7; color: #92400e; }
 html body .crm-card-icons { display: inline-flex; align-items: center; gap: 7px; margin-left: auto; color: #8a96a3; font-size: 11px; font-weight: 600; }
 html body .crm-card-icons > span { display: inline-flex; align-items: center; gap: 3px; }
+html body .crm-card-icons > .crm-card-book { display: inline-grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: inherit; cursor: pointer; transition: background .15s, color .15s, transform .15s; }
+html body .crm-card-icons > .crm-card-book:hover, html body .crm-card-icons > .crm-card-book:focus-visible { background: color-mix(in srgb, var(--brand-secondary, #0b7bb5) 14%, transparent); color: var(--brand-secondary, #0b7bb5); transform: translateY(-1px); }
 html body .app-shell.dark-mode .crm-card-src { background: #26313a; color: #c3ccd4; } html body .app-shell.dark-mode .crm-card-type { background: #2e2850; color: #c4b5fd; }
 
 /* Team → sign-in link panel */
