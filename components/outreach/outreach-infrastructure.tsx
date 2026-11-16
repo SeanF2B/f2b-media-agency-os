@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Activity, AlertTriangle, Camera, CheckCircle2, CircleDashed, Copy, Flame, Globe, Loader2, Lock, Mail, Plus, RefreshCw, Search, ShieldCheck, Sparkles, Trash2, Undo2, X, XCircle } from "lucide-react";
 import { money, outreachAction, pct, ago, type Health, type Mailbox, type OutreachState } from "./outreach-api";
 import type { DeliverabilityReport } from "@/lib/outreach/deliverability-report.mjs";
+import { fillIdentities, parsePeople } from "@/lib/outreach/identities.mjs";
 
 type Act = <T>(action: string, body?: Record<string, unknown>, success?: string) => Promise<T | null>;
 
@@ -309,6 +310,7 @@ function Provisioning({ state, act, reload }: { state: OutreachState; act: Act; 
   const [picked, setPicked] = useState<Record<string, Offer & { buy: boolean }>>({});
   const [owned, setOwned] = useState("");
   const [perDomain, setPerDomain] = useState(2);
+  const [senders, setSenders] = useState("");
   const [identities, setIdentities] = useState<Identity[]>([{ firstName: "", lastName: "", local: "" }, { firstName: "", lastName: "", local: "" }]);
   const [group, setGroup] = useState("");
   const [review, setReview] = useState<any>(null);
@@ -336,6 +338,9 @@ function Provisioning({ state, act, reload }: { state: OutreachState; act: Act; 
       </div>
       <div className="ox-panel"><h3>2 · Inboxes & sender identities</h3>
         <div className="ox-row"><label className="ox-inline">Inboxes per domain <select value={perDomain} onChange={(event) => setPerDomain(Number(event.target.value))}>{[1, 2, 3, 4, 5].map((value) => <option key={value}>{value}</option>)}</select></label><label className="ox-inline">Group <input value={group} onChange={(event) => setGroup(event.target.value)} placeholder="e.g. Roofing" /></label></div>
+        <div className="ox-row ox-autofill"><input value={senders} onChange={(event) => setSenders(event.target.value)} placeholder="Who sends? e.g. Sean Murphy, Niamh Kelly" aria-label="Sender names" />
+          <button type="button" className="secondary-button" disabled={!parsePeople(senders).length} onClick={() => setIdentities(fillIdentities(parsePeople(senders), perDomain))}><Sparkles size={15} /> Auto-fill inboxes</button>
+          <small className="ox-muted">Fills every row with unique, natural addresses for these people (sean@, sean.murphy@, seanm@…). Edit any row after.</small></div>
         {identities.map((identity, index) => <div key={index} className="ox-identity"><input value={identity.firstName} onChange={(event) => setIdentities(identities.map((item, i) => i === index ? { ...item, firstName: event.target.value } : item))} placeholder="First name" aria-label={`First name ${index + 1}`} /><input value={identity.lastName} onChange={(event) => setIdentities(identities.map((item, i) => i === index ? { ...item, lastName: event.target.value } : item))} placeholder="Last name" aria-label={`Last name ${index + 1}`} /><input value={identity.local} onChange={(event) => setIdentities(identities.map((item, i) => i === index ? { ...item, local: event.target.value } : item))} placeholder={identity.firstName ? identity.firstName.toLowerCase() : "mailbox name"} aria-label={`Mailbox name ${index + 1}`} /><span className="ox-muted">@domain</span></div>)}
       </div>
       <div className="ox-panel"><h3>3 · Review costs & approve</h3>
