@@ -118,6 +118,26 @@ export function darkReadyLogo(src: string): Promise<string> {
   return job;
 }
 
+// Colour of whatever is actually painted behind an element (first ancestor with a solid-enough background).
+function parseRgba(text: string): [number, number, number, number] | null {
+  const m = text.match(/rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,\s/]+([\d.]+%?))?\s*\)/);
+  if (!m) return null;
+  const a = m[4] === undefined ? 1 : m[4].endsWith("%") ? parseFloat(m[4]) / 100 : parseFloat(m[4]);
+  return [+m[1], +m[2], +m[3], a];
+}
+function sitsOnDarkSurface(img: HTMLElement) {
+  let el: HTMLElement | null = img.parentElement;
+  while (el && el !== document.documentElement) {
+    const cs = getComputedStyle(el);
+    const solid = parseRgba(cs.backgroundColor);
+    const grad = cs.backgroundImage && cs.backgroundImage !== "none" ? parseRgba(cs.backgroundImage) : null;
+    const c = solid && solid[3] >= 0.35 ? solid : grad && grad[3] >= 0.35 ? grad : null;
+    if (c) return (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) < 140;
+    el = el.parentElement;
+  }
+  return true; // nothing painted: the dark-mode page shows through
+}
+
 const LOGO_SELECTOR = "img[class*='logo'], [class*='logo'] img, [class*='Logo'] img";
 const SKIP = ".brand-icon-image, [data-keep-logo], .bot-icon img, .ai-icon img";
 /** Mounted once by the app: while dark mode is on, every logo image is swapped for its dark-ready copy (no white boxes). */
@@ -130,6 +150,7 @@ export function DarkLogoFixer({ dark }: { dark: boolean }) {
       const current = img.getAttribute("src") || "";
       if (!current || img.dataset.darkLogo === current) return; // already our copy
       if (/\.svg(\?|$)/i.test(current)) return;
+      if (!sitsOnDarkSurface(img)) return; // logo on a light bar/card: keep its real colours
       img.dataset.lightSrc = current;
       void darkReadyLogo(current).then((out) => { if (img.getAttribute("src") === current && out !== current) { img.dataset.darkLogo = out; img.src = out; } });
     };

@@ -2668,3 +2668,6 @@ html body .app-shell .crv-theme { display: inline-flex; padding: 3px; gap: 2px; 
 html body .app-shell .crv-theme button { border: 0; background: none; padding: 5px 12px; border-radius: 7px; font: inherit; font-size: 13px; font-weight: 600; color: #475569; cursor: pointer; }
 html body .app-shell .crv-theme button.on { background: #14213d; color: #fff; }
 html body .app-shell .crv-theme button:not(.on):hover { background: #fff; transform: translateY(-1px); }
+
+/* ===== Agency icon in the top bar: no tile behind it (light or dark mode) ===== */
+html body .app-shell.topnav-layout .tn-bar .tn-brand .tn-logo:not(.tn-logo-client) { background: transparent !important; box-shadow: none !important; border: 0 !important; padding: 0 !important; }
