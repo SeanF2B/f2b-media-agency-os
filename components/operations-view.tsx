@@ -62,7 +62,7 @@ const SEO_MAIN: Array<{ key: string; label: string; views: Array<[SeoMode, strin
 ];
 const seoMainOf = (mode: SeoMode) => SEO_MAIN.find((group) => group.views.some(([key]) => key === mode)) || SEO_MAIN[2];
 type AdsMode = "setup" | "manage" | "performance";
-type SitesTab = "overview" | "forms" | "email" | "domains" | "media";
+type SitesTab = "overview" | "forms" | "email" | "automations" | "domains" | "media";
 type SiteMode = "sites" | "settings" | "media" | "templates";
 /** Older links/state used other tabs; map them onto the current areas (+ the sub-view they opened). */
 export function normalizeOpsTab(value: string): { tab: OperationsTab; sub?: string } {
@@ -130,7 +130,8 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
       if (sub === "forms" || sub === "submissions") { setSitesTab("forms"); setFormsView(sub); }
       else if (sub === "domains" || sub === "dns") setSitesTab("domains");
       else if (sub === "media") setSitesTab("media");
-      else if (sub === "email" || sub === "automations" || sub === "system") { setSitesTab("email"); setEmailStart(sub === "email" ? "campaigns" : sub); }
+      else if (sub === "automations") setSitesTab(automations ? "automations" : "email");
+      else if (sub === "email" || sub === "system") { setSitesTab("email"); setEmailStart(sub === "email" ? "campaigns" : sub); }
       else { setSitesTab("overview"); setSiteMode(sub === "media" || sub === "templates" ? sub : "sites"); }
     }
     onTab(tab);
@@ -201,7 +202,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
 
     {tab === "ads" && selected && <div className="ops-subbar">{seg(adsMode || (selected.googleAdsAccountId ? "performance" : "setup"), setAdsMode, [["setup", "Setup"], ["manage", "Manage"], ["performance", "Performance"]], "Google Ads sections")}</div>}
     {tab === "seo" && selected && <div className="ops-subbar">{seg(seoMainOf(seoMode).key, (key: string) => setSeoMode(SEO_MAIN.find((group) => group.key === key)!.views[0][0]), SEO_MAIN.map((group) => [group.key, group.label] as [string, string]), "SEO sections")}</div>}
-    {tab === "sites" && <div className="ops-subbar">{seg(sitesTab, (key: SitesTab) => { setSitesTab(key); if (key === "overview") setSiteMode("sites"); }, [["overview", "Overview"], ["forms", "Forms"], ["email", "Email"], ["domains", "Domains"], ["media", "Media"]], "Sites sections")}</div>}
+    {tab === "sites" && <div className="ops-subbar">{seg(sitesTab, (key: SitesTab) => { setSitesTab(key); if (key === "overview") setSiteMode("sites"); }, [["overview", "Overview"], ["forms", "Forms"], ["email", "Email"], ...(automations ? [["automations", "Automations"]] as Array<[SitesTab, string]> : []), ["domains", "Domains"], ["media", "Media"]], "Sites sections")}</div>}
     {(tab === "seo" || tab === "ads") && selected && (() => { const site = hostOf(selected.website || selected.wordpressSiteUrl); const chips: Array<[string, boolean]> = tab === "ads" ? [["Google Ads account", Boolean(selected.googleAdsAccountId)], ["Website", Boolean(site)]] : [["Website", Boolean(site)], ["Search Console", Boolean(selected.googleSearchConsoleAccountId)], ["Analytics", Boolean(selected.googleAnalyticsAccountId)], ["Business Profile", Boolean(selected.googleBusinessProfileLocationId || selected.googleBusinessProfileAccountId)]]; return <div className="ops-client-strip">
       {site ? <a href={`https://${site}`} target="_blank" rel="noreferrer" className="ops-strip-site">{site}</a> : onEditClient && <button type="button" className="text-button" onClick={() => onEditClient(selected.id)}>Add client website</button>}
       <span className="ops-strip-chips">{chips.map(([label, ok]) => <span key={label} className={ok ? "ok" : "missing"} title={ok ? `${label} connected` : `${label} not connected`}>{ok ? "✓" : "○"} {label}</span>)}</span>
@@ -238,7 +239,8 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
     {tab === "sites" && sitesTab === "forms" && formsView === "submissions" && renderTool && <div className="ops-embed" key={`subs-${selected?.id || "all"}`}>{renderTool("submissions", selected?.id || "")}</div>}
     {tab === "sites" && sitesTab === "media" && renderTool && <div className="ops-embed" key={`media-${selected?.id || "all"}`}>{renderTool("media", selected?.id || "")}</div>}
     {tab === "sites" && sitesTab === "domains" && <div className="ops-embed ops-domains"><Suspense fallback={<div className="page-loading" role="status" aria-label="Loading domains…"><i /></div>}><DomainsDnsView /></Suspense></div>}
-    {tab === "sites" && sitesTab === "email" && emailClient && <Suspense fallback={<div className="page-loading" role="status" aria-label="Loading email…"><i /></div>}><EmailMarketingView key={emailStart} initialMode={emailStart} clientId={emailClient.id} clientName={emailClient.name} clientLogo={emailClient.logo} clientColor={emailClient.color} automations={automations} /></Suspense>}
+    {tab === "sites" && sitesTab === "email" && emailClient && <Suspense fallback={<div className="page-loading" role="status" aria-label="Loading email…"><i /></div>}><EmailMarketingView key={emailStart} initialMode={emailStart} clientId={emailClient.id} clientName={emailClient.name} clientLogo={emailClient.logo} clientColor={emailClient.color} /></Suspense>}
+    {tab === "sites" && sitesTab === "automations" && automations && <div className="ops-embed ops-automations">{automations}</div>}
 
 
     {tab === "onboarding" && <><button type="button" className="text-button ops-back" onClick={() => onTab("clients")}>← Back to clients</button>{onboarding}</>}

@@ -149,7 +149,7 @@ export function EmailMarketingView({ clientId, clientName, clientLogo, clientCol
 
   return <div className="em">
     <div className="ops-subbar em-subbar">
-      <span className="ops-seg" role="tablist" aria-label="Email sections">{([["campaigns", "Campaigns"], ...(automations ? [["automations", "Automations"]] : [])] as Array<[typeof mode, string]>).map(([key, text]) => <button key={key} type="button" role="tab" aria-selected={mode === key} className={mode === key ? "active" : ""} onClick={() => setMode(key)}>{text}</button>)}</span>
+      {automations ? <span className="ops-seg" role="tablist" aria-label="Email sections">{([["campaigns", "Campaigns"], ...(automations ? [["automations", "Automations"]] : [])] as Array<[typeof mode, string]>).map(([key, text]) => <button key={key} type="button" role="tab" aria-selected={mode === key} className={mode === key ? "active" : ""} onClick={() => setMode(key)}>{text}</button>)}</span> : <span />}
       <button type="button" className={`secondary-button em-settings-btn${mode === "settings" || mode === "system" || mode === "builder" ? " on" : ""}`} onClick={() => setMode(mode === "settings" || mode === "system" || mode === "builder" ? "campaigns" : "settings")}>Email settings</button>
       {data && !data.sending && (mode === "campaigns" || mode === "builder") && <span className="em-warn">Sending isn’t set up on the server yet (Resend). You can still build and save.</span>}
     </div>
