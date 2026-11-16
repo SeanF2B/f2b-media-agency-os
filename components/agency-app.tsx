@@ -5635,7 +5635,7 @@ The app will check the live account first and only restore the previous value if
           <span className={`service-chip service-${serviceCardClasses[task.service] || "other"}`}><span className="task-emoji"><AiIcon v={serviceIcons[task.service] || "✦"} /></span><span>{task.service}</span></span>
           <div className="task-card-actions">
             <button type="button" className="task-note-book" title="View or add work notes" aria-label="View or add task work notes" onClick={(event) => { event.stopPropagation(); onViewNotes(task.id, task.clientId); }}>📝{(noteCountByTask.get(task.id) || 0) > 0 && <span>{noteCountByTask.get(task.id)}</span>}</button>
-            <button type="button" className="task-edit" onClick={(event) => { event.stopPropagation(); onEdit(task); }} aria-label={`Edit ${task.title}`} title="Edit task and card note">✎</button>
+            <button type="button" className="task-edit" onClick={(event) => { event.stopPropagation(); if (inPopup) setPopupTaskId(""); onEdit(task); }} aria-label={`Edit ${task.title}`} title="Edit task and card note">✎</button>
             <button type="button" className="task-duplicate" onClick={(event) => { event.stopPropagation(); onDuplicate(task); }} aria-label={`Duplicate ${task.title}`} title="Duplicate card">⧉</button>
 <select className="task-quick-move" aria-label={`Move ${task.title}`} value={task.status} onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onChange={(event) => { event.stopPropagation(); onStatus(task.id, event.target.value); }}>{statuses.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select>
 
