@@ -1,13 +1,14 @@
 "use client";
 
 import { appAlert, appConfirm, appPrompt } from "./app-dialog";
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { readFocusClient, setFocusClient, useFocusClient } from "@/lib/focus-client";
 import { BrandIcon } from "./brand-icon";
-import { BarChart3, ClipboardList, Factory, FileText, Globe, LayoutDashboard, Check, Link2, Mail, MapPin, Megaphone, MessageCircle, Star, Search, Zap, type LucideIcon } from "lucide-react";
+import { FileText, Globe, LayoutDashboard, Check, Link2, Mail, MapPin, Megaphone, MessageCircle, Star, Search, type LucideIcon } from "lucide-react";
 import { AiVisibilityPanel } from "./ai-visibility-panel";
 import { RankTrackingPanel } from "./rank-tracking-panel";
 import { SiteFormsPanel } from "./site-forms-panel";
+const EmailMarketingView = lazy(() => import("./email-marketing-view").then((module) => ({ default: module.EmailMarketingView })));
 
 // Operations Centre: one admin-only page that reuses existing features (SEO, Google Ads, Websites,
 // Domains & DNS, Reports, Tasks). It reads the workspace already loaded in the app, so the
@@ -47,12 +48,17 @@ function QuickConnectLink({ client, missing }: { client: OpsClient; missing: str
   return <span className="ops-quick-link"><button type="button" title={copied ? "Link copied" : "Copy a connect link for this client"} aria-label={`Copy connect link for ${client.name}`} onClick={() => void copy()}>{copied ? <Check size={14} /> : <Link2 size={14} />}</button><button type="button" onClick={() => void email()} title="Email the connect link to the client" aria-label={`Email connect link to ${client.name}`}><Mail size={14} /></button></span>;
 }
 type SiteRow = { clientId: string; backend: string; previewUrl: string; repo: string; branch: string; updatedAt: string };
-const OPS_TAB_ICONS: Partial<Record<string, LucideIcon>> = { overview: LayoutDashboard, seo: Search, ads: Megaphone, websites: Globe, forms: ClipboardList, local: MapPin, reports: FileText, automations: Zap, leadfactory: Factory, analytics: BarChart3 };
-export type OperationsTab = "overview" | "seo" | "ads" | "websites" | "forms" | "local" | "reports" | "onboarding" | "automations" | "leadfactory";
-/** Older links/state used more tabs; map them onto the six areas (+ the sub-view they opened). */
+// Where everything lives: Overview (performance, priorities, issues) · Google Ads (campaigns, optimisation,
+// conversions) · SEO & AI (SEO, AEO/GEO, keyword research, Business Profile, backlinks, AI visibility) ·
+// Websites (sites, landing pages, forms, media) · Email (builder, AI campaigns, automations) · Reports.
+const OPS_TABS: Array<[OperationsTab, string, LucideIcon]> = [["overview", "Overview", LayoutDashboard], ["ads", "Google Ads", Megaphone], ["seo", "SEO & AI", Search], ["websites", "Websites", Globe], ["email", "Email", Mail], ["reports", "Reports", FileText]];
+export type OperationsTab = "overview" | "ads" | "seo" | "websites" | "email" | "reports" | "onboarding";
+type SeoMode = "keywords" | "competitors" | "ranks" | "audit" | "backlinks" | "local" | "ai";
+type SiteMode = "sites" | "forms" | "media";
+/** Older links/state used more tabs; map them onto the current areas (+ the sub-view they opened). */
 export function normalizeOpsTab(value: string): { tab: OperationsTab; sub?: string } {
-  const legacy: Record<string, { tab: OperationsTab; sub?: string }> = { keywords: { tab: "seo" }, audits: { tab: "reports", sub: "audits" }, media: { tab: "websites", sub: "media" }, ai: { tab: "local", sub: "ai" } };
-  return legacy[value] || { tab: (["overview", "seo", "ads", "websites", "forms", "local", "reports", "onboarding"].includes(value) ? value : "overview") as OperationsTab };
+  const legacy: Record<string, { tab: OperationsTab; sub?: string }> = { keywords: { tab: "seo", sub: "keywords" }, local: { tab: "seo", sub: "local" }, ai: { tab: "seo", sub: "ai" }, backlinks: { tab: "seo", sub: "backlinks" }, audits: { tab: "reports", sub: "audits" }, media: { tab: "websites", sub: "media" }, forms: { tab: "websites", sub: "forms" }, automations: { tab: "email", sub: "automations" }, emails: { tab: "email" }, leadfactory: { tab: "overview" } };
+  return legacy[value] || { tab: (OPS_TABS.some(([key]) => key === value) || value === "onboarding" ? value : "overview") as OperationsTab };
 }
 export type CommunityResult = { url: string; title: string; snippet: string; platform: string };
 type Check = { label: string; ok: boolean; page?: string };
@@ -81,21 +87,28 @@ function wpAdminUrl(siteUrl: string) {
   try { const url = new URL(/^https?:\/\//i.test(siteUrl) ? siteUrl : `https://${siteUrl}`); return `${url.origin}${url.pathname.replace(/\/+$/, "").replace(/\/wp-admin$/, "")}/wp-admin/`; } catch { return siteUrl; }
 }
 
-export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenWebsite, onOpenDns, onStartOnboarding, onboarding, onCreateGbpTask, onCreateCommunityTask, renderTool, automations, hasLeadFactory = false, onStartReviews, onEditClient }: {
+export function OperationsView({ clients, tasks, tab: rawTab, onTab, onOpenPage, onOpenWebsite, onOpenDns, onStartOnboarding, onboarding, onCreateGbpTask, onCreateCommunityTask, renderTool, automations, onStartReviews, onEditClient }: {
   onStartReviews?: (clientId: string) => string; onEditClient?: (clientId: string) => void;
-  clients: OpsClient[]; tasks: OpsTask[]; tab: OperationsTab; onTab: (tab: OperationsTab) => void;
+  clients: OpsClient[]; tasks: OpsTask[]; tab: string; onTab: (tab: OperationsTab) => void;
   onOpenPage: (page: string, clientId?: string) => void; onOpenWebsite: (client: OpsClient) => void; onOpenDns: () => void;
   onStartOnboarding?: (clientId: string) => void; onboarding?: React.ReactNode; automations?: React.ReactNode; hasLeadFactory?: boolean;
   onCreateGbpTask?: (clientId: string) => string; onCreateCommunityTask?: (clientId: string, results: CommunityResult[]) => string;
-  renderTool?: (tool: "keywords" | "seo-keywords" | "seo-competitors" | "seo-audit" | "audits" | "reports" | "media" | "ads", clientId: string) => React.ReactNode;
+  renderTool?: (tool: "keywords" | "seo-keywords" | "seo-competitors" | "seo-backlinks" | "seo-audit" | "audits" | "reports" | "media" | "ads", clientId: string) => React.ReactNode;
 }) {
   const [toolClientId, setToolClientIdState] = useState(() => { try { return window.localStorage.getItem("f2b-ops-client") || ""; } catch { return ""; } });
   useFocusClient((id) => { if (id) setToolClientIdState(id); });
   const setToolClientId = (id: string) => { setToolClientIdState(id); if (id) setFocusClient(id); try { window.localStorage.setItem("f2b-ops-client", id); } catch { /* storage unavailable */ } };
-  const [siteMode, setSiteMode] = useState<"sites" | "media">("sites");
-  const [localMode, setLocalMode] = useState<"business" | "ai">("business");
-  const [reportMode, setReportMode] = useState<"audits" | "reports">("audits");
-  const [seoMode, setSeoMode] = useState<"keywords" | "competitors" | "ranks" | "audit">("keywords");
+  const { tab, sub } = normalizeOpsTab(rawTab);
+  const [siteMode, setSiteMode] = useState<SiteMode>("sites");
+  const [reportMode, setReportMode] = useState<"audits" | "reports">("reports");
+  const [seoMode, setSeoMode] = useState<SeoMode>("keywords");
+  const [emailStart, setEmailStart] = useState<"campaigns" | "automations">("campaigns");
+  // Old links (e.g. "forms", "local", "automations") land on the right section inside the new tabs.
+  useEffect(() => {
+    if (!sub) return;
+    if (tab === "seo") setSeoMode(sub as SeoMode); else if (tab === "websites") setSiteMode(sub as SiteMode); else if (tab === "reports") setReportMode(sub as "audits"); else if (tab === "email" && sub === "automations") setEmailStart("automations");
+    onTab(tab);
+  }, [rawTab]); // eslint-disable-line react-hooks/exhaustive-deps
   const [community, setCommunity] = useState<Record<string, { busy?: boolean; error?: string; results?: CommunityResult[]; cost?: number | null; note?: string; usage?: { clientRuns: number; lastRun: string | null; workspaceRuns: number; monthCostUsd: number } }>>({});
   const [notice, setNotice] = useState("");
   const findQuestions = async (client: OpsClient) => {
@@ -119,13 +132,13 @@ export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenW
   const [statusView, setStatusView] = useState<"active" | "inactive" | "all">("active");
   const active = useMemo(() => clients.filter((client) => client.status !== "Inactive" && client.status !== "Archived" && !/^agency$/i.test(client.name.trim())), [clients]);
   useEffect(() => {
-    if (!["overview", "websites", "local"].includes(tab) || sites) return;
+    if (!(tab === "overview" || tab === "websites" || (tab === "seo" && seoMode === "local")) || sites) return;
     fetch("/api/sites?siteRegistry=1", { cache: "no-store" }).then(async (response) => {
       const json = await response.json().catch(() => ({})) as { sites?: SiteRow[]; error?: string };
       if (!response.ok) throw new Error(json.error || "Website list unavailable.");
       setSites(json.sites || []);
     }).catch((reason) => { setSites([]); setSiteError(reason instanceof Error ? reason.message : "Website list unavailable."); });
-  }, [tab, sites]);
+  }, [tab, seoMode, sites]);
   const siteFor = (id: string) => (sites || []).find((row) => row.clientId === id);
   const isActiveClient = (client: OpsClient) => client.status !== "Inactive" && client.status !== "Archived";
   const listed = clients.filter((client) => !/^agency$/i.test(client.name.trim()) && (statusView === "all" || (statusView === "active" ? isActiveClient(client) : !isActiveClient(client))));
@@ -140,7 +153,10 @@ export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenW
 
   const selected = active.find((client) => client.id === toolClientId) || active[0];
   // The top-bar client picker drives every Operations tool; when it's on "All clients", show the client being used there.
-  const needsClient = tab !== "overview" && tab !== "onboarding" && tab !== "automations" && tab !== "leadfactory";
+  const needsClient = tab !== "overview" && tab !== "onboarding";
+  // Email also works for the agency's own contacts when the agency is picked in the top bar.
+  const agencyClient = clients.find((client) => /^agency$/i.test(client.name.trim()));
+  const emailClient = agencyClient && toolClientId === agencyClient.id ? { ...agencyClient, id: "", name: "F2B Media (agency)" } : selected;
   useEffect(() => { if (needsClient && selected && !readFocusClient()) setFocusClient(selected.id); }, [needsClient, selected?.id]);
   const seg = <K extends string>(value: K, set: (key: K) => void, items: Array<[K, string]>, label: string) => <span className="ops-seg" role="tablist" aria-label={label}>{items.map(([key, text]) => <button type="button" role="tab" key={key} aria-selected={value === key} className={value === key ? "active" : ""} onClick={() => set(key)}>{text}</button>)}</span>;
   const seoLocation = ((selected as OpsClient & { seoLocations?: string[] } | undefined)?.seoLocations || [])[0] || "Ireland";
@@ -149,11 +165,10 @@ export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenW
     <div className="page-heading ops-heading"><div><p className="eyebrow">Agency</p><h1>Operations</h1></div>
     </div>
     <div className="ops-tabs" role="tablist" aria-label="Operations sections">
-      {([["overview", "Overview"], ["seo", "SEO & Research"], ["ads", "Google Ads"], ["websites", "Websites"], ["forms", "Forms"], ["local", "Local & AI"], ["reports", "Reports"], ["automations", "Automations"], ["leadfactory", "Lead Factory"]] as Array<[OperationsTab, string]>).filter(([key]) => (!["seo", "ads", "reports"].includes(key) || renderTool) && (key !== "automations" || Boolean(automations)) && (key !== "leadfactory" || hasLeadFactory)).map(([key, label]) => { const Icon = OPS_TAB_ICONS[key]; return <button type="button" role="tab" key={key} aria-selected={tab === key || (key === "overview" && tab === "onboarding")} className={tab === key || (key === "overview" && tab === "onboarding") ? "active" : ""} onClick={() => onTab(key)}>{Icon && <Icon size={16} strokeWidth={1.9} aria-hidden="true" className="ops-tab-icon" />}{label}</button>; })}
+      {OPS_TABS.filter(([key]) => !["seo", "ads", "reports"].includes(key) || renderTool).map(([key, label, Icon]) => { const on = tab === key || (key === "overview" && tab === "onboarding"); return <button type="button" role="tab" key={key} aria-selected={on} className={on ? "active" : ""} onClick={() => onTab(key)}><Icon size={16} strokeWidth={1.9} aria-hidden="true" className="ops-tab-icon" />{label}</button>; })}
     </div>
 
-    {tab === "automations" && automations}
-    {tab === "overview" && <p className="ops-more">Also: {[["SEO", "SEO"], ["Google Ads", "Google Ads"], ["Meta Ads", "Meta Ads"], ["Proposal Studio", "Proposals"], ["Automations", "Marketing automations"]].map(([page, label], index) => <span key={page}>{index ? " · " : ""}<button type="button" className="text-button" onClick={() => onOpenPage(page)}>{label}</button></span>)}</p>}
+    {tab === "overview" && <p className="ops-more">Also: {[["Meta Ads", "Meta Ads"], ["Proposal Studio", "Proposals"]].map(([page, label], index) => <span key={page}>{index ? " · " : ""}<button type="button" className="text-button" onClick={() => onOpenPage(page)}>{label}</button></span>)}</p>}
     {tab === "overview" && <>
       <div className="ops-summary">
         <div><b>{active.length}</b><span>Active clients</span></div>
@@ -169,13 +184,13 @@ export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenW
           <td>{(client.services || []).length ? [...new Set((client.services || []).map((service) => serviceName(service.name)))].join(", ") : <span className="muted">No services</span>}</td>
           <td><ConnectionDots client={client} hasSite={Boolean(siteFor(client.id))} onOpen={(page) => onOpenPage(page, client.id)} /></td>
           <td><button type="button" className="text-button" onClick={() => onOpenPage("Tasks")}>{openTasks} open{approvals ? ` · ${approvals} to review` : ""}</button></td>
-          <td className="ops-actions">{onStartOnboarding && <button type="button" className="secondary-button" onClick={() => onStartOnboarding(client.id)}>Onboard</button>}<select aria-label={`Open a tool for ${client.name}`} value="" onChange={(event) => { const value = event.target.value; if (value === "website") onOpenWebsite(client); else if (value) onOpenPage(value, client.id); }}><option value="">Open…</option><option value="website">Website builder</option><option value="SEO">SEO</option><option value="Google Ads">Google Ads</option><option value="Meta Ads">Meta Ads</option><option value="Report Studio">Reports</option><option value="Clients">Client profile</option></select></td>
+          <td className="ops-actions">{onStartOnboarding && <button type="button" className="secondary-button" onClick={() => onStartOnboarding(client.id)}>Onboard</button>}<select aria-label={`Open a tool for ${client.name}`} value="" onChange={(event) => { const value = event.target.value; if (value === "website") onOpenWebsite(client); else if (value.startsWith("tab:")) { setToolClientId(client.id); onTab(value.slice(4) as OperationsTab); } else if (value) onOpenPage(value, client.id); }}><option value="">Open…</option><option value="website">Website builder</option><option value="tab:ads">Google Ads</option><option value="tab:seo">SEO &amp; AI</option><option value="tab:email">Email</option><option value="tab:reports">Reports</option><option value="Meta Ads">Meta Ads</option><option value="Clients">Client profile</option></select></td>
         </tr>)}</tbody>
       </table>{!rows.length && <p className="ops-empty">No clients match.</p>}</div>
     </>}
 
+    {tab === "websites" && <div className="ops-subbar">{seg(siteMode, setSiteMode, [["sites", "Sites & domains"], ["forms", "Forms"], ["media", "Media library"]], "Websites sections")}</div>}
     {tab === "websites" && siteMode === "sites" && <>
-      <div className="ops-subbar">{seg(siteMode, setSiteMode, [["sites", "Sites & domains"], ["media", "Media library"]], "Websites sections")}</div>
       <div className="ops-toolbar"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search clients…" aria-label="Search clients" /><button type="button" className="secondary-button" onClick={onOpenDns}>Domains & DNS</button></div>
       {siteError && <p className="ops-empty" role="alert">{siteError}</p>}
       <div className="ops-table-wrap"><table className="ops-table">
@@ -190,31 +205,27 @@ export function OperationsView({ clients, tasks, tab, onTab, onOpenPage, onOpenW
       </table></div>
     </>}
 
-    {tab === "forms" && <SiteFormsPanel clients={clients.filter((client) => !/^agency$/i.test(client.name.trim()))} clientId={toolClientId && clients.some((c) => c.id === toolClientId) ? toolClientId : ""} onClient={setToolClientId} />}
+    {tab === "websites" && siteMode === "forms" && <SiteFormsPanel clients={clients.filter((client) => !/^agency$/i.test(client.name.trim()))} clientId={toolClientId && clients.some((c) => c.id === toolClientId) ? toolClientId : ""} onClient={setToolClientId} />}
 
     {tab === "onboarding" && <><button type="button" className="text-button ops-back" onClick={() => onTab("overview")}>← Back to overview</button>{onboarding}</>}
 
     {tab === "seo" && renderTool && selected && <>
-      <div className="ops-subbar">{seg(seoMode, setSeoMode, [["keywords", "Keywords"], ["competitors", "Competitors"], ["ranks", "Rankings"], ["audit", "Site Audit"]], "SEO sections")}</div>
-      <div className="ops-embed" key={`seo-${seoMode}-${selected.id}`}>{seoMode === "ranks" ? <RankTrackingPanel clientId={selected.id} clientName={selected.name} defaultLocation={seoLocation} /> : renderTool(seoMode === "competitors" ? "seo-competitors" : seoMode === "audit" ? "seo-audit" : "seo-keywords", selected.id)}</div>
+      <div className="ops-subbar">{seg(seoMode, setSeoMode, [["keywords", "Keywords"], ["competitors", "Competitors"], ["ranks", "Rankings"], ["audit", "Site audit"], ["backlinks", "Backlinks"], ["local", "Business Profile"], ["ai", "AI visibility"]], "SEO and AI sections")}</div>
+      {!["local", "ai"].includes(seoMode) && <div className="ops-embed" key={`seo-${seoMode}-${selected.id}`}>{seoMode === "ranks" ? <RankTrackingPanel clientId={selected.id} clientName={selected.name} defaultLocation={seoLocation} /> : renderTool(seoMode === "competitors" ? "seo-competitors" : seoMode === "audit" ? "seo-audit" : seoMode === "backlinks" ? "seo-backlinks" : "seo-keywords", selected.id)}</div>}
     </>}
+    {tab === "email" && emailClient && <Suspense fallback={<div className="page-loading" role="status" aria-label="Loading email…"><i /></div>}><EmailMarketingView key={`${emailClient.id || "agency"}-${emailStart}`} initialMode={emailStart} clientId={emailClient.id} clientName={emailClient.name} clientLogo={emailClient.logo} clientColor={emailClient.color} automations={automations} /></Suspense>}
     {tab === "ads" && renderTool && selected && <div className="ops-embed" key={`ads-${selected.id}`}>{renderTool("ads", selected.id)}</div>}
     {tab === "reports" && renderTool && selected && <>
-      <div className="ops-subbar">{seg(reportMode, setReportMode, [["audits", "Audits"], ["reports", "Reports"]], "Reports sections")}</div>
+      <div className="ops-subbar">{seg(reportMode, setReportMode, [["reports", "Client reports"], ["audits", "Audits"]], "Reports sections")}</div>
       <div className="ops-embed" key={`rep-${reportMode}-${selected.id}`}>{renderTool(reportMode, selected.id)}</div>
     </>}
-    {tab === "local" && localMode === "ai" && selected && <>
-      <div className="ops-subbar">{seg(localMode, setLocalMode, [["business", "Business & community"], ["ai", "AI visibility"]], "Local and AI sections")}</div>
+    {tab === "seo" && seoMode === "ai" && selected && <>
       <div className="ops-embed" key={`ai-${selected.id}`}><AiVisibilityPanel clientId={selected.id} clientName={selected.name} area={seoLocation} services={(selected.services || []).map((service) => service.name).concat((selected as OpsClient & { seoServices?: string[] }).seoServices || [])} /></div>
     </>}
-    {tab === "websites" && siteMode === "media" && renderTool && <>
-      <div className="ops-subbar">{seg(siteMode, setSiteMode, [["sites", "Sites & domains"], ["media", "Media library"]], "Websites sections")}</div>
-      <div className="ops-embed">{renderTool("media", "")}</div>
-    </>}
-    {!selected && ["seo", "ads", "reports"].includes(tab) && <p className="ops-empty">No active clients.</p>}
+    {tab === "websites" && siteMode === "media" && renderTool && <div className="ops-embed">{renderTool("media", "")}</div>}
+    {!selected && ["seo", "ads", "reports", "email"].includes(tab) && <p className="ops-empty">No active clients.</p>}
 
-    {tab === "local" && localMode === "business" && <>
-      <div className="ops-subbar">{seg(localMode, setLocalMode, [["business", "Business & community"], ["ai", "AI visibility"]], "Local and AI sections")}</div>
+    {tab === "seo" && seoMode === "local" && <>
       {notice && <p className="ops-notice" role="status">{notice}</p>}
       {!selected ? <p className="ops-empty">No active clients.</p> : (() => { const client = selected; const c = community[client.id] || {}; const gbp = Boolean(client.googleBusinessProfileLocationId || client.googleBusinessProfileAccountId); return <div className="ops-local-grid">
         <section className="ops-local-card">

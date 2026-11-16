@@ -7,6 +7,7 @@ import { processCrmAutomations } from "../lib/crm-automations/engine.ts";
 import { processExpiredMarketingSubmissions } from "../lib/marketing-submission-retention";
 import { processMonthlyClientReports } from "../lib/client-report-archive";
 import { processOutreach } from "../lib/outreach/server/engine";
+import { processEmailCampaigns } from "../lib/email-marketing/server";
 import { getGoogleAdsCampaignMetrics, googleAdsConnectionReady, keepGoogleAdsTokensFresh } from "../lib/google-ads-direct";
 import { ghlLocationRequest } from "../lib/gohighlevel-oauth";
 import { deliverGhlMarketingMessage } from "../lib/marketing-automation-message.js";
@@ -181,6 +182,8 @@ const worker = {
       processExpiredMarketingSubmissions(env.DB!, env.BUCKET, new Date(controller.scheduledTime)),
       processMonthlyClientReports(env.DB, env.BUCKET as never, new Date(controller.scheduledTime)),
       processOutreach(new Date(controller.scheduledTime)),
+      // Operations → Email campaigns: next email to up to 80 due contacts, one Resend batch call.
+      processEmailCampaigns(env as never, new Date(controller.scheduledTime)),
       keepGoogleAdsTokensFresh(env.DB!),
       processDailyMarketingSnapshots({ ...env, isGoogleAdsDirect: googleAdsConnectionReady, readDirectGoogleAds: async (ownerId, accountId, window) => (await getGoogleAdsCampaignMetrics(ownerId, accountId, window)).rows, isMetaAdsDirect: metaAdsConnectionExists, readDirectMetaAds: (ownerId, accountId, window) => readDirectMetaAdsInsights(ownerId, accountId, window, "campaigns"), isSearchConsoleDirect: hasGoogleSearchConsoleConnection, readDirectSearchConsole: (ownerId, accountId, window) => readGoogleSearchConsoleRows(ownerId, accountId, window.start, window.end), isGoogleAnalyticsDirect: hasGoogleAnalyticsDirectConnection, readDirectGoogleAnalytics: async (ownerId, accountId, window) => {
         const [totals, channels] = await Promise.all([

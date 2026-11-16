@@ -1882,3 +1882,12 @@ html body .app-shell .tn-side-head { display: none; }
   html body .app-shell.topnav-layout.nav-side .tn-right { grid-column: 2 !important; }
   html body .app-shell.topnav-layout.nav-side .main-area > :not(.tn-bar) { margin-left: 252px !important; max-width: calc(100vw - 268px) !important; }
 }
+/* Tab bars stay perfectly still when you switch tabs: the page wrapper no longer fades (so the bar
+   doesn't flash), only the content under the bar fades in; tabs don't lift or ring on hover/click. */
+html body .app-shell .main-area .crm-workspace { animation: none !important; }
+html body .app-shell .main-area .crm-workspace > :not(.crm-tabs):not(.crm-heading) { animation: f2b-fade-in .3s ease-out both; }
+html body .app-shell .main-area .crm-tabs.crm-tabs.crm-tabs.crm-tabs.crm-tabs > :is(button, a):not(:focus-visible):is(:hover, :focus, :active),
+html body .app-shell .main-area .ops-tabs.ops-tabs.ops-tabs.ops-tabs.ops-tabs > :is(button, a):not(:focus-visible):is(:hover, :focus, :active) { box-shadow: none !important; transform: none !important; }
+html body .app-shell .main-area .crm-tabs.crm-tabs.crm-tabs.crm-tabs.crm-tabs > :is(button, a),
+html body .app-shell .main-area .ops-tabs.ops-tabs.ops-tabs.ops-tabs.ops-tabs > :is(button, a) { transform: none !important; animation: none !important; }
+html body .app-shell .main-area .ops-tabs > button:not(.active):hover { background: rgba(127,138,160,.12) !important; }
