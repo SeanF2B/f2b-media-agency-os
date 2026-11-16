@@ -47,7 +47,7 @@ function Modal({ title, onClose, children, footer, wide }: { title: string; onCl
   </div>;
 }
 
-export function SchedulingView({ scopeClientId }: { scopeClientId: string }) {
+export function SchedulingView({ scopeClientId, onAddStaff }: { scopeClientId: string; onAddStaff?: () => void }) {
   const [data, setData] = useState<Data | null>(null);
   const [tab, setTab] = useState<"calendar" | "appointments" | "calendars" | "availability">("calendar");
   const [week, setWeek] = useState(() => mondayOf(new Date()));
@@ -174,12 +174,13 @@ export function SchedulingView({ scopeClientId }: { scopeClientId: string }) {
           <div className="sch-hours-sum">{days.length ? days.map(([k, l]) => <span key={k}><b>{l.slice(0, 3)}</b> {(s.weekly?.[k] || []).map((w) => `${w[0]}–${w[1]}`).join(", ")}</span>) : <span className="iv-need-text iv-small">No working hours set, so nobody can book this person.</span>}{s.blocked?.filter((d) => d >= todayKey).length ? <span className="iv-small">{s.blocked.filter((d) => d >= todayKey).length} day(s) off coming up</span> : null}</div>
           <div className="sch-sync">
             <div><img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_48dp.png" alt="" width={18} height={18} /><span>{s.google ? <>Google: <b>{s.google}</b></> : "Google Calendar not connected"}</span>
-              {s.canEdit && (s.google ? <button type="button" className="iv-btn danger" disabled={busy} onClick={() => void act({ action: "disconnectGoogle", staffId: s.id }, "Google Calendar disconnected.")}>Disconnect</button> : data.googleAvailable ? <a className="iv-btn" href={`/api/scheduling?${scopeQs(scopeClientId)}&connect=${encodeURIComponent(s.id)}`}>Connect</a> : <span className="iv-small">Not set up on server</span>)}</div>
+              {s.canEdit && (s.google ? <button type="button" className="iv-btn danger" disabled={busy} onClick={() => void act({ action: "disconnectGoogle", staffId: s.id }, "Google Calendar disconnected.")}>Disconnect</button> : data.googleAvailable ? <span className="sch-connect-pair"><a className="iv-btn" href={`/api/scheduling?${scopeQs(scopeClientId)}&connect=${encodeURIComponent(s.id)}`}>Connect</a>{data.canManage && <button type="button" className="iv-btn" title={`Copy a link to send ${s.name.split(" ")[0]} so they can connect their own Google Calendar`} onClick={() => { void navigator.clipboard?.writeText(`${window.location.origin}/api/scheduling?${scopeQs(scopeClientId)}&connect=${encodeURIComponent(s.id)}`); setNote(`Link copied — send it to ${s.name.split(" ")[0]}. They sign in to the OS, then pick their Google account.`); }}>Copy link</button>}</span> : <span className="iv-small">Not set up on server</span>)}</div>
             <div><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="4" fill="#fff" stroke="#e11d48" strokeWidth="1.6" /><rect x="3" y="4" width="18" height="5" rx="2" fill="#e11d48" /><text x="12" y="18" textAnchor="middle" fontSize="8" fontWeight="700" fill="#111">31</text></svg><span>Apple / Outlook calendar feed</span>
               {s.canEdit && (s.feedUrl ? <><button type="button" className="iv-btn" onClick={() => { void navigator.clipboard?.writeText(s.feedUrl); setNote("Feed link copied. On iPhone: Settings → Calendar → Accounts → Add Account → Other → Add Subscribed Calendar, then paste. On Mac: Calendar → File → New Calendar Subscription. In Outlook: Add calendar → Subscribe from web."); }}>Copy link</button><button type="button" className="iv-btn" title="Make a new private link (the old one stops working)" onClick={() => void act({ action: "rotateFeed", staffId: s.id }, "New private feed link created. Re-subscribe with the new link.")}><RefreshCw size={12} /></button></> : <button type="button" className="iv-btn" onClick={() => void act({ action: "createFeed", staffId: s.id }, "Private feed link ready. Click Copy link.")}>Create link</button>)}</div>
           </div>
           {(s.canEdit || data.canManage) && <div className="iv-actions"><button type="button" className="iv-btn" onClick={() => setEditAvail(s)}><Clock size={13} /> Edit hours &amp; days off</button></div>}
         </div>; })}
+      {onAddStaff && <button type="button" className="iv-card sch-staff sch-add-staff" onClick={onAddStaff}><span className="sch-add-plus">＋</span><b>Add staff</b><small>Invite a team member, then connect their calendar</small></button>}
     </div>}
 
     {newAppt && <NewAppointment data={data} scope={scopeClientId} initial={newAppt} onClose={() => setNewAppt(null)} onSaved={async (msg) => { setNewAppt(null); setNote(msg); await load(); }} onCalendarsChanged={() => void load()} />}

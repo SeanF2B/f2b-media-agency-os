@@ -1451,3 +1451,8 @@ html body .app-shell .sch-week-card { display: flex; flex-direction: column; hei
 html body .app-shell .sch-week-card .sch-week { flex: 1 1 auto; min-height: 0; overflow: auto !important; }
 html body .app-shell .sch-week-card .sch-day-head { position: sticky; top: 0; z-index: 3; background: var(--surface, #fff); }
 html body.f2b-dark .app-shell .sch-week-card .sch-day-head, html body .app-shell.dark-mode .sch-week-card .sch-day-head { background: #1f262c; }
+html body .app-shell .sch-connect-pair { display: inline-flex; gap: 6px; }
+html body .app-shell .sch-add-staff { display: grid; place-items: center; align-content: center; gap: 6px; min-height: 220px; border: 2px dashed rgba(127,138,160,.4) !important; background: transparent !important; cursor: pointer; text-align: center; color: inherit; }
+html body .app-shell .sch-add-staff:hover { border-color: var(--brand-primary, #1f6feb) !important; }
+html body .app-shell .sch-add-plus { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; font-size: 22px; background: color-mix(in srgb, var(--brand-primary, #1f6feb) 14%, transparent); color: var(--brand-primary, #1f6feb); }
+html body .app-shell .sch-add-staff small { opacity: .7; font-size: 12px; }
