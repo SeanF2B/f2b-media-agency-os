@@ -1691,3 +1691,14 @@ body.f2b-dark .cp-menu.cp-menu-float { background: #1d2429; border-color: #33404
 html body .app-shell .dh-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; align-items: stretch; }
 html body .app-shell .dh-grid > .dh-panel { margin: 0 !important; height: 100%; }
 @media (max-width: 1100px) { html body .app-shell .dh-grid { grid-template-columns: 1fr !important; } }
+/* Task table: no box on task titles, overdue tag in Open, mobile status picker */
+html body .app-shell :is(.tt-title, .tt-title:hover, .tt-title:focus, .tt-title:active, #f2b-tt-t) { border: 0 !important; outline: 0 !important; box-shadow: none !important; background: transparent !important; text-decoration: none !important; padding: 0 !important; }
+html body .app-shell .tt-title:hover { text-decoration: underline !important; text-underline-offset: 3px; }
+html body .app-shell .tt-overdue { margin-left: 8px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #fde8e8; color: #b42318; white-space: nowrap; }
+body.f2b-dark .app-shell .tt-overdue { background: #3a1f1f; color: #ff9b94; }
+html body .app-shell .tt-mobile-status { display: none; }
+@media (max-width: 860px) {
+  html body .app-shell .tt-table :is(th, td):nth-child(4) { display: none !important; }
+  html body .app-shell .tt-mobile-status { display: inline-block; margin-top: 6px; height: 28px; border: 0; border-radius: 999px; color: #fff; font-weight: 700; font-size: 12px; padding: 0 10px; }
+  html body .app-shell .tt-table td:nth-child(2) { display: table-cell !important; }
+}

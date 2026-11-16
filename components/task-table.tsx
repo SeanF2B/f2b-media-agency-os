@@ -41,7 +41,7 @@ export function TaskTable({ onQuickAdd, tasks, clients, staff, statuses, onStatu
 }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [sort, setSort] = useState<"due" | "priority" | "status" | "title">("due");
-  const [view, setView] = useState<"open" | "scheduled" | "overdue" | "all">("open");
+  const [view, setView] = useState<"open" | "scheduled" | "done">("open");
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const clientById = useMemo(() => new Map(clients.map((client) => [client.id, client])), [clients]);
   const staffById = useMemo(() => new Map(staff.map((member) => [member.id, member])), [staff]);
@@ -49,7 +49,7 @@ export function TaskTable({ onQuickAdd, tasks, clients, staff, statuses, onStatu
   const today = new Date().toISOString().slice(0, 10);
   const isScheduled = (task: TableTask) => (task.repeat && task.repeat !== "None") || Boolean(task.aiRunAt) || Boolean(task.due && task.due > today && task.status === "To do");
   const isOpen = (task: TableTask) => task.status !== "Done" && task.status !== "Cancelled";
-  const filtered = useMemo(() => tasks.filter((task) => view === "all" ? true : view === "open" ? isOpen(task) : view === "overdue" ? isOpen(task) && Boolean(task.due && task.due < today) : isOpen(task) && isScheduled(task)),
+  const filtered = useMemo(() => tasks.filter((task) => view === "done" ? !isOpen(task) : view === "open" ? isOpen(task) : isOpen(task) && isScheduled(task)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [tasks, view, today]);
   const groups = useMemo(() => {
@@ -65,11 +65,11 @@ export function TaskTable({ onQuickAdd, tasks, clients, staff, statuses, onStatu
   const toggleGroup = (id: string) => setCollapsed((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   const bulk = (patch: TaskPatch) => { if (!pickedIds.length) return; if (onBulkUpdate) onBulkUpdate(pickedIds, patch); else if (patch.status) pickedIds.forEach((id) => onStatus(id, patch.status!)); setPicked(new Set()); };
   const sortButton = (key: typeof sort, label: string) => <button type="button" className={`tt-sort ${sort === key ? "active" : ""}`} onClick={() => setSort(key)}>{label}{sort === key ? " ↓" : ""}</button>;
-  const counts = { open: tasks.filter(isOpen).length, scheduled: tasks.filter((task) => isOpen(task) && isScheduled(task)).length, overdue: tasks.filter((task) => isOpen(task) && Boolean(task.due && task.due < today)).length, all: tasks.length };
+  const counts = { open: tasks.filter(isOpen).length, scheduled: tasks.filter((task) => isOpen(task) && isScheduled(task)).length, done: tasks.filter((task) => !isOpen(task)).length };
 
   return <section className="task-table-view" aria-label="Task table">
     <div className="tt-toolbar">
-      <div className="tt-views" role="tablist" aria-label="Table views">{([["open", "Open"], ["scheduled", "Scheduled & recurring"], ["overdue", "Overdue"], ["all", "All"]] as const).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={view === key} className={view === key ? "active" : ""} onClick={() => { setView(key); setPicked(new Set()); }}>{label}<span>{counts[key]}</span></button>)}</div>
+      <div className="tt-views" role="tablist" aria-label="Table views">{([["open", "Open"], ["scheduled", "Scheduled & recurring"], ["done", "Done"]] as const).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={view === key} className={view === key ? "active" : ""} onClick={() => { setView(key); setPicked(new Set()); }}>{label}<span>{counts[key]}</span></button>)}</div>
       <button type="button" className="text-button tt-collapse" onClick={() => setCollapsed(collapsed.size ? new Set() : new Set(groups.map((group) => group.clientId)))}>{collapsed.size ? "Expand all" : "Collapse all"}</button>
     </div>
     {pickedIds.length > 0 && <div className="tt-bulk" role="toolbar" aria-label="Bulk actions">
@@ -91,7 +91,7 @@ export function TaskTable({ onQuickAdd, tasks, clients, staff, statuses, onStatu
         </tr>
         {open && group.list.map((task) => { const owner = staffById.get(task.assigneeId); const overdue = Boolean(task.due && task.due < today && isOpen(task)); return <tr key={task.id} className={`tt-row ${picked.has(task.id) ? "picked" : ""}`} style={{ ["--tt-group" as string]: group.colour }}>
           <td className="tt-check"><input type="checkbox" aria-label={`Select ${task.title}`} checked={picked.has(task.id)} onChange={(event) => togglePick([task.id], event.target.checked)} /></td>
-          <td><span className="tt-title-wrap"><TaskIcon service={task.service} title={task.title} /><button type="button" className="tt-title" onClick={() => onEdit(task.id)} title={task.title}>{task.title}</button></span></td>
+          <td><span className="tt-title-wrap"><TaskIcon service={task.service} title={task.title} /><button type="button" className="tt-title" onClick={() => onEdit(task.id)} title={task.title}>{task.title}</button>{overdue && <span className="tt-overdue">Overdue</span>}</span><select className="tt-mobile-status" aria-label={`Status of ${task.title}`} value={task.status} style={{ background: STATUS_COLOURS[task.status] || "#8a94a6" }} onChange={(event) => onStatus(task.id, event.target.value)}>{statuses.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></td>
           <td><span className="tt-owner">{renderAvatar(task.assigneeId)}<span>{owner?.name?.split("|")[0].trim() || "Unassigned"}</span></span></td>
           <td><select className="tt-pill" aria-label={`Status of ${task.title}`} value={task.status} style={{ background: STATUS_COLOURS[task.status] || "#8a94a6" }} onChange={(event) => onStatus(task.id, event.target.value)}>{statuses.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}{!statuses.some((item) => item.value === task.status) && <option value={task.status}>{task.status}</option>}</select></td>
           <td>{onBulkUpdate ? <select className="tt-pill" aria-label={`Priority of ${task.title}`} value={task.priority || "Normal"} style={{ background: PRIORITY_COLOURS[task.priority] || "#9aa5b1" }} onChange={(event) => onBulkUpdate([task.id], { priority: event.target.value })}>{PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}</select> : <span className="tt-pill" style={{ background: PRIORITY_COLOURS[task.priority] || "#9aa5b1" }}>{task.priority || "Normal"}</span>}</td>
@@ -102,6 +102,6 @@ export function TaskTable({ onQuickAdd, tasks, clients, staff, statuses, onStatu
         </tr>; })}
       </Fragment>; })}</tbody>
     </table></div>
-    {!groups.length && <p className="tt-empty">{view === "scheduled" ? "Nothing scheduled or recurring." : view === "overdue" ? "Nothing overdue." : "No tasks to show."}</p>}
+    {!groups.length && <p className="tt-empty">{view === "scheduled" ? "Nothing scheduled or recurring." : view === "done" ? "Nothing completed yet." : "No tasks to show."}</p>}
   </section>;
 }
