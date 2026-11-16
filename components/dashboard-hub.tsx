@@ -95,7 +95,15 @@ export function DashboardHub({ activityPanel = null, scopeClientId, clients, tas
   const tone = (mine: number) => mine >= OVERLOAD ? "overload" : mine > 0 ? "waiting" : "clear";
   const clientOf = (id: string) => clients.find((c) => c.id === id);
   const logo = (id: string) => { const c = clientOf(id); return c?.logo ? <img className="dh-logo" src={c.logo} alt="" /> : <span className="dh-logo dh-logo-fallback">{(c?.name || "•").slice(0, 1)}</span>; };
-  const view = sample ? SAMPLE : metrics;
+  // Sample keywords / ChatGPT questions follow this account's own services and town (from its website when known).
+  const [siteSample, setSiteSample] = useState<{ services: string[]; locations: string[] } | null>(null);
+  useEffect(() => {
+    if (!sample || !scopeClientId) { setSiteSample(null); return; }
+    let live = true;
+    fetch(`/api/scheduling?clientId=${encodeURIComponent(scopeClientId)}&view=site`).then((r) => r.ok ? r.json() : null).then((v: { services?: string[]; locations?: string[] } | null) => { if (live && v) setSiteSample({ services: v.services || [], locations: v.locations || [] }); }).catch(() => undefined);
+    return () => { live = false; };
+  }, [sample, scopeClientId]);
+  const view = sample ? sampleFor(SAMPLE, clients.find((c) => c.id === scopeClientId)?.name || "", siteSample) : metrics;
   const m = view?.marketing;
   const cur = m?.currency || "EUR";
 
@@ -234,4 +242,29 @@ export function DashboardHub({ activityPanel = null, scopeClientId, clients, tas
       </section>
     </div>
   </div>;
+}
+
+// Make the demo search terms and AI questions match the account (tattoo studio in Cork, roofer in Galway…).
+function sampleFor(base: Metrics, clientName: string, site: { services: string[]; locations: string[] } | null): Metrics {
+  if (!base.marketing) return base;
+  const n = clientName.toLowerCase();
+  const trade = /tattoo|ink|poppy|piercing/.test(n) ? "tattoo" : /roof/.test(n) ? "roofer" : /hair|salon|beauty|mua|lash|brow/.test(n) ? "beauty" : /plumb|heat/.test(n) ? "plumber" : /electric/.test(n) ? "electrician" : /handy|maint|property/.test(n) ? "handyman" : /interior|kitchen|design/.test(n) ? "interiors" : "business";
+  const defaults: Record<string, string[]> = { tattoo: ["Tattoo studio", "Fine line tattoo", "Cover up tattoo", "Piercing", "Black and grey tattoo"], roofer: ["Roofers", "Roof repairs", "Flat roof repair", "Chimney repair", "Gutter cleaning"], beauty: ["Makeup artist", "Bridal makeup", "Lash extensions", "Brow lamination", "Beauty salon"], plumber: ["Plumber", "Boiler service", "Emergency plumber", "Heating repair", "Bathroom fitting"], electrician: ["Electrician", "Fuse board upgrade", "EV charger install", "Emergency electrician", "Lighting install"], handyman: ["Handyman", "Property maintenance", "Painting and decorating", "Odd jobs", "Gutter cleaning"], interiors: ["Interior designer", "Kitchen design", "Home renovation", "Bathroom design", "Fitted wardrobes"], business: ["Local services", "Consultation", "Quote", "Best rated", "Near me"] };
+  const services = (site?.services.length ? site.services : defaults[trade]).map((x) => x.replace(/\s+(tattoos?|designs?)$/i, (m) => m).toLowerCase()).slice(0, 5);
+  const town = (site?.locations.find((l) => !/quarter|street|road/i.test(l)) || (/cork|poppy/.test(n) ? "Cork" : /galway|roof/.test(n) ? "Galway" : /birmingham|apex/.test(n) ? "Birmingham" : "Dublin")).trim();
+  const t = town.toLowerCase();
+  const rows: Array<[string, number, number, number]> = [
+    [`${services[0]} ${t}`, 2, 3, 720], [`best ${trade === "business" ? services[0] : trade} ${t}`, 1, 2, 390], [`${services[1] || services[0]} near me`, 3, 6, 880], [`${services[2] || services[0]} ${t}`, 5, 7, 260],
+    [`${services[3] || services[0]} ${t}`, 4, 4, 140], [`${services[4] || services[1] || services[0]} near me`, 6, 9, 210], [`${services[1] || services[0]} prices ${t}`, 8, 11, 90], [`${services[0]} open now`, 12, 15, 480],
+  ];
+  const keywords = rows.map(([keyword, position, previous, volume]) => ({ keyword, position, previous, volume }));
+  const label = trade === "business" ? services[0] : trade === "tattoo" ? "tattoo studio" : trade;
+  const questions = [
+    { prompt: `Who is the best ${label} in ${town}?`, mentioned: true, position: 1, competitors: [] as string[] },
+    { prompt: `Recommend a ${services[1] || label} near ${town}`, mentioned: true, position: 2, competitors: [] },
+    { prompt: `Where can I get ${services[2] || services[0]} in ${town} this weekend?`, mentioned: false, position: null, competitors: [] },
+    { prompt: `How much does ${services[0]} cost in ${town}?`, mentioned: false, position: null, competitors: [] },
+    { prompt: `Most trusted ${label} in ${town} with good reviews`, mentioned: true, position: 3, competitors: [] },
+  ];
+  return { ...base, marketing: { ...base.marketing, google: base.marketing.google ? { ...base.marketing.google, keywords } : null, chatgpt: base.marketing.chatgpt ? { ...base.marketing.chatgpt, questions } : null } };
 }

@@ -388,7 +388,7 @@ export async function updateBooking(deps: Deps, ownerId: string, id: string, cha
     const keep = answers.filter((a) => !(/^Photo/i.test(a.label) && a.value === change.removePhoto));
     const photos = keep.filter((a) => /^Photo/i.test(a.label)).map((a) => a.value);
     const others = keep.filter((a) => !/^Photo/i.test(a.label));
-    const added = (change.addPhotos || []).map((u) => clean(u, 600)).filter((u) => /^(https:\/\/|\/media\/)/.test(u) && !photos.includes(u));
+    const added = (change.addPhotos || []).map((u) => clean(u, 600)).filter((u) => /^(https:\/\/|\/media\/|\/api\/marketing-public\/media)/.test(u) && !photos.includes(u));
     const all = [...photos, ...added].slice(0, 12).map((value, i) => ({ label: i ? `Photo ${i + 1}` : "Photo", value }));
     await db.prepare("UPDATE sched_bookings SET answers=?3, updated_at=?4 WHERE owner_id=?1 AND id=?2").bind(ownerId, id, JSON.stringify([...others, ...all]), now).run();
   }
@@ -498,7 +498,7 @@ export type StaffReview = { id: string; author: string; rating: number; text: st
 export type StaffPhoto = { url: string; caption: string };
 export type StaffProfile = { showReviews: boolean; showPhotos: boolean; title: string; bio: string; reviews: StaffReview[]; photos: StaffPhoto[] };
 const EMPTY_PROFILE: StaffProfile = { showReviews: false, showPhotos: false, title: "", bio: "", reviews: [], photos: [] };
-const okImage = (url: string) => /^(https:\/\/|\/media\/)/.test(url) && url.length < 1000;
+const okImage = (url: string) => /^(https:\/\/|\/media\/|\/api\/marketing-public\/media)/.test(url) && url.length < 1000;
 
 export function sanitizeProfile(input: unknown): StaffProfile {
   const r = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;

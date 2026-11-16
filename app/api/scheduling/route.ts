@@ -171,7 +171,7 @@ export async function POST(request: Request) {
           location: typeof body.location === "string" ? body.location : "",
           extraAnswers: [
             ...(Number(body.price) > 0 ? [{ label: "Price", value: `${cal.currency === "GBP" ? "£" : cal.currency === "USD" ? "$" : "€"}${(Math.round(Number(body.price) * 100) / 100).toFixed(2)}` }] : []),
-            ...(Array.isArray(body.images) ? (body.images as unknown[]).map(String).filter((u) => /^(https:\/\/|\/media\/)/.test(u)).slice(0, 3).map((u, i) => ({ label: i ? `Photo ${i + 1}` : "Photo", value: u })) : []),
+            ...(Array.isArray(body.images) ? (body.images as unknown[]).map(String).filter((u) => /^(https:\/\/|\/media\/|\/api\/marketing-public\/media)/.test(u)).slice(0, 3).map((u, i) => ({ label: i ? `Photo ${i + 1}` : "Photo", value: u })) : []),
           ],
           source: "internal", createdBy: by, workspace: workspaceFor(ctx), notifyCustomer: body.notify !== false,
         });

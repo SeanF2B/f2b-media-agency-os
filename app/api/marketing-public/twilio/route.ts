@@ -1,6 +1,7 @@
 // Public Twilio webhook (SMS + WhatsApp). Lives under /api/marketing-public so the existing public Access bypass already covers it.
 // Every request is verified with Twilio's X-Twilio-Signature (HMAC-SHA1 with the saved Auth Token) before anything is stored.
 import { env } from "cloudflare:workers";
+import { detectMediaType, MEDIA_SCHEMA_SQL, newFileKey, publicMediaUrl } from "@/lib/media-library/core";
 import { addMessage, botReply, leadToCrm, e164, findOwnerByNumber, loadSettings, twilioCredentials, upsertThread, verifyTwilio, type Channel } from "@/lib/conversations/core";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +28,28 @@ export async function POST(request: Request) {
   const candidates = [...new Set([request.url, `https://${host}${url.pathname}${url.search}`, `https://${url.host}${url.pathname}${url.search}`])];
   if (!(await verifyTwilio(creds.token, candidates, params, request.headers.get("x-twilio-signature") || ""))) return xml("", 403);
   if (!text && !Number(params.NumMedia || 0)) return xml("");
-  const body = text || "[Customer sent a photo or file. Open Twilio to view it.]";
+  // Photos the customer sends are copied into the client's Media Library so they show in the chat (and can go on a booking).
+  const mediaLines: string[] = [];
+  const media = Math.min(5, Number(params.NumMedia || 0));
+  if (media > 0 && env.BUCKET) {
+    for (const stmt of MEDIA_SCHEMA_SQL.slice(0, 3)) await env.DB.prepare(stmt).run().catch(() => undefined);
+    for (let i = 0; i < media; i++) {
+      const src = String(params[`MediaUrl${i}`] || ""); if (!/^https:\/\/api\.twilio\.com\//.test(src)) continue;
+      try {
+        const res = await fetch(src, { headers: { authorization: `Basic ${btoa(`${creds.sid}:${creds.token}`)}` }, redirect: "follow" });
+        if (!res.ok) continue;
+        const bytes = new Uint8Array(await res.arrayBuffer()); if (!bytes.byteLength || bytes.byteLength > 20_000_000) continue;
+        const type = detectMediaType(bytes); if (!type || type.kind === "document") continue;
+        const key = newFileKey(type.ext);
+        await env.BUCKET.put(key, bytes, { httpMetadata: { contentType: type.mime, cacheControl: "public, max-age=31536000, immutable" } });
+        const now = new Date().toISOString();
+        await env.DB.prepare("INSERT INTO media_library_items (id, owner_id, scope_id, name, folder, kind, mime, size, file_key, source, source_id, created_by, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, 'Conversation photos', ?5, ?6, ?7, ?8, 'conversation', ?9, ?10, ?11, ?11)")
+          .bind(crypto.randomUUID(), found.ownerId, found.config.clientId || "", `${String(params.ProfileName || contact).slice(0, 60)} photo`, type.kind, type.mime, bytes.byteLength, key, String(params.MessageSid || ""), contact, now).run().catch(() => undefined);
+        mediaLines.push(`📷 ${publicMediaUrl(key)}`);
+      } catch { /* skip this file */ }
+    }
+  }
+  const body = [text, ...mediaLines].filter(Boolean).join("\n") || "[Customer sent a photo or file. Open Twilio to view it.]";
   const sid = String(params.MessageSid || "");
   if (sid) { const dup = await env.DB.prepare("SELECT 1 FROM conv_messages WHERE twilio_sid=?1 AND owner_id=?2").bind(sid, found.ownerId).first().catch(() => null); if (dup) return xml(""); }
   const thread = await upsertThread(found.ownerId, { channel, ourNumber, contact, contactName: String(params.ProfileName || ""), clientId: found.config.clientId });

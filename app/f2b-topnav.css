@@ -2183,3 +2183,13 @@ html body .app-shell .pipeline-card.is-compact .pipeline-card-details > :not(sum
 .dark-mode .task-pending-chip { background: #3a3220; border-color: #5c4b25; color: #f3dca6; }
 .app-shell .workflow-submit-review-controls.is-compact { display: flex; justify-content: flex-end; margin: 0; padding: 0; border: 0; background: transparent; }
 .app-shell .workflow-submit-review-controls.is-compact .workflow-submit-review-button { padding: 6px 11px; font-size: 11.5px; }
+
+/* Conversations: photos in chat, book button, photo zoom */
+.cv-photos{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.cv-photo{all:unset;cursor:zoom-in;display:block;width:120px;height:120px;border-radius:12px;overflow:hidden;background:#eef2f5}
+.cv-photo img{width:100%;height:100%;object-fit:cover;display:block}
+.cv-book{white-space:nowrap}
+.cv-head-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.cv-zoom{position:fixed;inset:0;z-index:6000;background:rgba(5,8,12,.88);display:flex;align-items:center;justify-content:center;padding:30px}
+.cv-zoom img{max-width:92vw;max-height:86vh;border-radius:12px;object-fit:contain}
+.cv-zoom button{position:absolute;top:18px;right:18px;width:40px;height:40px;border-radius:50%;border:0;background:rgba(255,255,255,.15);color:#fff;font-size:22px;cursor:pointer}

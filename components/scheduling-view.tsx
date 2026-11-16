@@ -18,6 +18,7 @@ type Data = { calendars: Calendar[]; bookings: Booking[]; staff: Staff[]; client
 type Slot = { start: string; end: string; staffIds: string[] };
 
 const DAY_LIST: Array<[DayKey, string]> = [["mon", "Monday"], ["tue", "Tuesday"], ["wed", "Wednesday"], ["thu", "Thursday"], ["fri", "Friday"], ["sat", "Saturday"], ["sun", "Sunday"]];
+const SHOW_LEGACY_DASH = false as boolean; // old Scheduling dashboard (replaced by the shared appointments panel)
 const HOURS_FROM = 7, HOURS_TO = 21, PX_DEFAULT = 0.9;
 const STATUS_LABEL: Record<Booking["status"], string> = { booked: "Booked", cancelled: "Cancelled", completed: "Completed", no_show: "No-show" };
 // Studio-style businesses (tattoo, piercing) always work from their own studio, so a per-appointment location isn't asked.
@@ -42,7 +43,7 @@ async function api<T>(scope: string, body?: unknown, qs = ""): Promise<T> {
 
 // A reference photo attached to the booking (e.g. the tattoo design), shown on the calendar.
 function bookingPhoto(b: Booking): string {
-  const v = b.answers.find((a) => /^Photo/i.test(a.label) && /^(https:\/\/|\/media\/)/.test(a.value))?.value || "";
+  const v = b.answers.find((a) => /^Photo/i.test(a.label) && /^(https:\/\/|\/media\/|\/api\/marketing-public\/media)/.test(a.value))?.value || "";
   return v;
 }
 
@@ -162,13 +163,14 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
 
     <div className="sch-toolbar">
       <div className="iv-tabs" role="tablist" aria-label="Scheduling sections">{([["dashboard", "Dashboard"], ["calendar", "Calendar"], ["appointments", "Appointments"], ["calendars", "Booking calendars"], ["availability", "Staff & availability"]] as const).map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{l}</button>)}</div>
-      {(tab === "dashboard" || tab === "calendar" || tab === "appointments") && <div className="sch-filters">
+      {(tab === "calendar" || tab === "appointments") && <div className="sch-filters">
         <label className="sch-select"><Users size={14} /><select aria-label="Filter by staff member" value={staffFilter} onChange={(e) => setStaffFilter(e.target.value)}><option value="">Everyone</option>{data.staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
         <label className="sch-select"><CalendarDays size={14} /><select aria-label="Filter by booking calendar" value={calFilter} onChange={(e) => setCalFilter(e.target.value)}><option value="">All calendars</option>{data.calendars.map((c) => <option key={c.id} value={c.id}>{data.scope === null && c.clientId ? `${clientName(c.clientId)} · ` : ""}{c.name}</option>)}</select></label>
       </div>}
     </div>
 
-    {tab === "dashboard" && (() => {
+    {tab === "dashboard" && <AppointmentsDashboard scopeClientId={scopeClientId} sample={sample} clientName={sampleClientName} onOpen={() => setTab("calendar")} />}
+    {SHOW_LEGACY_DASH && (() => {
       const key = ymd(dashDate); const isToday = key === todayKey;
       const dayList = visible.filter((b) => ymd(new Date(b.start)) === key && b.status !== "cancelled").sort((x, y) => x.start.localeCompare(y.start));
       const statusOf = (b: Booking): [string, string] => { const now = Date.now(), st = Date.parse(b.start), en = Date.parse(b.end); if (b.status === "no_show") return ["No-show", "bad"]; if (b.status === "completed" || en < now) return ["Done", "done"]; if (st <= now && now <= en) return ["In progress", "live"]; return ["Confirmed", "ok"]; };
@@ -408,7 +410,7 @@ function SlotPicker({ data, scope, calendarId, staffIds, date, exclude, value, o
   return <div className="sch-times">{slots.map((s) => <button key={s.start} type="button" className={value === s.start ? "on" : ""} onClick={() => onPick(s)}>{time(s.start)}</button>)}</div>;
 }
 
-type ApptDraft = { date: string; time: string; durationMin?: number; calendarId?: string; staffIds?: string[]; name?: string; email?: string; phone?: string; notes?: string };
+type ApptDraft = { date: string; time: string; durationMin?: number; images?: string[]; calendarId?: string; staffIds?: string[]; name?: string; email?: string; phone?: string; notes?: string };
 
 function NewAppointment({ data, scope, initial, onClose, onSaved, onCalendarsChanged }: { data: Data; scope: string; initial: ApptDraft; onClose: () => void; onSaved: (msg: string) => void; onCalendarsChanged: () => void }) {
   const [calendars, setCalendars] = useState<Calendar[]>(data.calendars);
@@ -424,7 +426,7 @@ function NewAppointment({ data, scope, initial, onClose, onSaved, onCalendarsCha
   const [location, setLocation] = useState("");
   const [duration, setDuration] = useState(initial.durationMin || 0); // 0 = the appointment type's own length
   const [price, setPrice] = useState("");
-  const [images, setImages] = useState<string[]>([]);
+  const [images, setImages] = useState<string[]>(() => (initial.images || []).slice(0, 3));
   const [uploading, setUploading] = useState(0);
   const uploadImages = async (files: FileList | null) => {
     const list = [...(files || [])].filter((f) => f.type.startsWith("image/")).slice(0, 3 - images.length);
@@ -523,7 +525,7 @@ function AppointmentDetail({ data, scope, booking, onClose, onSaved }: { data: D
     finally { setBusy(false); }
   };
   const staffChanged = staffIds.join(",") !== booking.staffIds.join(",");
-  const [photos, setPhotos] = useState<string[]>(() => booking.answers.filter((a) => /^Photo/i.test(a.label) && /^(https:\/\/|\/media\/)/.test(a.value)).map((a) => a.value));
+  const [photos, setPhotos] = useState<string[]>(() => booking.answers.filter((a) => /^Photo/i.test(a.label) && /^(https:\/\/|\/media\/|\/api\/marketing-public\/media)/.test(a.value)).map((a) => a.value));
   const [zoom, setZoom] = useState<number | null>(null);
   const [uploading, setUploading] = useState(0);
   const isSample = booking.id.startsWith("sample-");
@@ -1009,4 +1011,14 @@ function sampleSchedule(real: Data | null, week: Date, clientName: string, site:
     }
   }
   return { calendars, bookings, staff, clients: real?.clients || [], scope: real?.scope ?? null, canManage: false, isAdmin: false, meId: "", googleAvailable: false, emailReady: true, publicBase: real?.publicBase || "" };
+}
+
+// Book straight from somewhere else (e.g. a conversation): loads the account's calendars, then the usual New appointment form.
+export function QuickBook({ scopeClientId, prefill, onClose, onBooked }: { scopeClientId: string; prefill: { name?: string; phone?: string; email?: string; notes?: string; images?: string[] }; onClose: () => void; onBooked?: (msg: string) => void }) {
+  const [data, setData] = useState<Data | null>(null);
+  const [err, setErr] = useState("");
+  useEffect(() => { let live = true; api<Data>(scopeClientId, undefined, `&from=${new Date().toISOString()}&to=${addDays(new Date(), 14).toISOString()}`).then((d) => { if (live) setData(d); }).catch((e) => { if (live) setErr(errText(e, "Scheduling couldn't load.")); }); return () => { live = false; }; }, [scopeClientId]);
+  if (err) return <Modal title="Book appointment" onClose={onClose}><div className="iv-error" role="alert">{err}</div></Modal>;
+  if (!data) return <Modal title="Book appointment" onClose={onClose}><p className="iv-small">Loading calendars…</p></Modal>;
+  return <NewAppointment data={data} scope={scopeClientId} initial={{ date: ymd(new Date()), time: "", ...prefill }} onClose={onClose} onSaved={(msg) => { onBooked?.(msg); onClose(); }} onCalendarsChanged={() => undefined} />;
 }
