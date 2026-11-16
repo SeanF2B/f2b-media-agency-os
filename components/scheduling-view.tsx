@@ -124,6 +124,7 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
 
   const calById = useMemo(() => new Map((data?.calendars || []).map((c) => [c.id, c])), [data]);
   const staffById = useMemo(() => new Map((data?.staff || []).map((s) => [s.id, s])), [data]);
+  const personOf = (id: string) => { const p = staffById.get(id); return p ? { name: p.name.split("|")[0].trim(), avatar: p.avatar } : { name: "?" }; };
   const clientName = (id: string) => (id ? data?.clients.find((c) => c.id === id)?.name || "Client" : "Agency");
   const visible = useMemo(() => (data?.bookings || []).filter((b) => (!staffFilter || b.staffIds.includes(staffFilter)) && (!calFilter || b.calendarId === calFilter)), [data, staffFilter, calFilter]);
 
@@ -864,7 +865,7 @@ export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, c
     {!data ? <p className="dh-muted">Loading appointments…</p> : view === "day" ? <div className="sch-dash-day">
       <div className="sch-dash-day-list">
         <div className="sch-dash-stats"><span><b>{dayList.length}</b> booked</span><span><b>{dayList.filter((b) => Date.parse(b.start) > Date.now()).length}</b> to come</span><span><b>{dayList.filter((b) => b.status === "completed" || Date.parse(b.end) < Date.now()).length}</b> done</span></div>
-        {dayList.length ? <ul className="sch-dash-list">{dayList.map((b) => { const cal = calById.get(b.calendarId); return <li key={b.id} onClick={onOpen}><time>{time(b.start)}</time><span className="sch-dash-av" style={{ ["--c" as string]: cal?.color || "#2563eb" }}>{(b.name || "?").slice(0, 1).toUpperCase()}</span><span className="sch-dash-who"><b>{b.name}</b><small>{cal?.name || ""}{b.staffIds.length ? ` · ${b.staffIds.map(nameOf).filter(Boolean).join(", ")}` : ""}</small></span></li>; })}</ul> : <p className="dh-muted">Nothing booked{isToday ? " today" : " this day"}.</p>}
+        {dayList.length ? <ul className="sch-dash-list">{dayList.map((b) => { const cal = calById.get(b.calendarId); return <li key={b.id} onClick={onOpen}><time>{time(b.start)}</time>{b.staffIds.length ? <span className="sch-dash-avs">{b.staffIds.slice(0, 2).map((id) => <Avatar key={id} person={personOf(id)} size={30} />)}</span> : <span className="sch-dash-av" style={{ ["--c" as string]: cal?.color || "#2563eb" }}>{(b.name || "?").slice(0, 1).toUpperCase()}</span>}<span className="sch-dash-who"><b>{b.name}</b><small>{cal?.name || ""}{b.staffIds.length ? ` · ${b.staffIds.map(nameOf).filter(Boolean).join(", ")}` : ""}</small></span></li>; })}</ul> : <p className="dh-muted">Nothing booked{isToday ? " today" : " this day"}.</p>}
       </div>
       <div className="sch-avail-list">{staff.map((p) => {
         const off = p.blocked?.includes(key); const windows = off ? [] : p.weekly?.[dk] || [];
