@@ -2560,6 +2560,21 @@ ${senderName}`, staffType: member.staffType || (isSubAccountRole(member.role) ? 
     setToast("File removed"); window.setTimeout(() => setToast(""), 2500);
   };
 
+  // Staff pay from Scheduling → Books expenses (one entry per person per period; re-sending updates it).
+  const workspaceRef = useRef(workspace); workspaceRef.current = workspace;
+  useEffect(() => {
+    const onPay = (event: Event) => {
+      const detail = (event as CustomEvent<{ entries: Array<{ id: string; description: string; amount: number; date: string; clientId: string }> }>).detail;
+      const entries = (detail?.entries || []).filter((e) => e && e.id && e.amount > 0);
+      if (!entries.length) return;
+      const ids = new Set(entries.map((e) => e.id));
+      const records: FinanceRecord[] = entries.map((e) => ({ id: e.id, kind: "Expense", description: e.description.slice(0, 200), category: "Staff wages", amount: Math.round(e.amount * 100) / 100, date: e.date, clientId: e.clientId || "" }));
+      void persist({ ...workspaceRef.current, financeRecords: [...records, ...(workspaceRef.current.financeRecords || []).filter((r) => !ids.has(r.id))] }, `Staff pay added to Books (${records.length})`);
+      setToast(`Staff pay added to Books · ${records.length} expense${records.length === 1 ? "" : "s"} under “Staff wages”.`);
+    };
+    window.addEventListener("f2b-staff-pay-expense", onPay);
+    return () => window.removeEventListener("f2b-staff-pay-expense", onPay);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // Tasks live at agency level only; inside a sub-account, fall back to the Dashboard.
   useEffect(() => { if (activeScopeId && page === "Tasks") setPage("Overview"); }, [activeScopeId, page]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!ready) return <main className="loading-screen"><div className="spinner" /><span>Opening your private workspace…</span></main>;

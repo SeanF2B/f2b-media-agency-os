@@ -2370,3 +2370,21 @@ html body .app-shell label:has(> svg) > select, html body .app-shell .sch-select
   background-repeat: no-repeat !important; background-position: right 2px center !important; background-size: 12px !important; padding-right: 20px !important; cursor: pointer;
 }
 html body .app-shell.dark-mode label:has(> svg) > select, html body .app-shell.dark-mode .sch-select > select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23b6c2cc' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important; }
+/* Payslips */
+.bt.ps{width:min(900px,100%)}
+.ps-controls{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;padding:14px 20px;border-bottom:1px solid #eef2f5}
+.ps-controls label{display:grid;gap:4px;font-size:12px;font-weight:700;color:#475467}
+.ps-controls select,.ps-controls input{height:38px;border:1px solid #d0d7dd;border-radius:10px;padding:0 10px;font:inherit;font-size:13.5px;background:#fff;min-width:150px}
+.ps-range{font-size:12.5px;color:#667085;margin-right:auto;align-self:center}
+.ps-body{padding:16px 20px;overflow-y:auto;flex:1}
+.ps-doc{border:1px solid #e6ebef;border-radius:12px;padding:22px;background:#fff;color:#101828;font-size:13px}
+.ps-doc h1{margin:0;font-size:22px}
+.ps-doc .ps-top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #101828;padding-bottom:10px}
+.ps-doc .ps-meta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:14px 0}
+.ps-doc .ps-meta div{border:1px solid #e6ebef;border-radius:8px;padding:8px 10px}.ps-doc .ps-meta small{display:block;font-size:10px;color:#667085;text-transform:uppercase;letter-spacing:.04em}
+.ps-doc table{width:100%;border-collapse:collapse;font-size:12.5px}.ps-doc th,.ps-doc td{text-align:left;padding:7px 8px;border-bottom:1px solid #eef2f5}.ps-doc th{font-size:10px;text-transform:uppercase;color:#667085}.ps-doc .r{text-align:right}
+.ps-doc .ps-total{margin-top:14px;display:flex;justify-content:flex-end}.ps-doc .ps-total>div{border:2px solid #101828;border-radius:10px;padding:10px 16px;text-align:right}.ps-doc .ps-total b{font-size:22px}
+.ps-doc .ps-note{margin:12px 0 0;color:#475467}.ps-doc .ps-foot{margin:18px 0 0;font-size:10.5px;color:#98a2b3}
+.ps-notelabel{display:grid;gap:4px;margin-top:12px;font-size:12px;font-weight:700;color:#475467}.ps-notelabel input{height:38px;border:1px solid #d0d7dd;border-radius:10px;padding:0 10px;font:inherit}
+.sch-earn-split .sch-earn-chip:disabled{opacity:.45;cursor:default}
+@media(max-width:700px){.ps-doc .ps-meta{grid-template-columns:1fr 1fr}}

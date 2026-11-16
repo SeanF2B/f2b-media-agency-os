@@ -38,8 +38,14 @@ async function stripBackground(src: string): Promise<string> {
     out.getContext("2d")!.drawImage(canvas, x0, y0, out.width, out.height, 0, 0, out.width, out.height);
     return out.toDataURL("image/png");
   };
-  const corners = [at(0, 0), at(w - 1, 0), at(0, h - 1), at(w - 1, h - 1)].filter((i) => px[i + 3] > 200);
-  if (corners.length < 3) return cropped(); // already transparent
+  let corners = [at(0, 0), at(w - 1, 0), at(0, h - 1), at(w - 1, h - 1)].filter((i) => px[i + 3] > 200);
+  if (corners.length < 3) {
+    // Transparent corners can still hide a white rounded "card" behind the logo: sample just inside the edges.
+    const ix = Math.max(1, Math.round(w * 0.06)), iy = Math.max(1, Math.round(h * 0.08));
+    const inner = [at(ix, iy), at(w - 1 - ix, iy), at(ix, h - 1 - iy), at(w - 1 - ix, h - 1 - iy), at(ix, h >> 1), at(w - 1 - ix, h >> 1)].filter((i) => px[i + 3] > 200 && px[i] > 225 && px[i + 1] > 225 && px[i + 2] > 225);
+    if (inner.length < 4) return cropped(); // genuinely transparent background
+    corners = inner;
+  }
   const [br, bg, bb] = [0, 1, 2].map((c) => Math.round(corners.reduce((sum, i) => sum + px[i + c], 0) / corners.length));
   const dist = (i: number) => Math.max(Math.abs(px[i] - br), Math.abs(px[i + 1] - bg), Math.abs(px[i + 2] - bb));
   if (corners.filter((i) => dist(i) < 28).length < 3) return src; // corners disagree: no flat background

@@ -1042,6 +1042,7 @@ function StaffHoursPanel({ data: base, scopeClientId, sample }: { data: Data; sc
   const [coverMsg, setCoverMsg] = useState("");
   const [covering, setCovering] = useState(false);
   const [tick, setTick] = useState(0);
+  const [slips, setSlips] = useState(false);
   const [std, setStd] = useState<{ payType: "none" | "hourly" | "commission"; payRate: number }>({ payType: "commission", payRate: 70 });
   const [editStd, setEditStd] = useState(false);
   useEffect(() => { if (sample) return; let live = true; api<{ payType: "none" | "hourly" | "commission"; payRate: number }>(scopeClientId, { action: "getDefaultPay" }).then((r) => { if (live) setStd({ payType: r.payType, payRate: r.payRate }); }).catch(() => undefined); return () => { live = false; }; }, [sample, scopeClientId]);
@@ -1111,7 +1112,8 @@ function StaffHoursPanel({ data: base, scopeClientId, sample }: { data: Data; sc
       <div><small>Deposits paid</small><b>{money(tot.dep)}</b><em>held on bookings</em></div>
       <div className="earn"><small>Staff pay</small><b>{money(tot.earn)}</b><em>+{money(tot.earnS)} when scheduled work is done</em></div>
     </div>
-    <div className="sch-earn-split"><span>Standard split</span>{editStd ? <PayEditor value={std} onSave={(v) => void saveStd(v)} onCancel={() => setEditStd(false)} /> : <button type="button" className="sch-earn-chip" onClick={() => setEditStd(true)}>{std.payType === "commission" ? `Staff ${std.payRate}% · Business ${100 - std.payRate}%` : std.payType === "hourly" ? `${money(std.payRate)} per hour` : "Set split"} ✎</button>}<small>Used for everyone unless you set their own.</small></div>
+    <div className="sch-earn-split"><span>Standard split</span>{editStd ? <PayEditor value={std} onSave={(v) => void saveStd(v)} onCancel={() => setEditStd(false)} /> : <button type="button" className="sch-earn-chip" onClick={() => setEditStd(true)}>{std.payType === "commission" ? `Staff ${std.payRate}% · Business ${100 - std.payRate}%` : std.payType === "hourly" ? `${money(std.payRate)} per hour` : "Set split"} ✎</button>}<small>Used for everyone unless you set their own.</small><span style={{ flex: 1 }} /><button type="button" className="sch-earn-chip" onClick={() => setSlips(true)}>🧾 Payslips</button><button type="button" className="sch-earn-chip" disabled={!tot.earn} onClick={() => { if (sample) { setCoverMsg("Sample data — nothing added to Books."); return; } window.dispatchEvent(new CustomEvent("f2b-staff-pay-expense", { detail: { entries: rows.filter((r) => r.earned > 0).map((r) => ({ id: `staffpay-${r.p.id}-${ymd(range.a)}-${ymd(range.b)}`, description: `Staff pay · ${r.p.name.split("|")[0].trim()} · ${label}`, amount: r.earned, date: ymd(addDays(range.b, -1) < new Date() ? addDays(range.b, -1) : new Date()), clientId: data.scope || scopeClientId || "" })) } })); setCoverMsg(`Staff pay for ${label} sent to Books (Staff wages).`); }}>➕ Add pay to Books</button></div>
+    {slips && <PayslipMaker base={data} scopeClientId={scopeClientId} sample={sample} payOf={payOf} onClose={() => setSlips(false)} />}
     {coverMsg && <p className="sch-earn-note" role="status">{coverMsg}</p>}
     {cover && (() => { const person = data.staff.find((p) => p.id === cover.staffId); const a = new Date(`${cover.from}T00:00:00`).getTime(), z = addDays(new Date(`${cover.until}T00:00:00`), 1).getTime();
       const affected = data.bookings.filter((b) => b.status === "booked" && b.staffIds.includes(cover.staffId) && Date.parse(b.start) >= a && Date.parse(b.start) < z);
@@ -1160,4 +1162,66 @@ function PayEditor({ value, onSave, onCancel }: { value: { payType: "none" | "ho
   const [t, setT] = useState(value.payType === "none" ? "commission" : value.payType);
   const [rate, setRate] = useState(value.payRate ? String(value.payRate) : "");
   return <span className="sch-pay-edit"><select value={t} onChange={(e) => setT(e.target.value as "hourly" | "commission")}><option value="commission">% of price</option><option value="hourly">Per hour</option></select><input type="number" min={0} step="0.5" value={rate} placeholder={t === "hourly" ? "€/h" : "%"} onChange={(e) => setRate(e.target.value)} autoFocus /><button type="button" className="iv-btn ok" onClick={() => onSave({ payType: Number(rate) > 0 ? t : "none", payRate: Number(rate) || 0 })}>Save</button><button type="button" className="iv-btn" onClick={onCancel}>×</button></span>;
+}
+
+// Payslips: pick a staff member and a period, preview a payslip built from their appointments, print / save as PDF, add to Books.
+function PayslipMaker({ base, scopeClientId, sample, payOf, onClose }: { base: Data; scopeClientId: string; sample: boolean; payOf: (p: Staff) => { payType: "none" | "hourly" | "commission"; payRate: number }; onClose: () => void }) {
+  const [who, setWho] = useState(base.staff[0]?.id || "");
+  const [period, setPeriod] = useState<"thisWeek" | "lastWeek" | "thisMonth" | "lastMonth" | "custom">("lastMonth");
+  const [from, setFrom] = useState(() => ymd(new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1)));
+  const [to, setTo] = useState(() => ymd(new Date(new Date().getFullYear(), new Date().getMonth(), 0)));
+  const [data, setData] = useState<Data | null>(null);
+  const [note, setNote] = useState("");
+  const [msg, setMsg] = useState("");
+  const range = useMemo(() => { const now = new Date(); const wk = mondayOf(now);
+    if (period === "thisWeek") return { a: wk, b: addDays(wk, 7) }; if (period === "lastWeek") return { a: addDays(wk, -7), b: wk };
+    if (period === "thisMonth") return { a: new Date(now.getFullYear(), now.getMonth(), 1), b: new Date(now.getFullYear(), now.getMonth() + 1, 1) };
+    if (period === "lastMonth") return { a: new Date(now.getFullYear(), now.getMonth() - 1, 1), b: new Date(now.getFullYear(), now.getMonth(), 1) };
+    const a = new Date(`${from}T00:00:00`); return { a, b: addDays(new Date(`${to}T00:00:00`), 1) }; }, [period, from, to]);
+  const generate = async () => { setMsg(""); if (sample) { setData(base); return; } try { setData(await api<Data>(scopeClientId, undefined, `&from=${range.a.toISOString()}&to=${range.b.toISOString()}`)); } catch (e) { setMsg(errText(e, "Couldn't load appointments.")); } };
+  const d = data;
+  const person = (d || base).staff.find((p) => p.id === who);
+  const cal = new Map((d || base).calendars.map((c) => [c.id, c]));
+  const cur = (d || base).calendars[0]?.currency || "EUR";
+  const money = (n: number) => new Intl.NumberFormat("en-IE", { style: "currency", currency: cur }).format(n);
+  const priceOf = (b: Booking) => { const n = Number((b.answers.find((x) => /^price$/i.test(x.label))?.value || "").replace(/[^0-9.]/g, "")); return n > 0 ? n : (cal.get(b.calendarId)?.price || 0); };
+  const depositOf = (b: Booking) => Number((b.answers.find((x) => /^deposit/i.test(x.label))?.value || "").replace(/[^0-9.]/g, "")) || 0;
+  const lines = d && person ? d.bookings.filter((b) => b.staffIds.includes(who) && Date.parse(b.start) >= range.a.getTime() && Date.parse(b.start) < range.b.getTime() && (b.status === "completed" || (b.status === "booked" && Date.parse(b.end) < Date.now()))).sort((x, y) => x.start.localeCompare(y.start)) : [];
+  const pr = person ? payOf(person) : { payType: "none" as const, payRate: 0 };
+  const rows = lines.map((b) => { const share = 1 / Math.max(1, b.staffIds.length); const hours = (Date.parse(b.end) - Date.parse(b.start)) / 3_600_000; const value = priceOf(b) * share; return { b, hours, value, pay: pr.payType === "hourly" ? hours * pr.payRate : pr.payType === "commission" ? value * pr.payRate / 100 : 0, deposit: depositOf(b) * share }; });
+  const total = rows.reduce((t, r) => ({ h: t.h + r.hours, v: t.v + r.value, pay: t.pay + r.pay, dep: t.dep + r.deposit }), { h: 0, v: 0, pay: 0, dep: 0 });
+  const business = (d || base).clients.find((c) => c.id === (d || base).scope)?.name || (d || base).clients[0]?.name || "Business";
+  const periodLabel = `${range.a.toLocaleDateString("en-IE", { day: "numeric", month: "short", year: "numeric" })} – ${addDays(range.b, -1).toLocaleDateString("en-IE", { day: "numeric", month: "short", year: "numeric" })}`;
+  const name = person?.name.split("|")[0].trim() || "";
+  const print = () => {
+    const el = document.getElementById("payslip-doc"); if (!el) return;
+    const w = window.open("", "_blank", "width=820,height=1000"); if (!w) { setMsg("Allow pop-ups to print the payslip."); return; }
+    w.document.write(`<!doctype html><html><head><title>Payslip · ${name} · ${periodLabel}</title><style>body{font-family:Inter,Arial,sans-serif;color:#101828;margin:32px}h1{font-size:22px;margin:0}table{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #e6ebef}th{font-size:10px;text-transform:uppercase;color:#667085}td.r,th.r{text-align:right}.ps-top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #101828;padding-bottom:10px}.ps-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}.ps-meta div{border:1px solid #e6ebef;border-radius:8px;padding:8px}.ps-meta small{display:block;font-size:10px;color:#667085;text-transform:uppercase}.ps-total{margin-top:14px;display:flex;justify-content:flex-end}.ps-total div{border:2px solid #101828;border-radius:8px;padding:10px 16px;text-align:right}.ps-total b{font-size:22px}.ps-note{margin-top:14px;font-size:12px;color:#475467}.ps-foot{margin-top:24px;font-size:10px;color:#98a2b3}</style></head><body>${el.innerHTML}<script>window.onload=()=>{window.print()}<\/script></body></html>`);
+    w.document.close();
+  };
+  const toBooks = () => { if (!total.pay) return; if (sample) { setMsg("Sample data — nothing added to Books."); return; } window.dispatchEvent(new CustomEvent("f2b-staff-pay-expense", { detail: { entries: [{ id: `staffpay-${who}-${ymd(range.a)}-${ymd(range.b)}`, description: `Staff pay · ${name} · ${periodLabel}`, amount: total.pay, date: ymd(addDays(range.b, -1)), clientId: (d || base).scope || scopeClientId || "" }] } })); setMsg(sample ? "Sample: added to Books (you can delete it there)." : "Added to Books under Staff wages."); };
+  return <div className="bt-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="bt ps" role="dialog" aria-modal="true" aria-label="Payslips">
+      <header className="bt-head"><div><p className="eyebrow">🧾 PAYSLIPS</p><h2>Generate a payslip</h2><p>Built from the staff member's finished appointments and their pay split.</p></div><button type="button" className="bt-x" aria-label="Close" onClick={onClose}>×</button></header>
+      <div className="ps-controls">
+        <label>Staff member<select value={who} onChange={(e) => { setWho(e.target.value); }}>{base.staff.map((p) => <option key={p.id} value={p.id}>{p.name.split("|")[0].trim()}</option>)}</select></label>
+        <label>Period<select value={period} onChange={(e) => setPeriod(e.target.value as typeof period)}><option value="thisWeek">This week</option><option value="lastWeek">Last week</option><option value="thisMonth">This month</option><option value="lastMonth">Last month</option><option value="custom">Custom dates</option></select></label>
+        {period === "custom" && <><label>From<input type="date" value={from} max={to} onChange={(e) => e.target.value && setFrom(e.target.value)} /></label><label>To<input type="date" value={to} min={from} onChange={(e) => e.target.value && setTo(e.target.value)} /></label></>}
+        <span className="ps-range">{periodLabel}</span>
+        <button type="button" className="primary-button" onClick={() => void generate()}>Generate preview</button>
+      </div>
+      <div className="ps-body">{!d ? <p className="bt-loading">Pick a staff member and a period, then Generate preview.</p> : <>
+        <div id="payslip-doc" className="ps-doc">
+          <div className="ps-top"><div><h1>Payslip</h1><div>{business}</div></div><div style={{ textAlign: "right" }}><b>{name}</b><div>{person?.role || ""}</div><div>{periodLabel}</div></div></div>
+          <div className="ps-meta"><div><small>Appointments</small><b>{rows.length}</b></div><div><small>Hours</small><b>{total.h.toFixed(1)}h</b></div><div><small>Work value</small><b>{money(total.v)}</b></div><div><small>Pay basis</small><b>{pr.payType === "hourly" ? `${money(pr.payRate)} / hour` : pr.payType === "commission" ? `${pr.payRate}% of work value` : "Not set"}</b></div></div>
+          <table><thead><tr><th>Date</th><th>Service</th><th>Client</th><th className="r">Hours</th><th className="r">Value</th><th className="r">Pay</th></tr></thead><tbody>{rows.map((r) => <tr key={r.b.id}><td>{new Date(r.b.start).toLocaleDateString("en-IE", { day: "numeric", month: "short" })}</td><td>{cal.get(r.b.calendarId)?.name || "Appointment"}</td><td>{r.b.name}</td><td className="r">{r.hours.toFixed(1)}</td><td className="r">{money(r.value)}</td><td className="r">{money(r.pay)}</td></tr>)}{!rows.length && <tr><td colSpan={6}>No finished appointments in this period.</td></tr>}</tbody></table>
+          <div className="ps-total"><div><small>Gross pay</small><br /><b>{money(total.pay)}</b>{total.dep > 0 && <div style={{ fontSize: 11, color: "#667085" }}>Deposits taken on these bookings: {money(total.dep)}</div>}</div></div>
+          {note && <p className="ps-note">{note}</p>}
+          <p className="ps-foot">Generated {new Date().toLocaleDateString("en-IE", { day: "numeric", month: "long", year: "numeric" })} from appointment records. Gross figures before any tax or deductions.</p>
+        </div>
+        <label className="ps-notelabel">Note on the payslip (optional)<input value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Paid by bank transfer on 30 Nov" /></label>
+      </>}</div>
+      <footer className="bt-foot"><span className="bt-status">{msg}</span><span style={{ flex: 1 }} /><button type="button" className="secondary-button" disabled={!d || !total.pay} onClick={toBooks}>Add to Books</button><button type="button" className="primary-button" disabled={!d} onClick={print}>Print / save PDF</button></footer>
+    </div>
+  </div>;
 }
