@@ -1,7 +1,7 @@
 "use client";
 
 import { appAlert, appConfirm, appPrompt } from "./app-dialog";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Sparkles, CalendarDays, ChevronLeft, ChevronRight, Clock, Copy, Link2, MapPin, Plus, RefreshCw, Settings2, Trash2, UserRound, Users, Video, Phone, Building2 } from "lucide-react";
 import "./scheduling.css";
 
@@ -15,7 +15,7 @@ type Data = { calendars: Calendar[]; bookings: Booking[]; staff: Staff[]; client
 type Slot = { start: string; end: string; staffIds: string[] };
 
 const DAY_LIST: Array<[DayKey, string]> = [["mon", "Monday"], ["tue", "Tuesday"], ["wed", "Wednesday"], ["thu", "Thursday"], ["fri", "Friday"], ["sat", "Saturday"], ["sun", "Sunday"]];
-const HOURS_FROM = 7, HOURS_TO = 21, PX_PER_MIN = 0.9;
+const HOURS_FROM = 7, HOURS_TO = 21, PX_DEFAULT = 0.9;
 const STATUS_LABEL: Record<Booking["status"], string> = { booked: "Booked", cancelled: "Cancelled", completed: "Completed", no_show: "No-show" };
 const MODE_LABEL: Record<Calendar["assignMode"], string> = { customer_pick: "Customer picks the person", round_robin: "Auto-assign (round robin)", collective: "Everyone together" };
 
@@ -48,6 +48,14 @@ function Modal({ title, onClose, children, footer, wide }: { title: string; onCl
 }
 
 export function SchedulingView({ scopeClientId, onAddStaff }: { scopeClientId: string; onAddStaff?: () => void }) {
+  // Stretch the day so 07:00–21:00 fills the window (calendar always in full view).
+  const weekRef = useRef<HTMLDivElement>(null);
+  const [PX_PER_MIN, setPpm] = useState(PX_DEFAULT);
+  useEffect(() => {
+    const fit = () => { const el = weekRef.current; if (!el) return; const top = el.getBoundingClientRect().top; const room = window.innerHeight - top - 52 - 24; setPpm(Math.max(0.55, Math.min(2.2, room / ((HOURS_TO - HOURS_FROM) * 60)))); };
+    fit(); const t = window.setTimeout(fit, 250); window.addEventListener("resize", fit);
+    return () => { window.clearTimeout(t); window.removeEventListener("resize", fit); };
+  });
   const [data, setData] = useState<Data | null>(null);
   const [tab, setTab] = useState<"calendar" | "appointments" | "calendars" | "availability">("calendar");
   const [week, setWeek] = useState(() => mondayOf(new Date()));
@@ -127,7 +135,7 @@ export function SchedulingView({ scopeClientId, onAddStaff }: { scopeClientId: s
       <div className="sch-week-nav"><button type="button" className="iv-btn" aria-label="Previous week" onClick={() => setWeek(addDays(week, -7))}><ChevronLeft size={15} /></button><button type="button" className="iv-btn" onClick={() => setWeek(mondayOf(new Date()))}>Today</button><button type="button" className="iv-btn" aria-label="Next week" onClick={() => setWeek(addDays(week, 7))}><ChevronRight size={15} /></button>
         <b>{week.toLocaleDateString("en-IE", { day: "numeric", month: "short" })} – {addDays(week, 6).toLocaleDateString("en-IE", { day: "numeric", month: "short", year: "numeric" })}</b>
         <button type="button" className="iv-btn" aria-label="Refresh" onClick={() => void load()}><RefreshCw size={14} /></button></div>
-      <div className="sch-week" style={{ ["--sch-h" as string]: `${(HOURS_TO - HOURS_FROM) * 60 * PX_PER_MIN}px` }}>
+      <div className="sch-week" ref={weekRef} style={{ ["--sch-h" as string]: `${(HOURS_TO - HOURS_FROM) * 60 * PX_PER_MIN}px` }}>
         <div className="sch-hours">{Array.from({ length: HOURS_TO - HOURS_FROM }, (_, i) => <span key={i} style={{ top: i * 60 * PX_PER_MIN }}>{String(HOURS_FROM + i).padStart(2, "0")}:00</span>)}</div>
         {days.map((d) => { const key = ymd(d); const dayBookings = visible.filter((b) => ymd(new Date(b.start)) === key);
           return <div key={key} className={`sch-day${key === todayKey ? " today" : ""}`}>

@@ -1530,3 +1530,9 @@ html body .app-shell .tn-date { display: inline-flex; align-items: center; gap: 
 html body .app-shell .tn-date select, html body .app-shell .tn-date input { border: 0 !important; background: transparent !important; font: inherit; font-weight: 600; color: inherit; height: 32px; padding: 0 2px !important; box-shadow: none !important; }
 html body .app-shell .tn-date input { width: 128px; }
 @media (max-width: 860px) { html body .app-shell .tn-date span { display: none; } html body .app-shell .tn-date select { max-width: 94px; } html body .app-shell .tn-date input { width: 112px; } }
+/* Calendar fits by stretching hours (JS); card no longer forced taller than the window */
+html body .app-shell .sch-week-card { height: auto !important; min-height: 0 !important; }
+html body .app-shell .sch-week-card .sch-week { overflow: visible !important; }
+html body .app-shell .dh-client-note { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; }
+html body .app-shell .dh-client-note img { width: 24px; height: 24px; border-radius: 7px; object-fit: contain; background: #fff; border: 1px solid rgba(127,138,160,.25); }
+html body .app-shell .dh-client-note small { font-weight: 500; opacity: .6; }

@@ -45,10 +45,10 @@ function Tile({ icon, label, value, note, tone = "", children }: { icon: ReactNo
   return <div className={`dh-tile ${tone}`}><span className="dh-tile-icon">{icon}</span><div className="dh-tile-body"><small>{label}</small><b>{value}</b>{children}{note && <em>{note}</em>}</div></div>;
 }
 
-export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate, onAddTask, onOpenTask, adsPanel, valuePanel, periodStart = "", periodEnd = "", periodLabel = "Last 30 days" }: { periodStart?: string; periodEnd?: string; periodLabel?: string; adsPanel?: ReactNode; valuePanel?: ReactNode; scopeClientId: string; clients: HubClient[]; tasks: HubTask[]; staff: HubStaff[]; onNavigate: (page: string) => void; onAddTask: () => void; onOpenTask?: (id: string) => void }) {
+export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate, onAddTask, onOpenTask, adsPanel, valuePanel, periodStart = "", periodEnd = "", periodLabel = "Last 30 days", focusClientId = "" }: { focusClientId?: string; periodStart?: string; periodEnd?: string; periodLabel?: string; adsPanel?: ReactNode; valuePanel?: ReactNode; scopeClientId: string; clients: HubClient[]; tasks: HubTask[]; staff: HubStaff[]; onNavigate: (page: string) => void; onAddTask: () => void; onOpenTask?: (id: string) => void }) {
   const [pickedClient, setPickedClient] = useState(() => { try { return localStorage.getItem("f2b-dash-client") || ""; } catch { return ""; } });
   // Agency view defaults to all clients' Google Ads; a client can be picked for their full results.
-  const clientId = scopeClientId || (clients.some((c) => c.id === pickedClient) ? pickedClient : (clients.find((c) => c.googleAdsAccountId) || clients[0])?.id || "");
+  const clientId = scopeClientId || (clients.some((c) => c.id === focusClientId) ? focusClientId : (clients.find((c) => c.googleAdsAccountId) || clients[0])?.id || ""); void pickedClient; void setPickedClient;
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(false);
   const [sample, setSample] = useState(() => { try { return localStorage.getItem("f2b-dash-sample") === "1"; } catch { return false; } });
@@ -97,7 +97,7 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
     {valuePanel}
     <section className="panel dh-panel" aria-label="Website and marketing results">
       <div className="dh-head"><div><p className="eyebrow">📈 {periodLabel.toUpperCase()}</p><h2>Marketing</h2></div>
-        {!scopeClientId && clients.length > 0 && <label className="dh-client"><span>Client</span><select value={clientId} onChange={(e) => { setPickedClient(e.target.value); try { localStorage.setItem("f2b-dash-client", e.target.value); } catch { /* ignore */ } }}>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>}
+        {!scopeClientId && <span className="dh-client-note">{clients.find((c) => c.id === clientId)?.logo && <img src={clients.find((c) => c.id === clientId)?.logo} alt="" />}{clients.find((c) => c.id === clientId)?.name}{!focusClientId && <small> · change client in the top bar</small>}</span>}
       </div>
       {loading && !m ? <><p className="dh-muted">Loading results…</p></> : !m ? <></> : <>
         {(() => { const sp = m.split; const v = (x: number | null | undefined) => x == null ? "—" : num(x);
