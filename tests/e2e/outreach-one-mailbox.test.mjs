@@ -62,6 +62,7 @@ globalThis.fetch = async (input, init = {}) => {
     }
     return json({ error: { message: `unexpected Graph call ${method} ${p}` } }, 404);
   }
+  if (url.host === "api.frankfurter.dev") return json({ amount: 1, base: "USD", date: "2026-11-13", rates: { EUR: 0.92, GBP: 0.79 } });
   if (url.host === "api.cloudflare.com") {
     const p = url.pathname.replace("/client/v4", "");
     assert.equal(init.headers?.Authorization || init.headers?.authorization, "Bearer cf-dns-token-test");

@@ -103,3 +103,18 @@ test("monthly costs use real records and say when something is unpriced", () => 
   assert.equal(result.totalCents, 400 + 93 + 42 + 500);
   assert.equal(result.complete, false);
 });
+
+import { convertCents, parseRates } from "../lib/outreach/fx.mjs";
+
+test("currency conversion uses ECB US$ rates and never guesses a missing rate", () => {
+  const fx = parseRates({ date: "2026-11-13", rates: { EUR: 0.9, GBP: 0.8 } });
+  assert.equal(convertCents(4700, "USD", "EUR", fx), 4230);
+  assert.equal(convertCents(900, "EUR", "USD", fx), 1000);
+  assert.equal(convertCents(900, "EUR", "GBP", fx), 800);
+  assert.equal(convertCents(500, "EUR", "EUR", null), 500);
+  assert.equal(convertCents(500, "USD", "JPY", fx), null);
+  const costs = monthlyCosts({ mailboxes: [{ monthly_cost_cents: 490, status: "active" }], aiUsage: [{ cost_usd: 1, tokens_in: 1, tokens_out: 1, calls: 1 }], currency: "EUR", fx });
+  assert.equal(costs.currency, "EUR");
+  assert.equal(costs.lines.find((line) => line.key === "mailboxes").cents, 490, "seat prices you typed stay as entered");
+  assert.equal(costs.lines.find((line) => line.key === "ai").cents, 90, "US$1.00 of AI → €0.90");
+});

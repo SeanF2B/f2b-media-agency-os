@@ -253,7 +253,7 @@ function MailboxTable({ state, act }: { state: OutreachState; act: Act }) {
         <td><HealthPill health={mailbox.health} /></td>
         <td><button type="button" className="ox-link" onClick={() => setReportFor(mailbox)}><Activity size={14} /> Report</button></td>
         <td>{mailbox.campaigns.map((campaign) => campaign.name).join(", ") || <span className="ox-muted">—</span>}</td>
-        <td>{money(mailbox.monthlyCostCents)}</td>
+        <td>{money(mailbox.monthlyCostCents, state.costs.currency)}</td>
       </tr>)}</tbody>)}
     </table></div>
     {editing && <SenderDrawer mailbox={editing} act={act} onClose={() => setEditing(null)} />}
@@ -388,7 +388,12 @@ function Placement({ state, act }: { state: OutreachState; act: Act }) {
 // ============================ drawers ============================
 export function SettingsDrawer({ state, act, onClose }: { state: OutreachState; act: Act; onClose: () => void }) {
   const s = state.settings;
-  const [form, setForm] = useState({ cooldownDays: s.cooldownDays, bookingUrl: s.bookingUrl, ms: s.seatPriceCents.microsoft ?? "", google: s.seatPriceCents.google ?? "", workers: s.workersPlanCents ?? "", defaultTargetDaily: s.defaultTargetDaily, dmarcReportEmail: s.dmarcReportEmail, senderAddress: s.senderAddress, appUrl: s.appUrl });
+  const currency = state.costs.currency;
+  const symbol = (code: string) => new Intl.NumberFormat("en-IE", { style: "currency", currency: code }).formatToParts(0).find((part) => part.type === "currency")?.value || code;
+  const toMajor = (cents: number | null | undefined) => (cents === null || cents === undefined ? "" : String(cents / 100));
+  const toCents = (value: string | number) => (value === "" || value === null ? null : Math.round(Number(value) * 100));
+  const [sync, setSync] = useState(s.expenseSync);
+  const [form, setForm] = useState({ cooldownDays: s.cooldownDays, bookingUrl: s.bookingUrl, ms: toMajor(s.seatPriceCents.microsoft), google: toMajor(s.seatPriceCents.google), workers: toMajor(s.workersPlanCents), defaultTargetDaily: s.defaultTargetDaily, dmarcReportEmail: s.dmarcReportEmail, senderAddress: s.senderAddress, appUrl: s.appUrl });
   const [ms, setMs] = useState({ tenantId: "", clientId: "", clientSecret: "" });
   const [google, setGoogle] = useState({ adminEmail: "", serviceAccountJson: "" });
   const telegram = state.connections.find((connection) => connection.provider === "telegram");
@@ -396,7 +401,7 @@ export function SettingsDrawer({ state, act, onClose }: { state: OutreachState; 
   const [suppress, setSuppress] = useState("");
   const instantly = state.connections.find((connection) => connection.provider === "instantly");
   const [instantlyKey, setInstantlyKey] = useState("");
-  const [instantlyPrice, setInstantlyPrice] = useState<string>(String(s.instantlyPlanCents ?? ""));
+  const [instantlyPrice, setInstantlyPrice] = useState<string>(toMajor(s.instantlyPlanCents));
   return <div className="ox-drawer-backdrop" onClick={onClose}><aside className="ox-drawer" onClick={(event) => event.stopPropagation()} aria-label="Outreach settings">
     <header><h2>Outreach settings</h2><button type="button" className="ox-icon" onClick={onClose} aria-label="Close"><X size={17} /></button></header>
     <section><h3>Sending rules</h3>
@@ -408,8 +413,20 @@ export function SettingsDrawer({ state, act, onClose }: { state: OutreachState; 
       <label className="ox-field">App address (for unsubscribe and alert links)<input value={form.appUrl} onChange={(event) => setForm({ ...form, appUrl: event.target.value })} /></label>
     </section>
     <section><h3>Real costs</h3>
-      <div className="ox-grid2"><label className="ox-field">Microsoft seat (cents/mo)<input type="number" value={form.ms} onChange={(event) => setForm({ ...form, ms: event.target.value as never })} /></label><label className="ox-field">Google seat (cents/mo)<input type="number" value={form.google} onChange={(event) => setForm({ ...form, google: event.target.value as never })} /></label><label className="ox-field">Workers plan (cents/mo)<input type="number" value={form.workers} onChange={(event) => setForm({ ...form, workers: event.target.value as never })} /></label></div>
-      <button type="button" className="primary-button" onClick={() => void act("save-settings", { cooldownDays: form.cooldownDays, bookingUrl: form.bookingUrl, defaultTargetDaily: form.defaultTargetDaily, senderAddress: form.senderAddress, dmarcReportEmail: form.dmarcReportEmail, appUrl: form.appUrl, seatPriceCents: { microsoft: form.ms, google: form.google }, workersPlanCents: form.workers }, "Settings saved")}>Save</button>
+      <p className="ox-muted">Shown in your account currency ({currency}). Prices billed in US$ (Cloudflare, OpenRouter, Instantly) are converted at the European Central Bank rate{state.costs.fxDate ? ` of ${state.costs.fxDate}` : ""}.</p>
+      <div className="ox-grid2"><label className="ox-field">Microsoft seat ({symbol(currency)}/month)<input type="number" min={0} step="0.01" value={form.ms} onChange={(event) => setForm({ ...form, ms: event.target.value })} /></label><label className="ox-field">Google seat ({symbol(currency)}/month)<input type="number" min={0} step="0.01" value={form.google} onChange={(event) => setForm({ ...form, google: event.target.value })} /></label><label className="ox-field">Cloudflare Workers plan (US$/month)<input type="number" min={0} step="0.01" value={form.workers} onChange={(event) => setForm({ ...form, workers: event.target.value })} /></label></div>
+      <button type="button" className="primary-button" onClick={() => void act("save-settings", { cooldownDays: form.cooldownDays, bookingUrl: form.bookingUrl, defaultTargetDaily: form.defaultTargetDaily, senderAddress: form.senderAddress, dmarcReportEmail: form.dmarcReportEmail, appUrl: form.appUrl, seatPriceCents: { microsoft: toCents(form.ms), google: toCents(form.google) }, workersPlanCents: toCents(form.workers) }, "Settings saved")}>Save</button>
+    </section>
+    <section><h3>Add to Books → Expenses</h3>
+      <label className="ox-check"><input type="checkbox" checked={sync.enabled} onChange={(event) => setSync({ ...sync, enabled: event.target.checked })} /> Post Outreach costs to Books automatically ({currency}, category Software)</label>
+      {sync.enabled && <div className="ox-stack" style={{ gap: 6, paddingLeft: 24 }}>
+        <label className="ox-check"><input type="checkbox" checked={sync.mailboxes} onChange={(event) => setSync({ ...sync, mailboxes: event.target.checked })} /> Mailbox seats — monthly, on the last day of the month</label>
+        <label className="ox-check"><input type="checkbox" checked={sync.instantly} onChange={(event) => setSync({ ...sync, instantly: event.target.checked })} /> Instantly plan — monthly</label>
+        <label className="ox-check"><input type="checkbox" checked={sync.domains} onChange={(event) => setSync({ ...sync, domains: event.target.checked })} /> Domains — on the day each is bought or renewed</label>
+        <label className="ox-check"><input type="checkbox" checked={sync.ai} onChange={(event) => setSync({ ...sync, ai: event.target.checked })} /> AI usage — monthly (leave off if you already record your OpenRouter top-ups)</label>
+      </div>}
+      <small className="ox-muted">Each entry is added once (never duplicated) and you can edit or delete it in Books like any other expense.{s.expensePostedMonth ? ` Last posted: ${s.expensePostedMonth}.` : ""}</small>
+      <div className="ox-row"><button type="button" className="secondary-button" onClick={() => void act("save-settings", { expenseSync: sync }, "Saved")}>Save</button></div>
     </section>
     <section><h3>Microsoft 365</h3><p className="ox-muted">An Entra app with User.ReadWrite.All, Domain.ReadWrite.All, Organization.Read.All, Mail.Send and Mail.Read (application permissions, admin consent).</p>
       <input placeholder="Tenant ID" value={ms.tenantId} onChange={(event) => setMs({ ...ms, tenantId: event.target.value })} /><input placeholder="Application (client) ID" value={ms.clientId} onChange={(event) => setMs({ ...ms, clientId: event.target.value })} /><input type="password" placeholder="Client secret" value={ms.clientSecret} onChange={(event) => setMs({ ...ms, clientSecret: event.target.value })} />
@@ -420,11 +437,11 @@ export function SettingsDrawer({ state, act, onClose }: { state: OutreachState; 
       <button type="button" className="secondary-button" disabled={!google.serviceAccountJson} onClick={() => void act("connect-google", google, "Google checked")}>Connect & verify</button></section>
     <section><h3>Instantly warm-up</h3><p className="ox-muted">{instantly?.status === "ok" ? "Connected. Clicking a flame warms that mailbox on Instantly's network; campaigns still send from Agency OS and unlock after 14 days." : "Optional. Uses Instantly only for warm-up (its network of real inboxes). Create an API key in Instantly → Settings → Integrations with the accounts:all scope."}</p>
       {instantly?.status !== "ok" && <input type="password" placeholder="Instantly API key" value={instantlyKey} onChange={(event) => setInstantlyKey(event.target.value)} />}
-      <label className="ox-field">Instantly plan (cents/mo, for the cost report)<input type="number" min={0} value={instantlyPrice} onChange={(event) => setInstantlyPrice(event.target.value)} /></label>
+      <label className="ox-field">Instantly plan (US$/month — converted to {currency} in costs and Books)<input type="number" min={0} step="0.01" value={instantlyPrice} onChange={(event) => setInstantlyPrice(event.target.value)} /></label>
       <div className="ox-row">{instantly?.status === "ok"
         ? <button type="button" className="secondary-button" onClick={() => void act("remove-connection", { provider: "instantly" }, "Instantly disconnected")}>Disconnect</button>
         : <button type="button" className="secondary-button" disabled={instantlyKey.length < 20} onClick={async () => { const ok = await act("connect-instantly", { apiKey: instantlyKey }, "Instantly connected"); if (ok) setInstantlyKey(""); }}>Connect & verify</button>}
-        <button type="button" className="ox-link" onClick={() => void act("save-settings", { instantlyPlanCents: instantlyPrice === "" ? null : Number(instantlyPrice) }, "Saved")}>Save price</button></div></section>
+        <button type="button" className="ox-link" onClick={() => void act("save-settings", { instantlyPlanCents: toCents(instantlyPrice) }, "Saved")}>Save price</button></div></section>
     <section><h3>Telegram</h3><p className="ox-muted">{telegram?.config?.source === "worker-secret" ? "Using your existing F2B bot from the server secrets." : telegram?.config?.source === "saved-api-key" ? "Using the Telegram key saved under Settings → Other API keys." : "No bot found in the server secrets. Paste your existing F2B bot token once (send-only; its current setup isn't touched)."}</p>
       <input placeholder="Chat ID to alert" value={tg.chatId} onChange={(event) => setTg({ ...tg, chatId: event.target.value })} />
       {!telegram?.config?.source && <input type="password" placeholder="Existing bot token" value={tg.botToken} onChange={(event) => setTg({ ...tg, botToken: event.target.value })} />}

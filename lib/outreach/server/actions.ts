@@ -12,6 +12,7 @@ import { canRemoveSuppression } from "@/lib/outreach/reply-handling.mjs";
 import { buildPlaybookContext, buildCopywriterMessages, correctionFromEdit, parseJsonReply, KINDS } from "@/lib/outreach/playbook.mjs";
 import { buildMessage, newMessageId, replySubject } from "@/lib/outreach/mime.mjs";
 import { rampProgress, dailyAllowance } from "@/lib/outreach/ramp.mjs";
+import { accountCurrency, usdRates } from "./money";
 import { beginExternalWarmup, completeExternalConnect, instantlyFor, pauseExternalWarmup, readExternal, unlockForCampaigns } from "./instantly";
 import { createInstantly, externalWarmupProgress } from "@/lib/outreach/providers/instantly.mjs";
 import { DOMAIN_BLOCKLISTS, interpretBlocklist, buildDeliverabilityReport } from "@/lib/outreach/deliverability-report.mjs";
@@ -74,7 +75,9 @@ export async function loadState(ctx: Ctx, query: URLSearchParams) {
 
   const monthStart = `${day.slice(0, 7)}-01`;
   const aiUsage = (await database.prepare("SELECT feature, calls, tokens_in, tokens_out, cost_usd FROM outreach_ai_usage WHERE owner_id = ?1 AND day >= ?2").bind(ownerId, monthStart).all<Row>()).results || [];
-  const costs = monthlyCosts({ mailboxes: mailboxes.map((mailbox) => ({ monthly_cost_cents: mailbox.monthly_cost_cents ?? null, status: mailbox.status })), domains: domains.map((domain) => ({ annual_cost_cents: domain.annual_cost_cents ?? null, protected: domain.protected })), aiUsage: aiUsage as never, openRouterMonthUsd: query.get("costs") === "1" ? await openRouterMonthUsd(ownerId) : null, workersPlanCents: settings.workersPlanCents, subscriptions: connections.some((item: Row) => item.provider === "instantly" && item.status === "ok") ? [{ key: "instantly", label: "Instantly (warm-up)", cents: settings.instantlyPlanCents, source: "Your Instantly plan price (Settings)" }] : [] });
+  const currency = await accountCurrency();
+  const fx = currency === "USD" ? null : await usdRates(ownerId, settings);
+  const costs = monthlyCosts({ mailboxes: mailboxes.map((mailbox) => ({ monthly_cost_cents: mailbox.monthly_cost_cents ?? null, status: mailbox.status })), domains: domains.map((domain) => ({ annual_cost_cents: domain.annual_cost_cents ?? null, protected: domain.protected })), aiUsage: aiUsage as never, openRouterMonthUsd: query.get("costs") === "1" ? await openRouterMonthUsd(ownerId) : null, workersPlanCents: settings.workersPlanCents, subscriptions: connections.some((item: Row) => item.provider === "instantly" && item.status === "ok") ? [{ key: "instantly", label: "Instantly (warm-up)", cents: settings.instantlyPlanCents, currency: "USD", source: "Your Instantly plan price (Settings)" }] : [], currency, fx });
 
   const jobs = await Promise.all((jobRows.results || []).map(async (job) => {
     const jobSteps = (await database.prepare("SELECT step_key, position, status, attempts, message, next_attempt_at, result_json FROM outreach_job_steps WHERE job_id = ?1 ORDER BY position").bind(job.id).all<Row>()).results || [];
@@ -158,6 +161,10 @@ const HANDLERS: Record<string, (ctx: Ctx, body: Row) => Promise<Row>> = {
     if (body.senderAddress !== undefined) patch.senderAddress = str(body.senderAddress, 300);
     if (body.appUrl !== undefined) patch.appUrl = str(body.appUrl, 300);
     if (body.instantlyPlanCents !== undefined) patch.instantlyPlanCents = numOrNull(body.instantlyPlanCents);
+    if (body.expenseSync && typeof body.expenseSync === "object") {
+      const sync = body.expenseSync as Record<string, unknown>;
+      patch.expenseSync = { ...(await getSettings(ctx.ownerId)).expenseSync, ...Object.fromEntries(["enabled", "mailboxes", "instantly", "domains", "ai"].filter((key) => typeof sync[key] === "boolean").map((key) => [key, sync[key] as boolean])) };
+    }
     return { settings: await saveSettings(ctx.ownerId, patch) };
   },
 

@@ -17,7 +17,7 @@ const env = globalThis.__OUTREACH_TEST_ENV__ = {
   TELEGRAM_BOT_TOKEN: "7012345678:AAH-existingF2BbotTokenForTests_xyz12", TELEGRAM_CHAT_ID: "-1009876543210",
 };
 const now0 = new Date().toISOString();
-DB.sqlite.prepare("INSERT INTO workspace_documents (id, owner_id, data, updated_at) VALUES ('f2b-agency', ?, '{}', ?)").run(OWNER, now0);
+DB.sqlite.prepare("INSERT INTO workspace_documents (id, owner_id, data, updated_at) VALUES ('f2b-agency', ?, ?, ?)").run(OWNER, JSON.stringify({ settings: { currency: "EUR" }, financeRecords: [{ id: "manual-1", kind: "Expense", description: "Office rent", category: "Office", amount: 500, date: "2026-11-01", clientId: "" }] }), now0);
 
 const instantly = { accounts: new Map(), warmup: new Set(), oauth: new Map(), calls: [] };
 const telegram = [];
@@ -61,6 +61,7 @@ globalThis.fetch = async (input, init = {}) => {
     if (p === "/accounts/warmup-analytics") return json({ email_date_data: {}, aggregate_data: Object.fromEntries(body.emails.map((email) => [email, { sent: 120, received: 118, landed_inbox: 111, landed_spam: 7, health_score_label: "94%", health_score: 94 }])) });
     return json({ statusCode: 404, message: `unexpected ${method} ${p}` }, 404);
   }
+  if (url.host === "api.frankfurter.dev") return json({ amount: 1, base: "USD", date: "2026-11-13", rates: { EUR: 0.9, GBP: 0.8 } });
   if (url.host === "api.telegram.org") { if (url.pathname.endsWith("/sendMessage")) telegram.push(JSON.parse(String(init.body))); return json({ ok: true, result: {} }); }
   throw new Error(`Unexpected network call: ${method} ${url.href}`);
 };
@@ -124,7 +125,9 @@ test("engine pulls Instantly's warm-up numbers into the flame and the report", a
   assert.equal(deliverability.externalWarmup.provider, "Instantly");
   assert.ok(deliverability.findings.some((item) => /Warm-up emails reach the inbox 94\.\d%/.test(item.text)));
   const costs = (await loadState(ctx, new URLSearchParams())).costs;
-  assert.ok(costs.lines.some((line) => line.key === "instantly" && line.cents === 4700), "Instantly plan appears in monthly costs");
+  assert.equal(costs.currency, "EUR", "costs follow the account currency");
+  assert.equal(costs.fxDate, "2026-11-13");
+  assert.ok(costs.lines.some((line) => line.key === "instantly" && line.cents === 4230 && /from US\$/.test(line.source)), "Instantly's US$47 shown as €42.30 at the ECB rate");
 });
 
 test("after 14 days the mailbox unlocks for campaigns by itself, with full ramp credit", async () => {
@@ -146,4 +149,21 @@ test("a banned account raises one critical alert; pausing stops Instantly warm-u
   assert.ok(!instantly.warmup.has(MAILBOX));
   assert.equal(one("SELECT status FROM outreach_mailboxes WHERE id = ?", mailboxId).status, "paused");
   assert.equal((await box()).external.paused, true);
+});
+
+test("Outreach costs are posted to Books → Expenses in EUR, once", async () => {
+  await act("save-settings", { seatPriceCents: { microsoft: 490 } });
+  DB.sqlite.prepare("UPDATE outreach_mailboxes SET monthly_cost_cents = 490, created_at = '2026-01-01T00:00:00Z' WHERE id = ?").run(mailboxId);
+  DB.sqlite.prepare("UPDATE outreach_connections SET created_at = '2026-01-01T00:00:00Z' WHERE provider = 'instantly'").run();
+  const firstOfMonth = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() + 1, 1, 0, 2));
+  const previous = new Date(Date.UTC(firstOfMonth.getUTCFullYear(), firstOfMonth.getUTCMonth() - 1, 15)).toISOString().slice(0, 7);
+  const run = await processOutreach(firstOfMonth);
+  assert.equal(run.expenses.currency, "EUR");
+  const books = () => JSON.parse(one("SELECT data FROM workspace_documents WHERE id = 'f2b-agency'").data).financeRecords;
+  const mine = books().filter((record) => record.source === "outreach");
+  assert.deepEqual(mine.map((record) => [record.id, record.amount, record.category]).sort(), [[`outreach-instantly-${previous}`, 42.3, "Software"], [`outreach-mailboxes-${previous}`, 4.9, "Software"]].sort());
+  assert.ok(books().some((record) => record.id === "manual-1"), "existing expenses are untouched");
+  assert.ok(!mine.some((record) => record.id.startsWith("outreach-ai-")), "AI usage is off by default (avoids double-counting OpenRouter top-ups)");
+  await processOutreach(new Date(firstOfMonth.getTime() + 3600_000));
+  assert.equal(books().filter((record) => record.source === "outreach").length, 2, "never posted twice");
 });
