@@ -149,6 +149,16 @@ export async function GET(request: Request) {
     const chatgpt = ai?.platforms.find((p) => p.platform === "chatgpt");
     const leadsNow = seo?.attribution.status === "ok" ? Object.values(seo.attribution.data!.allChannels || {}).reduce((a, b) => a + (Number(b) || 0), 0) : null;
     const [meta, gsc, trustpilot] = await Promise.all([metaFor([clientId]), searchConsoleFor(clientId), trustpilotFor(clientId)]);
+    // Latest ChatGPT answer per question (last 60 days) for the "Where you show up" drop-down.
+    const aiQuestions = await (async () => {
+      try {
+        const since = new Date(Date.now() - 60 * 86400_000).toISOString();
+        const rows = (await db.prepare("SELECT prompt, mentioned, position, competitors_json, created_at FROM ai_visibility_tests WHERE owner_id = ?1 AND client_id = ?2 AND platform = 'chatgpt' AND error IS NULL AND created_at >= ?3 ORDER BY created_at DESC LIMIT 200").bind(ownerId, clientId, since).all<{ prompt: string; mentioned: number; position: number | null; competitors_json: string; created_at: string }>()).results || [];
+        const seen = new Set<string>(); const out: Array<{ prompt: string; mentioned: boolean; position: number | null; competitors: string[]; at: string }> = [];
+        for (const r of rows) { const key = r.prompt.trim().toLowerCase(); if (seen.has(key)) continue; seen.add(key); let comps: string[] = []; try { const v = JSON.parse(r.competitors_json || "[]"); comps = (Array.isArray(v) ? v : []).map((c: unknown) => typeof c === "string" ? c : String((c as { name?: string })?.name || "")).filter(Boolean).slice(0, 4); } catch { /* ignore */ } out.push({ prompt: r.prompt.slice(0, 240), mentioned: Boolean(r.mentioned), position: r.position ?? null, competitors: comps, at: r.created_at }); if (out.length >= 20) break; }
+        return out;
+      } catch { return []; }
+    })();
     // Paid vs organic split: leads by channel from CRM attribution, ad calls from Google Ads.
     const channels = seo?.attribution.status === "ok" ? seo.attribution.data!.allChannels as Record<string, number> : null;
     const accountId = String((workspace.clients || []).find((c) => c.id === clientId)?.googleAdsAccountId || "").replace(/\D/g, "");
@@ -168,8 +178,8 @@ export async function GET(request: Request) {
       calls: biz && biz.calls != null ? { value: biz.calls, previous: biz.previous?.calls ?? null } : null,
       profileClicks: biz && biz.websiteClicks != null ? { value: biz.websiteClicks, previous: biz.previous?.websiteClicks ?? null } : null, businessNote: why(seo?.business),
       leads: leadsNow != null ? { value: leadsNow, previous: null } : null,
-      google: positions.length ? { position: avg(positions), previous: avg(prevPositions), tracked: positions.length, top3: positions.filter((p) => p <= 3).length } : null, rankNote: why(seo?.rankings) || (ranks && !positions.length ? "No ranking checks yet" : ""),
-      chatgpt: chatgpt ? { share: chatgpt.share, previous: chatgpt.previousShare, prompts: chatgpt.prompts, mentioned: chatgpt.mentioned } : null, aiNote: why(seo?.aiVisibility),
+      google: positions.length ? { position: avg(positions), previous: avg(prevPositions), tracked: positions.length, top3: positions.filter((p) => p <= 3).length, keywords: (ranks?.keywords || []).map((k) => ({ keyword: k.keyword, position: k.position, previous: k.previousPosition, volume: k.volume })) } : null, rankNote: why(seo?.rankings) || (ranks && !positions.length ? "No ranking checks yet" : ""),
+      chatgpt: chatgpt ? { share: chatgpt.share, previous: chatgpt.previousShare, prompts: chatgpt.prompts, mentioned: chatgpt.mentioned, questions: aiQuestions } : null, aiNote: why(seo?.aiVisibility),
       bing: null, bingNote: "Bing rank tracking isn’t set up yet",
     };
   };

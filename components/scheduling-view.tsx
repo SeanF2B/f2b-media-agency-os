@@ -19,6 +19,8 @@ type Slot = { start: string; end: string; staffIds: string[] };
 const DAY_LIST: Array<[DayKey, string]> = [["mon", "Monday"], ["tue", "Tuesday"], ["wed", "Wednesday"], ["thu", "Thursday"], ["fri", "Friday"], ["sat", "Saturday"], ["sun", "Sunday"]];
 const HOURS_FROM = 7, HOURS_TO = 21, PX_DEFAULT = 0.9;
 const STATUS_LABEL: Record<Booking["status"], string> = { booked: "Booked", cancelled: "Cancelled", completed: "Completed", no_show: "No-show" };
+// Studio-style businesses (tattoo, piercing) always work from their own studio, so a per-appointment location isn't asked.
+const isStudioBusiness = (data: Data, cal?: Calendar) => { const client = data.clients.find((c) => c.id === (cal?.clientId || data.scope || "")); return /tattoo|\bink\b|piercing/i.test(`${client?.name || ""} ${cal?.name || ""}`); };
 const MODE_LABEL: Record<Calendar["assignMode"], string> = { customer_pick: "Customer picks the person", round_robin: "Auto-assign (round robin)", collective: "Everyone together" };
 
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -154,7 +156,7 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
         <div className="iv-card sch-dash-appts">
           <div className="sch-dash-head"><h3>{isToday ? "Today’s appointments" : dashDate.toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "short" })}</h3><div className="sch-dash-nav"><button type="button" className="iv-btn" aria-label="Previous day" onClick={() => setDashDate(addDays(dashDate, -1))}><ChevronLeft size={15} /></button><input type="date" value={key} onChange={(e) => e.target.value && setDashDate(new Date(`${e.target.value}T12:00:00`))} aria-label="Pick a date" /><button type="button" className="iv-btn" aria-label="Next day" onClick={() => setDashDate(addDays(dashDate, 1))}><ChevronRight size={15} /></button>{!isToday && <button type="button" className="iv-btn" onClick={() => setDashDate(new Date())}>Today</button>}</div></div>
           <div className="sch-dash-stats"><span><b>{dayList.length}</b> booked</span><span><b>{dayList.filter((b) => statusOf(b)[0] === "Confirmed").length}</b> to come</span><span><b>{dayList.filter((b) => statusOf(b)[0] === "Done").length}</b> done</span>{dayList.some((b) => b.status === "no_show") && <span><b>{dayList.filter((b) => b.status === "no_show").length}</b> no-show</span>}</div>
-          {dayList.length ? <ul className="sch-dash-list">{dayList.map((b) => { const [label, tone] = statusOf(b); const cal = calById.get(b.calendarId); return <li key={b.id} onClick={() => setDetail(b)}><time>{time(b.start)}</time><span className="sch-dash-av" style={{ ["--c" as string]: cal?.color || "#2563eb" }}>{(b.name || "?").slice(0, 1).toUpperCase()}</span><span className="sch-dash-who"><b>{b.name}</b><small>{cal?.name || ""}</small><small className="sch-dash-staff">{b.staffIds.map((id) => staffById.get(id)?.name.split(" ")[0]).filter(Boolean).join(", ")}</small></span><span className={`sch-dash-status ${tone}`}>{label}</span></li>; })}</ul> : <p className="iv-small sch-dash-empty">Nothing booked{isToday ? " today" : " on this day"}.</p>}
+          {dayList.length ? <ul className="sch-dash-list">{dayList.map((b) => { const [label, tone] = statusOf(b); const cal = calById.get(b.calendarId); return <li key={b.id} onClick={() => setDetail(b)}><time>{time(b.start)}</time>{b.staffIds.length ? <span className="sch-dash-avs">{b.staffIds.slice(0, 2).map((id) => <Avatar key={id} person={personOf(id)} size={30} />)}</span> : <span className="sch-dash-av" style={{ ["--c" as string]: cal?.color || "#2563eb" }}>{(b.name || "?").slice(0, 1).toUpperCase()}</span>}<span className="sch-dash-who"><b>{b.name}</b><small>{cal?.name || ""}</small><small className="sch-dash-staff">{b.staffIds.map((id) => staffById.get(id)?.name.split(" ")[0]).filter(Boolean).join(", ")}</small></span><span className={`sch-dash-status ${tone}`}>{label}</span></li>; })}</ul> : <p className="iv-small sch-dash-empty">Nothing booked{isToday ? " today" : " on this day"}.</p>}
         </div>
         <div className="iv-card sch-dash-staff-card">
           <div className="sch-dash-head"><h3>Staff availability</h3><span className="iv-small">{dashDate.toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short" })}</span></div>
@@ -189,7 +191,7 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
               {key === todayKey && (() => { const n = new Date(); const m = n.getHours() * 60 + n.getMinutes() - HOURS_FROM * 60; return m > 0 && m < (HOURS_TO - HOURS_FROM) * 60 ? <i className="sch-now" style={{ top: m * PX_PER_MIN }} /> : null; })()}
               {dayBookings.map((b) => { const s = new Date(b.start), e = new Date(b.end); const top = Math.max(0, (s.getHours() * 60 + s.getMinutes() - HOURS_FROM * 60) * PX_PER_MIN); const height = Math.max(22, ((e.getTime() - s.getTime()) / 60000) * PX_PER_MIN - 2); const cal = calById.get(b.calendarId);
                 return <button key={b.id} type="button" className={`sch-block ${b.status}`} style={{ top, height, ["--c" as string]: cal?.color || "#2563eb" }} onClick={() => setDetail(b)} title={`${time(b.start)} ${cal?.name || ""} · ${b.name}`}>
-                  <b>{time(b.start)} {b.name}</b><span>{cal?.name}</span><em>{b.staffIds.map((id) => staffById.get(id)?.name.split(" ")[0]).filter(Boolean).join(", ")}</em></button>; })}
+                  <span className="sch-block-avs">{b.staffIds.slice(0, 3).map((id) => <Avatar key={id} person={staffById.get(id) || { name: "?" }} size={20} />)}</span><b>{time(b.start)} {b.name}</b><span>{cal?.name}</span><em>{b.staffIds.map((id) => staffById.get(id)?.name.split(" ")[0]).filter(Boolean).join(", ")}</em></button>; })}
             </div></div>; })}
       </div>
     </div>}
@@ -369,6 +371,7 @@ function NewAppointment({ data, scope, initial, onClose, onSaved, onCalendarsCha
   const [customTime, setCustomTime] = useState(initial.time || "09:00");
   const [form, setForm] = useState({ name: initial.name || "", email: initial.email || "", phone: initial.phone || "", notes: initial.notes || "" });
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [location, setLocation] = useState("");
   const [notify, setNotify] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -384,6 +387,7 @@ function NewAppointment({ data, scope, initial, onClose, onSaved, onCalendarsCha
   const pool = data.staff.filter((s) => cal?.staffIds.includes(s.id) || custom || staffIds.includes(s.id));
   const days = Array.from({ length: 14 }, (_, i) => addDays(new Date(), i));
   const useAnyTime = () => { setCustom(true); if (!staffIds.length) setStaffIds(data.meId && data.staff.some((s) => s.id === data.meId) ? [data.meId] : data.staff[0] ? [data.staff[0].id] : []); };
+  const showLocation = Boolean(cal) && !isStudioBusiness(data, cal) && !cal!.questions.some((q) => /address|eircode|location/i.test(q.label)) && cal!.locationType !== "video";
   const when = custom ? (customTime ? `${new Date(`${date}T12:00:00`).toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short" })} at ${customTime}` : "") : slot ? longDate(slot) : "";
   const save = async () => {
     setBusy(true); setErr("");
@@ -392,7 +396,7 @@ function NewAppointment({ data, scope, initial, onClose, onSaved, onCalendarsCha
       if (!form.name.trim()) throw new Error("Add the customer's name.");
       if (!start) throw new Error("Pick a time.");
       if (custom && !staffIds.length) throw new Error("Choose who the appointment is with.");
-      await api(scope, { action: "book", calendarId, start, staffIds, force: custom, ...form, answers, notify });
+      await api(scope, { action: "book", calendarId, start, staffIds, force: custom, ...form, answers, location: showLocation ? location : "", notify });
       onSaved(`Booked: ${form.name} · ${when}.`);
     } catch (e) { setErr(errText(e, "Couldn't book this appointment.")); }
     finally { setBusy(false); }
@@ -420,6 +424,7 @@ function NewAppointment({ data, scope, initial, onClose, onSaved, onCalendarsCha
     {custom ? <div className="sch-inline"><input type="time" aria-label="Time" value={customTime} onChange={(e) => setCustomTime(e.target.value)} /><button type="button" className="iv-btn" onClick={() => setCustom(false)}>Show free times instead</button></div>
       : cal ? <><SlotPicker data={data} scope={scope} calendarId={calendarId} staffIds={staffIds} date={date} value={slot} onPick={(s) => setSlot(s.start)} /><button type="button" className="sch-linkbtn" onClick={useAnyTime}>Need a time that isn't listed? Pick any time</button></> : null}
     {cal?.questions.length ? <><h3 className="sch-h3">Details</h3><div className="iv-grid">{cal.questions.map((q) => <Field key={q.id} label={q.label}>{q.type === "select" ? <select value={answers[q.id] || ""} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}><option value="">Choose…</option>{(q.options || []).map((o) => <option key={o}>{o}</option>)}</select> : <input value={answers[q.id] || ""} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })} />}</Field>)}</div></> : null}
+    {showLocation && <Field label={cal!.locationType === "phone" ? "Location (optional)" : cal!.locationType === "office" ? "Location (leave blank for your office)" : "Location / site address"}><input value={location} onChange={(e) => setLocation(e.target.value)} maxLength={300} placeholder={cal!.locationType === "office" ? cal!.locationDetail || "Your office" : "e.g. 12 Main St, Oranmore, H91 X2Y3"} /></Field>}
     <Field label="Notes (only your team sees these)"><textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} maxLength={2000} /></Field>
     {(form.email.trim() || !form.phone) && <label className="iv-check iv-small"><input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} /> Email the customer a confirmation</label>}
   </Modal>;
@@ -762,6 +767,7 @@ export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, c
   const staff = (data?.staff || []).filter((p) => !staffId || p.id === staffId);
   const calById = new Map((data?.calendars || []).map((c) => [c.id, c]));
   const nameOf = (id: string) => data?.staff.find((p) => p.id === id)?.name.split("|")[0].trim().split(" ")[0] || "";
+  const personOf = (id: string) => { const p = data?.staff.find((x) => x.id === id); return p ? { name: p.name.split("|")[0].trim(), avatar: (p as { avatar?: string }).avatar } : { name: "?" }; };
   const key = ymd(day); const isToday = key === ymd(new Date());
   const dayList = bookings.filter((b) => ymd(new Date(b.start)) === key).sort((a, b) => a.start.localeCompare(b.start));
   const mins = (hhmm: string) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + (m || 0); };
@@ -814,7 +820,7 @@ export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, c
           <span className={`sch-avail-pill ${!windows.length ? "off" : !booked.length ? "free" : free ? "some" : "full"}`}>{summary}</span></div>; })}</div>
     </div> : <div className="sch-dash-week">{Array.from({ length: 7 }, (_, i) => addDays(week, i)).map((d) => { const k = ymd(d); const list = bookings.filter((b) => ymd(new Date(b.start)) === k).sort((a, b) => a.start.localeCompare(b.start)); return <div key={k} className={`sch-dash-wday${k === ymd(new Date()) ? " today" : ""}`}>
       <button type="button" className="sch-dash-wday-head" onClick={() => { setDay(d); setMode("day"); }}><small>{d.toLocaleDateString("en-IE", { weekday: "short" })}</small><b>{d.getDate()}</b>{list.length > 0 && <em>{list.length}</em>}</button>
-      <div className="sch-dash-wday-body">{list.length ? list.slice(0, 6).map((b) => { const cal = calById.get(b.calendarId); return <button type="button" key={b.id} className="sch-dash-chip" style={{ ["--c" as string]: cal?.color || "#2563eb" }} onClick={onOpen} title={`${time(b.start)} ${b.name} · ${cal?.name || ""}`}><b>{time(b.start)}</b><span>{b.name}</span></button>; }) : <span className="sch-dash-free">Free</span>}{list.length > 6 && <small className="iv-small">+{list.length - 6} more</small>}</div>
+      <div className="sch-dash-wday-body">{list.length ? list.slice(0, 6).map((b) => { const cal = calById.get(b.calendarId); return <button type="button" key={b.id} className="sch-dash-chip" style={{ ["--c" as string]: cal?.color || "#2563eb" }} onClick={onOpen} title={`${time(b.start)} ${b.name} · ${cal?.name || ""}`}><span className="sch-chip-top"><b>{time(b.start)}</b><span className="sch-chip-avs">{b.staffIds.slice(0, 2).map((id) => <Avatar key={id} person={personOf(id)} size={20} />)}</span></span><span>{b.name}</span></button>; }) : <span className="sch-dash-free">Free</span>}{list.length > 6 && <small className="iv-small">+{list.length - 6} more</small>}</div>
     </div>; })}</div>}
   </section>;
 }

@@ -206,7 +206,7 @@ function normPhone(v: string) {
 
 export type BookInput = {
   cal: CalendarConfig; start: string; staffId?: string; staffIds?: string[]; name: string; email?: string; phone?: string;
-  answers?: Record<string, unknown>; notes?: string; source: "public" | "internal"; createdBy?: string; workspace: WorkspaceLite;
+  answers?: Record<string, unknown>; location?: string; notes?: string; source: "public" | "internal"; createdBy?: string; workspace: WorkspaceLite;
   attribution?: Record<string, string>; pageUrl?: string; skipAvailability?: boolean; notifyCustomer?: boolean;
 };
 
@@ -223,6 +223,8 @@ export async function createBooking(deps: Deps, input: BookInput) {
   if (!Number.isFinite(startMs)) throw new SchedulingError("Choose a time.");
   const endMs = startMs + cal.durationMin * 60_000;
   const answers = cal.questions.map((q) => ({ label: q.label, value: clean(input.answers?.[q.id], 1000) }));
+  const location = clean(input.location, 300);
+  if (location && !answers.some((a) => /address|eircode|location/i.test(a.label) && a.value)) answers.push({ label: "Location", value: location });
   if (input.source === "public") { const missing = cal.questions.find((q, i) => q.required && !answers[i].value); if (missing) throw new SchedulingError(`Please answer: ${missing.label}`); }
 
   // Re-check the slot on the server: never trust the time the browser sent.

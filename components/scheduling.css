@@ -253,3 +253,25 @@
 .sch-dash-wday{background:rgba(127,138,160,.03)}
 .app-shell.dark-mode .sch-dash-overview>div{border-color:#3c4850}.app-shell.dark-mode .sch-dash-day,.app-shell.dark-mode .sch-dash-week{border-color:#2f3a41}
 .sch-sample-tag{margin-left:8px;font-size:10.5px;font-weight:800;letter-spacing:.04em;background:#fef3c7;color:#92400e;border-radius:999px;padding:2px 8px;vertical-align:middle}
+/* Appointments panel toolbar: one height, one style (overrides global button rules) */
+html body .app-shell .sch-dash-panel-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+html body .app-shell .sch-dash-panel-tools>*{height:36px;box-sizing:border-box;margin:0}
+html body .app-shell .sch-dash-panel-tools .sch-select{display:inline-flex;align-items:center;gap:6px;padding:0 10px;border:1px solid #dce3e7;border-radius:10px;background:#fff;min-width:150px}
+html body .app-shell .sch-dash-panel-tools .sch-select select{border:0;background:transparent;font:inherit;font-size:13px;font-weight:700;height:34px;padding:0 4px;box-shadow:none;outline:none;flex:1;min-width:0}
+html body .app-shell .sch-dash-panel-tools .sch-seg{display:inline-flex;gap:2px;padding:3px;border:1px solid #dce3e7;border-radius:10px;background:#f3f5f7;overflow:visible}
+html body .app-shell .sch-dash-panel-tools .sch-seg button{height:28px;min-height:0;border:0!important;box-shadow:none!important;outline:0;border-radius:7px;padding:0 14px;font-size:13px;font-weight:700;background:transparent;color:#5b6773;transform:none}
+html body .app-shell .sch-dash-panel-tools .sch-seg button.on{background:#fff;color:#101828;box-shadow:0 1px 3px rgba(16,24,40,.14)!important}
+html body .app-shell .sch-dash-panel-tools .iv-btn{display:inline-flex;align-items:center;justify-content:center;min-width:36px;padding:0 10px;border:1px solid #dce3e7;border-radius:10px;background:#fff;box-shadow:none;font-size:13px;font-weight:700}
+html body .app-shell .sch-dash-panel-tools .text-button{display:inline-flex;align-items:center;padding:0 6px;font-size:13px;font-weight:700;white-space:nowrap}
+html body .app-shell.dark-mode .sch-dash-panel-tools .sch-select,html body .app-shell.dark-mode .sch-dash-panel-tools .iv-btn{background:#1d252b;border-color:#3c4850}
+html body .app-shell.dark-mode .sch-dash-panel-tools .sch-seg{background:#151c21;border-color:#3c4850}
+html body .app-shell.dark-mode .sch-dash-panel-tools .sch-seg button{color:#9aa7b2}
+html body .app-shell.dark-mode .sch-dash-panel-tools .sch-seg button.on{background:#2a343b;color:#fff}
+/* Assigned staff photos on appointments */
+.sch-chip-top{display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%}
+.sch-chip-avs,.sch-dash-avs,.sch-block-avs{display:inline-flex;flex-shrink:0}
+.sch-chip-avs .sch-avatar,.sch-dash-avs .sch-avatar,.sch-block-avs .sch-avatar{box-shadow:0 0 0 2px #fff}
+.sch-chip-avs .sch-avatar+.sch-avatar,.sch-dash-avs .sch-avatar+.sch-avatar,.sch-block-avs .sch-avatar+.sch-avatar{margin-left:-7px}
+.sch-block .sch-block-avs{position:absolute;top:4px;right:4px}
+.sch-block{position:absolute}
+.app-shell.dark-mode .sch-chip-avs .sch-avatar,.app-shell.dark-mode .sch-dash-avs .sch-avatar,.app-shell.dark-mode .sch-block-avs .sch-avatar{box-shadow:0 0 0 2px #1b2227}

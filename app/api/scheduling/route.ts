@@ -160,6 +160,7 @@ export async function POST(request: Request) {
           start: str(body.start, 40), staffId: !force && staffIds.length === 1 ? staffIds[0] : undefined, staffIds, skipAvailability: force,
           name: str(body.name, 120), email: str(body.email, 160), phone: str(body.phone, 40), notes: str(body.notes, 2000),
           answers: (body.answers && typeof body.answers === "object" ? body.answers : {}) as Record<string, unknown>,
+          location: typeof body.location === "string" ? body.location : "",
           source: "internal", createdBy: by, workspace: workspaceFor(ctx), notifyCustomer: body.notify !== false,
         });
         return json({ booking: result.booking });

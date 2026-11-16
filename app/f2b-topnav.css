@@ -1995,3 +1995,31 @@ html body .app-shell .client-appt-toggle input:checked + span::after { transform
 html body .app-shell .client-appt-toggle input:focus-visible + span { outline: 2px solid var(--brand-secondary, #3b82f6); outline-offset: 2px; }
 html body .app-shell .ops-clients { margin-top: 6px; }
 html body .app-shell .ops-clients > .page-heading { display: none; }
+/* Where you show up: clickable cards with keyword / ChatGPT question drop-downs */
+html body .app-shell .dh-rank.dh-rank-click{position:relative;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+html body .app-shell .dh-rank.dh-rank-click:hover{border-color:#c9d3da;box-shadow:0 4px 14px rgba(16,24,40,.06)}
+html body .app-shell .dh-rank.dh-rank-click.open{border-color:var(--brand-primary,#1f6feb);box-shadow:0 0 0 3px rgba(31,111,235,.10)}
+html body .app-shell .dh-rank-chev{position:absolute;top:12px;right:14px;font-size:11px;font-weight:700;color:#6b7785}
+html body .app-shell .dh-rank-drop{margin-top:10px;border:1px solid #e8edf1;border-radius:13px;background:#fff;padding:6px 14px 10px;animation:f2b-fade-in .18s ease}
+html body .app-shell .dh-rank-drop-head{display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;border-bottom:1px solid #eef2f5}
+html body .app-shell .dh-rank-drop-head b{font-size:14px}html body .app-shell .dh-rank-drop-head small{color:#8a96a3;font-size:11.5px}
+html body .app-shell .dh-rank-row{display:grid;grid-template-columns:54px minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:9px 0;border-bottom:1px solid #f2f5f7;font-size:13px}
+html body .app-shell .dh-rank-row:last-child{border-bottom:0}
+html body .app-shell .dh-rank-row.ai{grid-template-columns:54px minmax(0,1fr) auto minmax(0,220px)}
+html body .app-shell .dh-rank-term{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:#101828}
+html body .app-shell .dh-rank-row b{font-size:12px}html body .app-shell .dh-rank-row b.good{color:#15803d}html body .app-shell .dh-rank-row b.bad{color:#b42318}html body .app-shell .dh-rank-row b.flat{color:#9aa5b1}
+html body .app-shell .dh-rank-row small{color:#8a96a3;font-size:11.5px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html body .app-shell .dh-pos{display:inline-flex;justify-content:center;align-items:center;height:24px;border-radius:999px;font-size:12px;font-weight:800;background:#f1f4f6;color:#475467}
+html body .app-shell .dh-pos.top{background:#dcfce7;color:#166534}html body .app-shell .dh-pos.mid{background:#fef3c7;color:#92400e}html body .app-shell .dh-pos.low{background:#fee2e2;color:#991b1b}
+html body .app-shell.dark-mode .dh-rank-drop{background:#1b2227;border-color:#2f3a41}html body .app-shell.dark-mode .dh-rank-term{color:#e7edf1}html body .app-shell.dark-mode .dh-rank-row,html body .app-shell.dark-mode .dh-rank-drop-head{border-color:#2a343b}
+@media (max-width:700px){html body .app-shell .dh-rank-row,html body .app-shell .dh-rank-row.ai{grid-template-columns:48px minmax(0,1fr) auto}html body .app-shell .dh-rank-row small{grid-column:2/-1;text-align:left;white-space:normal}}
+/* No square boxes on hover/focus: selects and inputs inside a rounded wrapper stay borderless; the wrapper shows a soft rounded ring instead. */
+html body .app-shell label:has(> svg) > select, html body .app-shell label:has(> svg) > input:not([type=checkbox]):not([type=radio]),
+html body .app-shell .sch-select select, html body .app-shell .sch-select select:hover, html body .app-shell .sch-select select:focus, html body .app-shell .sch-select select:focus-visible,
+html body .app-shell label:has(> svg) > select:hover, html body .app-shell label:has(> svg) > select:focus, html body .app-shell label:has(> svg) > select:focus-visible,
+html body .app-shell label:has(> svg) > input:hover, html body .app-shell label:has(> svg) > input:focus, html body .app-shell label:has(> svg) > input:focus-visible {
+  border: 0 !important; outline: 0 !important; box-shadow: none !important; background-color: transparent !important; transform: none !important; border-radius: 0 !important;
+}
+html body .app-shell label:has(> svg):has(> select:focus-visible), html body .app-shell label:has(> svg):has(> input:focus-visible), html body .app-shell .sch-select:focus-within { box-shadow: 0 0 0 3px rgba(59,130,246,.16) !important; }
+html body .app-shell button:focus:not(:focus-visible), html body .app-shell select:focus:not(:focus-visible), html body .app-shell [role=button]:focus:not(:focus-visible) { outline: none !important; }
+html body .app-shell button:focus-visible, html body .app-shell [role=button]:focus-visible { outline: 2px solid rgba(59,130,246,.45) !important; outline-offset: 2px; border-radius: 10px; }
