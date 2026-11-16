@@ -2,8 +2,8 @@
 // Floating AI assistant: a big animated bot bubble in the corner of every page. It knows which page you're on,
 // greets new users, pops up notifications (approvals, new leads, unread messages), runs page tours, and turns
 // typed or spoken requests into pre-filled forms (nothing is saved without your OK).
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Mic, MicOff, Send, X, Compass, Sparkles, LifeBuoy } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode, type PointerEvent as RPointerEvent, type CSSProperties } from "react";
+import { Mic, MicOff, Send, X, Compass, Sparkles, LifeBuoy, EyeOff } from "lucide-react";
 
 export type AiCommand = { action: string; reply: string; fields: Record<string, string> };
 type Suggestion = { title: string; clientId: string; priority: string; service: string; why: string; source?: string };
@@ -68,6 +68,15 @@ export function AiChatWidget({ page, pageName, clientId, avatar, enabled, onComm
   const [messages, setMessages] = useState<Msg[]>([]);
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
+  // Drag the assistant anywhere (position remembered) or hide it to a small tab at the screen edge.
+  const [dock, setDock] = useState<{ right: number; bottom: number } | null>(() => { try { return JSON.parse(localStorage.getItem("f2b-ai-dock") || "null"); } catch { return null; } });
+  const [hiddenBot, setHiddenBot] = useState(() => { try { return localStorage.getItem("f2b-ai-hidden") === "1"; } catch { return false; } });
+  const dragRef = useRef<{ x: number; y: number; moved: boolean } | null>(null);
+  const hideBot = () => { setHiddenBot(true); setOpen(false); setToast(null); try { localStorage.setItem("f2b-ai-hidden", "1"); } catch { /* ignore */ } };
+  const showBot = () => { setHiddenBot(false); try { localStorage.setItem("f2b-ai-hidden", "0"); } catch { /* ignore */ } };
+  const onLauncherDown = (event: RPointerEvent<HTMLButtonElement>) => { dragRef.current = { x: event.clientX, y: event.clientY, moved: false }; (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId); };
+  const onLauncherMove = (event: RPointerEvent<HTMLButtonElement>) => { const d = dragRef.current; if (!d) return; if (!d.moved && Math.hypot(event.clientX - d.x, event.clientY - d.y) < 6) return; d.moved = true; const size = 64; setDock({ right: Math.max(8, Math.min(window.innerWidth - size - 8, window.innerWidth - event.clientX - size / 2)), bottom: Math.max(8, Math.min(window.innerHeight - size - 8, window.innerHeight - event.clientY - size / 2)) }); };
+  const onLauncherUp = () => { const d = dragRef.current; if (d?.moved) { setDock((current) => { try { localStorage.setItem("f2b-ai-dock", JSON.stringify(current)); } catch { /* ignore */ } return current; }); window.setTimeout(() => { dragRef.current = null; }, 0); } else dragRef.current = null; };
   const [employee, setEmployee] = useState(() => { try { return localStorage.getItem("f2b-ai-employee") || ""; } catch { return ""; } });
   const [pickerOpen, setPickerOpen] = useState(false);
   const [listening, setListening] = useState(false);
@@ -287,7 +296,8 @@ export function AiChatWidget({ page, pageName, clientId, avatar, enabled, onComm
     lead_gen: ["Where are leads coming from?", "How many new leads this month?", "Which leads should I follow up?"],
   };
   const chips = (employee ? EMPLOYEE_CHIPS[employee] || [] : PAGE_HELP[page] || PAGE_HELP.Overview).slice(0, 3);
-  return <>
+  const dockStyle = { ["--ai-right" as string]: `${dock?.right ?? 24}px`, ["--ai-bottom" as string]: `${dock?.bottom ?? 24}px` } as CSSProperties;
+  return <div className={`ai-chat-dock${dock ? " is-moved" : ""}`} style={dockStyle}>
     {tour && step && rect && <div className="ai-tour" role="dialog" aria-label={step.title}>
       <div className="ai-tour-hole" style={{ top: rect.top - 6, left: rect.left - 6, width: rect.width + 12, height: rect.height + 12 }} />
       <div className="ai-tour-card" style={{ top: Math.min(window.innerHeight - 190, rect.bottom + 14 > window.innerHeight - 190 ? Math.max(12, rect.top - 190) : rect.bottom + 14), left: Math.max(12, Math.min(window.innerWidth - 352, rect.left)) }}>
@@ -297,7 +307,7 @@ export function AiChatWidget({ page, pageName, clientId, avatar, enabled, onComm
     </div>}
     {toast && !open && <div className="ai-chat-toast" role="status"><button type="button" className="ai-chat-toast-x" aria-label="Dismiss" onClick={() => setToast(null)}><X size={14} /></button><p>{toast.text}</p>{toast.action && <button type="button" className="primary-button" onClick={() => { const run = toast.action!.run; setToast(null); run(); }}>{toast.action.label}</button>}</div>}
     {open && <section className="ai-chat-panel" aria-label="AI assistant">
-      <header><span className="ai-chat-head-bot">{avatar}</span><div className="ai-emp-wrap"><button type="button" className="ai-emp-trigger" aria-haspopup="listbox" aria-expanded={pickerOpen} onClick={() => setPickerOpen((v) => !v)} title="Choose an AI employee"><b>{current.icon} {current.name}</b><span aria-hidden="true">▾</span></button><small>On {label}</small>{pickerOpen && <div className="ai-emp-menu" role="listbox">{EMPLOYEES.map((item) => <button type="button" role="option" aria-selected={item.id === employee} key={item.id || "assistant"} className={item.id === employee ? "is-on" : ""} onClick={() => void chooseEmployee(item.id)}><span className="ai-emp-ico">{item.icon}</span><span><b>{item.name}</b><small>{item.hint}</small></span></button>)}</div>}</div><button type="button" className="ai-chat-icon" title="Raise a support ticket" aria-label="Raise a support ticket" onClick={openTicket}><LifeBuoy size={17} /></button>{TOURS[page] && <button type="button" className="ai-chat-icon" title={`Tour ${label}`} aria-label={`Tour ${label}`} onClick={() => startTour(page)}><Compass size={17} /></button>}<button type="button" className="ai-chat-icon" aria-label="Close" onClick={() => setOpen(false)}><X size={17} /></button></header>
+      <header><span className="ai-chat-head-bot">{avatar}</span><div className="ai-emp-wrap"><button type="button" className="ai-emp-trigger" aria-haspopup="listbox" aria-expanded={pickerOpen} onClick={() => setPickerOpen((v) => !v)} title="Choose an AI employee"><b>{current.icon} {current.name}</b><span aria-hidden="true">▾</span></button><small>On {label}</small>{pickerOpen && <div className="ai-emp-menu" role="listbox">{EMPLOYEES.map((item) => <button type="button" role="option" aria-selected={item.id === employee} key={item.id || "assistant"} className={item.id === employee ? "is-on" : ""} onClick={() => void chooseEmployee(item.id)}><span className="ai-emp-ico">{item.icon}</span><span><b>{item.name}</b><small>{item.hint}</small></span></button>)}</div>}</div><button type="button" className="ai-chat-icon" title="Hide assistant" aria-label="Hide assistant" onClick={hideBot}><EyeOff size={16} /></button><button type="button" className="ai-chat-icon" title="Raise a support ticket" aria-label="Raise a support ticket" onClick={openTicket}><LifeBuoy size={17} /></button>{TOURS[page] && <button type="button" className="ai-chat-icon" title={`Tour ${label}`} aria-label={`Tour ${label}`} onClick={() => startTour(page)}><Compass size={17} /></button>}<button type="button" className="ai-chat-icon" aria-label="Close" onClick={() => setOpen(false)}><X size={17} /></button></header>
       <div className="ai-chat-list" ref={listRef}>{messages.map((message, index) => <div key={index} className={`ai-chat-msg ${message.from}`}><p>{message.text}</p>{message.rows && message.rows.length > 0 && <div className="ai-emp-rows">{message.rows.map((row) => <div key={row.label} className={`ai-emp-row ${row.tone || ""}`}><span>{row.label}</span><b>{row.value}</b></div>)}</div>}{message.actions && message.actions.length > 0 && <div className="ai-chat-actions">{message.actions.map((action) => <button type="button" key={action.label} onClick={action.run}>{action.label}</button>)}</div>}</div>)}{busy && <div className="ai-chat-msg bot typing"><p><i /><i /><i /></p></div>}</div>
       {ticket && <form className="ai-chat-ticket" onSubmit={(event) => { event.preventDefault(); void sendTicket(); }}>
         <b><LifeBuoy size={15} /> New support ticket</b>
@@ -309,6 +319,8 @@ export function AiChatWidget({ page, pageName, clientId, avatar, enabled, onComm
       <div className="ai-chat-chips">{chips.map((chip) => <button type="button" key={chip} onClick={() => void ask(chip)} disabled={busy}><Sparkles size={11} /> {chip}</button>)}</div>
       <form className="ai-chat-input" onSubmit={(event) => { event.preventDefault(); void ask(prompt); }}><input value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder={listening ? "Listening…" : `Ask me anything about ${label}…`} aria-label="Message the AI assistant" /><button type="button" className={`ai-chat-icon${listening ? " on" : ""}`} onClick={talk} aria-label={listening ? "Stop" : "Talk"}>{listening ? <MicOff size={17} /> : <Mic size={17} />}</button><button type="submit" className="ai-chat-send" disabled={busy || !prompt.trim()} aria-label="Send"><Send size={16} /></button></form>
     </section>}
-    <button type="button" className={`ai-chat-launcher${toast && !open ? " has-toast" : ""}${open ? " is-open" : ""}`} aria-label={open ? "Close AI assistant" : "Open AI assistant"} onClick={() => open ? setOpen(false) : openChat()}>{avatar}<span className="ai-chat-online" aria-label="Online" /></button>
-  </>;
+    {!hiddenBot && <button type="button" className={`ai-chat-launcher${toast && !open ? " has-toast" : ""}${open ? " is-open" : ""}`} aria-label={open ? "Close AI assistant" : "Open AI assistant (drag to move)"} title="Drag to move" onPointerDown={onLauncherDown} onPointerMove={onLauncherMove} onPointerUp={onLauncherUp} onClick={() => { if (dragRef.current?.moved) return; if (open) setOpen(false); else openChat(); }}>{avatar}<span className="ai-chat-online" aria-label="Online" /></button>}
+    {!hiddenBot && !open && <button type="button" className="ai-chat-hide" aria-label="Hide AI assistant" title="Hide assistant" onClick={hideBot}><EyeOff size={12} /></button>}
+    {hiddenBot && <button type="button" className="ai-chat-peek" aria-label="Show AI assistant" title="Show AI assistant" onClick={showBot}><span className="ai-chat-eyes"><span className="ai-eyes-icon" aria-hidden="true"><span className="ai-eyes-antenna" /><span className="ai-eyes-face"><i /><i /></span></span></span></button>}
+  </div>;
 }
