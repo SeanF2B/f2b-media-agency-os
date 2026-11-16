@@ -6,6 +6,8 @@ import { listBookings } from "@/lib/scheduling/server";
 import { metaAdsConnectionExists, readDirectMetaAdsInsights } from "@/lib/meta-ads-direct";
 import { summarizeMetaAdsRows, summarizeMetaAdsTotals } from "@/lib/meta-ads-performance";
 import { getGoogleAdsCallStats } from "@/lib/google-ads-direct";
+import { hasGoogleSearchConsoleConnection, listGoogleSearchConsoleProperties, readGoogleSearchConsoleRows } from "@/lib/google-search-console-direct";
+import { loadCachedMarketingData } from "@/lib/marketing-data-history";
 
 // Dashboard tiles: marketing results for one client (from the same cached reads as client reports),
 // upcoming appointments and emails the system sent. One request per dashboard load.
@@ -22,7 +24,7 @@ export async function GET(request: Request) {
   const db = env.DB;
   const row = await db.prepare("SELECT data FROM workspace_documents WHERE id = 'f2b-agency'").first<{ data: string }>();
   if (!row?.data) return reply({ error: "The workspace is unavailable." }, 503);
-  const workspace = JSON.parse(row.data) as { ownerId?: string; staff?: Staff[]; clients?: Array<{ id: string; name: string; googleAdsAccountId?: string; metaAdsAccountId?: string }> };
+  const workspace = JSON.parse(row.data) as { ownerId?: string; staff?: Staff[]; clients?: Array<{ id: string; name: string; googleAdsAccountId?: string; metaAdsAccountId?: string; website?: string; wordpressSiteUrl?: string; googleSearchConsoleAccountId?: string }> };
   const ownerId = String(workspace.ownerId || "");
   const owner = ownerId === user.userId;
   const staff = (workspace.staff || []).find((item) => !item.isBot && (item.id === user.userId || item.email?.toLowerCase() === user.email.toLowerCase()));
@@ -59,6 +61,35 @@ export async function GET(request: Request) {
     const t = ok.reduce((a, r) => ({ spend: a.spend + r.spend, impressions: a.impressions + r.impressions, clicks: a.clicks + r.clicks, leads: a.leads + r.leads }), { spend: 0, impressions: 0, clicks: 0, leads: 0 });
     return { meta: { ...t, cpc: t.clicks ? t.spend / t.clicks : null, costPerLead: t.leads ? t.spend / t.leads : null, accounts: ok.length, linkedAccounts: linked.length, campaigns }, metaNote: "" };
   };
+  // Real organic data from Google Search Console: clicks, position, top pages and trending searches.
+  const searchConsoleFor = async (cid: string) => {
+    const client = (workspace.clients || []).find((c) => c.id === cid);
+    if (!client) return null;
+    if (!(await hasGoogleSearchConsoleConnection(ownerId).catch(() => false))) return { error: "Connect Google Search Console in Operations → Launchpad to see real organic searches and pages." };
+    const host = (raw: string) => { try { return new URL(/^https?:/.test(raw) ? raw : `https://${raw}`).hostname.replace(/^www\./, "").toLowerCase(); } catch { return ""; } };
+    let property = String(client.googleSearchConsoleAccountId || "").trim();
+    if (!property) {
+      const domain = host(client.website || client.wordpressSiteUrl || "");
+      if (!domain) return { error: "Add this client’s website so Search Console can be matched." };
+      const props = await loadCachedMarketingData({ db: db as never, ownerId, clientId: "agency", service: "Search Console", key: "gsc-properties", ttlMs: 6 * 3600_000 }, () => listGoogleSearchConsoleProperties(ownerId)).then((r) => r.data).catch(() => []);
+      const match = props.find((p) => p.id === `sc-domain:${domain}`) || props.find((p) => host(p.id.replace(/^sc-domain:/, "")) === domain);
+      if (!match) return { error: `${domain} isn’t in the connected Search Console account yet. Add it (or give that Google login access) and it will appear here.` };
+      property = match.id;
+    }
+    const end = day(-3), start = day(-30), pEnd = day(-31), pStart = day(-58);
+    const read = (a: string, b: string) => loadCachedMarketingData({ db: db as never, ownerId, clientId: cid, service: "Search Console", key: JSON.stringify({ report: "dash-gsc", property, a, b }), ttlMs: 6 * 3600_000 }, () => readGoogleSearchConsoleRows(ownerId, property, a, b)).then((r) => r.data);
+    try {
+      const [cur, prev] = await Promise.all([read(start, end), read(pStart, pEnd).catch(() => [])]);
+      const totals = (rows: typeof cur) => { let clicks = 0, impressions = 0, posW = 0; for (const r of rows) { clicks += r.clicks; impressions += r.impressions; posW += r.position * r.impressions; } return { clicks, impressions, position: impressions ? Math.round((posW / impressions) * 10) / 10 : null }; };
+      const group = (rows: typeof cur, key: "page" | "query") => { const map = new Map<string, { key: string; clicks: number; impressions: number; posW: number }>(); for (const r of rows) { const k = r[key]; if (!k) continue; const g = map.get(k) || { key: k, clicks: 0, impressions: 0, posW: 0 }; g.clicks += r.clicks; g.impressions += r.impressions; g.posW += r.position * r.impressions; map.set(k, g); } return map; };
+      const now = totals(cur), before = totals(prev);
+      const pages = [...group(cur, "page").values()].sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions).slice(0, 5).map((g) => ({ page: g.key.replace(/^https?:\/\/[^/]+/, "") || "/", clicks: g.clicks, impressions: g.impressions, position: g.impressions ? Math.round(g.posW / g.impressions * 10) / 10 : null }));
+      const qNow = group(cur, "query"), qPrev = group(prev, "query");
+      const queries = [...qNow.values()].sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions).slice(0, 5).map((g) => ({ query: g.key, clicks: g.clicks, impressions: g.impressions, position: g.impressions ? Math.round(g.posW / g.impressions * 10) / 10 : null }));
+      const trending = [...qNow.values()].map((g) => ({ query: g.key, impressions: g.impressions, change: g.impressions - (qPrev.get(g.key)?.impressions || 0) })).filter((g) => g.change > 0).sort((a, b) => b.change - a.change).slice(0, 5);
+      return { property, clicks: now.clicks, previousClicks: prev.length ? before.clicks : null, impressions: now.impressions, position: now.position, previousPosition: prev.length ? before.position : null, queriesTracked: qNow.size, pages, queries, trending };
+    } catch (error) { return { error: error instanceof Error ? error.message : "Search Console couldn’t be read." }; }
+  };
   const marketing = async () => {
     if (!clientId || !(admin || permissions.reports)) return null;
     const period = { start: day(-30), end: day(0) };
@@ -93,7 +124,7 @@ export async function GET(request: Request) {
     const prevPositions = (ranks?.keywords || []).map((k) => k.previousPosition).filter((p): p is number => typeof p === "number" && p > 0);
     const chatgpt = ai?.platforms.find((p) => p.platform === "chatgpt");
     const leadsNow = seo?.attribution.status === "ok" ? Object.values(seo.attribution.data!.allChannels || {}).reduce((a, b) => a + (Number(b) || 0), 0) : null;
-    const meta = await metaFor([clientId]);
+    const [meta, gsc] = await Promise.all([metaFor([clientId]), searchConsoleFor(clientId)]);
     // Paid vs organic split: leads by channel from CRM attribution, ad calls from Google Ads.
     const channels = seo?.attribution.status === "ok" ? seo.attribution.data!.allChannels as Record<string, number> : null;
     const accountId = String((workspace.clients || []).find((c) => c.id === clientId)?.googleAdsAccountId || "").replace(/\D/g, "");
@@ -105,7 +136,7 @@ export async function GET(request: Request) {
       notes: { organic: why(seo?.traffic) || (biz ? "" : why(seo?.business)), paid: accountId ? why(ads?.ads) : "No Google Ads account linked" },
     };
     return {
-      ...meta, split,
+      ...meta, split, gsc,
       googleCampaigns: adsData ? adsData.campaigns.slice(0, 40).map((c) => ({ id: c.id, name: c.name, status: c.status, spend: c.spend, clicks: c.clicks, impressions: c.impressions, conversions: c.conversions })) : [],
       currency: seo?.client.currency || ads?.client.currency || "EUR",
       visits: traffic ? { value: traffic.current, previous: traffic.previous, metric: traffic.metric } : null, visitsNote: why(seo?.traffic),

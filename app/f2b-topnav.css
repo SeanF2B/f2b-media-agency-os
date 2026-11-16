@@ -1478,3 +1478,14 @@ html body .app-shell .ad-report-stats > div { display: grid; gap: 2px; padding: 
 html body .app-shell .ad-report-stats > div b { font-size: 18px !important; line-height: 1.2; }
 html body .app-shell .ad-report-stats > div span { font-size: 11.5px !important; opacity: .75; }
 html body .app-shell .ad-report-off p, html body .app-shell .ad-report-card p { font-size: 13px !important; }
+/* Dashboard: Search Console top pages / searches / trending */
+html body .app-shell .dh-gsc { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 4px; }
+html body .app-shell .dh-gsc-col { border: 1px solid #e8edf1; border-radius: 14px; padding: 4px 12px 10px; background: #fff; }
+html body .app-shell .dh-gsc-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(127,138,160,.12); font-size: 13px; }
+html body .app-shell .dh-gsc-row:last-child { border-bottom: 0; }
+html body .app-shell .dh-gsc-row span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html body .app-shell .dh-gsc-row b.good { color: #157a43; }
+html body .app-shell .dh-gsc-row small { grid-column: 1 / -1; font-size: 11px; color: #8a96a3; }
+@media (max-width: 900px) { html body .app-shell .dh-gsc { grid-template-columns: 1fr; } }
+body.f2b-dark .app-shell .dh-gsc-col { background: #1a2025 !important; border-color: #33404a !important; }
+body.f2b-dark :is(.app-shell .dh-gsc-row b.good, #f2b-gsc-x) { color: #6fdc9b !important; -webkit-text-fill-color: #6fdc9b !important; }
