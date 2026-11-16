@@ -2581,3 +2581,22 @@ html body .app-shell .pipeline-card.is-compact .task-card-open-button { margin-r
 
 /* Reports → Keywords: research/pick tool above the report builder */
 html body .app-shell .ops-kw-picker { margin-bottom: 16px; }
+
+/* Operations → Forms: cards show a mini preview of the form */
+html body .app-shell .sf-intro { margin: 0 0 12px; }
+html body .app-shell .sf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+html body .app-shell .sf-card { display: flex; flex-direction: column; gap: 10px; text-align: left; }
+html body .app-shell .sf-preview { display: grid; gap: 8px; padding: 12px; border: 1px solid #e4e8ec; border-radius: 12px; background: #fafbfc; pointer-events: none; }
+html body .app-shell .sf-pv-field { display: grid; gap: 4px; }
+html body .app-shell .sf-pv-label { font-size: 11px; font-weight: 650; color: #475467; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html body .app-shell .sf-pv-input { display: block; height: 26px; border: 1px solid #d8dfe3; border-radius: 7px; background: #fff; font-size: 10.5px; color: #98a2b3; padding: 0 8px; line-height: 24px; }
+html body .app-shell .sf-pv-input.tall { height: 46px; }
+html body .app-shell .sf-pv-input.select { background: #fff linear-gradient(45deg, transparent 50%, #98a2b3 50%) no-repeat right 12px center / 5px 5px; }
+html body .app-shell .sf-pv-input.photo { border-style: dashed; text-align: center; }
+html body .app-shell .sf-pv-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+html body .app-shell .sf-pv-chips i { font-style: normal; font-size: 10.5px; font-weight: 600; padding: 3px 8px; border: 1px solid #d8dfe3; border-radius: 999px; background: #fff; color: #475467; }
+html body .app-shell .sf-pv-more { font-size: 10.5px; color: #7b8a93; }
+html body .app-shell .sf-pv-submit { justify-self: start; padding: 5px 16px; border-radius: 8px; color: #fff; font-size: 11.5px; font-weight: 700; }
+html body .app-shell.dark-mode .sf-preview { background: #1b2227; border-color: #2f3a41; }
+html body .app-shell.dark-mode .sf-pv-input, html body .app-shell.dark-mode .sf-pv-chips i { background: #26313a; border-color: #3a4650; color: #b8bcc5; }
+html body .app-shell.dark-mode .sf-pv-label { color: #c9ced6; }

@@ -18,7 +18,7 @@ const ACTIONS: Record<string, string> = { tag: "Add tag", urgent: "Mark urgent (
 const blankDef = (): FormDefinition => ({ steps: [{ id: "main", title: "Form" }], fields: [], rules: [] });
 const blankSettings = (): FormSettings => ({ status: "live", notify: [], thankYouUrl: "", pages: { mode: "all", paths: [] } });
 
-export function SiteFormsPanel({ clients, clientId, onClient }: { clients: Client[]; clientId: string; onClient: (id: string) => void }) {
+export function SiteFormsPanel({ clients, clientId }: { clients: Client[]; clientId: string; onClient?: (id: string) => void }) {
   const [forms, setForms] = useState<FormRow[] | null>(null);
   const [stages, setStages] = useState<Record<string, Stage[]>>({});
   const [error, setError] = useState("");
@@ -41,15 +41,34 @@ export function SiteFormsPanel({ clients, clientId, onClient }: { clients: Clien
   if (open) return <FormDetail key={open.formKey} form={open} client={clientOf(open.clientId)} stages={stages[open.clientId] || []} clients={clients} tab={tab} onTab={setTab} onBack={() => setOpenKey("")} onSaved={(row) => setForms((list) => (list || []).map((f) => f.formKey === row.formKey ? { ...f, ...row } : f))} />;
 
   return <div className="sf-wrap">
-    <div className="ops-toolbar"><label className="sf-pick">Client<select value={clientId} onChange={(e) => onClient(e.target.value)}><option value="">All clients</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label><span className="muted">Every form on every client site. Open one to see its submissions, logic and settings.</span></div>
+    <p className="muted sf-intro">{clientId ? `${clientOf(clientId)?.name || "This client"}’s website forms.` : "Every form on every client site."} Open one to see its submissions, logic and settings. Change client in the top bar.</p>
     {error && <p className="ops-empty" role="alert">{error}</p>}
     {forms === null ? <p className="ops-empty">Loading forms…</p> : !shown.length ? <p className="ops-empty">No forms yet for this client. Forms appear here once a site form is connected or receives its first submission.</p> :
       <div className="sf-grid">{shown.map((f) => { const c = clientOf(f.clientId); return <button type="button" key={f.formKey} className="sf-card" onClick={() => { setOpenKey(f.formKey); setTab("submissions"); }}>
         <span className="sf-card-top">{c?.logo ? <img src={c.logo} alt="" /> : <i style={{ background: c?.color || "#d9dee3" }} />}<span><b>{f.name}</b><small>{f.clientName}{f.site ? ` · ${f.site}` : ""}</small></span><span className={`sf-status ${f.settings?.status === "paused" ? "off" : "on"}`}>{f.settings ? (f.settings.status === "paused" ? "Paused" : "Live") : "Not set up"}</span></span>
+        <FormPreview def={f.definition} color={c?.color} />
         <span className="sf-stats"><span><b>{f.submissions}</b> submissions</span><span><b>{f.last30}</b> last 30 days</span><span>Last: {fmt(f.lastAt)}</span></span>
         <span className="sf-meta">{f.definition ? `${f.definition.fields.length} questions · ${f.definition.rules.length} rules` : "Questions learned from submissions"}<ArrowRight size={15} /></span>
       </button>; })}</div>}
   </div>;
+}
+
+/** A small, read-only picture of the form as visitors see it: its first questions and the submit button. */
+function FormPreview({ def, color }: { def: FormDefinition | null; color?: string }) {
+  const fields = (def?.fields || []).filter((field) => !field.showWhen).slice(0, 4);
+  const more = (def?.fields.length || 0) - fields.length;
+  const accent = /^#[0-9a-f]{6}$/i.test(color || "") ? color : "var(--brand-primary, #0b74b8)";
+  return <span className="sf-preview" aria-hidden="true">
+    {fields.length ? fields.map((field) => <span key={field.id} className="sf-pv-field"><span className="sf-pv-label">{field.label}{field.required ? " *" : ""}</span>
+      {field.type === "choice" && field.options?.length ? <span className="sf-pv-chips">{field.options.slice(0, 3).map((option) => <i key={option.value || option.label}>{option.label}</i>)}</span>
+        : field.type === "textarea" ? <span className="sf-pv-input tall" />
+        : field.type === "photos" ? <span className="sf-pv-input photo">Add photos</span>
+        : <span className={`sf-pv-input${field.type === "select" ? " select" : ""}`} />}
+    </span>)
+      : <><span className="sf-pv-field"><span className="sf-pv-label">Name</span><span className="sf-pv-input" /></span><span className="sf-pv-field"><span className="sf-pv-label">Phone or email</span><span className="sf-pv-input" /></span><span className="sf-pv-field"><span className="sf-pv-label">Message</span><span className="sf-pv-input tall" /></span></>}
+    {more > 0 && <span className="sf-pv-more">+{more} more question{more === 1 ? "" : "s"}</span>}
+    <span className="sf-pv-submit" style={{ background: accent }}>Send</span>
+  </span>;
 }
 
 function FormDetail({ form, client, stages, clients, tab, onTab, onBack, onSaved }: { form: FormRow; client?: Client; stages: Stage[]; clients: Client[]; tab: Tab; onTab: (t: Tab) => void; onBack: () => void; onSaved: (row: Partial<FormRow> & { formKey: string }) => void }) {
