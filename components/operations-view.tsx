@@ -4,7 +4,7 @@ import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
 import { readFocusClient, setFocusClient, useFocusClient } from "@/lib/focus-client";
 import { BrandIcon } from "./brand-icon";
-import { Briefcase, FileText, Globe, LayoutDashboard, Check, Link2, Mail, MapPin, Megaphone, MessageCircle, Star, Search, type LucideIcon } from "lucide-react";
+import { Briefcase, FileText, Globe, Check, Link2, Mail, MapPin, Megaphone, MessageCircle, Star, Search, type LucideIcon } from "lucide-react";
 import { AiVisibilityPanel } from "./ai-visibility-panel";
 import { RankTrackingPanel } from "./rank-tracking-panel";
 import { SiteFormsPanel } from "./site-forms-panel";
@@ -51,14 +51,14 @@ type SiteRow = { clientId: string; backend: string; previewUrl: string; repo: st
 // Where everything lives: Overview (performance, priorities, issues) · Google Ads (campaigns, optimisation,
 // conversions) · SEO & AI (SEO, AEO/GEO, keyword research, Business Profile, backlinks, AI visibility) ·
 // Websites (sites, landing pages, forms, media) · Email (builder, AI campaigns, automations) · Reports.
-const OPS_TABS: Array<[OperationsTab, string, LucideIcon]> = [["overview", "Overview", LayoutDashboard], ["clients", "Clients", Briefcase], ["ads", "Google Ads", Megaphone], ["seo", "SEO & AI", Search], ["websites", "Websites", Globe], ["email", "Email", Mail], ["reports", "Reports", FileText]];
+const OPS_TABS: Array<[OperationsTab, string, LucideIcon]> = [["clients", "Clients", Briefcase], ["ads", "Google Ads", Megaphone], ["seo", "SEO & AI", Search], ["websites", "Websites", Globe], ["email", "Email", Mail], ["reports", "Reports", FileText]];
 export type OperationsTab = "overview" | "clients" | "ads" | "seo" | "websites" | "email" | "reports" | "onboarding";
 type SeoMode = "keywords" | "competitors" | "ranks" | "audit" | "backlinks" | "local" | "ai";
 type SiteMode = "sites" | "forms" | "media";
 /** Older links/state used more tabs; map them onto the current areas (+ the sub-view they opened). */
 export function normalizeOpsTab(value: string): { tab: OperationsTab; sub?: string } {
   const legacy: Record<string, { tab: OperationsTab; sub?: string }> = { keywords: { tab: "seo", sub: "keywords" }, local: { tab: "seo", sub: "local" }, ai: { tab: "seo", sub: "ai" }, backlinks: { tab: "seo", sub: "backlinks" }, audits: { tab: "reports", sub: "audits" }, media: { tab: "websites", sub: "media" }, forms: { tab: "websites", sub: "forms" }, automations: { tab: "email", sub: "automations" }, emails: { tab: "email" }, leadfactory: { tab: "overview" } };
-  return legacy[value] || { tab: (OPS_TABS.some(([key]) => key === value) || value === "onboarding" ? value : "overview") as OperationsTab };
+  return legacy[value] || { tab: (OPS_TABS.some(([key]) => key === value) || value === "onboarding" ? value : "clients") as OperationsTab };
 }
 export type CommunityResult = { url: string; title: string; snippet: string; platform: string };
 type Check = { label: string; ok: boolean; page?: string };
@@ -87,7 +87,7 @@ function wpAdminUrl(siteUrl: string) {
   try { const url = new URL(/^https?:\/\//i.test(siteUrl) ? siteUrl : `https://${siteUrl}`); return `${url.origin}${url.pathname.replace(/\/+$/, "").replace(/\/wp-admin$/, "")}/wp-admin/`; } catch { return siteUrl; }
 }
 
-export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab, onOpenPage, onOpenWebsite, onOpenDns, onStartOnboarding, onboarding, onCreateGbpTask, onCreateCommunityTask, renderTool, automations, onStartReviews, onEditClient }: { clientsView?: ReactNode; 
+export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab, onOpenPage, onOpenWebsite, onOpenDns, onStartOnboarding, onboarding, onCreateGbpTask, onCreateCommunityTask, renderTool, automations, onStartReviews, onEditClient, onPickClient }: { clientsView?: ReactNode; onPickClient?: (clientId: string) => void; 
   onStartReviews?: (clientId: string) => string; onEditClient?: (clientId: string) => void;
   clients: OpsClient[]; tasks: OpsTask[]; tab: string; onTab: (tab: OperationsTab) => void;
   onOpenPage: (page: string, clientId?: string) => void; onOpenWebsite: (client: OpsClient) => void; onOpenDns: () => void;
@@ -98,7 +98,8 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
   const [toolClientId, setToolClientIdState] = useState(() => { try { return window.localStorage.getItem("f2b-ops-client") || ""; } catch { return ""; } });
   useFocusClient((id) => { if (id) setToolClientIdState(id); });
   const setToolClientId = (id: string) => { setToolClientIdState(id); if (id) setFocusClient(id); try { window.localStorage.setItem("f2b-ops-client", id); } catch { /* storage unavailable */ } };
-  const { tab, sub } = normalizeOpsTab(rawTab);
+  const { tab, sub } = normalizeOpsTab(rawTab === "overview" ? "clients" : rawTab);
+  const [workroom, setWorkroom] = useState(false); // client workroom (full client profile) open inside the Clients tab
   const [siteMode, setSiteMode] = useState<SiteMode>("sites");
   const [reportMode, setReportMode] = useState<"audits" | "reports">("reports");
   const [seoMode, setSeoMode] = useState<SeoMode>("keywords");
@@ -132,7 +133,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
   const [statusView, setStatusView] = useState<"active" | "inactive" | "all">("active");
   const active = useMemo(() => clients.filter((client) => client.status !== "Inactive" && client.status !== "Archived" && !/^agency$/i.test(client.name.trim())), [clients]);
   useEffect(() => {
-    if (!(tab === "overview" || tab === "websites" || (tab === "seo" && seoMode === "local")) || sites) return;
+    if (!(tab === "clients" || tab === "websites" || (tab === "seo" && seoMode === "local")) || sites) return;
     fetch("/api/sites?siteRegistry=1", { cache: "no-store" }).then(async (response) => {
       const json = await response.json().catch(() => ({})) as { sites?: SiteRow[]; error?: string };
       if (!response.ok) throw new Error(json.error || "Website list unavailable.");
@@ -153,7 +154,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
 
   const selected = active.find((client) => client.id === toolClientId) || active[0];
   // The top-bar client picker drives every Operations tool; when it's on "All clients", show the client being used there.
-  const needsClient = tab !== "overview" && tab !== "onboarding";
+  const needsClient = tab !== "clients" && tab !== "onboarding";
   // Email also works for the agency's own contacts when the agency is picked in the top bar.
   const agencyClient = clients.find((client) => /^agency$/i.test(client.name.trim()));
   const emailClient = agencyClient && toolClientId === agencyClient.id ? { ...agencyClient, id: "", name: "F2B Media (agency)" } : selected;
@@ -165,12 +166,12 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
     <div className="page-heading ops-heading"><div><p className="eyebrow">Agency</p><h1>Operations</h1></div>
     </div>
     <div className="ops-tabs" role="tablist" aria-label="Operations sections">
-      {OPS_TABS.filter(([key]) => (key !== "clients" || clientsView) && (!["seo", "ads", "reports"].includes(key) || renderTool)).map(([key, label, Icon]) => { const on = tab === key || (key === "overview" && tab === "onboarding"); return <button type="button" role="tab" key={key} aria-selected={on} className={on ? "active" : ""} onClick={() => onTab(key)}><Icon size={16} strokeWidth={1.9} aria-hidden="true" className="ops-tab-icon" />{label}</button>; })}
+      {OPS_TABS.filter(([key]) => (key !== "clients" || clientsView) && (!["seo", "ads", "reports"].includes(key) || renderTool)).map(([key, label, Icon]) => { const on = tab === key || (key === "clients" && tab === "onboarding"); return <button type="button" role="tab" key={key} aria-selected={on} className={on ? "active" : ""} onClick={() => { if (key === "clients") setWorkroom(false); onTab(key); }}><Icon size={16} strokeWidth={1.9} aria-hidden="true" className="ops-tab-icon" />{label}</button>; })}
     </div>
 
-    {tab === "clients" && clientsView}
-    {tab === "overview" && <p className="ops-more">Also: {[["Meta Ads", "Meta Ads"], ["Proposal Studio", "Proposals"]].map(([page, label], index) => <span key={page}>{index ? " · " : ""}<button type="button" className="text-button" onClick={() => onOpenPage(page)}>{label}</button></span>)}</p>}
-    {tab === "overview" && <>
+    {tab === "clients" && workroom && clientsView && <><button type="button" className="text-button ops-back" onClick={() => setWorkroom(false)}>← All clients</button>{clientsView}</>}
+    {tab === "clients" && !workroom && <p className="ops-more">Also: {[["Meta Ads", "Meta Ads"], ["Proposal Studio", "Proposals"]].map(([page, label], index) => <span key={page}>{index ? " · " : ""}<button type="button" className="text-button" onClick={() => onOpenPage(page)}>{label}</button></span>)}</p>}
+    {tab === "clients" && !workroom && <>
       <div className="ops-summary">
         <div><b>{active.length}</b><span>Active clients</span></div>
         <button type="button" onClick={() => onOpenPage("Tasks")}><b>{rows.reduce((sum, row) => sum + row.openTasks, 0)}</b><span>Open tasks</span></button>
@@ -178,16 +179,16 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
         <div className={issues ? "warn" : ""}><b>{issues}</b><span>Missing connections</span></div>
       </div>
       <div className="ops-toolbar"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search clients…" aria-label="Search clients" /><span className="ops-status-filter" role="tablist" aria-label="Client status">{([["active", "Active"], ["inactive", "Inactive"], ["all", "All"]] as const).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={statusView === key} className={statusView === key ? "active" : ""} onClick={() => setStatusView(key)}>{label}<span>{key === "all" ? clients.filter((c) => !/^agency$/i.test(c.name.trim())).length : clients.filter((c) => !/^agency$/i.test(c.name.trim()) && (key === "active" ? isActiveClient(c) : !isActiveClient(c))).length}</span></button>)}</span>{onStartOnboarding && <button type="button" className="primary-button" onClick={() => onStartOnboarding("")}>＋ Onboard a client</button>}</div>
-      <div className="ops-table-wrap"><table className="ops-table">
-        <thead><tr><th>Client</th><th>Services</th><th>Connections</th><th>Tasks</th><th></th></tr></thead>
-        <tbody>{rows.map(({ client, openTasks, approvals, checks }) => <tr key={client.id}>
-          <td><span className="ops-client">{client.logo ? <img src={client.logo} alt="" /> : <i style={{ background: client.color || "#d9dee3" }} />}<b>{client.name}</b></span></td>
-          <td>{(client.services || []).length ? [...new Set((client.services || []).map((service) => serviceName(service.name)))].join(", ") : <span className="muted">No services</span>}</td>
-          <td><ConnectionDots client={client} hasSite={Boolean(siteFor(client.id))} onOpen={(page) => onOpenPage(page, client.id)} /></td>
-          <td><button type="button" className="text-button" onClick={() => onOpenPage("Tasks")}>{openTasks} open{approvals ? ` · ${approvals} to review` : ""}</button></td>
-          <td className="ops-actions">{onStartOnboarding && <button type="button" className="secondary-button" onClick={() => onStartOnboarding(client.id)}>Onboard</button>}<select aria-label={`Open a tool for ${client.name}`} value="" onChange={(event) => { const value = event.target.value; if (value === "website") onOpenWebsite(client); else if (value.startsWith("tab:")) { setToolClientId(client.id); onTab(value.slice(4) as OperationsTab); } else if (value) onOpenPage(value, client.id); }}><option value="">Open…</option><option value="website">Website builder</option><option value="tab:ads">Google Ads</option><option value="tab:seo">SEO &amp; AI</option><option value="tab:email">Email</option><option value="tab:reports">Reports</option><option value="Meta Ads">Meta Ads</option><option value="Clients">Client profile</option></select></td>
-        </tr>)}</tbody>
-      </table>{!rows.length && <p className="ops-empty">No clients match.</p>}</div>
+      <div className="ops-cards">{rows.map(({ client, openTasks, approvals }) => { const services = [...new Set((client.services || []).map((service) => serviceName(service.name)))]; const open = () => { if (clientsView && onPickClient) { onPickClient(client.id); setWorkroom(true); } else onEditClient?.(client.id); }; return <article key={client.id} className={`ops-card${isActiveClient(client) ? "" : " inactive"}`}>
+        <button type="button" className="ops-card-head" onClick={open} title={`Open ${client.name}`}>{client.logo ? <img src={client.logo} alt="" /> : <i style={{ background: client.color || "#d9dee3" }}>{client.name.slice(0, 1)}</i>}<span><b>{client.name}</b><small>{services.length ? services.join(" · ") : "No services yet"}</small></span><em className={isActiveClient(client) ? "on" : ""}>{isActiveClient(client) ? "Active" : "Inactive"}</em></button>
+        <div className="ops-card-conn"><small>Integrations</small><ConnectionDots client={client} hasSite={Boolean(siteFor(client.id))} onOpen={(page) => onOpenPage(page, client.id)} /></div>
+        <div className="ops-card-stats">
+          <button type="button" onClick={() => onOpenPage("Tasks")}><b>{openTasks}</b><small>Open tasks</small></button>
+          <button type="button" className={approvals ? "warn" : ""} onClick={() => onOpenPage("Tasks")}><b>{approvals}</b><small>To review</small></button>
+          <div><b>{(client.services || []).length}</b><small>Services</small></div>
+        </div>
+        <div className="ops-card-actions">{clientsView && onPickClient && <button type="button" className="primary-button" onClick={open}>Open client</button>}{onStartOnboarding && <button type="button" className="secondary-button" onClick={() => onStartOnboarding(client.id)}>Onboard</button>}<select aria-label={`Open a tool for ${client.name}`} value="" onChange={(event) => { const value = event.target.value; if (value === "website") onOpenWebsite(client); else if (value.startsWith("tab:")) { setToolClientId(client.id); onTab(value.slice(4) as OperationsTab); } else if (value === "profile") onEditClient?.(client.id); else if (value) onOpenPage(value, client.id); }}><option value="">Tools…</option><option value="website">Website builder</option><option value="tab:ads">Google Ads</option><option value="tab:seo">SEO &amp; AI</option><option value="tab:email">Email</option><option value="tab:reports">Reports</option><option value="Meta Ads">Meta Ads</option>{onEditClient && <option value="profile">Edit profile</option>}</select></div>
+      </article>; })}</div>{!rows.length && <p className="ops-empty">No clients match.</p>}
     </>}
 
     {tab === "websites" && <div className="ops-subbar">{seg(siteMode, setSiteMode, [["sites", "Sites & domains"], ["forms", "Forms"], ["media", "Media library"]], "Websites sections")}</div>}
@@ -208,7 +209,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
 
     {tab === "websites" && siteMode === "forms" && <SiteFormsPanel clients={clients.filter((client) => !/^agency$/i.test(client.name.trim()))} clientId={toolClientId && clients.some((c) => c.id === toolClientId) ? toolClientId : ""} onClient={setToolClientId} />}
 
-    {tab === "onboarding" && <><button type="button" className="text-button ops-back" onClick={() => onTab("overview")}>← Back to overview</button>{onboarding}</>}
+    {tab === "onboarding" && <><button type="button" className="text-button ops-back" onClick={() => onTab("clients")}>← Back to clients</button>{onboarding}</>}
 
     {tab === "seo" && renderTool && selected && <>
       <div className="ops-subbar">{seg(seoMode, setSeoMode, [["keywords", "Keywords"], ["competitors", "Competitors"], ["ranks", "Rankings"], ["audit", "Site audit"], ["backlinks", "Backlinks"], ["local", "Business Profile"], ["ai", "AI visibility"]], "SEO and AI sections")}</div>

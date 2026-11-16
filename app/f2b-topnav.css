@@ -2045,3 +2045,29 @@ html body .app-shell .dh-appr-acts .dh-appr-no { color: #b42318; }
 html body .app-shell.dark-mode .dh-appr-list { background: #1b2227; border-color: #2f3a41; }
 html body .app-shell.dark-mode .dh-approval.overload { background: #3a1f1d; border-color: #6b2f29; }
 @media (max-width: 700px) { html body .app-shell .dh-approvals { grid-template-columns: 1fr 1fr; gap: 8px; } html body .app-shell .dh-approval { padding: 10px; gap: 8px; } html body .app-shell .dh-approval-text small { display: none; } html body .app-shell .dh-appr-item { grid-template-columns: 10px minmax(0,1fr); } html body .app-shell .dh-appr-acts { grid-column: 2; } }
+/* Operations → Clients: one card per client with integrations and stats */
+html body .app-shell .ops-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+html body .app-shell .ops-card { display: grid; gap: 12px; padding: 16px; border: 1px solid #e3e8ec; border-radius: 16px; background: #fff; box-shadow: 0 1px 2px rgba(16,24,40,.04); transition: box-shadow .15s, transform .15s; }
+html body .app-shell .ops-card:hover { box-shadow: 0 8px 24px rgba(16,24,40,.08); transform: translateY(-1px); }
+html body .app-shell .ops-card.inactive { opacity: .7; }
+html body .app-shell .ops-card-head { display: grid; grid-template-columns: 44px minmax(0,1fr) auto; gap: 12px; align-items: center; border: 0; background: transparent; padding: 0; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+html body .app-shell .ops-card-head img, html body .app-shell .ops-card-head > i { width: 44px; height: 44px; border-radius: 12px; object-fit: contain; background: #f6f8fa; border: 1px solid #eef2f5; display: grid; place-items: center; font-style: normal; font-weight: 800; color: #fff; }
+html body .app-shell .ops-card-head span { display: grid; min-width: 0; }
+html body .app-shell .ops-card-head b { font-size: 15px; color: #101828; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html body .app-shell .ops-card-head small { font-size: 12px; color: #667085; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html body .app-shell .ops-card-head em { font-style: normal; font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: 999px; background: #f1f4f6; color: #667085; }
+html body .app-shell .ops-card-head em.on { background: #dcfce7; color: #166534; }
+html body .app-shell .ops-card-conn { display: grid; gap: 6px; padding: 10px 12px; border-radius: 12px; background: #f8fafb; }
+html body .app-shell .ops-card-conn > small { font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: #8a96a3; }
+html body .app-shell .ops-card-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+html body .app-shell .ops-card-stats > * { display: grid; gap: 1px; padding: 8px 10px; border: 1px solid #eef2f5; border-radius: 11px; background: #fff; text-align: left; font: inherit; color: inherit; cursor: default; }
+html body .app-shell .ops-card-stats > button { cursor: pointer; }
+html body .app-shell .ops-card-stats b { font-size: 18px; color: #101828; } html body .app-shell .ops-card-stats small { font-size: 11.5px; color: #667085; }
+html body .app-shell .ops-card-stats .warn { background: #fff8e1; border-color: #f5d77a; }
+html body .app-shell .ops-card-actions { display: flex; gap: 8px; align-items: center; }
+html body .app-shell .ops-card-actions > * { height: 36px; }
+html body .app-shell .ops-card-actions select { flex: 1; min-width: 0; border: 1px solid #dce3e7; border-radius: 10px; padding: 0 10px; background: #fff; font: inherit; font-size: 13px; }
+html body .app-shell.dark-mode .ops-card, html body .app-shell.dark-mode .ops-card-stats > * { background: #1b2227; border-color: #2f3a41; }
+html body .app-shell.dark-mode .ops-card-conn { background: #151c21; }
+html body .app-shell.dark-mode .ops-card-head b, html body .app-shell.dark-mode .ops-card-stats b { color: #e7edf1; }
+@media (max-width: 700px) { html body .app-shell .ops-cards { grid-template-columns: 1fr; } }
