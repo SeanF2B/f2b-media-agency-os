@@ -2329,3 +2329,12 @@ html body .app-shell .ops-centre .ops-embed :is(.page-heading, .welcome-row):not
 html body .app-shell .ops-centre .ops-embed :is(.primary-button, .secondary-button) { padding: 6px 12px !important; font-size: 13px !important; min-height: 0 !important; }
 html body .app-shell .ops-centre .ops-embed .ml-heading :is(.eyebrow, h1, p) { display: none !important; }
 html body .app-shell .ops-centre .ops-embed .ml-heading { margin-bottom: 6px !important; }
+html body .app-shell .ops-forms-toggle { margin: 0 0 10px; }
+html body .app-shell .ops-template-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)) !important; gap: 14px !important; }
+html body .app-shell .ops-template-card { padding: 0 !important; overflow: hidden; gap: 0 !important; }
+html body .app-shell .ops-template-card > header, html body .app-shell .ops-template-card > .ops-template-actions { padding: 10px 14px 0; }
+html body .app-shell .ops-template-card > .ops-template-actions { padding-bottom: 14px; }
+html body .app-shell .ops-template-thumb { display: block; position: relative; height: 210px; overflow: hidden; background: #eef1f4; border-bottom: 1px solid var(--f2b-border, #d9dee3); }
+html body .app-shell .ops-template-thumb iframe { position: absolute; top: 0; left: 0; width: 400%; height: 400%; border: 0; transform: scale(.25); transform-origin: 0 0; pointer-events: none; background: #fff; }
+html body .app-shell .ops-template-thumb span { display: grid; place-items: center; height: 100%; font-size: 13px; opacity: .6; }
+html body .app-shell .ops-template-thumb:hover iframe { filter: brightness(.96); }

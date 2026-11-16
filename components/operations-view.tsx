@@ -34,13 +34,13 @@ function SiteTemplatesPanel({ clients, onEdit }: { clients: OpsClient[]; onEdit:
   const empties = clients.filter((c) => !/^agency$/i.test(c.name.trim()) && c.status !== "Inactive" && c.status !== "Archived");
   if (rows === null) return <div className="page-loading" role="status" aria-label="Loading templates…"><i /></div>;
   return <div className="ops-templates">
-    <p className="ops-more">Any site you build becomes a template. Edit one to change the template; to use it, pick a client and open their builder (a client with no pages yet gets “Use the … template”).</p>
+    <p className="ops-more">Every site you build is a template. Pick “Use for…” to start another client from it.</p>
     {!rows.length ? <p className="ops-empty">No builder sites yet. Open a client in Sites &amp; domains → Edit website to build the first one.</p>
       : <div className="ops-template-grid">{rows.map((row) => { const client = byId(row.clientId); if (!client) return null; return <article key={row.clientId} className="ops-template-card">
+        <a className="ops-template-thumb" href={row.previewUrl || undefined} target="_blank" rel="noreferrer" aria-label={`Open the ${client.name} site`}>{row.previewUrl ? <iframe src={row.previewUrl} title={`${client.name} site preview`} loading="lazy" tabIndex={-1} sandbox="allow-same-origin allow-scripts" /> : <span>No preview yet</span>}</a>
         <header><span className="ops-client">{client.logo ? <img src={client.logo} alt="" /> : <i style={{ background: client.color || "#d9dee3" }} />}<b>{client.name} template</b></span><small>{row.pages} page{row.pages === 1 ? "" : "s"}{row.updatedAt ? ` · edited ${new Date(row.updatedAt).toLocaleDateString("en-IE", { day: "numeric", month: "short" })}` : ""}</small></header>
         <div className="ops-template-actions">
           <button type="button" className="secondary-button" onClick={() => onEdit(client)}>Edit template</button>
-          {row.previewUrl && <a className="secondary-button" href={row.previewUrl} target="_blank" rel="noreferrer">Preview</a>}
           <select aria-label={`Use the ${client.name} template for a client`} value={useFor[row.clientId] || ""} onChange={(event) => setUseFor((cur) => ({ ...cur, [row.clientId]: event.target.value }))}><option value="">Use for…</option>{empties.filter((c) => c.id !== client.id).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
           {useFor[row.clientId] && <button type="button" className="primary-button" onClick={() => { const target = byId(useFor[row.clientId]); if (target) onEdit(target); }}>Open builder</button>}
         </div>
@@ -191,7 +191,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
       </article>; })}</div>{!rows.length && <p className="ops-empty">No clients match.</p>}</>}
     </>}
 
-    {tab === "websites" && <div className="ops-subbar">{seg(siteMode === "settings" ? "sites" : siteMode, setSiteMode, [["sites", "Sites & domains"], ["landing", "Landing pages"], ["forms", "Forms"], ["surveys", "Surveys"], ["submissions", "Submissions"], ["templates", "Templates"], ["media", "Media library"]], "Websites sections")}</div>}
+    {tab === "websites" && <div className="ops-subbar">{seg(siteMode === "settings" ? "sites" : siteMode === "submissions" ? "forms" : siteMode, setSiteMode, [["sites", "Sites & domains"], ["forms", "Forms"], ["templates", "Templates"], ["media", "Media library"]], "Websites sections")}</div>}
     {tab === "websites" && siteMode === "sites" && <>
       <div className="ops-toolbar"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search clients…" aria-label="Search clients" /><button type="button" className="secondary-button" onClick={onOpenDns}>Domains & DNS</button></div>
       {siteError && <p className="ops-empty" role="alert">{siteError}</p>}
@@ -207,6 +207,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
       </table></div>
     </>}
 
+    {tab === "websites" && (siteMode === "forms" || siteMode === "submissions") && <div className="ops-forms-toggle">{seg(siteMode as "forms" | "submissions", setSiteMode, [["forms", "Forms"], ["submissions", "Submissions"]], "Forms view")}</div>}
     {tab === "websites" && siteMode === "forms" && <SiteFormsPanel clients={clients.filter((client) => !/^agency$/i.test(client.name.trim()))} clientId={toolClientId && clients.some((c) => c.id === toolClientId) ? toolClientId : ""} onClient={setToolClientId} />}
 
     {tab === "onboarding" && <><button type="button" className="text-button ops-back" onClick={() => onTab("clients")}>← Back to clients</button>{onboarding}</>}
@@ -225,8 +226,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
       <div className="ops-embed" key={`ai-${selected.id}`}><AiVisibilityPanel clientId={selected.id} clientName={selected.name} area={seoLocation} services={(selected.services || []).map((service) => service.name).concat((selected as OpsClient & { seoServices?: string[] }).seoServices || [])} /></div>
     </>}
     {tab === "websites" && siteMode === "media" && renderTool && <div className="ops-embed">{renderTool("media", selected?.id || "")}</div>}
-    {tab === "websites" && renderTool && selected && (siteMode === "settings" || siteMode === "landing") && <>{siteMode === "settings" && <button type="button" className="text-button ops-back" onClick={() => setSiteMode("sites")}>← All websites</button>}<div className="ops-embed" key={`site-${siteMode}`}>{renderTool(siteMode === "landing" ? "landing" : "site-settings", selected.id)}</div></>}
-    {tab === "websites" && renderTool && siteMode === "surveys" && <div className="ops-embed">{renderTool("surveys", "")}</div>}
+    {tab === "websites" && renderTool && selected && siteMode === "settings" && <>{siteMode === "settings" && <button type="button" className="text-button ops-back" onClick={() => setSiteMode("sites")}>← All websites</button>}<div className="ops-embed" key={`site-${siteMode}`}>{renderTool(siteMode === "landing" ? "landing" : "site-settings", selected.id)}</div></>}
     {tab === "websites" && renderTool && siteMode === "submissions" && <div className="ops-embed">{renderTool("submissions", "")}</div>}
     {tab === "websites" && siteMode === "templates" && <SiteTemplatesPanel clients={clients} onEdit={(client) => onOpenWebsite(client)} />}
     {!selected && ["seo", "ads", "reports", "email"].includes(tab) && <p className="ops-empty">No active clients.</p>}
