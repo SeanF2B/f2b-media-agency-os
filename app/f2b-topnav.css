@@ -1719,3 +1719,11 @@ html body .ai-chat-msg, html body .ai-chat-msg p { max-width: 100%; overflow-wra
 html body .ai-chat-chips { display: flex !important; flex-wrap: wrap !important; overflow: visible !important; gap: 6px; }
 html body .ai-chat-chips::-webkit-scrollbar { display: none; }
 html body .ai-chat-chips button { white-space: normal !important; text-align: left; max-width: 100%; }
+/* Top nav never shifts between pages: always reserve the scrollbar space and keep the centre column fixed */
+html { scrollbar-gutter: stable; overflow-y: scroll; }
+@media (min-width: 861px) {
+  html body .app-shell.topnav-layout .tn-bar { display: grid !important; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) !important; }
+  html body .app-shell.topnav-layout .tn-left { justify-self: start; min-width: 0; }
+  html body .app-shell.topnav-layout .tn-nav { justify-self: center; }
+  html body .app-shell.topnav-layout .tn-right { justify-self: end; }
+}
