@@ -402,3 +402,19 @@ html body .app-shell.dark-mode .sch-dash-panel-tools .sch-seg button.on{backgrou
 @media(max-width:900px){.sch-earn-totals{grid-template-columns:repeat(2,minmax(0,1fr))}.sch-earn-row{grid-template-columns:1fr auto;}.sch-earn-bar{grid-column:1/-1}.sch-cover-grid{grid-template-columns:1fr}}
 .sch-earn-totals em,.sch-earn-money em{font-style:normal;font-size:11px;color:#667085;font-weight:600}
 .sch-earn-row .sch-tl-who{min-width:0}
+/* Staff earnings: clean table */
+.sch-earn-totals{grid-template-columns:repeat(5,minmax(0,1fr))!important}
+.sch-earn-totals>div{gap:1px!important}
+.sch-earn-totals .std{background:#f8fafc}
+.sch-earn-totals .std .sch-earn-pay{justify-self:start;font-size:19px;color:#101828;text-decoration:none;border-bottom:1px dashed #98a2b3}
+.sch-earn-table{display:grid}
+.sch-earn-row{display:grid!important;grid-template-columns:minmax(170px,1.4fr) 1fr 1fr 1.2fr 76px!important;gap:12px!important;align-items:center;padding:9px 6px!important;border-bottom:1px solid rgba(127,138,160,.12);border-radius:0!important}
+.sch-earn-row:last-child{border-bottom:0}
+.sch-earn-row.head{font-size:11px;font-weight:800;color:#98a2b3;text-transform:uppercase;letter-spacing:.04em;padding-top:2px!important;padding-bottom:6px!important}
+.sch-earn-row.head:hover{background:transparent!important}
+.sch-earn-cell{display:grid;gap:1px;min-width:0}.sch-earn-cell b{font-size:14px}.sch-earn-cell em{font-style:normal;font-size:11px;color:#667085}
+.sch-earn-cell.earn b{color:#067647}
+.sch-earn-rule{justify-self:start;border:0;background:transparent;padding:0;font:inherit;font-size:11px;color:#667085;cursor:pointer;text-decoration:underline dotted}
+.sch-earn-rule:hover{color:var(--brand-primary,#2563eb)}
+.sch-earn-cover{justify-self:end}
+@media(max-width:900px){.sch-earn-totals{grid-template-columns:repeat(2,minmax(0,1fr))!important}.sch-earn-row{grid-template-columns:1fr 1fr!important}.sch-earn-row.head{display:none!important}.sch-earn-row .sch-tl-who{grid-column:1/-1}}

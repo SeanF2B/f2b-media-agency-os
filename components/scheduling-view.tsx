@@ -1012,7 +1012,6 @@ function sampleSchedule(real: Data | null, week: Date, clientName: string, site:
     }
   }
   calendars.forEach((c) => { if (!c.price) c.price = c.durationMin >= 180 ? 320 : c.durationMin >= 90 ? 150 : c.durationMin >= 60 ? 90 : 50; });
-  staff.forEach((p, i) => { p.profile = { ...(p.profile || { showReviews: false, showPhotos: false, title: "", bio: "", reviews: [], photos: [] }), payType: i % 2 ? "hourly" : "commission", payRate: i % 2 ? 22 : 50 }; });
   return { calendars, bookings, staff, clients: real?.clients || [], scope: real?.scope ?? null, canManage: false, isAdmin: false, meId: "", googleAvailable: false, emailReady: true, publicBase: real?.publicBase || "" };
 }
 
@@ -1041,6 +1040,9 @@ function StaffHoursPanel({ data: base, scopeClientId, sample }: { data: Data; sc
   const [coverMsg, setCoverMsg] = useState("");
   const [covering, setCovering] = useState(false);
   const [tick, setTick] = useState(0);
+  const [std, setStd] = useState<{ payType: "none" | "hourly" | "commission"; payRate: number }>({ payType: "commission", payRate: 70 });
+  const [editStd, setEditStd] = useState(false);
+  useEffect(() => { if (sample) return; let live = true; api<{ payType: "none" | "hourly" | "commission"; payRate: number }>(scopeClientId, { action: "getDefaultPay" }).then((r) => { if (live) setStd({ payType: r.payType, payRate: r.payRate }); }).catch(() => undefined); return () => { live = false; }; }, [sample, scopeClientId]);
   const range = useMemo(() => {
     if (period === "custom") { const a = new Date(`${from}T00:00:00`), b = addDays(new Date(`${to}T00:00:00`), 1); return { a, b: b > a ? b : addDays(a, 1) }; }
     if (period === "day") { const a = new Date(anchor); a.setHours(0, 0, 0, 0); return { a, b: addDays(a, 1) }; }
@@ -1058,7 +1060,7 @@ function StaffHoursPanel({ data: base, scopeClientId, sample }: { data: Data; sc
   const cal = new Map(data.calendars.map((c) => [c.id, c]));
   const money = (n: number) => new Intl.NumberFormat("en-IE", { style: "currency", currency: data.calendars[0]?.currency || "EUR", maximumFractionDigits: 0 }).format(n);
   const priceOf = (b: Booking) => { const a = b.answers.find((x) => /^price$/i.test(x.label))?.value || ""; const n = Number(a.replace(/[^0-9.]/g, "")); return n > 0 ? n : (cal.get(b.calendarId)?.price || 0); };
-  const payOf = (p: Staff) => pay[p.id] || { payType: p.profile?.payType || "none", payRate: p.profile?.payRate || 0 };
+  const payOf = (p: Staff) => pay[p.id] || (p.profile?.payType && p.profile.payType !== "none" ? { payType: p.profile.payType, payRate: p.profile.payRate || 0 } : { ...std, standard: true } as { payType: "none" | "hourly" | "commission"; payRate: number; standard?: boolean });
   const inRange = data.bookings.filter((b) => b.status !== "cancelled" && Date.parse(b.start) >= range.a.getTime() && Date.parse(b.start) < range.b.getTime());
   const people = data.staff.filter((p) => !who || p.id === who);
   const rows = people.map((p) => {
@@ -1084,6 +1086,8 @@ function StaffHoursPanel({ data: base, scopeClientId, sample }: { data: Data; sc
     if (sample) return;
     try { await api(scopeClientId, { action: "saveProfile", staffId: p.id, profile: { ...(p.profile || { showReviews: false, showPhotos: false, title: "", bio: "", reviews: [], photos: [] }), ...v } }); } catch { /* keeps the local value */ }
   };
+  const saveStd = async (v: { payType: "none" | "hourly" | "commission"; payRate: number }) => { setStd(v); setEditStd(false); if (!sample) { try { await api(scopeClientId, { action: "saveDefaultPay", ...v }); } catch { /* keeps the local value */ } } };
+  const rule = (pr: { payType: string; payRate: number; standard?: boolean }) => pr.payType === "hourly" ? `${money(pr.payRate)}/h` : pr.payType === "commission" ? `${pr.payRate}% / ${100 - pr.payRate}%${pr.standard ? " · standard" : ""}` : "No pay set";
   return <section className="sch-earn" aria-label="Staff hours and earnings">
     <div className="sch-earn-head">
       <div><p className="eyebrow">⏱ STAFF HOURS &amp; EARNINGS</p><h3>{label}</h3></div>
@@ -1094,7 +1098,13 @@ function StaffHoursPanel({ data: base, scopeClientId, sample }: { data: Data; sc
           : <><button type="button" className="iv-btn" aria-label="Previous" onClick={() => step(-1)}><ChevronLeft size={15} /></button><button type="button" className="iv-btn" onClick={() => setAnchor(new Date())}>Now</button><button type="button" className="iv-btn" aria-label="Next" onClick={() => step(1)}><ChevronRight size={15} /></button></>}
       </div>
     </div>
-    <div className="sch-earn-totals"><div><small>Hours worked</small><b>{tot.h.toFixed(1)}h</b></div><div><small>Booked ahead</small><b>{tot.u.toFixed(1)}h</b></div><div><small>Appointments</small><b>{tot.n}</b></div><div><small>Revenue</small><b>{money(tot.rev)}</b>{tot.revA > 0 && <em>+{money(tot.revA)} booked</em>}</div><div className="earn"><small>Staff earnings</small><b>{money(tot.earn)}</b>{tot.earnA > 0 && <em>+{money(tot.earnA)} booked</em>}</div></div>
+    <div className="sch-earn-totals">
+      <div><small>Hours worked</small><b>{tot.h.toFixed(1)}h</b>{tot.u > 0 && <em>+{tot.u.toFixed(1)}h booked</em>}</div>
+      <div><small>Appointments</small><b>{tot.n}</b></div>
+      <div><small>Revenue</small><b>{money(tot.rev)}</b>{tot.revA > 0 && <em>+{money(tot.revA)} booked</em>}</div>
+      <div className="earn"><small>Staff earnings</small><b>{money(tot.earn)}</b>{tot.earnA > 0 && <em>+{money(tot.earnA)} booked</em>}</div>
+      <div className="std"><small>Standard split</small>{editStd ? <PayEditor value={std} onSave={(v) => void saveStd(v)} onCancel={() => setEditStd(false)} /> : <button type="button" className="sch-earn-pay" onClick={() => setEditStd(true)}>{std.payType === "commission" ? `${std.payRate} / ${100 - std.payRate}` : std.payType === "hourly" ? `${money(std.payRate)}/h` : "Set"}</button>}<em>{std.payType === "commission" ? "staff / business" : std.payType === "hourly" ? "per hour" : "for everyone"}</em></div>
+    </div>
     {coverMsg && <p className="sch-earn-note" role="status">{coverMsg}</p>}
     {cover && (() => { const person = data.staff.find((p) => p.id === cover.staffId); const a = new Date(`${cover.from}T00:00:00`).getTime(), z = addDays(new Date(`${cover.until}T00:00:00`), 1).getTime();
       const affected = data.bookings.filter((b) => b.status === "booked" && b.staffIds.includes(cover.staffId) && Date.parse(b.start) >= a && Date.parse(b.start) < z);
@@ -1123,13 +1133,17 @@ function StaffHoursPanel({ data: base, scopeClientId, sample }: { data: Data; sc
         <p className="iv-small">{affected.length ? `${affected.length} booked appointment${affected.length === 1 ? "" : "s"} will move to the cover person. Customers aren't emailed.` : "No booked appointments in these dates."}</p>
         <div className="sch-cover-actions"><button type="button" className="secondary-button" onClick={() => setCover(null)}>Cancel</button><button type="button" className="primary-button" disabled={!cover.to || covering} onClick={() => void run()}>{covering ? "Moving…" : `Assign cover${affected.length ? ` (${affected.length})` : ""}`}</button></div>
       </div>; })()}
-    <div className="sch-earn-rows">{rows.map((r) => <div key={r.p.id} className="sch-earn-row">
-      <div className="sch-tl-who"><Avatar person={r.p} size={34} /><span><b>{r.p.name.split("|")[0].trim()}</b><small>{r.count} appointment{r.count === 1 ? "" : "s"}{r.noShows ? ` · ${r.noShows} no-show${r.noShows === 1 ? "" : "s"}` : ""}</small></span></div>
-      <div className="sch-earn-bar" title={`${r.workedH.toFixed(1)}h worked · ${r.upcomingH.toFixed(1)}h booked ahead`}><i className="worked" style={{ width: `${(r.workedH / maxH) * 100}%` }} /><i className="ahead" style={{ width: `${(r.upcomingH / maxH) * 100}%` }} /><em>{r.workedH.toFixed(1)}h{r.upcomingH ? ` + ${r.upcomingH.toFixed(1)}h` : ""}</em></div>
-      <div className="sch-earn-money"><small>Revenue</small><b>{money(r.revenue)}</b>{r.aheadRevenue > 0 && <em>+{money(r.aheadRevenue)}</em>}</div>
-      <button type="button" className="sch-earn-cover" title={`Get someone to cover ${r.p.name.split("|")[0].trim()}'s appointments`} onClick={() => setCover({ staffId: r.p.id, to: "", from: ymd(new Date()), until: ymd(new Date()), dayOff: true })}>Cover</button>
-      <div className="sch-earn-money earn"><small>{r.pr.payType === "hourly" ? `${money(r.pr.payRate)}/h` : r.pr.payType === "commission" ? `${r.pr.payRate}% commission` : "Earnings"}</small>{editPay === r.p.id ? <PayEditor value={r.pr} onSave={(v) => void savePay(r.p, v)} onCancel={() => setEditPay("")} /> : <button type="button" className="sch-earn-pay" onClick={() => setEditPay(r.p.id)}>{r.earnings === null ? "Set pay" : money(r.earnings)}</button>}</div>
-    </div>)}{!rows.length && <p className="dh-muted">No staff to show.</p>}</div>
+    <div className="sch-earn-table">
+      <div className="sch-earn-row head"><span>Staff</span><span>Hours</span><span>Revenue</span><span>Earnings</span><span /></div>
+      {rows.map((r) => <div key={r.p.id} className="sch-earn-row">
+        <div className="sch-tl-who"><Avatar person={r.p} size={32} /><span><b>{r.p.name.split("|")[0].trim()}</b><small>{r.count} appt{r.count === 1 ? "" : "s"}{r.noShows ? ` · ${r.noShows} no-show` : ""}</small></span></div>
+        <div className="sch-earn-cell"><b>{r.workedH.toFixed(1)}h</b>{r.upcomingH > 0 && <em>+{r.upcomingH.toFixed(1)}h booked</em>}</div>
+        <div className="sch-earn-cell"><b>{money(r.revenue)}</b>{r.aheadRevenue > 0 && <em>+{money(r.aheadRevenue)} booked</em>}</div>
+        <div className="sch-earn-cell earn">{editPay === r.p.id ? <PayEditor value={r.pr} onSave={(v) => void savePay(r.p, v)} onCancel={() => setEditPay("")} /> : <><b>{r.earnings === null ? "—" : money(r.earnings)}</b><button type="button" className="sch-earn-rule" onClick={() => setEditPay(r.p.id)} title="Change this person's pay">{rule(r.pr)}</button></>}</div>
+        <button type="button" className="sch-earn-cover" title={`Get someone to cover ${r.p.name.split("|")[0].trim()}`} onClick={() => setCover({ staffId: r.p.id, to: "", from: ymd(new Date()), until: ymd(new Date()), dayOff: true })}>Cover</button>
+      </div>)}
+      {!rows.length && <p className="dh-muted">No staff to show.</p>}
+    </div>
   </section>;
 }
 

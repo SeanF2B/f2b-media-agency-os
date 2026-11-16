@@ -139,6 +139,13 @@ export async function POST(request: Request) {
         const t = await reviewLinkToken(db, ownerId, staffId, Boolean(body.rotate));
         return json({ url: `${deps.baseUrl}/f/review/${t}` });
       }
+      case "getDefaultPay": case "saveDefaultPay": {
+        // The account's standard pay split for staff without their own setting (e.g. 70% to the artist).
+        const key = `__pay_default__:${ctx.scope || "agency"}`;
+        if (body.action === "saveDefaultPay") { if (!(ctx.admin || ctx.canManage)) return fail("Only a manager can change the standard split.", 403); const saved = await saveStaffProfile(db, ownerId, key, { payType: body.payType, payRate: body.payRate }); return json({ payType: saved.payType, payRate: saved.payRate }); }
+        const got = (await getStaffProfiles(db, ownerId, [key]))[key];
+        return json({ payType: got?.payType || "commission", payRate: got ? got.payRate : 70, saved: Boolean(got) });
+      }
       case "saveProfile": {
         const staffId = str(body.staffId, 120);
         if (!ctx.ws.staff.some((s) => s.id === staffId) || !(ctx.admin || ctx.canManage || ctx.me?.id === staffId)) return fail("You can only change your own booking profile.", 403);
