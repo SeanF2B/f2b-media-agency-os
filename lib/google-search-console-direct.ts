@@ -22,6 +22,8 @@ async function googleApi<T>(url: string, accessToken: string, init?: RequestInit
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
     console.error("Google Search Console API request failed", { status: response.status, detail: detail.slice(0, 240) });
+    const disabled = detail.match(/has not been used in project (\d+)[^]*?(https:\/\/console\.developers\.google\.com\/apis\/api\/[\w.]+)/);
+    if (response.status === 403 && disabled) throw new Error(`The Google Search Console API is switched off in your Google Cloud project ${disabled[1]}. Turn it on here, then try again: ${disabled[2]}/overview?project=${disabled[1]}`);
     if (response.status === 403) throw new Error("This Google login does not have Search Console access to the selected property. Connect the Google account that owns or can view it.");
     throw new Error(`Google Search Console could not complete the request (HTTP ${response.status}).`);
   }

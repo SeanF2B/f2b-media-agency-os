@@ -37,6 +37,8 @@ async function googleRequest<T>(url: string, token: string, init?: RequestInit):
   const response = await fetch(url, { ...init, headers: { Authorization: `Bearer ${token}`, ...(init?.headers || {}) }, signal: AbortSignal.timeout(20000) });
   if (!response.ok) {
     const detail = await response.json().catch(() => ({})) as { error?: { message?: string; status?: string } };
+    const disabled = String(detail.error?.message || "").match(/(Google Analytics[\w ]* API) has not been used in project (\d+)[^]*?(https:\/\/console\.developers\.google\.com\/apis\/api\/[\w.]+)/);
+    if (response.status === 403 && disabled) throw new Error(`${disabled[1]} is switched off in your Google Cloud project ${disabled[2]}. Turn it on here, then try again: ${disabled[3]}/overview?project=${disabled[2]}`);
     if (response.status === 403) throw new Error("This Google login cannot access that GA4 property. Connect an account with Viewer access to the property and the Google Analytics Data API enabled.");
     if (response.status === 404) throw new Error("Google could not find that GA4 property. Check the saved property ID.");
     throw new Error(`Google Analytics could not complete the report (HTTP ${response.status}${detail.error?.status ? ` · ${detail.error.status}` : ""}).`);
