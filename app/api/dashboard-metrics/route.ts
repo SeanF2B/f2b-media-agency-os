@@ -169,10 +169,12 @@ export async function GET(request: Request) {
       const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
       const where = scope === null ? "" : " AND t.client_id=?3";
       const bind = scope === null ? [ownerId, since] : [ownerId, since, scope];
-      const recent = (await db.prepare(`SELECT m.body, m.created_at, t.contact, t.contact_name FROM conv_messages m JOIN conv_threads t ON t.id=m.thread_id WHERE m.owner_id=?1 AND t.channel='email' AND m.direction='out' AND m.created_at>=?2${where} ORDER BY m.created_at DESC LIMIT 6`).bind(...bind).all<{ body: string; created_at: string; contact: string; contact_name: string }>()).results || [];
-      const total = (await db.prepare(`SELECT COUNT(*) AS n FROM conv_messages m JOIN conv_threads t ON t.id=m.thread_id WHERE m.owner_id=?1 AND t.channel='email' AND m.direction='out' AND m.created_at>=?2${where}`).bind(...bind).first<{ n: number }>())?.n || 0;
-      return { total, recent: recent.map((r) => ({ to: r.contact_name || r.contact, subject: (r.body.split("\n")[0] || "").replace(/^subject:\s*/i, "").slice(0, 90), at: r.created_at })) };
-    } catch { return { total: 0, recent: [] }; }
+      const recent = (await db.prepare(`SELECT m.body, m.created_at, m.error, t.contact, t.contact_name FROM conv_messages m JOIN conv_threads t ON t.id=m.thread_id WHERE m.owner_id=?1 AND t.channel='email' AND m.direction='out' AND m.created_at>=?2${where} ORDER BY m.created_at DESC LIMIT 6`).bind(...bind).all<{ body: string; created_at: string; error: string; contact: string; contact_name: string }>()).results || [];
+      const stats = await db.prepare(`SELECT COUNT(*) AS n, SUM(CASE WHEN COALESCE(m.error,'')<>'' THEN 1 ELSE 0 END) AS failed, COUNT(DISTINCT t.contact) AS people, MAX(m.created_at) AS last FROM conv_messages m JOIN conv_threads t ON t.id=m.thread_id WHERE m.owner_id=?1 AND t.channel='email' AND m.direction='out' AND m.created_at>=?2${where}`).bind(...bind).first<{ n: number; failed: number; people: number; last: string }>();
+      const replies = (await db.prepare(`SELECT COUNT(*) AS n FROM conv_messages m JOIN conv_threads t ON t.id=m.thread_id WHERE m.owner_id=?1 AND t.channel='email' AND m.direction='in' AND m.created_at>=?2${where}`).bind(...bind).first<{ n: number }>())?.n || 0;
+      const total = Number(stats?.n || 0), failed = Number(stats?.failed || 0);
+      return { total, failed, delivered: total - failed, people: Number(stats?.people || 0), replies, last: stats?.last || "", configured: Boolean((env as unknown as Record<string, unknown>).RESEND_API_KEY), recent: recent.map((r) => ({ to: r.contact_name || r.contact, subject: (r.body.split("\n")[0] || "").replace(/^subject:\s*/i, "").slice(0, 90), at: r.created_at, failed: Boolean(r.error) })) };
+    } catch { return { total: 0, failed: 0, delivered: 0, people: 0, replies: 0, last: "", configured: false, recent: [] }; }
   };
   const [m, a, e] = await Promise.all([marketing(), appointments(), emails()]);
   return reply({ clientId, marketing: m, appointments: a, emails: e });

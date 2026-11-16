@@ -15,7 +15,7 @@ type Marketing = {
 };
 type Gsc = { error?: string; property?: string; clicks?: number; previousClicks?: number | null; impressions?: number; position?: number | null; previousPosition?: number | null; queriesTracked?: number; pages?: Array<{ page: string; clicks: number; impressions: number; position: number | null }>; queries?: Array<{ query: string; clicks: number; impressions: number; position: number | null }>; trending?: Array<{ query: string; impressions: number; change: number }> };
 type Split = { organic: { clicks: number | null; visits: number | null; calls: number | null; leads: number | null }; paid: { clicks: number | null; calls: number | null; callConversions: number | null; leads: number | null; conversions: number | null }; otherLeads: number | null; notes: { organic: string; paid: string } };
-type Metrics = { clientId: string; marketing: Marketing | null; appointments: Array<{ id: string; name: string; start: string; end?: string; status?: string; clientId: string; channel: string; calendar?: string; staff?: string }>; emails: { total: number; recent: Array<{ to: string; subject: string; at: string }> } };
+type Metrics = { clientId: string; marketing: Marketing | null; appointments: Array<{ id: string; name: string; start: string; end?: string; status?: string; clientId: string; channel: string; calendar?: string; staff?: string }>; emails: { total: number; failed?: number; delivered?: number; people?: number; replies?: number; last?: string; configured?: boolean; recent: Array<{ to: string; subject: string; at: string; failed?: boolean }> } };
 
 const CACHE_MS = 15 * 60_000;
 // Demo figures for the agency dashboard's "Sample data" toggle (never saved anywhere).
@@ -25,7 +25,7 @@ const SAMPLE: Metrics = {
     split: { organic: { clicks: 912, visits: 1840, calls: 38, leads: 21 }, paid: { clicks: 742, calls: 17, callConversions: 17, leads: 19, conversions: 71 }, otherLeads: 7, notes: { organic: "", paid: "" } },
     google: { position: 4.2, previous: 5.8, tracked: 24, top3: 9 }, rankNote: "", chatgpt: { share: 42, previous: 30, prompts: 12, mentioned: 5 }, aiNote: "", bing: null, bingNote: "Sample: Bing tracking not set up" },
   appointments: [{ id: "s1", name: "Mary Walsh", calendar: "Kitchen survey", start: new Date(new Date().setHours(10, 0, 0, 0)).toISOString(), end: new Date(new Date().setHours(11, 0, 0, 0)).toISOString(), status: "confirmed", clientId: "", channel: "On site", staff: "Pat" }, { id: "s2", name: "John Byrne", calendar: "Roof quote", start: new Date(new Date().setHours(11, 30, 0, 0)).toISOString(), status: "confirmed", clientId: "", channel: "Phone", staff: "Mick" }, { id: "s3", name: "Aoife Kelly", calendar: "Consultation", start: new Date(new Date().setHours(14, 30, 0, 0)).toISOString(), status: "pending", clientId: "", channel: "Google Meet", staff: "Sean" }, { id: "s4", name: "Daniel Brooks", calendar: "Site visit", start: new Date(new Date().setHours(16, 0, 0, 0)).toISOString(), status: "confirmed", clientId: "", channel: "On site", staff: "Pat" }],
-  emails: { total: 64, recent: [{ to: "Mary Walsh", subject: "Your quote from Renew Electrical", at: new Date(Date.now() - 2 * 3600_000).toISOString() }, { to: "John Byrne", subject: "Booking confirmed for Thursday", at: new Date(Date.now() - 20 * 3600_000).toISOString() }, { to: "Aoife Kelly", subject: "Invoice INV-0012", at: new Date(Date.now() - 44 * 3600_000).toISOString() }] },
+  emails: { total: 64, failed: 1, delivered: 63, people: 41, replies: 12, configured: true, recent: [{ to: "Mary Walsh", subject: "Your quote from Renew Electrical", at: new Date(Date.now() - 2 * 3600_000).toISOString() }, { to: "John Byrne", subject: "Booking confirmed for Thursday", at: new Date(Date.now() - 20 * 3600_000).toISOString() }, { to: "Aoife Kelly", subject: "Invoice INV-0012", at: new Date(Date.now() - 44 * 3600_000).toISOString() }] },
 };
 const money = (n: number, currency: string) => { try { return new Intl.NumberFormat("en-IE", { style: "currency", currency, maximumFractionDigits: 0 }).format(n); } catch { return `€${Math.round(n)}`; } };
 const money2 = (n: number, currency: string) => { try { return new Intl.NumberFormat("en-IE", { style: "currency", currency, maximumFractionDigits: 2 }).format(n); } catch { return `€${n.toFixed(2)}`; } };
@@ -156,14 +156,18 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
     {adsPanel && <div className="dh-ads-wrap">{adsPanel}</div>}
     <div className="dh-grid">
 
-      <section className="panel dh-panel"><div className="dh-head"><div><p className="eyebrow"><ClipboardList size={12} /> COMING UP</p><h2>Upcoming tasks</h2></div><label className={`task-ai-toggle ${showAi ? "is-on" : ""}`} title="Include tasks the AI is handling"><input type="checkbox" role="switch" checked={showAi} onChange={(e) => { setShowAi(e.target.checked); try { localStorage.setItem("f2b-dash-ai", e.target.checked ? "1" : "0"); } catch { /* ignore */ } }} /><span className="task-ai-toggle-track" aria-hidden="true"><span className="task-ai-toggle-thumb" /></span><b>AI tasks</b></label></div>
-        {upcoming.length ? <ul className="dh-list">{upcoming.map((t) => <li key={t.id} onClick={() => onOpenTask?.(t.id)} className={onOpenTask ? "clickable" : ""}>{logo(t.clientId)}<span><b>{t.title}</b><small>{when(t.dueAt || t.due) || "No due date"}{bots.has(t.assigneeId) ? " · 🤖 AI" : ""}</small></span></li>)}</ul> : <p className="dh-muted">You’re all caught up.</p>}
-      </section>
-      <section className="panel dh-panel"><div className="dh-head"><div><p className="eyebrow"><CheckCircle2 size={12} /> DONE</p><h2>Recently completed</h2></div><button type="button" className="text-button" onClick={() => onNavigate("Tasks")}>All tasks</button></div>
-        {completed.length ? <ul className="dh-list">{completed.map((t) => <li key={t.id}>{logo(t.clientId)}<span><b>{t.title}</b><small className="good">✓ {when(t.completedAt)}</small></span></li>)}</ul> : <p className="dh-muted">Nothing finished yet.</p>}
-      </section>
-      <section className="panel dh-panel"><div className="dh-head"><div><p className="eyebrow"><Mail size={12} /> LAST 30 DAYS</p><h2>Emails sent · {view ? num(view.emails.total) : "…"}</h2></div><button type="button" className="text-button" onClick={() => onNavigate("Conversations")}>Open</button></div>
-        {view?.emails.recent.length ? <ul className="dh-list">{view!.emails.recent.map((e, i) => <li key={i}><span className="dh-logo dh-logo-fallback"><Mail size={13} /></span><span><b>{e.subject || "(no subject)"}</b><small>{e.to} · {when(e.at)}</small></span></li>)}</ul> : <p className="dh-muted">{loading ? "Loading…" : "No emails sent yet."}</p>}
+      <section className="panel dh-panel dh-email"><div className="dh-head"><div><p className="eyebrow"><Mail size={12} /> {periodLabel.toUpperCase()}</p><h2>Emails &amp; health</h2></div><button type="button" className="text-button" onClick={() => onNavigate("Conversations")}>Open inbox →</button></div>
+        {(() => { const e = view?.emails; if (!e) return <p className="dh-muted">{loading ? "Loading…" : "No emails yet."}</p>; const rate = e.total ? Math.round(((e.delivered ?? e.total) / e.total) * 100) : null; const tone = rate == null ? "" : rate >= 98 ? "good" : rate >= 90 ? "warn" : "bad"; return <>
+          <div className="dh-email-stats">
+            <div className="dh-email-stat"><small>Sent</small><b>{num(e.total)}</b></div>
+            <div className={`dh-email-stat ${tone}`}><small>Delivered</small><b>{rate == null ? "—" : `${rate}%`}</b></div>
+            <div className={`dh-email-stat ${(e.failed || 0) > 0 ? "bad" : "good"}`}><small>Failed</small><b>{num(e.failed || 0)}</b></div>
+            <div className="dh-email-stat"><small>People emailed</small><b>{num(e.people || 0)}</b></div>
+            <div className="dh-email-stat"><small>Replies</small><b>{num(e.replies || 0)}</b></div>
+            <div className={`dh-email-stat ${e.configured === false ? "bad" : "good"}`}><small>Sending</small><b>{e.configured === false ? "Not set up" : "Healthy"}</b></div>
+          </div>
+          {e.recent.length ? <ul className="dh-list dh-email-list">{e.recent.map((m, i) => <li key={i}><span className={`dh-logo dh-logo-fallback ${m.failed ? "is-bad" : ""}`}>{m.failed ? "!" : <Mail size={13} />}</span><span><b>{m.subject || "(no subject)"}</b><small>{m.to} · {when(m.at)}{m.failed ? " · failed" : ""}</small></span></li>)}</ul> : <p className="dh-muted">No emails sent in this period.</p>}
+        </>; })()}
       </section>
     </div>
   </div>;

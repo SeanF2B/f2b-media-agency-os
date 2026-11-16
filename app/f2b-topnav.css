@@ -1783,3 +1783,21 @@ html body .app-shell .tn-layout-toggle { display: inline-grid; place-items: cent
   html body .app-shell.nav-side .tn-right { grid-column: 2; }
   html body .app-shell.nav-side .main-area > :not(.tn-bar) { margin-left: 92px !important; }
 }
+/* Dashboard: emails & health (full width), activity timeline panel */
+html body .app-shell .dh-grid { grid-template-columns: 1fr !important; }
+html body .app-shell .dh-email-stats { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+@media (max-width: 900px) { html body .app-shell .dh-email-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+html body .app-shell .dh-email-stat { display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; background: rgba(127,138,160,.07); border: 1px solid rgba(127,138,160,.15); }
+html body .app-shell .dh-email-stat small { font-size: 11.5px; opacity: .7; } html body .app-shell .dh-email-stat b { font-size: 18px; }
+html body .app-shell .dh-email-stat.good { background: #effaf3; border-color: #cdebd8; } html body .app-shell .dh-email-stat.good b { color: #157a43; }
+html body .app-shell .dh-email-stat.warn { background: #fff8e1; border-color: #f5d77a; } html body .app-shell .dh-email-stat.warn b { color: #b07800; }
+html body .app-shell .dh-email-stat.bad { background: #fff2f2; border-color: #f6d4d4; } html body .app-shell .dh-email-stat.bad b { color: #b42318; }
+body.f2b-dark .app-shell .dh-email-stat.good { background: #15291e; border-color: #24533a; } body.f2b-dark :is(.app-shell .dh-email-stat.good b, #f2b-em-x) { color: #6fdc9b !important; -webkit-text-fill-color: #6fdc9b !important; }
+body.f2b-dark .app-shell .dh-email-stat.warn { background: #2d2610; border-color: #6b5413; } body.f2b-dark :is(.app-shell .dh-email-stat.warn b, #f2b-em-x) { color: #f5c46b !important; -webkit-text-fill-color: #f5c46b !important; }
+body.f2b-dark .app-shell .dh-email-stat.bad { background: #2c1a1a; border-color: #5a2a2a; } body.f2b-dark :is(.app-shell .dh-email-stat.bad b, #f2b-em-x) { color: #ff9b94 !important; -webkit-text-fill-color: #ff9b94 !important; }
+html body .app-shell .dh-email-list { grid-template-columns: repeat(2, minmax(0, 1fr)); display: grid; }
+@media (max-width: 900px) { html body .app-shell .dh-email-list { grid-template-columns: 1fr; } }
+html body .app-shell .dh-logo-fallback.is-bad { background: #fde8e8; color: #b42318; font-weight: 800; }
+html body .app-shell .dh-activity { padding: 16px 18px !important; }
+html body .app-shell .dh-activity .activity-page-heading.is-compact > :not(.activity-filters) { display: none !important; }
+html body .app-shell .dh-activity .activity-page-heading.is-compact { margin: 0 0 6px !important; padding: 0 !important; }
