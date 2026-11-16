@@ -2571,3 +2571,10 @@ html body .app-shell .client-tax-stats { grid-template-columns: repeat(auto-fit,
 
 /* Confirm / prompt dialogs always sit above every pop-up (lead details was 5000 and hid them) */
 html body .app-dialog-backdrop { z-index: 2147483000 !important; }
+
+/* Task cards: proper inner padding so the pending banner, logo and Open button never touch the edges */
+html body .app-shell .pipeline-card.is-compact { padding: 12px 14px !important; box-sizing: border-box; overflow: visible; }
+html body .app-shell .pipeline-card.is-compact .task-pending-chip { margin: 0 0 4px !important; padding: 6px 10px !important; }
+html body .app-shell .pipeline-card.is-compact .pipeline-card-details > summary { padding: 4px 0 !important; gap: 10px !important; align-items: center; }
+html body .app-shell .pipeline-card.is-compact .task-client-mark { flex: none; border-radius: 10px; }
+html body .app-shell .pipeline-card.is-compact .task-card-open-button { margin-right: 0; flex: none; }
