@@ -13,7 +13,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const OWNER = "owner-e2e";
 const DOMAIN = "f2b-outreach-demo.ie";
 const MAILBOX = `sean@${DOMAIN}`;
-const ctx = { ownerId: OWNER, actor: "e2e", origin: "https://agency.test" };
+const ctx = { ownerId: OWNER, actor: "owner@agency.test", origin: "https://agency.test" };
+const PRIMARY = "info@agency.test"; // the agency's own business domain — must never be touched
 
 // ---------------------------------------------------------------- environment
 const DB = createD1(root);
@@ -22,6 +23,7 @@ const env = globalThis.__OUTREACH_TEST_ENV__ = {
   DB,
   AGENCY_CREDENTIALS_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64"),
   OPENROUTER_API_KEY: "sk-or-test",
+  CLOUDFLARE_DNS_API_TOKEN: "cf-dns-token-test",
   TELEGRAM_BOT_TOKEN: "7012345678:AAH-existingF2BbotTokenForTests_xyz12", // reused from the server secrets, never a new bot
   TELEGRAM_CHAT_ID: "-1009876543210",
 };
@@ -32,7 +34,8 @@ DB.sqlite.prepare("INSERT INTO crm_pipelines (id, owner_id, name, created_at, up
   .forEach(([id, name, position, category]) => DB.sqlite.prepare("INSERT INTO crm_pipeline_stages (id, owner_id, pipeline_id, name, position, category, created_at) VALUES (?, ?, 'pipe-1', ?, ?, ?, ?)").run(id, OWNER, name, position, category, now0));
 
 // ---------------------------------------------------------------- the outside world
-const dns = { dmarc: false, dkim: true };
+const dns = { dmarc: false, dkim: false };
+const cfWrites = [];
 const inbox = []; // messages that will arrive in the mailbox
 const calls = []; const sentMime = []; const telegram = []; const profileUpdates = []; const photoUploads = [];
 let deltaToken = 0;
@@ -46,7 +49,8 @@ globalThis.fetch = async (input, init = {}) => {
   if (url.host === "graph.microsoft.com") {
     const p = decodeURIComponent(url.pathname.replace("/v1.0", ""));
     if (p === "/organization") return json({ value: [{ id: "t1", displayName: "F2B Media", verifiedDomains: [{ name: "f2b.onmicrosoft.com", isInitial: true }] }] });
-    if (p === `/users/${MAILBOX}/mailFolders/inbox`) return json({ id: "inbox" });
+    if (p === `/users/${MAILBOX}/mailFolders/inbox` || p === `/users/${PRIMARY}/mailFolders/inbox`) return json({ id: "inbox" });
+    if (p === `/domains/${DOMAIN}/serviceConfigurationRecords`) return json({ value: [{ recordType: "Mx", mailExchange: "f2b-outreach-demo-ie.mail.protection.outlook.com", preference: 0, supportedService: "Email" }, { recordType: "Txt", text: "v=spf1 include:spf.protection.outlook.com -all", supportedService: "Email" }] });
     if (p === `/users/${MAILBOX}` && method === "PATCH") { profileUpdates.push(JSON.parse(String(init.body))); return new Response(null, { status: 204 }); }
     if (p === `/users/${MAILBOX}/photo/$value` && method === "PUT") { photoUploads.push({ type: init.headers["Content-Type"], bytes: init.body.length }); return new Response(null, { status: 200 }); }
     if (p === `/users/${MAILBOX}/sendMail` && method === "POST") { sentMime.push(Buffer.from(String(init.body), "base64").toString("utf8")); return new Response(null, { status: 202 }); }
@@ -58,8 +62,27 @@ globalThis.fetch = async (input, init = {}) => {
     }
     return json({ error: { message: `unexpected Graph call ${method} ${p}` } }, 404);
   }
+  if (url.host === "api.cloudflare.com") {
+    const p = url.pathname.replace("/client/v4", "");
+    assert.equal(init.headers?.Authorization || init.headers?.authorization, "Bearer cf-dns-token-test");
+    if (p === "/zones" && method === "GET") return json({ success: true, result: url.searchParams.get("name") === DOMAIN ? [{ id: "zone-demo", name: DOMAIN, status: "active" }] : [] });
+    if (p === "/zones/zone-demo/dns_records" && method === "GET") return json({ success: true, result: [
+      { id: "r-spf", type: "TXT", name: DOMAIN, content: "v=spf1 include:spf.protection.outlook.com -all" },
+      { id: "r-mx", type: "MX", name: DOMAIN, content: "f2b-outreach-demo-ie.mail.protection.outlook.com", priority: 0 },
+      ...(dns.dmarc ? [{ id: "r-dmarc", type: "TXT", name: `_dmarc.${DOMAIN}`, content: "v=DMARC1; p=none" }] : []),
+    ], result_info: { page: 1, total_pages: 1 } });
+    if (p.startsWith("/zones/zone-demo/dns_records") && method !== "GET") {
+      const body = JSON.parse(String(init.body || "{}")); cfWrites.push({ method, ...body });
+      if (body.name === `_dmarc.${DOMAIN}` && /v=DMARC1/.test(body.content)) dns.dmarc = true; // the published record goes live
+      return json({ success: true, result: { id: `rec-${cfWrites.length}`, ...body } });
+    }
+    return json({ success: false, errors: [{ message: `unexpected Cloudflare call ${method} ${p}` }] }, 404);
+  }
   if (url.host === "dns.google") {
     const name = url.searchParams.get("name"); const type = url.searchParams.get("type");
+    if (type === "A" && name.endsWith(".dbl.spamhaus.org")) return json({ Status: 3 });
+    if (type === "A" && name.endsWith(".multi.surbl.org")) return json({ Status: 0, Answer: [{ type: 1, data: "127.0.0.1" }] }); // public resolver refused
+    if (type === "A" && name.endsWith(".multi.uribl.com")) return json({ Status: 3 });
     if (name === DOMAIN && type === "TXT") return json(answer("TXT", ["v=spf1 include:spf.protection.outlook.com -all"]));
     if (name === DOMAIN && type === "MX") return json(answer("MX", ["0 f2b-outreach-demo-ie.mail.protection.outlook.com."]));
     if (name === `_dmarc.${DOMAIN}` && type === "TXT") return json(dns.dmarc ? answer("TXT", ["v=DMARC1; p=none; rua=mailto:dmarc@f2bmedia.com"]) : { Status: 3 });
@@ -114,33 +137,53 @@ test("1. connect the existing Microsoft 365 tenant (no purchase)", async () => {
   assert.ok(!JSON.stringify(stored).includes("secret-value-123"), "the client secret is stored encrypted only");
 });
 
-test("2. connect one existing mailbox; its domain is protected and DMARC is missing", async () => {
-  const result = await act("connect-existing-mailbox", { host: "microsoft", email: MAILBOX, displayName: "Sean Murphy" });
+test("2. connect one existing mailbox on a dedicated outreach domain (Outreach may manage its DNS)", async () => {
+  const result = await act("connect-existing-mailbox", { host: "microsoft", email: MAILBOX, displayName: "Sean Murphy", manageDns: true });
   assert.equal(result.check.allPass, false);
   assert.equal(result.check.dmarc, "missing");
-  const domain = one("SELECT * FROM outreach_domains WHERE owner_id = ? AND domain = ?", OWNER, DOMAIN);
-  assert.equal(domain.protected, 1, "a connected existing domain is protected by default — its DNS is never changed");
+  assert.equal(result.protected, false);
+  assert.equal(one("SELECT protected FROM outreach_domains WHERE domain = ?", DOMAIN).protected, 0);
   mailboxId = one("SELECT id FROM outreach_mailboxes WHERE email = ?", MAILBOX).id;
 });
 
-test("3. warm-up refuses to start while authentication fails", async () => {
-  const result = await act("mailboxes-bulk", { ids: [mailboxId], op: "warmup-start" });
-  assert.equal(result.started, 0);
-  assert.deepEqual(result.blocked, [MAILBOX]);
-  assert.equal(one("SELECT status FROM outreach_mailboxes WHERE id = ?", mailboxId).status, "setup");
+test("2b. the agency's own business domain is always protected, even if asked to manage it", async () => {
+  const result = await act("connect-existing-mailbox", { host: "microsoft", email: PRIMARY, displayName: "Info", manageDns: true });
+  assert.equal(result.protected, true); assert.equal(result.primaryDomain, true);
+  const primaryId = one("SELECT id FROM outreach_mailboxes WHERE email = ?", PRIMARY).id;
+  const flame = await act("warmup-auto", { ids: [primaryId] });
+  assert.equal(flame.results[0].state, "needs-you");
+  assert.match(flame.results[0].message, /protected, so Outreach won't change its DNS/);
+  assert.equal(cfWrites.length, 0, "no DNS write for the protected domain");
+  DB.sqlite.prepare("DELETE FROM outreach_mailboxes WHERE id = ?").run(primaryId); // keep the rest of the scenario to one mailbox
 });
 
-test("4. once DMARC is published, one click starts the ramp", async () => {
-  dns.dmarc = true;
-  const check = await act("domain-check", { domain: DOMAIN });
-  assert.equal(check.check.allPass, true);
-  const result = await act("mailboxes-bulk", { ids: [mailboxId], op: "warmup-start" });
-  assert.equal(result.started, 1);
+test("3. one click on the flame fixes DMARC on Cloudflare and explains the one manual step (DKIM)", async () => {
+  const flame = await act("warmup-auto", { ids: [mailboxId] });
+  const [item] = flame.results;
+  assert.equal(item.state, "needs-you");
+  assert.match(item.message, /Added\/updated 1 DNS record/);
+  assert.match(item.message, /DKIM/);
+  assert.equal(cfWrites.length, 1); assert.equal(cfWrites[0].name, `_dmarc.${DOMAIN}`); assert.match(cfWrites[0].content, /^v=DMARC1; p=none/);
+  assert.equal(one("SELECT status FROM outreach_mailboxes WHERE id = ?", mailboxId).status, "setup", "never ramps while DKIM fails");
+  const state = await loadState(ctx, new URLSearchParams());
+  const box = state.mailboxes.find((entry) => entry.id === mailboxId);
+  assert.equal(box.warmupPending, true, "the flame shows 'waiting for DNS'");
+  assert.ok(box.authMissing.some((text) => /DKIM/.test(text)));
+  assert.equal(one("SELECT COUNT(*) n FROM outreach_dns_changes WHERE domain = ?", DOMAIN).n, 1, "every DNS change is logged for rollback");
+});
+
+test("4. once DKIM goes live, the engine starts warm-up by itself", async () => {
+  dns.dkim = true;
+  const report = await tick(10);
+  assert.equal(report.warmups.started, 1);
   assert.equal(one("SELECT status FROM outreach_mailboxes WHERE id = ?", mailboxId).status, "ramping");
   const state = await loadState(ctx, new URLSearchParams());
   const box = state.mailboxes.find((item) => item.id === mailboxId);
-  assert.ok(box, "mailbox appears in Infrastructure");
+  assert.equal(box.warmupPending, false);
   assert.ok(box.limitToday > 0 && box.limitToday <= 15, "day-one allowance is small");
+  const again = await act("warmup-auto", { ids: [mailboxId] });
+  assert.equal(again.results[0].state, "already");
+  assert.equal(cfWrites.length, 1, "nothing rewritten once it passes");
 });
 
 test("4b. sender name and real photo are edited here and pushed to the mailbox account", async () => {
@@ -273,6 +316,19 @@ test("10. unsubscribe is permanent and survives re-import", async () => {
   await assert.rejects(() => act("suppression-remove", { value: "conor@atlanticroofs.ie" }), /unsubscribe|can't|cannot|permanent/i);
 });
 
+test("10b. deliverability & spam report uses real checks and admits what it couldn't check", async () => {
+  const report = await act("deliverability-report", { id: mailboxId });
+  assert.equal(report.email, MAILBOX);
+  assert.deepEqual(report.auth.map((item) => [item.label, item.state]), [["SPF", "pass"], ["DKIM", "pass"], ["DMARC", "pass"], ["MX", "pass"]]);
+  assert.equal(report.blocklists.find((item) => item.id === "spamhaus-dbl").state, "clear");
+  assert.equal(report.blocklists.find((item) => item.id === "surbl").state, "unknown", "a refused lookup is reported as unchecked, never as clean");
+  assert.equal(report.rates.find((item) => item.key === "sent").value, "2");
+  assert.ok(report.findings.some((item) => /Only 2 emails sent/.test(item.text)), "small samples are called out");
+  assert.ok(report.actions.some((text) => /Placement/.test(text)), "suggests a free placement test");
+  assert.equal(report.dmarcRecord, "v=DMARC1; p=none; rua=mailto:dmarc@f2bmedia.com");
+  assert.ok(["good", "watch"].includes(report.verdict));
+});
+
 test("11. Overview shows real numbers and real costs; nothing was purchased", async () => {
   const state = await loadState(ctx, new URLSearchParams({ from: new Date(Date.now() - 86_400_000).toISOString().slice(0, 10), to: new Date(clock.getTime() + 86_400_000).toISOString().slice(0, 10) }));
   assert.equal(state.overview.sent, 2);
@@ -281,5 +337,5 @@ test("11. Overview shows real numbers and real costs; nothing was purchased", as
   assert.ok(state.costs.lines.some((line) => /AI/i.test(line.label) && line.cents > 0), "recorded OpenRouter spend shows up");
   assert.ok(!calls.some((call) => /registrar|registrations/.test(call)), "no domain purchase calls");
   assert.ok(!calls.some((call) => call.startsWith("POST graph.microsoft.com/v1.0/users") && !call.includes("sendMail")), "no mailbox created");
-  assert.ok(!calls.some((call) => /api\.cloudflare\.com.*dns_records/.test(call) && !call.startsWith("GET")), "the protected domain's DNS was never changed");
+  assert.deepEqual(cfWrites.map((write) => write.name), [`_dmarc.${DOMAIN}`], "only the dedicated domain's missing DMARC record was ever written");
 });
