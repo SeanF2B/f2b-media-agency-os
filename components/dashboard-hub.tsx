@@ -9,7 +9,7 @@ type HubClient = { id: string; name: string; logo?: string; googleAdsAccountId?:
 type HubStaff = { id: string; name: string; isBot?: boolean };
 type Stat = { value: number; previous: number | null } | null;
 type Marketing = {
-  currency: string; visits: (Stat & { metric?: string }) | null; visitsNote: string; adSpend: Stat; adClicks: Stat; impressions?: Stat; conversions?: Stat; cpc?: Stat; costPerConversion?: Stat; adsNote: string; split?: Split; gsc?: Gsc | null; googleCampaigns?: Array<{ id: string; name: string; status: string; spend: number; clicks: number; impressions: number; conversions: number }>; meta?: { spend: number; impressions: number; clicks: number; leads: number; cpc: number | null; costPerLead: number | null; accounts: number; linkedAccounts: number; campaigns?: Array<{ id: string; name: string; status: string; spend: number; clicks: number; impressions: number; leads: number }> } | null; metaNote?: string; scope?: string; accounts?: number; linkedAccounts?: number; calls: Stat; profileClicks: Stat; businessNote: string; leads: Stat;
+  currency: string; visits: (Stat & { metric?: string }) | null; visitsNote: string; adSpend: Stat; adClicks: Stat; impressions?: Stat; conversions?: Stat; cpc?: Stat; costPerConversion?: Stat; adsNote: string; businessProfile?: { views: number | null; calls: number | null; directions: number | null; websiteClicks: number | null; previous: { impressions: number | null; calls: number | null; directions: number | null; websiteClicks: number | null } | null } | null; trustpilot?: { status: string; rating?: number | null; total?: number | null; url?: string }; split?: Split; gsc?: Gsc | null; googleCampaigns?: Array<{ id: string; name: string; status: string; spend: number; clicks: number; impressions: number; conversions: number }>; meta?: { spend: number; impressions: number; clicks: number; leads: number; cpc: number | null; costPerLead: number | null; accounts: number; linkedAccounts: number; campaigns?: Array<{ id: string; name: string; status: string; spend: number; clicks: number; impressions: number; leads: number }> } | null; metaNote?: string; scope?: string; accounts?: number; linkedAccounts?: number; calls: Stat; profileClicks: Stat; businessNote: string; leads: Stat;
   google: { position: number | null; previous: number | null; tracked: number; top3: number } | null; rankNote: string;
   chatgpt: { share: number; previous: number | null; prompts: number; mentioned: number } | null; aiNote: string; bing: null; bingNote: string;
 };
@@ -54,13 +54,15 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
   const [sample, setSample] = useState(() => { try { return localStorage.getItem("f2b-dash-sample") === "1"; } catch { return false; } });
   const [apptRange, setApptRange] = useState<"today" | "tomorrow" | "week" | "all" | "date">("today");
   const [apptDate, setApptDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [gReviews, setGReviews] = useState<{ total: number | null; averageRating: number | null } | null>(null);
+  useEffect(() => { setGReviews(null); if (!clientId) return; let live = true; fetch(`/api/local-seo?clientId=${encodeURIComponent(clientId)}&range=last_30d`).then((r) => r.ok ? r.json() : null).then((j: { reviews?: { total: number | null; averageRating: number | null } } | null) => { if (live && j?.reviews) setGReviews({ total: j.reviews.total, averageRating: j.reviews.averageRating }); }).catch(() => undefined); return () => { live = false; }; }, [clientId]);
   const [gCamp, setGCamp] = useState("");
   const [mCamp, setMCamp] = useState("");
   useEffect(() => { setGCamp(""); setMCamp(""); }, [clientId]);
   const [showAi, setShowAi] = useState(() => { try { return localStorage.getItem("f2b-dash-ai") !== "0"; } catch { return true; } });
 
   useEffect(() => {
-    const key = `f2b-dash-metrics-v4:${clientId}:${periodStart}:${periodEnd}`;
+    const key = `f2b-dash-metrics-v5:${clientId}:${periodStart}:${periodEnd}`;
     try { const cached = JSON.parse(sessionStorage.getItem(key) || "null") as { at: number; data: Metrics } | null; if (cached && Date.now() - cached.at < CACHE_MS) { setMetrics(cached.data); return; } } catch { /* no cache */ }
     let live = true; setLoading(true);
     fetch(`/api/dashboard-metrics?clientId=${encodeURIComponent(clientId)}&start=${periodStart}&end=${periodEnd}`).then((r) => r.ok ? r.json() as Promise<Metrics> : null).then((data) => { if (!live || !data) return; setMetrics(data); try { sessionStorage.setItem(key, JSON.stringify({ at: Date.now(), data })); } catch { /* full */ } }).catch(() => undefined).finally(() => { if (live) setLoading(false); });
@@ -144,6 +146,21 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
           <div className="dh-gsc-col"><h3 className="dh-sub">Top searches</h3>{(m.gsc.queries || []).map((q) => <div key={q.query} className="dh-gsc-row"><span title={q.query}>{q.query}</span><b>{num(q.clicks)}</b><small>{q.position != null ? `#${q.position}` : ""}</small></div>)}</div>
           <div className="dh-gsc-col"><h3 className="dh-sub">🔥 Trending searches</h3>{(m.gsc.trending || []).length ? (m.gsc.trending || []).map((q) => <div key={q.query} className="dh-gsc-row"><span title={q.query}>{q.query}</span><b className="good">▲ {num(q.change)}</b><small>{num(q.impressions)} seen</small></div>) : <p className="dh-muted">No rising searches vs the previous month.</p>}</div>
         </div>}
+        {(() => { const bp = m.businessProfile; const tp = m.trustpilot; return <>
+          <h3 className="dh-sub">Reviews &amp; Google Business</h3>
+          <div className="dh-reviews">
+            <div className="dh-review"><BrandIcon id="business-profile" size={22} fallback={null} /><span><b>{gReviews?.averageRating != null ? `${gReviews.averageRating.toFixed(1)} ★` : "—"}</b><small>{gReviews?.total != null ? `${num(gReviews.total)} Google reviews` : "Google reviews · connect Business Profile"}</small></span></div>
+            <div className="dh-review"><BrandIcon id="facebook" size={22} fallback={null} /><span><b>—</b><small>Facebook reviews · connect the Facebook Page</small></span></div>
+            <div className="dh-review"><BrandIcon id="trustpilot" size={22} fallback={null} /><span><b>{tp?.status === "ok" && tp.rating != null ? `${tp.rating.toFixed(1)} ★` : "—"}</b><small>{tp?.status === "ok" ? `${num(tp.total || 0)} Trustpilot reviews` : tp?.status === "not_found" ? "Not on Trustpilot yet" : tp?.status === "no_website" ? "Trustpilot · add the website" : "Trustpilot"}</small></span></div>
+          </div>
+          <div className="dh-tiles dh-gbp">
+            <Tile icon={<BrandIcon id="business-profile" size={20} fallback={null} />} label="Profile views" value={bp?.views != null ? num(bp.views) : "—"}><Delta now={bp?.views} before={bp?.previous?.impressions} /></Tile>
+            <Tile icon={<Phone size={18} />} label="Calls" value={bp?.calls != null ? num(bp.calls) : "—"} tone={(bp?.calls || 0) > 0 ? "good" : ""}><Delta now={bp?.calls} before={bp?.previous?.calls} /></Tile>
+            <Tile icon={<span>🧭</span>} label="Directions" value={bp?.directions != null ? num(bp.directions) : "—"}><Delta now={bp?.directions} before={bp?.previous?.directions} /></Tile>
+            <Tile icon={<MousePointerClick size={18} />} label="Website clicks" value={bp?.websiteClicks != null ? num(bp.websiteClicks) : "—"}><Delta now={bp?.websiteClicks} before={bp?.previous?.websiteClicks} /></Tile>
+          </div>
+          {!bp && <p className="dh-muted">{m.businessNote || "Connect this client’s Google Business Profile to see views, calls and directions."}</p>}
+        </>; })()}
         {m.scope !== "all" && <><h3 className="dh-sub">Where you show up</h3>
         <div className="dh-ranks">
           <div className="dh-rank"><div className="dh-rank-logos"><BrandIcon id="google" size={24} fallback={<span>G</span>} /><span className="dh-rank-also" title="Chrome and Safari use Google search"><BrandIcon id="chrome" size={14} fallback={null} /><BrandIcon id="safari" size={14} fallback={null} /></span></div><small>Google · Chrome & Safari</small>{m.google ? <><b>{m.google.position != null ? `#${m.google.position}` : "—"}</b><em>avg of {m.google.tracked} keywords · {m.google.top3} in top 3 <Delta now={m.google.position} before={m.google.previous} lowerIsBetter suffix="" /></em></> : m.gsc && !m.gsc.error && m.gsc.position != null ? <><b>#{m.gsc.position}</b><em>avg position across {num(m.gsc.queriesTracked || 0)} searches (Search Console) <Delta now={m.gsc.position} before={m.gsc.previousPosition} lowerIsBetter suffix="" /></em></> : <><b>—</b><em>{m.gsc?.error || m.rankNote || "Not tracked yet"}</em></>}</div>
@@ -158,14 +175,22 @@ export function DashboardHub({ scopeClientId, clients, tasks, staff, onNavigate,
 
       <section className="panel dh-panel dh-email"><div className="dh-head"><div><p className="eyebrow"><Mail size={12} /> {periodLabel.toUpperCase()}</p><h2>Emails &amp; health</h2></div><button type="button" className="text-button" onClick={() => onNavigate("Conversations")}>Open inbox →</button></div>
         {(() => { const e = view?.emails; if (!e) return <p className="dh-muted">{loading ? "Loading…" : "No emails yet."}</p>; const rate = e.total ? Math.round(((e.delivered ?? e.total) / e.total) * 100) : null; const tone = rate == null ? "" : rate >= 98 ? "good" : rate >= 90 ? "warn" : "bad"; return <>
-          <div className="dh-email-stats">
-            <div className="dh-email-stat"><small>Sent</small><b>{num(e.total)}</b></div>
-            <div className={`dh-email-stat ${tone}`}><small>Delivered</small><b>{rate == null ? "—" : `${rate}%`}</b></div>
-            <div className={`dh-email-stat ${(e.failed || 0) > 0 ? "bad" : "good"}`}><small>Failed</small><b>{num(e.failed || 0)}</b></div>
-            <div className="dh-email-stat"><small>People emailed</small><b>{num(e.people || 0)}</b></div>
-            <div className="dh-email-stat"><small>Replies</small><b>{num(e.replies || 0)}</b></div>
-            <div className={`dh-email-stat ${e.configured === false ? "bad" : "good"}`}><small>Sending</small><b>{e.configured === false ? "Not set up" : "Healthy"}</b></div>
-          </div>
+          {(() => { const deliv = e.total ? ((e.delivered ?? e.total) / e.total) * 100 : null; const bounce = e.total ? ((e.failed || 0) / e.total) * 100 : null; const reply = e.people ? Math.min(100, ((e.replies || 0) / e.people) * 100) : null;
+            const score = e.total ? Math.max(0, Math.min(100, Math.round((deliv ?? 0) * 0.7 + Math.min(30, (reply ?? 0) * 1.5) - (bounce ?? 0) * 2 + (e.configured === false ? -20 : 0)))) : null;
+            const label = score == null ? "No data" : score >= 80 ? "Excellent" : score >= 60 ? "Good" : score >= 40 ? "Fair" : "Poor";
+            const R = 70, C = Math.PI * R, pct = (score ?? 0) / 100;
+            const row = (icon: ReactNode, name: string, value: string, good: boolean | null, rec: string) => <div className="dh-eh-row"><span className="dh-eh-ico">{icon}</span><span>{name}</span><b className={good == null ? "" : good ? "good" : "bad"}>{value}</b><small>{rec}</small></div>;
+            return <div className="dh-eh">
+              <div className="dh-eh-gauge"><svg viewBox="0 0 180 104" width="180" height="104" aria-hidden="true"><path d="M20 94 A70 70 0 0 1 160 94" fill="none" stroke="rgba(127,138,160,.2)" strokeWidth="12" strokeLinecap="round" /><path d="M20 94 A70 70 0 0 1 160 94" fill="none" stroke="var(--brand-primary, #1f6feb)" strokeWidth="12" strokeLinecap="round" strokeDasharray={`${pct * C} ${C}`} /></svg><b>{score ?? "—"}</b><small>Deliverability score</small><span className={`dh-eh-badge ${score == null ? "" : score >= 60 ? "good" : "bad"}`}>{label}</span></div>
+              <div className="dh-eh-table"><div className="dh-eh-row head"><span /><span>Metric</span><b>Health</b><small>Recommended</small></div>
+                {row(<Mail size={14} />, "Deliveries", deliv == null ? "—" : `${deliv.toFixed(1)}%`, deliv == null ? null : deliv >= 98, "98%+")}
+                {row(<span>↩</span>, "Bounce / failed", bounce == null ? "—" : `${bounce.toFixed(1)}%`, bounce == null ? null : bounce <= 2, "under 2%")}
+                {row(<MessageSquare size={14} />, "Reply rate", reply == null ? "—" : `${reply.toFixed(1)}%`, reply == null ? null : reply >= 5, "5%+")}
+                {row(<span>👁</span>, "Open rate", "Not tracked", null, "turn on open tracking")}
+                {row(<MousePointerClick size={14} />, "Click rate", "Not tracked", null, "turn on click tracking")}
+                {row(<span>⚙</span>, "Sending setup", e.configured === false ? "Not set up" : "Healthy", e.configured !== false, "domain verified")}
+              </div>
+            </div>; })()}
           {e.recent.length ? <ul className="dh-list dh-email-list">{e.recent.map((m, i) => <li key={i}><span className={`dh-logo dh-logo-fallback ${m.failed ? "is-bad" : ""}`}>{m.failed ? "!" : <Mail size={13} />}</span><span><b>{m.subject || "(no subject)"}</b><small>{m.to} · {when(m.at)}{m.failed ? " · failed" : ""}</small></span></li>)}</ul> : <p className="dh-muted">No emails sent in this period.</p>}
         </>; })()}
       </section>

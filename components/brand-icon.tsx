@@ -17,6 +17,7 @@ export const BRAND_DOMAINS: Record<string, string> = {
   "business-profile": "business.google.com", gbp: "business.google.com", wordpress: "wordpress.org", site: "wordpress.org",
   dataforseo: "dataforseo.com", gohighlevel: "www.gohighlevel.com", "google-calendar": "calendar.google.com", "google-drive": "drive.google.com",
   "gmail-bookkeeping": "mail.google.com", "email-sending": "resend.com", twilio: "www.twilio.com", pagespeed: "pagespeed.web.dev",
+  facebook: "www.facebook.com", trustpilot: "www.trustpilot.com",
   google: "www.google.com", bing: "www.bing.com", edge: "microsoftedge.microsoft.com", safari: "www.apple.com", chrome: "www.google.com", chatgpt: "chatgpt.com",
   stripe: "stripe.com", openrouter: "openrouter.ai", cloudflare: "www.cloudflare.com", outscraper: "outscraper.com",
 };

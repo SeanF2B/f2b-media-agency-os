@@ -97,6 +97,23 @@ export async function GET(request: Request) {
       return { property, clicks: now.clicks, previousClicks: prev.length ? before.clicks : null, impressions: now.impressions, position: now.position, previousPosition: prev.length ? before.position : null, queriesTracked: qNow.size, pages, queries, trending };
     } catch (error) { return { error: error instanceof Error ? error.message : "Search Console couldn’t be read." }; }
   };
+  // Public Trustpilot rating for the client's website (cached a day). Facebook needs a connected Page.
+  const trustpilotFor = async (cid: string) => {
+    const client = (workspace.clients || []).find((c) => c.id === cid);
+    const raw = client?.website || client?.wordpressSiteUrl || "";
+    let domain = ""; try { domain = new URL(/^https?:/.test(raw) ? raw : `https://${raw}`).hostname.replace(/^www\./, ""); } catch { /* none */ }
+    if (!domain) return { status: "no_website" as const };
+    try {
+      const got = await loadCachedMarketingData({ db: db as never, ownerId, clientId: cid, service: "Trustpilot", key: `tp:${domain}`, ttlMs: 24 * 3600_000 }, async () => {
+        const res = await fetch(`https://www.trustpilot.com/review/${domain}`, { headers: { "User-Agent": "Mozilla/5.0 (compatible; F2B-OS/1.0)", Accept: "text/html" }, signal: AbortSignal.timeout(8000) });
+        if (res.status === 404) return { found: false, rating: null as number | null, total: null as number | null };
+        const html = await res.text();
+        const rating = /"ratingValue"\s*:\s*"?([\d.]+)/.exec(html)?.[1]; const total = /"reviewCount"\s*:\s*"?(\d+)/.exec(html)?.[1];
+        return { found: Boolean(rating || total), rating: rating ? Number(rating) : null, total: total ? Number(total) : null };
+      });
+      return got.data.found ? { status: "ok" as const, rating: got.data.rating, total: got.data.total, url: `https://www.trustpilot.com/review/${domain}` } : { status: "not_found" as const, url: `https://www.trustpilot.com/review/${domain}` };
+    } catch { return { status: "unavailable" as const }; }
+  };
   const marketing = async () => {
     if (!clientId || !(admin || permissions.reports)) return null;
     const period = { start: clampStart, end: reqEnd };
@@ -131,7 +148,7 @@ export async function GET(request: Request) {
     const prevPositions = (ranks?.keywords || []).map((k) => k.previousPosition).filter((p): p is number => typeof p === "number" && p > 0);
     const chatgpt = ai?.platforms.find((p) => p.platform === "chatgpt");
     const leadsNow = seo?.attribution.status === "ok" ? Object.values(seo.attribution.data!.allChannels || {}).reduce((a, b) => a + (Number(b) || 0), 0) : null;
-    const [meta, gsc] = await Promise.all([metaFor([clientId]), searchConsoleFor(clientId)]);
+    const [meta, gsc, trustpilot] = await Promise.all([metaFor([clientId]), searchConsoleFor(clientId), trustpilotFor(clientId)]);
     // Paid vs organic split: leads by channel from CRM attribution, ad calls from Google Ads.
     const channels = seo?.attribution.status === "ok" ? seo.attribution.data!.allChannels as Record<string, number> : null;
     const accountId = String((workspace.clients || []).find((c) => c.id === clientId)?.googleAdsAccountId || "").replace(/\D/g, "");
@@ -143,7 +160,7 @@ export async function GET(request: Request) {
       notes: { organic: why(seo?.traffic) || (biz ? "" : why(seo?.business)), paid: accountId ? why(ads?.ads) : "No Google Ads account linked" },
     };
     return {
-      ...meta, split, gsc,
+      ...meta, split, gsc, trustpilot, businessProfile: biz ? { views: biz.impressions, calls: biz.calls, directions: biz.directions, websiteClicks: biz.websiteClicks, previous: biz.previous } : null,
       googleCampaigns: adsData ? adsData.campaigns.slice(0, 40).map((c) => ({ id: c.id, name: c.name, status: c.status, spend: c.spend, clicks: c.clicks, impressions: c.impressions, conversions: c.conversions })) : [],
       currency: seo?.client.currency || ads?.client.currency || "EUR",
       visits: traffic ? { value: traffic.current, previous: traffic.previous, metric: traffic.metric } : null, visitsNote: why(seo?.traffic),

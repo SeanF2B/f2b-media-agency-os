@@ -1801,3 +1801,26 @@ html body .app-shell .dh-logo-fallback.is-bad { background: #fde8e8; color: #b42
 html body .app-shell .dh-activity { padding: 16px 18px !important; }
 html body .app-shell .dh-activity .activity-page-heading.is-compact > :not(.activity-filters) { display: none !important; }
 html body .app-shell .dh-activity .activity-page-heading.is-compact { margin: 0 0 6px !important; padding: 0 !important; }
+/* Email health: gauge + metrics table */
+html body .app-shell .dh-eh { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 18px; align-items: center; margin-bottom: 12px; }
+@media (max-width: 800px) { html body .app-shell .dh-eh { grid-template-columns: 1fr; } }
+html body .app-shell .dh-eh-gauge { position: relative; display: grid; justify-items: center; gap: 2px; padding: 8px; }
+html body .app-shell .dh-eh-gauge > b { margin-top: -54px; font-size: 38px; line-height: 1; }
+html body .app-shell .dh-eh-gauge > small { font-size: 13px; opacity: .75; margin-top: 6px; }
+html body .app-shell .dh-eh-badge { margin-top: 6px; padding: 2px 12px; border-radius: 999px; border: 1px solid rgba(127,138,160,.4); font-size: 12px; font-weight: 700; }
+html body .app-shell .dh-eh-badge.good { border-color: #22a55b; color: #157a43; } html body .app-shell .dh-eh-badge.bad { border-color: #e5484d; color: #b42318; }
+html body .app-shell .dh-eh-table { display: grid; border: 1px solid rgba(127,138,160,.18); border-radius: 12px; overflow: hidden; }
+html body .app-shell .dh-eh-row { display: grid; grid-template-columns: 34px minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 10px; padding: 9px 12px; border-top: 1px solid rgba(127,138,160,.14); font-size: 13.5px; }
+html body .app-shell .dh-eh-row.head { border-top: 0; font-size: 12px; font-weight: 700; opacity: .75; background: rgba(127,138,160,.06); }
+html body .app-shell .dh-eh-ico { width: 28px; height: 28px; border-radius: 999px; display: grid; place-items: center; background: rgba(127,138,160,.12); font-size: 13px; }
+html body .app-shell .dh-eh-row b.good { color: #157a43; } html body .app-shell .dh-eh-row b.bad { color: #b42318; }
+html body .app-shell .dh-eh-row small { font-size: 12px; opacity: .7; }
+body.f2b-dark :is(.app-shell .dh-eh-row b.good, .app-shell .dh-eh-badge.good, #f2b-eh) { color: #6fdc9b !important; -webkit-text-fill-color: #6fdc9b !important; }
+body.f2b-dark :is(.app-shell .dh-eh-row b.bad, .app-shell .dh-eh-badge.bad, #f2b-eh) { color: #ff9b94 !important; -webkit-text-fill-color: #ff9b94 !important; }
+html body .app-shell .dh-email-stats { display: none !important; }
+/* Reviews row */
+html body .app-shell .dh-reviews { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 10px; }
+@media (max-width: 800px) { html body .app-shell .dh-reviews { grid-template-columns: 1fr; } }
+html body .app-shell .dh-review { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 13px; border: 1px solid rgba(127,138,160,.18); background: rgba(127,138,160,.05); }
+html body .app-shell .dh-review span { display: grid; } html body .app-shell .dh-review b { font-size: 20px; color: #b07800; } html body .app-shell .dh-review small { font-size: 12px; opacity: .75; }
+body.f2b-dark :is(.app-shell .dh-review b, #f2b-rv) { color: #f5c46b !important; -webkit-text-fill-color: #f5c46b !important; }
