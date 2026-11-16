@@ -1839,3 +1839,46 @@ body.f2b-dark .app-shell .dfs-connect { background: rgba(255,255,255,.04); }
 body.f2b-dark .app-shell .dfs-connect-error { color: #fda29b; }
 @media (max-width: 720px) { html body .app-shell .dfs-connect { grid-template-columns: 1fr; } }
 html body .app-shell .launchpad-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* ===== Client logo in the top bar: big, readable, no tiny tile (final say over earlier rules) ===== */
+html body .app-shell.topnav-layout .tn-bar .tn-brand .tn-logo-client { display: flex !important; align-items: center; justify-content: center; height: 48px !important; width: auto !important; min-width: 0 !important; max-width: 210px !important; padding: 2px 6px !important; border: 0 !important; border-radius: 10px !important; background: transparent !important; box-shadow: none !important; overflow: visible !important; }
+html body .app-shell.topnav-layout .tn-bar .tn-brand .tn-logo-client img { display: block; height: 44px !important; max-height: 44px !important; width: auto !important; max-width: 198px !important; object-fit: contain !important; }
+/* Dark logo on a dark bar (or light on light): give it a soft tile so it stays readable */
+html body .app-shell.dark-mode.topnav-layout .tn-bar .tn-brand .tn-logo-client:has(img[data-ink="dark"]) { background: rgba(255,255,255,.92) !important; padding: 3px 10px !important; }
+html body .app-shell:not(.dark-mode).topnav-layout .tn-bar .tn-brand .tn-logo-client:has(img[data-ink="light"]) { background: #1f2a33 !important; padding: 3px 10px !important; }
+@media (max-width: 860px) {
+  html body .app-shell.topnav-layout .tn-bar .tn-brand .tn-logo-client { height: 40px !important; max-width: 130px !important; }
+  html body .app-shell.topnav-layout .tn-bar .tn-brand .tn-logo-client img { height: 36px !important; max-height: 36px !important; max-width: 120px !important; }
+}
+
+/* ===== Side menu: full sidebar like the original (icon + label rows, logo on top, toggle back to top bar) ===== */
+html body .app-shell .tn-side-head { display: none; }
+@media (min-width: 861px) {
+  html body .app-shell.topnav-layout.nav-side .tn-bar .tn-nav.tn-nav-all {
+    position: fixed !important; top: 12px !important; bottom: 12px !important; left: 12px !important; transform: none !important;
+    width: 228px !important; max-width: 228px !important; height: auto !important; margin: 0 !important;
+    display: flex !important; flex-direction: column !important; align-items: stretch !important; justify-content: flex-start !important; gap: 4px !important;
+    padding: 14px 12px !important; overflow-y: auto !important; overflow-x: hidden !important; z-index: 140 !important;
+    border-radius: 22px !important; box-shadow: 0 18px 50px rgba(10,18,26,.22), 0 2px 8px rgba(10,18,26,.08) !important;
+  }
+  html body .app-shell.topnav-layout.nav-side .tn-side-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 64px; padding: 4px 4px 14px; margin-bottom: 8px; border-bottom: 1px solid rgba(127,138,160,.18); }
+  html body .app-shell.topnav-layout.nav-side .tn-side-head img, html body .app-shell.topnav-layout.nav-side .tn-side-head .sidebar-logo { max-height: 52px; max-width: 160px; width: auto; object-fit: contain; display: flex; align-items: center; }
+  html body .app-shell.topnav-layout.nav-side .tn-side-head .brand-icon-image { width: 44px !important; height: 44px !important; }
+  html body .app-shell.topnav-layout.nav-side .tn-side-collapse { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; border: 1px solid rgba(127,138,160,.3); background: transparent; color: inherit; cursor: pointer; transition: transform .14s, border-color .14s; }
+  html body .app-shell.topnav-layout.nav-side .tn-side-collapse:hover { transform: translateY(-1px); border-color: var(--brand-secondary, var(--brand-primary, #3b82f6)); }
+  html body .app-shell.topnav-layout.nav-side .tn-nav.tn-nav-all .tn-item {
+    flex-direction: row !important; justify-content: flex-start !important; align-items: center !important; gap: 12px !important;
+    width: 100% !important; min-width: 0 !important; height: 44px !important; padding: 0 12px !important; border-radius: 12px !important; text-align: left !important;
+  }
+  html body .app-shell.topnav-layout.nav-side .tn-nav.tn-nav-all .tn-item .tn-icon { flex: none; width: 22px; display: grid; place-items: center; position: relative; }
+  html body .app-shell.topnav-layout.nav-side .tn-nav.tn-nav-all .tn-item .tn-label { display: block !important; font-size: 14px !important; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 1 !important; max-width: none !important; }
+  html body .app-shell.topnav-layout.nav-side .tn-nav.tn-nav-all .tn-item:hover { transform: translateX(2px); }
+  html body .app-shell.topnav-layout.nav-side .tn-nav.tn-nav-all .tn-item.active { box-shadow: inset 3px 0 0 var(--brand-secondary, var(--brand-primary, #3b82f6)); }
+  html body .app-shell.topnav-layout.nav-side .tn-nav.tn-nav-all .tn-more-wrap { width: 100%; }
+  html body .app-shell.topnav-layout.nav-side .tn-nav.tn-nav-all .tn-more-menu { left: calc(100% + 10px) !important; right: auto !important; top: auto !important; bottom: 0 !important; }
+  /* Logo lives in the sidebar, so the top bar keeps only the pickers and right-hand buttons */
+  html body .app-shell.topnav-layout.nav-side .tn-bar .tn-brand { display: none !important; }
+  html body .app-shell.topnav-layout.nav-side .tn-bar { margin-left: 252px !important; width: auto !important; grid-template-columns: minmax(0, 1fr) auto !important; }
+  html body .app-shell.topnav-layout.nav-side .tn-right { grid-column: 2 !important; }
+  html body .app-shell.topnav-layout.nav-side .main-area > :not(.tn-bar) { margin-left: 252px !important; max-width: calc(100vw - 268px) !important; }
+}
