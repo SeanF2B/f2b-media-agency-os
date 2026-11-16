@@ -32,7 +32,8 @@ export async function GET(request: Request) {
   const { client, admin, ownerId, db } = context;
   if (!admin) return respond({ status: "forbidden", message: "Only an owner or admin can run backlink research." }, 403);
   let defaultTarget = "";
-  try { defaultTarget = client.wordpressSiteUrl ? new URL(client.wordpressSiteUrl).hostname.replace(/^www\./, "") : ""; } catch { /* an invalid saved URL is shown as an empty target */ }
+  // The client's own site is pre-filled: their website, or the WordPress site when that's all that's saved.
+  try { const site = String(client.website || client.wordpressSiteUrl || "").trim(); defaultTarget = site ? new URL(/^https?:\/\//i.test(site) ? site : `https://${site}`).hostname.replace(/^www\./, "") : ""; } catch { /* an invalid saved URL is shown as an empty target */ }
   const configured = Boolean((await dataForSeoCredentials(db, ownerId)));
   const historyRows = await db.prepare("SELECT target, created_at, result_json, provider_cost_usd FROM seo_backlink_snapshots WHERE owner_id = ?1 AND client_id = ?2 ORDER BY created_at DESC LIMIT 20").bind(ownerId, client.id).all<{ target: string; created_at: string; result_json: string; provider_cost_usd: number | null }>();
   const history = (historyRows.results || []).flatMap((row) => {

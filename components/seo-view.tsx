@@ -335,11 +335,11 @@ ${sorted.map((group, index) => `<section class="page"><div class="running">${esc
       const payload = await response.json() as BacklinkData;
       if (!response.ok) throw new Error(payload.message || "Could not check DataForSEO connection status.");
       return payload;
-    }).then((payload) => { if (!cancelled) setBacklinkData(payload); }).catch((reason) => {
+    }).then((payload) => { if (cancelled) return; setBacklinkData(payload); if (payload.defaultTarget) setBacklinkTarget((current) => current || payload.defaultTarget || ""); }).catch((reason) => {
       if (!cancelled) setBacklinkData({ status: "unavailable", message: reason instanceof Error ? reason.message : "Could not check the backlink connection." });
     });
     return () => { cancelled = true; };
-  }, [active, visKey, clientId, client?.wordpressSiteUrl, dfsVersion]);
+  }, [active, visKey, clientId, client?.wordpressSiteUrl, client?.website, dfsVersion]);
 
   useEffect(() => {
     if (!active || !vis("Backlinks") || !clientId) return;
