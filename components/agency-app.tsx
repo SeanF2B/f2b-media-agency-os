@@ -5561,7 +5561,7 @@ The app will check the live account first and only restore the previous value if
         setSelectedRecommendationIds((current) => current.filter((key) => key !== item.key));
       }
     }
-    if (startedAny) setToast("Selected recommendation tasks started on the Board");
+    if (startedAny) void appAlert("Selected recommendation tasks started on the Board");
   };
   const rejectSelectedRecommendations = async () => {
     const selected = aiRecommendationItems.filter((item) => selectedRecommendationIds.includes(item.key));
