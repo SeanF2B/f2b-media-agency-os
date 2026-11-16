@@ -2277,3 +2277,4 @@ html body .app-shell .ops-local-more[open] > summary { margin-bottom: 10px; }
 .sp-editor > footer { display: flex; align-items: center; gap: 8px; padding: 12px 18px; border-top: 1px solid #eef2f5; } .sp-del { color: #b42318 !important; }
 .dark-mode .sp, .dark-mode .sp-editor { background: #1b2227; color: #e7edf1; border-color: #2f3a41; } .dark-mode .sp-day { background: #161d22; border-color: #2a343b; } .dark-mode .sp-col input, .dark-mode .sp-col textarea { background: #11171b; color: #e7edf1; border-color: #3c4850; }
 @media (max-width: 760px) { .sp-grid { grid-template-columns: repeat(7, minmax(40px, 1fr)); overflow-x: auto; } .sp-day { min-height: 70px; } .sp-post small, .sp-post em { display: none; } .sp-editor-body { grid-template-columns: 1fr; } .sp-backdrop { padding: 0; align-items: flex-end; } .sp-editor { border-radius: 18px 18px 0 0; max-height: 96vh; } }
+/* redeploy 1794807215 */
