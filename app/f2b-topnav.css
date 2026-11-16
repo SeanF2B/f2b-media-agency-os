@@ -2600,3 +2600,7 @@ html body .app-shell .sf-pv-submit { justify-self: start; padding: 5px 16px; bor
 html body .app-shell.dark-mode .sf-preview { background: #1b2227; border-color: #2f3a41; }
 html body .app-shell.dark-mode .sf-pv-input, html body .app-shell.dark-mode .sf-pv-chips i { background: #26313a; border-color: #3a4650; color: #b8bcc5; }
 html body .app-shell.dark-mode .sf-pv-label { color: #c9ced6; }
+
+/* Top bar: menu-layout toggle sits beside the client selector; World sits beside Chess */
+html body .app-shell .tn-left .tn-layout-toggle { flex: none; margin-left: 2px; }
+html body .app-shell .tn-world-button .tn-gamepad { width: 18px; height: 18px; }
