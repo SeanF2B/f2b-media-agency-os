@@ -1985,3 +1985,11 @@ html body .crm-detail-backdrop { z-index: 5000 !important; }
 html body .crm-stage-pop-backdrop { z-index: 5010 !important; }
 html body .crm-lightbox { z-index: 5020 !important; }
 @media (max-width: 640px) { html body .crm-stage-pop { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); } }
+/* Client card: Appointment-based toggle */
+html body .app-shell .client-appt-toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; cursor: pointer; margin-left: 10px; user-select: none; }
+html body .app-shell .client-appt-toggle input { position: absolute; opacity: 0; pointer-events: none; }
+html body .app-shell .client-appt-toggle > span { width: 36px; height: 20px; border-radius: 999px; background: #cbd5e1; position: relative; transition: background .15s; flex: none; }
+html body .app-shell .client-appt-toggle > span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .15s; }
+html body .app-shell .client-appt-toggle input:checked + span { background: var(--brand-primary, #0b74b8); }
+html body .app-shell .client-appt-toggle input:checked + span::after { transform: translateX(16px); }
+html body .app-shell .client-appt-toggle input:focus-visible + span { outline: 2px solid var(--brand-secondary, #3b82f6); outline-offset: 2px; }

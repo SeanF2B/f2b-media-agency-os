@@ -739,3 +739,60 @@ export function StaffSchedulingPanel({ staffId, staffName = "", scope = "" }: { 
     </>}
   </section>;
 }
+
+/** Dashboard panel for appointment-based businesses: staff selector, Day (appointments + availability) and Week calendar. */
+export function AppointmentsDashboard({ scopeClientId, onOpen }: { scopeClientId: string; onOpen: () => void }) {
+  const [data, setData] = useState<Data | null>(null);
+  const [err, setErr] = useState("");
+  const [view, setView] = useState<"day" | "week">(() => { try { return localStorage.getItem("f2b-dash-appt-view") === "week" ? "week" : "day"; } catch { return "day"; } });
+  const [staffId, setStaffId] = useState("");
+  const [day, setDay] = useState(() => new Date());
+  const week = mondayOf(day);
+  useEffect(() => {
+    let live = true;
+    const from = addDays(week, -1), to = addDays(week, 8);
+    api<Data>(scopeClientId, undefined, `&from=${from.toISOString()}&to=${to.toISOString()}`).then((d) => { if (live) { setData(d); setErr(""); } }).catch((e) => { if (live) setErr(errText(e, "Appointments couldn't load.")); });
+    return () => { live = false; };
+  }, [scopeClientId, ymd(week)]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (err && !data) return null; // no Scheduling access: hide quietly
+  const setMode = (m: "day" | "week") => { setView(m); try { localStorage.setItem("f2b-dash-appt-view", m); } catch { /* optional */ } };
+  const bookings = (data?.bookings || []).filter((b) => b.status !== "cancelled" && (!staffId || b.staffIds.includes(staffId)));
+  const staff = (data?.staff || []).filter((p) => !staffId || p.id === staffId);
+  const calById = new Map((data?.calendars || []).map((c) => [c.id, c]));
+  const nameOf = (id: string) => data?.staff.find((p) => p.id === id)?.name.split("|")[0].trim().split(" ")[0] || "";
+  const key = ymd(day); const isToday = key === ymd(new Date());
+  const dayList = bookings.filter((b) => ymd(new Date(b.start)) === key).sort((a, b) => a.start.localeCompare(b.start));
+  const mins = (hhmm: string) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + (m || 0); };
+  const dk = (["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as DayKey[])[day.getDay()];
+  return <section className="panel sch-dash-panel" aria-label="Appointments">
+    <div className="sch-dash-panel-head">
+      <div><p className="eyebrow">📅 APPOINTMENTS</p><h2>{view === "day" ? (isToday ? "Today" : day.toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "short" })) : `Week of ${week.toLocaleDateString("en-IE", { day: "numeric", month: "short" })}`}</h2></div>
+      <div className="sch-dash-panel-tools">
+        <label className="sch-select"><Users size={14} /><select aria-label="Staff member" value={staffId} onChange={(e) => setStaffId(e.target.value)}><option value="">Everyone</option>{(data?.staff || []).map((p) => <option key={p.id} value={p.id}>{p.name.split("|")[0].trim()}</option>)}</select></label>
+        <div className="sch-seg" role="tablist" aria-label="View"><button type="button" role="tab" aria-selected={view === "day"} className={view === "day" ? "on" : ""} onClick={() => setMode("day")}>Day</button><button type="button" role="tab" aria-selected={view === "week"} className={view === "week" ? "on" : ""} onClick={() => setMode("week")}>Week</button></div>
+        <button type="button" className="iv-btn" aria-label="Previous" onClick={() => setDay(addDays(day, view === "day" ? -1 : -7))}><ChevronLeft size={15} /></button>
+        {!isToday && <button type="button" className="iv-btn" onClick={() => setDay(new Date())}>Today</button>}
+        <button type="button" className="iv-btn" aria-label="Next" onClick={() => setDay(addDays(day, view === "day" ? 1 : 7))}><ChevronRight size={15} /></button>
+        <button type="button" className="text-button" onClick={onOpen}>Open Scheduling ↗</button>
+      </div>
+    </div>
+    {!data ? <p className="dh-muted">Loading appointments…</p> : view === "day" ? <div className="sch-dash-day">
+      <div className="sch-dash-day-list">
+        <div className="sch-dash-stats"><span><b>{dayList.length}</b> booked</span><span><b>{dayList.filter((b) => Date.parse(b.start) > Date.now()).length}</b> to come</span><span><b>{dayList.filter((b) => b.status === "completed" || Date.parse(b.end) < Date.now()).length}</b> done</span></div>
+        {dayList.length ? <ul className="sch-dash-list">{dayList.map((b) => { const cal = calById.get(b.calendarId); return <li key={b.id} onClick={onOpen}><time>{time(b.start)}</time><span className="sch-dash-av" style={{ ["--c" as string]: cal?.color || "#2563eb" }}>{(b.name || "?").slice(0, 1).toUpperCase()}</span><span className="sch-dash-who"><b>{b.name}</b><small>{cal?.name || ""}{b.staffIds.length ? ` · ${b.staffIds.map(nameOf).filter(Boolean).join(", ")}` : ""}</small></span></li>; })}</ul> : <p className="dh-muted">Nothing booked{isToday ? " today" : " this day"}.</p>}
+      </div>
+      <div className="sch-avail-list">{staff.map((p) => {
+        const off = p.blocked?.includes(key); const windows = off ? [] : p.weekly?.[dk] || [];
+        const booked = dayList.filter((b) => b.staffIds.includes(p.id)).map((b) => { const s0 = new Date(b.start), e0 = new Date(b.end); return [s0.getHours() * 60 + s0.getMinutes(), e0.getHours() * 60 + e0.getMinutes()] as const; });
+        const start = windows.length ? mins(windows[0][0]) : 0, end = windows.length ? mins(windows[windows.length - 1][1]) : 1;
+        const total = windows.reduce((n, w) => n + mins(w[1]) - mins(w[0]), 0), used = booked.reduce((n, [a, z]) => n + Math.max(0, Math.min(z, end) - Math.max(a, start)), 0), free = Math.max(0, total - used);
+        const summary = off ? "Day off" : !windows.length ? "Not working" : !booked.length ? "Free all day" : free ? `${Math.floor(free / 60)}h${free % 60 ? ` ${free % 60}m` : ""} free` : "Fully booked";
+        return <div key={p.id} className={`sch-avail-row${!windows.length ? " off" : ""}`}><Avatar person={p} size={32} /><div className="sch-avail-name"><b>{p.name.split("|")[0].trim()}</b><small>{windows.length ? `${windows[0][0]}–${windows[windows.length - 1][1]}` : p.role}</small></div>
+          <div className="sch-avail-track" aria-hidden="true">{windows.map((w, i) => <i key={`w${i}`} className="free" style={{ left: `${((mins(w[0]) - start) / Math.max(1, end - start)) * 100}%`, width: `${((mins(w[1]) - mins(w[0])) / Math.max(1, end - start)) * 100}%` }} />)}{booked.map(([a, z], i) => <i key={`b${i}`} className="booked" style={{ left: `${((Math.max(a, start) - start) / Math.max(1, end - start)) * 100}%`, width: `${((Math.min(z, end) - Math.max(a, start)) / Math.max(1, end - start)) * 100}%` }} />)}</div>
+          <span className={`sch-avail-pill ${!windows.length ? "off" : !booked.length ? "free" : free ? "some" : "full"}`}>{summary}</span></div>; })}</div>
+    </div> : <div className="sch-dash-week">{Array.from({ length: 7 }, (_, i) => addDays(week, i)).map((d) => { const k = ymd(d); const list = bookings.filter((b) => ymd(new Date(b.start)) === k).sort((a, b) => a.start.localeCompare(b.start)); return <div key={k} className={`sch-dash-wday${k === ymd(new Date()) ? " today" : ""}`}>
+      <button type="button" className="sch-dash-wday-head" onClick={() => { setDay(d); setMode("day"); }}><small>{d.toLocaleDateString("en-IE", { weekday: "short" })}</small><b>{d.getDate()}</b>{list.length > 0 && <em>{list.length}</em>}</button>
+      <div className="sch-dash-wday-body">{list.length ? list.slice(0, 6).map((b) => { const cal = calById.get(b.calendarId); return <button type="button" key={b.id} className="sch-dash-chip" style={{ ["--c" as string]: cal?.color || "#2563eb" }} onClick={onOpen} title={`${time(b.start)} ${b.name} · ${cal?.name || ""}`}><b>{time(b.start)}</b><span>{b.name}</span></button>; }) : <span className="sch-dash-free">Free</span>}{list.length > 6 && <small className="iv-small">+{list.length - 6} more</small>}</div>
+    </div>; })}</div>}
+  </section>;
+}
