@@ -1,0 +1,54 @@
+/* Brand lock — loaded last.
+   House rules: only the account's own brand colours (no stray blue/purple/teal/pink/green accents),
+   and text must always be readable on whatever it sits on.
+   Semantic warning states stay as they are: amber "waiting", red "overdue/overload", red "Lost". */
+
+:root {
+  --bl-ink: var(--brand-secondary-ink, #1e3a8a);
+  --bl-tint: color-mix(in srgb, var(--brand-secondary, #1e3a8a) 13%, #fff);
+  --bl-soft: color-mix(in srgb, var(--brand-secondary, #1e3a8a) 6%, #fff);
+  --bl-edge: color-mix(in srgb, var(--brand-secondary, #1e3a8a) 24%, #fff);
+}
+html body .app-shell.dark-mode, body.f2b-dark .app-shell {
+  --bl-ink: var(--brand-secondary-ink-dark, #a4bcfd);
+  --bl-tint: color-mix(in srgb, var(--brand-secondary, #1e3a8a) 26%, #15171a);
+  --bl-soft: color-mix(in srgb, var(--brand-secondary, #1e3a8a) 14%, #15171a);
+  --bl-edge: color-mix(in srgb, var(--brand-secondary, #1e3a8a) 38%, #15171a);
+}
+
+/* ── Top bar (client sub-accounts): Clock in, Sample and the period picker were white text on a pale pill ── */
+html body .app-shell.client-scoped.topnav-layout .tn-right :is(.tn-clock, .tn-sample),
+html body .app-shell.client-scoped.topnav-layout .tn-right .tn-date-slot :is(.tn-date, select, button) {
+  background: color-mix(in srgb, var(--sb-mix, #fff) 10%, var(--brand-sidebar, #1f2123)) !important;
+  border-color: var(--sb-edge, rgba(255,255,255,.22)) !important;
+  color: var(--sb-fg-strong, #fff) !important;
+}
+html body .app-shell.client-scoped.topnav-layout .tn-right .tn-date-slot :is(select, button, input) { background: transparent !important; border-color: transparent !important; }
+html body .app-shell.client-scoped.topnav-layout .tn-right .tn-date-slot :is(svg, option) { color: inherit; }
+html body .app-shell.client-scoped.topnav-layout .tn-right .tn-date-slot option { color: #111; background: #fff; }
+html body .app-shell.client-scoped.topnav-layout .tn-right :is(.tn-clock, .tn-sample) :is(b, svg, span) { color: var(--sb-fg-strong, #fff) !important; }
+html body .app-shell.client-scoped.topnav-layout .tn-right .tn-sample-track { background: color-mix(in srgb, var(--sb-mix, #fff) 35%, var(--brand-sidebar, #1f2123)) !important; }
+html body .app-shell.client-scoped.topnav-layout .tn-right .tn-clock small { color: var(--sb-fg-strong, #fff) !important; opacity: .85; }
+html body .app-shell.client-scoped.topnav-layout .tn-right :is(.tn-clock, .tn-sample):hover { border-color: var(--sb-fg-strong, #fff) !important; }
+/* "On" states keep their meaning (amber = sample data showing, green = clocked in) but stay readable */
+html body .app-shell.client-scoped.topnav-layout .tn-right .tn-sample.on { background: #f59e0b !important; border-color: #f59e0b !important; color: #1a1205 !important; }
+html body .app-shell.client-scoped.topnav-layout .tn-right .tn-sample.on :is(b, span) { color: #1a1205 !important; }
+html body .app-shell.client-scoped.topnav-layout .tn-right .tn-sample.on .tn-sample-track { background: rgba(0,0,0,.28) !important; }
+
+/* ── Dashboard quick actions: one brand tint instead of six random colours ── */
+html body .app-shell .dh-action:is(.blue, .violet, .teal, .amber, .pink, .green) .dh-action-icon { background: var(--bl-tint) !important; color: var(--bl-ink) !important; }
+html body .app-shell .dh-action:hover { border-color: var(--bl-edge) !important; }
+
+/* ── Approvals / appointment updates when everything is done: brand, not green ── */
+html body .app-shell .dh-approval.clear { background: var(--bl-soft) !important; border-color: var(--bl-edge) !important; }
+html body .app-shell .dh-approval.clear .dh-approval-icon { color: var(--bl-ink) !important; }
+html body .app-shell .dh-approval.clear .dh-approval-n { background: var(--bl-ink) !important; color: #fff !important; -webkit-text-fill-color: #fff !important; }
+html body .app-shell.dark-mode .dh-approval.clear .dh-approval-n, body.f2b-dark .app-shell .dh-approval.clear .dh-approval-n { color: #111 !important; -webkit-text-fill-color: #111 !important; }
+
+/* ── Appointments week: "Free" in brand ink, not green ── */
+html body .app-shell .sch-dash-free { color: var(--bl-ink) !important; }
+
+/* ── Staff hours & earnings: Staff pay (was green) and Business profit (was blue) use the brand ── */
+html body .app-shell .sch-earn-totals :is(.earn, .profit) { background: var(--bl-soft) !important; border-color: var(--bl-edge) !important; }
+html body .app-shell .sch-earn-totals :is(.earn, .profit) b,
+html body .app-shell :is(.sch-earn-money.earn b, .sch-earn-cell.earn b, .sch-earn-pay, .sch-earn-note) { color: var(--bl-ink) !important; }
