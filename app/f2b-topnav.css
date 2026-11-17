@@ -3136,3 +3136,71 @@ html body .app-shell .ops-tasks .task-page-heading h1, html body .app-shell .ops
   /* the AI bubble and its greeting never sit on top of a pop-up */
   html body:has(:is(.modal-backdrop, .crm-modal-backdrop, .cv-modal, .iv-modal, .ps-modal-back, .ox-drawer-backdrop, .ow-modal-scrim, .stage-pop-backdrop, .upload-backdrop, .review-backdrop, .preview-backdrop, .task-popup-backdrop, .bt-backdrop, .sp-backdrop, .spp-drawer-backdrop)) :is(.ai-chat-launcher, .ai-chat-toast) { display: none !important; }
 }
+
+/* ===== Phones (17 Nov): every Operations tab fits the screen ===== */
+@media (max-width: 860px) {
+  html body .app-shell .ops-centre { grid-template-columns: minmax(0, 1fr) !important; min-width: 0; max-width: 100%; position: relative; }
+  html body .app-shell .ops-centre > * { min-width: 0 !important; max-width: 100%; }
+  /* sub-tabs: 2–3 per row, never sideways scrolling */
+  html body .app-shell .ops-centre .ops-subbar { min-width: 0; max-width: 100%; }
+  html body .app-shell .ops-centre .ops-seg, html body .app-shell .ops-centre .ads-view-switch { display: flex !important; flex-wrap: wrap !important; gap: 4px !important; width: 100%; max-width: 100%; overflow: visible !important; box-sizing: border-box; }
+  html body .app-shell .ops-centre :is(.ops-seg, .ads-view-switch) > button { flex: 1 1 auto !important; min-width: 0 !important; height: 36px !important; padding: 0 10px !important; font-size: 13px !important; white-space: nowrap; justify-content: center; text-align: center; overflow: hidden; text-overflow: ellipsis; }
+  html body .app-shell .ops-centre .ops-seg:not(:has(> button:nth-child(4))) > button { flex: 1 1 0 !important; }
+  html body .app-shell .ops-centre .ops-seg:has(> button:nth-child(4):last-child) { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  html body .app-shell .ops-centre .ops-seg:has(> button:nth-child(6):last-child) { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+  /* Tasks: New task beside the Operations title; toggles, views and filters each in one tidy row */
+  html body .app-shell .ops-centre .ops-tasks .task-page-heading { position: absolute !important; top: 0; right: 0; margin: 0 !important; padding: 0 !important; z-index: 2; display: flex !important; }
+  html body .app-shell .ops-centre .ops-tasks .task-page-heading > div:first-child { display: none !important; }
+  html body .app-shell .ops-centre .ops-tasks .task-page-heading .primary-button { height: 38px !important; padding: 0 14px !important; font-size: 14px !important; white-space: nowrap; }
+  html body .app-shell .ops-tasks { margin-top: 0 !important; }
+  html body .app-shell .ops-tasks .task-view-switch-row { display: grid !important; grid-template-columns: 1fr 1fr; gap: 6px; width: 100%; margin: 0 0 8px !important; }
+  html body .app-shell .ops-tasks .task-view-switch-row > label { min-width: 0 !important; height: 42px !important; padding: 0 10px !important; gap: 6px !important; margin: 0 !important; box-sizing: border-box; }
+  html body .app-shell .ops-tasks .task-view-switch-row > label > :is(.f2b-ico, .ai-eyes-icon, span:not([class])) { display: none !important; }
+  html body .app-shell .ops-tasks .task-view-switch-row > label b { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px !important; line-height: 1.1; }
+  html body .app-shell .ops-tasks .task-view-switch-row > label .task-ai-toggle-count { flex: none; }
+  html body .app-shell .page-content .ops-tasks .ai-task-tabs { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)) !important; grid-auto-flow: row !important; gap: 4px !important; padding: 4px !important; margin: 0 0 8px !important; }
+  html body .app-shell .page-content .ops-tasks .ai-task-tabs > button { display: flex !important; height: 44px !important; min-height: 0 !important; max-height: 44px; padding: 0 4px !important; font-size: 12px !important; gap: 4px !important; flex-direction: row !important; flex-wrap: nowrap !important; justify-content: center !important; align-items: center !important; white-space: nowrap; overflow: hidden; min-width: 0 !important; }
+  html body .app-shell .page-content .ops-tasks .ai-task-tabs > button > .f2b-ico { display: none !important; }
+  html body .app-shell .page-content .ops-tasks .ai-task-tabs > button > * { position: static !important; margin: 0 !important; }
+  html body .app-shell .page-content .ops-tasks .ai-task-tabs > button > span:last-child { min-width: 18px; height: 18px; padding: 0 5px; font-size: 11px; }
+  html body .app-shell .ops-tasks .tt-toolbar { flex-wrap: wrap; gap: 6px; }
+  html body .app-shell .ops-tasks .tt-views { display: grid !important; grid-template-columns: auto 1fr auto; gap: 4px; width: 100%; }
+  html body .app-shell .ops-tasks .tt-views > button { min-width: 0 !important; padding: 0 10px !important; font-size: 12.5px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; justify-content: center; }
+  html body .app-shell .approval-inbox-subtabs { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 4px !important; overflow: visible !important; }
+  html body .app-shell .approval-inbox-subtabs > * { min-width: 0 !important; width: auto !important; padding: 0 8px !important; font-size: 13px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; justify-content: center; }
+  html body .app-shell .ai-recommendation-controls { grid-template-columns: minmax(0, 1fr) !important; }
+  html body .app-shell .ai-recommendation-feedback { min-width: 0; max-width: 100%; }
+  html body .app-shell .ai-approval-inbox-row { flex-wrap: wrap; min-width: 0; }
+  html body .app-shell .ai-approval-inbox-row > * { min-width: 0; max-width: 100%; }
+  /* Sites list: one card per site instead of a sideways table */
+  html body .app-shell .ops-centre .ops-table-wrap { overflow: visible !important; border: 0 !important; background: transparent !important; box-shadow: none !important; }
+  html body .app-shell .ops-centre .ops-table { display: block !important; width: 100% !important; min-width: 0 !important; }
+  html body .app-shell .ops-centre .ops-table thead { display: none !important; }
+  html body .app-shell .ops-centre .ops-table tbody { display: grid !important; gap: 6px; }
+  html body .app-shell .ops-centre .ops-table tr { display: flex !important; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 10px 12px !important; border-radius: 14px; background: var(--f2b-white, #fff); border: 1px solid var(--f2b-border, #e3e7ec); }
+  html body .app-shell.dark-mode .ops-centre .ops-table tr { background: #1f1e22; border-color: #3a393d; }
+  html body .app-shell .ops-centre .ops-table td { display: block !important; padding: 0 !important; border: 0 !important; min-width: 0; max-width: 100%; }
+  html body .app-shell .ops-centre .ops-table td:first-child { flex: 1 1 100%; }
+  html body .app-shell .ops-centre .ops-table td:last-child { margin-left: auto; }
+  /* Google Ads: date/campaign pickers fit; setup steps show numbers with the current step named */
+  html body .app-shell .google-ads-view-controls { min-width: 0; max-width: 100%; }
+  html body .app-shell .google-ads-view-controls > label { flex: 1 1 100%; min-width: 0; max-width: 100%; }
+  html body .app-shell .google-ads-view-controls select { width: 100%; min-width: 0; max-width: 100%; text-overflow: ellipsis; }
+  html body .app-shell .ops-centre .sw { grid-template-columns: minmax(0, 1fr) !important; min-width: 0; max-width: 100%; }
+  html body .app-shell .ops-centre .sw > * { min-width: 0; max-width: 100%; }
+  html body .app-shell .ops-centre .sw-steps { display: flex !important; flex-wrap: nowrap !important; gap: 4px !important; overflow: visible !important; width: 100%; max-width: 100%; }
+  html body .app-shell .ops-centre .sw-steps > button { flex: 0 0 auto !important; min-width: 0 !important; padding: 0 6px !important; justify-content: center; }
+  html body .app-shell .ops-centre .sw-steps > button:not(.on) > span { display: none !important; }
+  html body .app-shell .ops-centre .sw-steps > button.on { flex: 1 1 0 !important; overflow: hidden; }
+  html body .app-shell .ops-centre .sw-steps > button.on > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  /* Clients: workroom record tabs as one row of icon tabs; card integration icons wrap */
+  html body .app-shell .client-detail-head { flex-wrap: wrap !important; min-width: 0; max-width: 100%; }
+  html body .app-shell .client-detail-head .client-head-actions { flex: 1 1 100% !important; min-width: 0; max-width: 100%; flex-wrap: wrap !important; }
+  html body .app-shell .client-detail-head .workroom-icons { display: grid !important; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; width: 100%; flex: 1 1 100%; min-width: 0; }
+  html body .app-shell .client-detail-head .workroom-icon { display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; gap: 3px !important; height: 54px !important; padding: 4px 2px !important; min-width: 0 !important; width: auto !important; font-size: 10px !important; line-height: 1.1; position: relative; }
+  html body .app-shell .client-detail-head .workroom-icon > span { display: block; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  html body .app-shell .client-detail-head .workroom-icon > i { position: absolute !important; top: 3px; right: 4px; }
+  html body .app-shell .client-card-extras { flex-wrap: wrap; min-width: 0; }
+  html body .app-shell .client-card-extras > * { min-width: 0; max-width: 100%; }
+  html body .app-shell .client-card-extras .ops-conn { flex-wrap: wrap !important; width: 100% !important; }
+}
