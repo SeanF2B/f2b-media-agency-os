@@ -2906,3 +2906,10 @@ html body .app-shell.dark-mode .crm-detail-foot .crm-detail-book, html body.f2b-
   html body .app-shell .crm-heading > div { text-align: left !important; }
   html body .app-shell .cv .cv-banner { display: none !important; }
 }
+
+/* Dashboard: third status card (Appointment updates) */
+html body .app-shell .dh-approvals:has(.dh-appt-updates) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 860px) {
+  html body .app-shell .dh-approvals:has(.dh-appt-updates) { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  html body .app-shell .dh-approvals .dh-appt-updates { grid-column: 1 / -1; }
+}
