@@ -3331,3 +3331,5 @@ html body .app-shell .finance-panel > .panel-heading::after { content: ""; posit
   html body .app-shell .finance-panel:not([data-mopen]) > :not(.panel-heading) { display: none !important; }
   html body .app-shell .finance-panel:not([data-mopen]) > .panel-heading::after { transform: rotate(45deg); top: 10px; }
 }
+/* Period pickers (Dashboard, Books): one arrow at the right — beats the generic label+icon select rules in light and dark */
+html body .app-shell.app-shell label.tn-date.tn-date > select, html body .app-shell.dark-mode.dark-mode label.tn-date.tn-date > select { background-repeat: no-repeat !important; background-position: right 4px center !important; background-size: 12px 12px !important; background-color: transparent !important; padding-right: 22px !important; }
