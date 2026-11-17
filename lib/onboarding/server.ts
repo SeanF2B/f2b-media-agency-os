@@ -611,6 +611,38 @@ export async function createCheckout(session: SessionRow, selection: { services:
   await updateSession(session, { quote: { ...quote, mode }, checkout_id: String(checkout.id || ""), payment_status: session.payment_status === "paid" ? "paid" : "checkout_started", approvals });
   return { url: String(checkout.url || ""), mode };
 }
+/**
+ * Proposal checkout (Operations → Reports → Proposals → client clicks "Approve & get started").
+ * Uses the same onboarding session + Stripe Checkout as /f/start, with the proposal's own agreed prices,
+ * so the existing webhook creates the client, marks the CRM deal won and records the invoice.
+ * Stripe Checkout shows Apple Pay / Google Pay automatically when enabled in Stripe.
+ */
+export async function createProposalCheckout(input: {
+  ownerId: string; proposalId: string; businessName: string; email?: string; website?: string; contactId?: string | null; clientId?: string | null;
+  currency: string; lines: Array<{ service: string; label: string; amount: number; recurring: boolean }>; successUrl: string; cancelUrl: string;
+}) {
+  const settings = await getSettings(input.ownerId);
+  const mode = settings.stripeMode;
+  const secret = await stripeSecret(input.ownerId, mode, "key");
+  if (!secret) throw new OnboardingError("Online payment isn't set up yet.", 503);
+  if (mode === "live" && !E.isLiveKey(secret)) throw new OnboardingError("Payments are misconfigured.", 503);
+  if (mode === "test" && !E.isTestKey(secret)) throw new OnboardingError("Test mode needs a Stripe test key.", 503);
+  const lines = input.lines.filter((line) => line.amount > 0).map((line, index) => ({ key: `${line.service}:${line.recurring ? "monthly" : "setup"}:${index}`, service: line.service, label: line.label.slice(0, 120), amount: Math.round(line.amount), recurring: line.recurring }));
+  if (!lines.length) throw new OnboardingError("There's nothing to pay for in this proposal.");
+  const quote = { currency: (input.currency || "EUR").toUpperCase(), lines, oneOff: lines.filter((l) => !l.recurring).reduce((sum, l) => sum + l.amount, 0), monthly: lines.filter((l) => l.recurring).reduce((sum, l) => sum + l.amount, 0), discountPercent: 0, services: [...new Set(lines.map((l) => l.service))], manager: false, adSpendNote: "" };
+  const session = await createSession(input.ownerId, { route: "grow", acquisition: { source: "proposal", proposalId: input.proposalId }, visitor: `proposal:${input.proposalId}`, staff: false, answers: { businessName: input.businessName, email: input.email || "", website: input.website || "" } as Answers, contactId: input.contactId || null, clientId: input.clientId || null });
+  const fields = E.checkoutFormFields(quote as never, { successUrl: input.successUrl.replace("{SESSION}", session.id), cancelUrl: input.cancelUrl, customerEmail: input.email || "", sessionRef: session.id });
+  fields.push(["billing_address_collection", "auto"], ["phone_number_collection[enabled]", "true"]);
+  const checkout = await stripeRequest(secret, "checkout/sessions", fields, `prop_${session.id}`);
+  await updateSession(session, { quote: { ...quote, mode }, checkout_id: String(checkout.id || ""), payment_status: "checkout_started", approvals: [{ what: `Proposal approved: ${quote.services.join(", ")}`, at: nowIso() }] });
+  return { url: String(checkout.url || ""), mode, sessionId: session.id };
+}
+/** Whether the agency has online payment ready (so the proposal page can offer card / Apple Pay). */
+export async function proposalPaymentsReady(ownerId: string) {
+  const settings = await getSettings(ownerId).catch(() => null);
+  if (!settings) return false;
+  return settings.stripeMode === "live" ? settings.stripe.liveKey : settings.stripe.testKey;
+}
 /** Verifies and applies one Stripe webhook. Each event id is processed once; unknown sessions are ignored safely. */
 export async function handleStripeWebhook(payload: string, signature: string | null, origin: string) {
   const ownerId = await agencyOwnerId();

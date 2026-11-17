@@ -173,7 +173,7 @@ export function buildDeck(input: {
   add("closing", {
     heading: first(ai.closingHeading || "", "Let's get started"),
     body: first(ai.closing || "", `We're excited to help ${name} grow. Approve this proposal and we'll book your onboarding call this week.`),
-    cta: "Approve proposal",
+    cta: "Approve & get started",
     contact: input.agencyContact || "hello@f2bmedia.com · f2bmedia.com",
   });
   return { version: 1, accent: "#1463ff", slides };

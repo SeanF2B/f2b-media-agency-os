@@ -387,8 +387,17 @@ function Editor({ proposal, change, flush, setProposal, onUpload, uploadOne, onR
     window.setTimeout(rerender, 0);
   };
   const pickImage = (src: string) => { if (!picker) return; setSlotImage(picker.slide, picker.key, src); setPicker(null); };
-  const fullHtml = (print: boolean) => renderProposalHtml(deck, proposal.brand, { assetUrl: (name) => `${window.location.origin}${assetUrl(proposal.id)(name)}`, agencyLogo: AGENCY_LOGO, printButton: true, title: proposal.title }).replace("</body>", print ? `<script>window.addEventListener("load",function(){document.fonts.ready.then(function(){setTimeout(function(){print()},500)})})</script></body>` : "</body>");
-  const openWindow = (print: boolean) => { const win = window.open("", "_blank"); if (!win) { window.alert("Allow pop-ups for this site to open the proposal."); return; } win.document.open(); win.document.write(fullHtml(print)); win.document.close(); };
+  // The Approve button links to the client's checkout page — an absolute link, so it also works inside the PDF.
+  const fullHtml = (print: boolean, token: string | null) => renderProposalHtml(deck, proposal.brand, { assetUrl: (name) => `${window.location.origin}${assetUrl(proposal.id)(name)}`, agencyLogo: AGENCY_LOGO, printButton: true, title: proposal.title, approveUrl: token && !proposal.approvedAt ? `${window.location.origin}/f/proposal/${token}?approve=1` : undefined }).replace("</body>", print ? `<script>window.addEventListener("load",function(){document.fonts.ready.then(function(){setTimeout(function(){print()},500)})})</script></body>` : "</body>");
+  const openWindow = async (print: boolean) => {
+    const win = window.open("", "_blank");
+    if (!win) { window.alert("Allow pop-ups for this site to open the proposal."); return; }
+    let token = proposal.shareToken;
+    if (print && !token) {
+      try { await flush(); const { proposal: next } = await api<{ proposal: Proposal }>({ action: "share", id: proposal.id, enable: true }); setProposal(next); token = next.shareToken; } catch { /* PDF still works, without the approve link */ }
+    }
+    win.document.open(); win.document.write(fullHtml(print, token)); win.document.close();
+  };
   const shareUrl = proposal.shareToken ? `${window.location.origin}/f/proposal/${proposal.shareToken}` : "";
   const toggleShare = async (enable: boolean) => { setSharing(true); try { await flush(); const { proposal: next } = await api<{ proposal: Proposal }>({ action: "share", id: proposal.id, enable }); setProposal(next); } catch (reason) { window.alert(reason instanceof Error ? reason.message : "Couldn't update the share link."); } finally { setSharing(false); } };
   const doRewrite = async () => {
@@ -407,8 +416,8 @@ function Editor({ proposal, change, flush, setProposal, onUpload, uploadOne, onR
       <span className="ps-hint">Click any text on a slide to edit it · click an image to swap it</span>
       <label className="ps-accent" title="Accent colour">Accent<input type="color" value={deck.accent} onChange={(event) => setDeck({ ...deck, accent: event.target.value })} /></label>
       <button type="button" className="secondary-button" onClick={onRegenerate}><SparkIcon /> Regenerate</button>
-      <button type="button" className="secondary-button" onClick={() => openWindow(false)}>Full screen</button>
-      <button type="button" className="secondary-button" onClick={() => openWindow(true)}>Download PDF</button>
+      <button type="button" className="secondary-button" onClick={() => void openWindow(false)}>Full screen</button>
+      <button type="button" className="secondary-button" title="Includes a clickable Approve & pay button" onClick={() => void openWindow(true)}>Download PDF</button>
       {shareUrl ? <span className="ps-share"><input readOnly value={shareUrl} onFocus={(event) => event.currentTarget.select()} aria-label="Share link" data-no-ai /><button type="button" className="primary-button" onClick={async () => { try { await navigator.clipboard.writeText(shareUrl); setCopied(true); window.setTimeout(() => setCopied(false), 1800); } catch { /* clipboard blocked */ } }}>{copied ? "Copied" : "Copy link"}</button><button type="button" className="text-button" disabled={sharing} onClick={() => void toggleShare(false)}>Turn off</button>{proposal.viewCount > 0 && <small>{proposal.viewCount} view{proposal.viewCount === 1 ? "" : "s"}</small>}</span>
         : <button type="button" className="primary-button" disabled={sharing} onClick={() => void toggleShare(true)}>{sharing ? "Creating link…" : "Share link"}</button>}
     </div>
