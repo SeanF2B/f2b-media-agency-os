@@ -3294,3 +3294,19 @@ html body .app-shell .overview-projection-metrics { display: grid !important; gr
 }
 /* Dashboard quick actions: an odd one out fills the last row (no gap) */
 @media (max-width: 700px) { html body .app-shell .dh-actions > .dh-action:last-child:nth-child(odd) { grid-column: 1 / -1; } }
+/* Client Books (expenses & tax): period picker in the header, top right */
+html body .app-shell .client-tax-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+@media (max-width: 860px) {
+  /* phones: at the bottom of Books, folds open/closed from its header like Dashboard sections */
+  html body .app-shell .page-content:has(> .book-tabs) > .client-tax.client-tax { order: 20; }
+  html body .app-shell .client-tax:not([data-mopen]) > :not(.client-tax-head) { display: none !important; }
+  html body .app-shell .client-tax > .client-tax-head { position: relative; padding-right: 30px !important; cursor: pointer; }
+  html body .app-shell .client-tax > .client-tax-head::after { content: ""; position: absolute; right: 8px; top: 14px; width: 9px; height: 9px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); opacity: .55; transition: transform .2s; }
+  html body .app-shell .client-tax[data-mopen] > .client-tax-head::after { transform: rotate(-135deg); top: 18px; }
+  html body .app-shell .client-tax-head > div:first-child { flex: 1 1 100%; min-width: 0; }
+  html body .app-shell .client-tax-head > div:first-child > p:not(.eyebrow) { display: none; }
+  html body .app-shell .client-tax-head h2 { font-size: 21px !important; }
+  html body .app-shell .client-tax-date { flex: 1 1 100%; }
+  html body .app-shell .client-tax-date .tn-date { width: 100%; height: 40px; box-sizing: border-box; }
+  html body .app-shell .client-tax-date .tn-date select { flex: 1 1 auto; max-width: none !important; font-size: 16px !important; }
+}
