@@ -605,9 +605,10 @@ html body .app-shell.dark-mode .sch-dash-panel-tools .sch-seg button.on{backgrou
   .sch-dash-month .sch-month-more{font-size:9px}
 }
 
-/* Calendar tab: compact page header so the whole week fits under it */
+/* Scheduling header is the same compact size on every tab, so switching tabs never moves the tab bar */
 @media(min-width:861px){
-  .sch:has(.sch-week-card) .iv-head h1{font-size:clamp(24px,2.2vw,34px);margin:2px 0}
-  .sch:has(.sch-week-card) .iv-head > div > p:not(.eyebrow){display:none}
-  .sch:has(.sch-week-card) .dh-sample-banner{padding:6px 12px;font-size:12px}
+  .sch .iv-head h1{font-size:clamp(24px,2.2vw,34px);margin:2px 0}
+  .sch .iv-head > div > p:not(.eyebrow){display:none}
+  .sch .dh-sample-banner{padding:6px 12px;font-size:12px}
 }
+.sch .iv-stats.sch-stats-under{margin:0 0 12px}
