@@ -81,13 +81,15 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
   // Phones: booking only — one day at a time, no drag-to-create or drag-to-move (it fights with scrolling).
   const [isPhone, setIsPhone] = useState(false);
   const [phoneDay, setPhoneDay] = useState(() => new Date());
+  const [phoneView, setPhoneView] = useState<"day" | "week" | "month">("day");
   useEffect(() => { const mq = window.matchMedia("(max-width: 860px)"); const on = () => setIsPhone(mq.matches); on(); mq.addEventListener("change", on); return () => mq.removeEventListener("change", on); }, []);
   useEffect(() => { if (isPhone && tab !== "calendar") setTab("calendar"); }, [isPhone]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    const fit = () => { const el = weekRef.current; if (!el) return; const top = el.getBoundingClientRect().top; const room = window.innerHeight - top - 52 - 24; setPpm(Math.max(1.05, Math.min(2.2, room / ((HOURS_TO - HOURS_FROM) * 60)))); };
+    // Fill the screen: on phones the whole working day fits above the bottom bar (full frame).
+    const fit = () => { const el = weekRef.current; if (!el) return; const top = el.getBoundingClientRect().top; const room = window.innerHeight - top - 52 - (isPhone ? 92 : 24); setPpm(Math.max(isPhone ? 0.5 : 1.05, Math.min(2.2, room / ((HOURS_TO - HOURS_FROM) * 60)))); };
     fit(); const t = window.setTimeout(fit, 250); window.addEventListener("resize", fit);
     return () => { window.clearTimeout(t); window.removeEventListener("resize", fit); };
-  }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tab, isPhone, phoneView]); // eslint-disable-line react-hooks/exhaustive-deps
   const [dashDate, setDashDate] = useState(() => new Date());
   const [week, setWeek] = useState(() => mondayOf(new Date()));
   const [staffFilter, setStaffFilter] = useState("");
@@ -156,10 +158,10 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
   }, [visible, data]);
 
   if (!data) return <section className="sch" aria-label="Scheduling"><div className="empty-state" role="status">{error || "Loading Scheduling…"}</div></section>;
-  const days = isPhone ? [phoneDay] : Array.from({ length: 7 }, (_, i) => addDays(week, i));
+  const days = isPhone ? (phoneView === "week" ? Array.from({ length: 7 }, (_, i) => addDays(mondayOf(phoneDay), i)) : [phoneDay]) : Array.from({ length: 7 }, (_, i) => addDays(week, i));
   const todayKey = ymd(new Date());
 
-  return <section className={`sch${isPhone ? " is-phone" : ""}`} aria-label="Scheduling">
+  return <section className={`sch${isPhone ? ` is-phone m-${phoneView}` : ""}`} aria-label="Scheduling">
     <header className="iv-head"><div><p className="eyebrow">SCHEDULING</p><h1>Appointments &amp; bookings</h1><p>Service calendars, consultations and staff availability, synced with Google Calendar and Apple / Outlook.</p></div>
       <div className="iv-head-actions">{data.canManage && <button type="button" className="secondary-button" onClick={() => setEditCal(blankCalendar(data))}><Plus size={15} /> New booking calendar</button>}<button type="button" className="primary-button" onClick={() => setNewAppt({ date: ymd(new Date()), time: "" })}><Plus size={15} /> New appointment</button></div></header>
     {error && <div className="iv-error" role="alert">{error}</div>}{note && <div className="iv-note" role="status">{note}</div>}
@@ -220,9 +222,19 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
       </div>;
     })()}
     {tab === "calendar" && <div className="iv-card sch-week-card">
-      <div className="sch-week-nav"><button type="button" className="iv-btn" aria-label={isPhone ? "Previous day" : "Previous week"} onClick={() => isPhone ? setPhoneDay(addDays(phoneDay, -1)) : setWeek(addDays(week, -7))}><ChevronLeft size={15} /></button><button type="button" className="iv-btn" onClick={() => isPhone ? setPhoneDay(new Date()) : setWeek(mondayOf(new Date()))}>Today</button><button type="button" className="iv-btn" aria-label={isPhone ? "Next day" : "Next week"} onClick={() => isPhone ? setPhoneDay(addDays(phoneDay, 1)) : setWeek(addDays(week, 7))}><ChevronRight size={15} /></button>
-        <b>{isPhone ? phoneDay.toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "short" }) : <>{week.toLocaleDateString("en-IE", { day: "numeric", month: "short" })} – {addDays(week, 6).toLocaleDateString("en-IE", { day: "numeric", month: "short", year: "numeric" })}</>}</b>
+      <div className="sch-week-nav"><button type="button" className="iv-btn" aria-label={isPhone ? `Previous ${phoneView}` : "Previous week"} onClick={() => isPhone ? setPhoneDay(phoneView === "month" ? new Date(phoneDay.getFullYear(), phoneDay.getMonth() - 1, 1) : addDays(phoneDay, phoneView === "week" ? -7 : -1)) : setWeek(addDays(week, -7))}><ChevronLeft size={15} /></button><button type="button" className="iv-btn" onClick={() => isPhone ? setPhoneDay(new Date()) : setWeek(mondayOf(new Date()))}>Today</button><button type="button" className="iv-btn" aria-label={isPhone ? `Next ${phoneView}` : "Next week"} onClick={() => isPhone ? setPhoneDay(phoneView === "month" ? new Date(phoneDay.getFullYear(), phoneDay.getMonth() + 1, 1) : addDays(phoneDay, phoneView === "week" ? 7 : 1)) : setWeek(addDays(week, 7))}><ChevronRight size={15} /></button>
+        <b>{isPhone ? (phoneView === "month" ? phoneDay.toLocaleDateString("en-IE", { month: "long", year: "numeric" }) : phoneView === "week" ? `${mondayOf(phoneDay).toLocaleDateString("en-IE", { day: "numeric", month: "short" })} – ${addDays(mondayOf(phoneDay), 6).toLocaleDateString("en-IE", { day: "numeric", month: "short" })}` : phoneDay.toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short" })) : <>{week.toLocaleDateString("en-IE", { day: "numeric", month: "short" })} – {addDays(week, 6).toLocaleDateString("en-IE", { day: "numeric", month: "short", year: "numeric" })}</>}</b>
         <button type="button" className="iv-btn" aria-label="Refresh" onClick={() => void load()}><RefreshCw size={14} /></button></div>
+      {isPhone && <div className="sch-m-views" role="tablist" aria-label="Calendar view">{(["day", "week", "month"] as const).map((v) => <button key={v} type="button" role="tab" aria-selected={phoneView === v} className={phoneView === v ? "on" : ""} onClick={() => setPhoneView(v)}>{v === "day" ? "Day" : v === "week" ? "Week" : "Month"}</button>)}</div>}
+      {isPhone && phoneView === "month" && (() => {
+        const first = new Date(phoneDay.getFullYear(), phoneDay.getMonth(), 1); const start = mondayOf(first);
+        const counts = new Map<string, number>(); for (const b of visible) { if (b.status === "cancelled") continue; const k = ymd(new Date(b.start)); counts.set(k, (counts.get(k) || 0) + 1); }
+        return <div className="sch-month" role="grid" aria-label="Month">
+          {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => <span key={`h${i}`} className="sch-month-h">{d}</span>)}
+          {Array.from({ length: 42 }, (_, i) => addDays(start, i)).map((d) => { const k = ymd(d); const n = counts.get(k) || 0; const out = d.getMonth() !== first.getMonth();
+            return <button key={k} type="button" role="gridcell" className={`sch-month-d${out ? " out" : ""}${k === todayKey ? " today" : ""}${n ? " has" : ""}`} onClick={() => { setPhoneDay(d); setPhoneView("day"); }} aria-label={`${d.toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "long" })}${n ? `, ${n} appointment${n === 1 ? "" : "s"}` : ""}`}><b>{d.getDate()}</b>{n > 0 && <i>{n}</i>}</button>; })}
+        </div>;
+      })()}
       <div className="sch-week" ref={weekRef} style={{ ["--sch-h" as string]: `${(HOURS_TO - HOURS_FROM) * 60 * PX_PER_MIN}px` }}>
         <div className="sch-hours">{Array.from({ length: HOURS_TO - HOURS_FROM }, (_, i) => <span key={i} style={{ top: i * 60 * PX_PER_MIN }}>{String(HOURS_FROM + i).padStart(2, "0")}:00</span>)}</div>
         {days.map((d) => { const key = ymd(d); const dayBookings = visible.filter((b) => ymd(new Date(b.start)) === key);
