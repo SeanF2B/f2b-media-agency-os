@@ -74,6 +74,7 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
   const sampleClientName = realData?.clients.find((c) => c.id === scopeClientId)?.name || "";
   const data = useMemo(() => {
     if (!sample || !realData) return realData;
+    if (!site.loaded) return null; // wait for the client's own team instead of flashing placeholder names
     const demo = sampleSchedule(realData, mondayOf(new Date()), sampleClientName, site);
     return { ...demo, canManage: realData.canManage, isAdmin: realData.isAdmin, meId: realData.meId, googleAvailable: realData.googleAvailable, bookings: demo.bookings.map((b) => sampleMoves[b.id] ? { ...b, start: sampleMoves[b.id], end: new Date(Date.parse(sampleMoves[b.id]) + Date.parse(b.end) - Date.parse(b.start)).toISOString() } : b) };
   }, [sample, realData, sampleClientName, site, sampleMoves]);
@@ -894,7 +895,7 @@ export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, c
   }, [scopeClientId, ymd(week), ymd(gridStart), refresh]); // eslint-disable-line react-hooks/exhaustive-deps
   const [detail, setDetail] = useState<Booking | null>(null);
   const site = useSiteSample(scopeClientId, sample);
-  const data = useMemo(() => sample ? sampleSchedule(realData, mondayOf(new Date()), clientName, site) : realData, [sample, realData, clientName, site]); // eslint-disable-line react-hooks/exhaustive-deps
+  const data = useMemo(() => sample ? (!site.loaded ? null : sampleSchedule(realData, mondayOf(new Date()), clientName, site)) : realData, [sample, realData, clientName, site]); // eslint-disable-line react-hooks/exhaustive-deps
   if (err && !realData && !sample) return null; // no Scheduling access: hide quietly
   const setMode = (m: "day" | "week" | "month") => { setView(m); try { localStorage.setItem("f2b-dash-appt-view", m); } catch { /* optional */ } };
   const bookings = (data?.bookings || []).filter((b) => b.status !== "cancelled" && (!staffId || b.staffIds.includes(staffId)));
@@ -989,17 +990,27 @@ export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, c
 }
 
 // Demo schedule for the Dashboard "Sample data" toggle (never saved). Uses the account's real team when there is one.
-type SiteSample = { services: string[]; locations: string[]; team: string[]; photos?: Record<string, string>; work?: Record<string, string[]>; gallery?: string[] };
+type SiteSample = { loaded?: boolean; services: string[]; locations: string[]; team: string[]; photos?: Record<string, string>; work?: Record<string, string[]>; gallery?: string[] };
 const EMPTY_SITE: SiteSample = { services: [], locations: [], team: [], photos: {}, work: {}, gallery: [] };
 // The client's real services, areas and team (from their profile + website) to make demo data look like their business.
 function useSiteSample(scope: string, enabled: boolean): SiteSample {
-  const [site, setSite] = useState<SiteSample>(EMPTY_SITE);
+  // The client's team/services come from their own website, which can take a few seconds to read.
+  // Keep the last result per account so sample data shows the client's real people straight away
+  // (instead of flashing placeholder names first), then refresh quietly in the background.
+  const cacheKey = `f2b-site-sample-${scope}`;
+  const readCache = (): SiteSample => { try { const v = scope ? window.localStorage.getItem(cacheKey) : null; return v ? { ...EMPTY_SITE, ...(JSON.parse(v) as SiteSample), loaded: true } : EMPTY_SITE; } catch { return EMPTY_SITE; } };
+  const [site, setSite] = useState<SiteSample>(() => (enabled ? readCache() : EMPTY_SITE));
   useEffect(() => {
     if (!enabled || !scope) { setSite(EMPTY_SITE); return; }
+    setSite(readCache());
     let live = true;
-    fetch(`/api/scheduling?clientId=${encodeURIComponent(scope)}&view=site`, { credentials: "same-origin" }).then((r) => r.ok ? r.json() : EMPTY_SITE).then((v: SiteSample) => { if (live) setSite({ services: v.services || [], locations: v.locations || [], team: v.team || [], photos: v.photos || {}, work: v.work || {}, gallery: v.gallery || [] }); }).catch(() => undefined);
+    fetch(`/api/scheduling?clientId=${encodeURIComponent(scope)}&view=site`, { credentials: "same-origin" }).then((r) => r.ok ? r.json() : EMPTY_SITE).then((v: SiteSample) => {
+      const next: SiteSample = { services: v.services || [], locations: v.locations || [], team: v.team || [], photos: v.photos || {}, work: v.work || {}, gallery: v.gallery || [] };
+      try { window.localStorage.setItem(cacheKey, JSON.stringify(next)); } catch { /* storage full or blocked */ }
+      if (live) setSite({ ...next, loaded: true });
+    }).catch(() => { if (live) setSite((cur) => ({ ...cur, loaded: true })); });
     return () => { live = false; };
-  }, [scope, enabled]);
+  }, [scope, enabled]); // eslint-disable-line react-hooks/exhaustive-deps
   return site;
 }
 function sampleSchedule(real: Data | null, week: Date, clientName: string, site: SiteSample = EMPTY_SITE): Data {
@@ -1244,7 +1255,7 @@ export function PayslipsView({ scopeClientId, business, timeEntries = [], countr
     } catch (e) { setErr(errText(e, "Payroll couldn't load.")); }
   }, [scopeClientId, year]);
   useEffect(() => { void load(); }, [load]);
-  const data = useMemo(() => sample ? sampleSchedule(real, mondayOf(new Date()), business.name, site) : real, [sample, real, business.name, site]); // eslint-disable-line react-hooks/exhaustive-deps
+  const data = useMemo(() => sample ? (!site.loaded ? null : sampleSchedule(real, mondayOf(new Date()), business.name, site)) : real, [sample, real, business.name, site]); // eslint-disable-line react-hooks/exhaustive-deps
   const head = <header className="crv-head ps-head"><div><h2>Payslips <span className="admin-badge" title="Only admins can see payroll">ADMIN</span></h2><p>Branded payslips for <b>{business.name}</b>, built from each person&apos;s finished appointments and pay split, with PAYE, USC and PRSI.</p></div>{data && (payroll || sample) && <button type="button" className="secondary-button" onClick={() => setEditEmployer(true)}>Employer details</button>}</header>;
   if (err && !sample) return <section className="crv ps-view">{head}<p className="dh-muted">{err}</p></section>;
   if (!data || (!payroll && !sample)) return <section className="crv ps-view">{head}<p className="dh-muted">Loading payroll…</p></section>;
