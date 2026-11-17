@@ -1,4 +1,5 @@
 import { crmScopeFrom } from "@/lib/client-accounts/client-accounts-api";
+import { loadLeadHistory } from "@/lib/lead-history";
 import { crmClientScope } from "@/lib/access-permissions";
 import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "../../chatgpt-auth";
@@ -134,6 +135,11 @@ export async function GET(request: Request) {
   try {
     await Promise.all([ensurePipeline(db, ownerId), ensureOrderTable(db)]);
     const url = new URL(request.url);
+    if (url.searchParams.get("history") === "1") {
+      // A lead's journey from live records (forms with UTM / click IDs, conversations, deals, bookings).
+      const history = await loadLeadHistory(db, ownerId, { contactId: clean(url.searchParams.get("contactId"), 80), phone: clean(url.searchParams.get("phone"), 40), email: clean(url.searchParams.get("email"), 200), clientId: access.scopeClientId ? access.scopeClientId : null });
+      return Response.json(history, { headers: { "Cache-Control": "no-store" } });
+    }
     if (url.searchParams.get("summary") === "1") {
       // Strict: a sub-account only sees its own pipelines; the agency only sees agency pipelines.
       const rawScope = clean(url.searchParams.get("clientId"), 80);
