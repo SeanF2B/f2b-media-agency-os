@@ -597,3 +597,14 @@ export async function getGoogleAdsCallStats(ownerId: string, customerId: string,
   ]);
   return { calls, callConversions: conversions };
 }
+
+/** Landing pages (final URLs) that ads sent people to, with clicks, cost and conversions, for a date window. */
+export async function getGoogleAdsLandingPages(ownerId: string, customerId: string, window: { start: string; end: string }) {
+  const range = `segments.date BETWEEN '${window.start.replace(/[^0-9-]/g, "")}' AND '${window.end.replace(/[^0-9-]/g, "")}'`;
+  const { payload } = await googleAdsPost(ownerId, customerId, "googleAds:searchStream", { query: `SELECT campaign.id, landing_page_view.unexpanded_final_url, metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions FROM landing_page_view WHERE ${range} AND metrics.impressions > 0 ORDER BY metrics.clicks DESC LIMIT 300` });
+  return (payload as Array<{ results?: Array<any> }>).flatMap((batch) => batch.results || []).map((row) => ({
+    campaignId: String(row.campaign?.id || ""), url: String(row.landingPageView?.unexpandedFinalUrl || ""),
+    clicks: Number(row.metrics?.clicks || 0), impressions: Number(row.metrics?.impressions || 0),
+    spend: Number(row.metrics?.costMicros || 0) / 1_000_000, conversions: Number(row.metrics?.conversions || 0),
+  })).filter((r) => r.url);
+}

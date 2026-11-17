@@ -5,7 +5,7 @@ import { buildClientReport } from "@/lib/client-report-data";
 import { listBookings, listCalendars } from "@/lib/scheduling/server";
 import { metaAdsConnectionExists, readDirectMetaAdsInsights } from "@/lib/meta-ads-direct";
 import { summarizeMetaAdsRows, summarizeMetaAdsTotals } from "@/lib/meta-ads-performance";
-import { getGoogleAdsCallStats } from "@/lib/google-ads-direct";
+import { getGoogleAdsCallStats, getGoogleAdsKeywordPerformance, getGoogleAdsLandingPages } from "@/lib/google-ads-direct";
 import { hasGoogleSearchConsoleConnection, listGoogleSearchConsoleProperties, readGoogleSearchConsoleRows } from "@/lib/google-search-console-direct";
 import { loadCachedMarketingData } from "@/lib/marketing-data-history";
 
@@ -90,10 +90,10 @@ export async function GET(request: Request) {
       const totals = (rows: typeof cur) => { let clicks = 0, impressions = 0, posW = 0; for (const r of rows) { clicks += r.clicks; impressions += r.impressions; posW += r.position * r.impressions; } return { clicks, impressions, position: impressions ? Math.round((posW / impressions) * 10) / 10 : null }; };
       const group = (rows: typeof cur, key: "page" | "query") => { const map = new Map<string, { key: string; clicks: number; impressions: number; posW: number }>(); for (const r of rows) { const k = r[key]; if (!k) continue; const g = map.get(k) || { key: k, clicks: 0, impressions: 0, posW: 0 }; g.clicks += r.clicks; g.impressions += r.impressions; g.posW += r.position * r.impressions; map.set(k, g); } return map; };
       const now = totals(cur), before = totals(prev);
-      const pages = [...group(cur, "page").values()].sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions).slice(0, 5).map((g) => ({ page: g.key.replace(/^https?:\/\/[^/]+/, "") || "/", clicks: g.clicks, impressions: g.impressions, position: g.impressions ? Math.round(g.posW / g.impressions * 10) / 10 : null }));
+      const pages = [...group(cur, "page").values()].sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions).slice(0, 25).map((g) => ({ page: g.key.replace(/^https?:\/\/[^/]+/, "") || "/", url: g.key, clicks: g.clicks, impressions: g.impressions, position: g.impressions ? Math.round(g.posW / g.impressions * 10) / 10 : null }));
       const qNow = group(cur, "query"), qPrev = group(prev, "query");
-      const queries = [...qNow.values()].sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions).slice(0, 5).map((g) => ({ query: g.key, clicks: g.clicks, impressions: g.impressions, position: g.impressions ? Math.round(g.posW / g.impressions * 10) / 10 : null }));
-      const trending = [...qNow.values()].map((g) => ({ query: g.key, impressions: g.impressions, change: g.impressions - (qPrev.get(g.key)?.impressions || 0) })).filter((g) => g.change > 0).sort((a, b) => b.change - a.change).slice(0, 5);
+      const queries = [...qNow.values()].sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions).slice(0, 25).map((g) => ({ query: g.key, clicks: g.clicks, impressions: g.impressions, position: g.impressions ? Math.round(g.posW / g.impressions * 10) / 10 : null }));
+      const trending = [...qNow.values()].map((g) => ({ query: g.key, impressions: g.impressions, change: g.impressions - (qPrev.get(g.key)?.impressions || 0) })).filter((g) => g.change > 0).sort((a, b) => b.change - a.change).slice(0, 15);
       return { property, clicks: now.clicks, previousClicks: prev.length ? before.clicks : null, impressions: now.impressions, position: now.position, previousPosition: prev.length ? before.position : null, queriesTracked: qNow.size, pages, queries, trending };
     } catch (error) { return { error: error instanceof Error ? error.message : "Search Console couldn’t be read." }; }
   };
@@ -163,6 +163,19 @@ export async function GET(request: Request) {
     const channels = seo?.attribution.status === "ok" ? seo.attribution.data!.allChannels as Record<string, number> : null;
     const accountId = String((workspace.clients || []).find((c) => c.id === clientId)?.googleAdsAccountId || "").replace(/\D/g, "");
     const adCalls = accountId ? await getGoogleAdsCallStats(ownerId, accountId, period).catch(() => null) : null;
+    // Landing pages and keywords behind the Google Ads card's drop-down (cached 6h, one Ads read each).
+    const adsDetail = accountId ? await (async () => {
+      const cache = <T,>(key: string, load: () => Promise<T>) => loadCachedMarketingData({ db: db as never, ownerId, clientId, service: "Google Ads", key: JSON.stringify({ report: key, accountId, a: period.start, b: period.end }), ttlMs: 6 * 3600_000 }, load).then((r) => r.data);
+      const [pages, kws] = await Promise.all([
+        cache("dash-ads-pages", () => getGoogleAdsLandingPages(ownerId, accountId, period)).catch(() => null),
+        cache("dash-ads-keywords", () => getGoogleAdsKeywordPerformance(ownerId, accountId, undefined, { startDate: period.start, endDate: period.end }).then((r) => r.keywords)).catch(() => null),
+      ]);
+      return {
+        landingPages: (pages || []).slice(0, 60),
+        keywords: (kws || []).slice(0, 80).map((k) => ({ campaignId: k.campaignId, keyword: k.keyword, matchType: k.matchType, clicks: k.clicks, impressions: k.impressions, spend: k.spend, conversions: k.conversions, qualityScore: k.qualityScore })),
+        error: pages == null && kws == null ? "Google Ads didn’t return landing pages or keywords." : "",
+      };
+    })() : null;
     const split = {
       organic: { clicks: traffic && /click/i.test(traffic.metric) ? traffic.current : null, visits: traffic && !/click/i.test(traffic.metric) ? traffic.current : null, calls: biz?.calls ?? null, leads: channels ? Number(channels.seo || 0) : null },
       paid: { clicks: adsData ? adsData.current.clicks : null, calls: adCalls ? (adCalls.calls ?? null) : null, callConversions: adCalls?.callConversions ?? null, leads: channels ? Number(channels.google_ads || 0) : null, conversions: adsData ? adsData.current.conversions : null },
@@ -170,7 +183,7 @@ export async function GET(request: Request) {
       notes: { organic: why(seo?.traffic) || (biz ? "" : why(seo?.business)), paid: accountId ? why(ads?.ads) : "No Google Ads account linked" },
     };
     return {
-      ...meta, split, gsc, trustpilot, businessProfile: biz ? { views: biz.impressions, calls: biz.calls, directions: biz.directions, websiteClicks: biz.websiteClicks, previous: biz.previous } : null,
+      ...meta, split, gsc, trustpilot, adsDetail, businessProfile: biz ? { views: biz.impressions, calls: biz.calls, directions: biz.directions, websiteClicks: biz.websiteClicks, previous: biz.previous } : null,
       googleCampaigns: adsData ? adsData.campaigns.slice(0, 40).map((c) => ({ id: c.id, name: c.name, status: c.status, spend: c.spend, clicks: c.clicks, impressions: c.impressions, conversions: c.conversions })) : [],
       currency: seo?.client.currency || ads?.client.currency || "EUR",
       visits: traffic ? { value: traffic.current, previous: traffic.previous, metric: traffic.metric } : null, visitsNote: why(seo?.traffic),

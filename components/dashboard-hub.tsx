@@ -41,9 +41,10 @@ type Stat = { value: number; previous: number | null } | null;
 type Marketing = {
   currency: string; visits: (Stat & { metric?: string }) | null; visitsNote: string; adSpend: Stat; adClicks: Stat; impressions?: Stat; conversions?: Stat; cpc?: Stat; costPerConversion?: Stat; adsNote: string; businessProfile?: { views: number | null; calls: number | null; directions: number | null; websiteClicks: number | null; previous: { impressions: number | null; calls: number | null; directions: number | null; websiteClicks: number | null } | null } | null; trustpilot?: { status: string; rating?: number | null; total?: number | null; url?: string }; split?: Split; gsc?: Gsc | null; googleCampaigns?: Array<{ id: string; name: string; status: string; spend: number; clicks: number; impressions: number; conversions: number }>; meta?: { spend: number; impressions: number; clicks: number; leads: number; cpc: number | null; costPerLead: number | null; accounts: number; linkedAccounts: number; campaigns?: Array<{ id: string; name: string; status: string; spend: number; clicks: number; impressions: number; leads: number }> } | null; metaNote?: string; scope?: string; accounts?: number; linkedAccounts?: number; calls: Stat; profileClicks: Stat; businessNote: string; leads: Stat;
   google: { position: number | null; previous: number | null; tracked: number; top3: number; keywords?: Array<{ keyword: string; position: number | null; previous: number | null; volume: number | null }> } | null; rankNote: string;
-  chatgpt: { share: number; previous: number | null; prompts: number; mentioned: number; questions?: Array<{ prompt: string; mentioned: boolean; position: number | null; competitors: string[]; at?: string }> } | null; aiNote: string; bing: null; bingNote: string;
+  chatgpt: { share: number; previous: number | null; prompts: number; mentioned: number; questions?: Array<{ prompt: string; mentioned: boolean; position: number | null; competitors: string[]; at?: string }> } | null; aiNote: string; bing: null; bingNote: string; adsDetail?: AdsDetail | null;
 };
-type Gsc = { error?: string; property?: string; clicks?: number; previousClicks?: number | null; impressions?: number; position?: number | null; previousPosition?: number | null; queriesTracked?: number; pages?: Array<{ page: string; clicks: number; impressions: number; position: number | null }>; queries?: Array<{ query: string; clicks: number; impressions: number; position: number | null }>; trending?: Array<{ query: string; impressions: number; change: number }> };
+type Gsc = { error?: string; property?: string; clicks?: number; previousClicks?: number | null; impressions?: number; position?: number | null; previousPosition?: number | null; queriesTracked?: number; pages?: Array<{ page: string; url?: string; clicks: number; impressions: number; position: number | null }>; queries?: Array<{ query: string; clicks: number; impressions: number; position: number | null }>; trending?: Array<{ query: string; impressions: number; change: number }> };
+type AdsDetail = { error?: string; landingPages: Array<{ campaignId: string; url: string; clicks: number; impressions: number; spend: number; conversions: number }>; keywords: Array<{ campaignId: string; keyword: string; matchType: string; clicks: number; impressions: number; spend: number; conversions: number; qualityScore: number | null }> };
 type Split = { organic: { clicks: number | null; visits: number | null; calls: number | null; leads: number | null }; paid: { clicks: number | null; calls: number | null; callConversions: number | null; leads: number | null; conversions: number | null }; otherLeads: number | null; notes: { organic: string; paid: string } };
 type Metrics = { clientId: string; marketing: Marketing | null; appointments: Array<{ id: string; name: string; start: string; end?: string; status?: string; clientId: string; channel: string; calendar?: string; staff?: string }>; emails: { total: number; failed?: number; delivered?: number; people?: number; replies?: number; last?: string; configured?: boolean; recent: Array<{ to: string; subject: string; at: string; failed?: boolean }> } };
 
@@ -83,6 +84,27 @@ function Tile({ icon, label, value, note, tone = "", children }: { icon: ReactNo
   return <div className={`dh-tile ${tone}`}><span className="dh-tile-icon">{icon}</span><div className="dh-tile-body"><small>{label}</small><b>{value}</b>{children}{note && <em>{note}</em>}</div></div>;
 }
 
+// Small chevron buttons at the foot of a results card; each opens its list below the cards.
+type DetailKey = "" | "org-pages" | "org-kw" | "org-trend" | "ads-pages" | "ads-kw";
+function DetailToggles({ value, onChange, items }: { value: DetailKey; onChange: (v: DetailKey) => void; items: Array<[Exclude<DetailKey, "">, string]> }) {
+  return <div className="dh-detail-toggles">{items.map(([k, label]) => <button type="button" key={k} className={`dh-detail-btn ${value === k ? "open" : ""}`} aria-expanded={value === k} onClick={() => onChange(value === k ? "" : k)}><span>{value === k ? "▲" : "▼"}</span>{label}</button>)}</div>;
+}
+// Demo landing pages and keywords for the "Sample data" toggle, built from the sample tracked keywords.
+function sampleDetail(m: Marketing): { gsc: Gsc | null; ads: AdsDetail } {
+  const kws = m.google?.keywords || [];
+  const slug = (t: string) => "/" + t.toLowerCase().replace(/\b(near me|galway|cork|dublin|ireland|cost)\b/g, "").trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const pages = [{ page: "/", clicks: 388, impressions: 9100, position: 3.1 }, ...kws.slice(0, 6).map((k, i) => ({ page: slug(k.keyword) || "/services", clicks: Math.max(12, 160 - i * 24), impressions: Math.max(400, 4200 - i * 520), position: k.position }))];
+  const seen = new Set<string>(); const uniq = pages.filter((p) => !seen.has(p.page) && seen.add(p.page));
+  const site = "https://example.ie";
+  return {
+    gsc: { pages: uniq.map((p) => ({ ...p, url: site + p.page })), queries: kws.map((k, i) => ({ query: k.keyword, clicks: Math.max(4, 120 - i * 14), impressions: k.volume ? k.volume * 3 : 600, position: k.position })), trending: kws.slice(0, 4).map((k, i) => ({ query: k.keyword, impressions: k.volume ? k.volume * 3 : 600, change: 140 - i * 30 })) } as Gsc,
+    ads: {
+      landingPages: uniq.slice(0, 5).map((p, i) => ({ campaignId: "", url: site + p.page, clicks: [312, 188, 121, 76, 45][i], impressions: [4100, 2600, 1800, 1100, 700][i], spend: [560, 351, 238, 132, 83][i], conversions: [31, 19, 12, 6, 3][i] })),
+      keywords: kws.slice(0, 8).map((k, i) => ({ campaignId: "", keyword: k.keyword, matchType: i % 3 === 0 ? "EXACT" : "PHRASE", clicks: [168, 141, 112, 88, 71, 64, 52, 46][i], impressions: [1900, 1500, 1300, 1000, 820, 760, 610, 540][i], spend: [302, 251, 207, 168, 129, 118, 101, 88][i], conversions: [17, 14, 11, 8, 7, 6, 5, 3][i], qualityScore: [8, 7, 9, 6, 7, 5, 6, 4][i] })),
+    },
+  };
+}
+
 export function DashboardHub({ salesStats = null, activityPanel = null, scopeClientId, clients, tasks, staff, onNavigate, onAddTask, onOpenTask, onReviewTask, currentStaffId = "", adsPanel, valuePanel, periodStart = "", periodEnd = "", periodLabel = "Last 30 days", focusClientId = "" }: { salesStats?: SalesStats | null; activityPanel?: ReactNode; focusClientId?: string; periodStart?: string; periodEnd?: string; periodLabel?: string; adsPanel?: ReactNode; valuePanel?: ReactNode; scopeClientId: string; clients: HubClient[]; tasks: HubTask[]; staff: HubStaff[]; onNavigate: (page: string) => void; onAddTask: () => void; onOpenTask?: (id: string) => void; onReviewTask?: (id: string, action: "approve" | "request_changes") => void; currentStaffId?: string }) {
   const [pickedClient, setPickedClient] = useState(() => { try { return localStorage.getItem("f2b-dash-client") || ""; } catch { return ""; } });
   // Agency view defaults to all clients' Google Ads; a client can be picked for their full results.
@@ -91,6 +113,8 @@ export function DashboardHub({ salesStats = null, activityPanel = null, scopeCli
   const [loading, setLoading] = useState(false);
   const [apprOpen, setApprOpen] = useState<"" | "ai" | "human">("");
   const [rankOpen, setRankOpen] = useState<"" | "google" | "chatgpt">("");
+  // Drop-down under the Organic / Google Ads cards: landing pages (URLs) and keywords.
+  const [detail, setDetail] = useState<DetailKey>("");
   const [sample] = useSampleData();
   // Won deals from the CRM (sample figures when Sample is on).
   const sales: SalesStats | null = sample ? { leads: 47, won: 12, wonValue: 18400, adsLeads: 19, adsWon: 5, adsWonValue: 7600, periodLabel: "sample" } : salesStats;
@@ -100,11 +124,11 @@ export function DashboardHub({ salesStats = null, activityPanel = null, scopeCli
   useEffect(() => { setGReviews(null); if (!clientId) return; let live = true; fetch(`/api/local-seo?clientId=${encodeURIComponent(clientId)}&range=last_30d`).then((r) => r.ok ? r.json() : null).then((j: { reviews?: { total: number | null; averageRating: number | null } } | null) => { if (live && j?.reviews) setGReviews({ total: j.reviews.total, averageRating: j.reviews.averageRating }); }).catch(() => undefined); return () => { live = false; }; }, [clientId]);
   const [gCamp, setGCamp] = useState("");
   const [mCamp, setMCamp] = useState("");
-  useEffect(() => { setGCamp(""); setMCamp(""); }, [clientId]);
+  useEffect(() => { setGCamp(""); setMCamp(""); setDetail(""); }, [clientId]); // eslint-disable-line react-hooks/exhaustive-deps
   const [showAi, setShowAi] = useState(() => { try { return localStorage.getItem("f2b-dash-ai") !== "0"; } catch { return true; } });
 
   useEffect(() => {
-    const key = `f2b-dash-metrics-v5:${clientId}:${periodStart}:${periodEnd}`;
+    const key = `f2b-dash-metrics-v6:${clientId}:${periodStart}:${periodEnd}`;
     try { const cached = JSON.parse(sessionStorage.getItem(key) || "null") as { at: number; data: Metrics } | null; if (cached && Date.now() - cached.at < CACHE_MS) { setMetrics(cached.data); return; } } catch { /* no cache */ }
     let live = true; setLoading(true);
     fetch(`/api/dashboard-metrics?clientId=${encodeURIComponent(clientId)}&start=${periodStart}&end=${periodEnd}`).then((r) => r.ok ? r.json() as Promise<Metrics> : null).then((data) => { if (!live || !data) return; setMetrics(data); try { sessionStorage.setItem(key, JSON.stringify({ at: Date.now(), data })); } catch { /* full */ } }).catch(() => undefined).finally(() => { if (live) setLoading(false); });
@@ -182,6 +206,7 @@ export function DashboardHub({ salesStats = null, activityPanel = null, scopeCli
               <Row icon={<BrandIcon id="business-profile" size={15} fallback={<MousePointerClick size={15} />} />} label="Profile website clicks" value={v(m.profileClicks?.value)} good={(m.profileClicks?.value || 0) > 0} />
               <Row icon={<UserPlus size={15} />} label="Leads" value={v(sp?.organic.leads)} good={(sp?.organic.leads || 0) > 0} />
               {m.gsc?.error ? <em className="dh-split-note">{m.gsc.error}</em> : !m.gsc && sp?.notes.organic ? <em className="dh-split-note">{sp.notes.organic}</em> : null}
+              <DetailToggles value={detail} onChange={setDetail} items={[["org-pages", "Landing pages"], ["org-kw", "Keywords"], ["org-trend", "Trending"]]} />
             </div>
             {(() => { const camps = m.googleCampaigns || []; const c = camps.find((x) => x.id === gCamp); const spend = c ? c.spend : m.adSpend?.value; const clicks = c ? c.clicks : sp?.paid.clicks; const conv = c ? c.conversions : sp?.paid.conversions;
               return <div className="dh-split-col"><div className="dh-split-head"><BrandIcon id="google-ads" size={20} fallback={null} /><b>Google Ads</b>{camps.length > 0 && <div className="dh-camp-wrap"><CampaignPicker label="Google Ads campaign" currency={cur} value={gCamp} onChange={setGCamp} options={camps.map((x) => ({ value: x.id, name: x.name, logo: clientOf(clientId)?.logo, spend: x.spend, status: x.status }))} /></div>}</div>
@@ -194,6 +219,7 @@ export function DashboardHub({ salesStats = null, activityPanel = null, scopeCli
                 {!c && sales && (() => { const r = roasGrade(sales.adsWonValue, spend ?? null, sales.adsLeads); return <GradedRow icon={<TrendingUp size={15} />} label="Return on ad spend" value={r.value} grade={r.grade} tip={r.tip} detail={spend ? `${money(sales.adsWonValue, cur)} won from ${money(spend, cur)} spend` : "No spend yet"} />; })()}
                 {!c && sales && (() => { const r = closeGrade(sales.adsWon, sales.adsLeads); return <GradedRow icon={<CheckCircle2 size={15} />} label="Ads close rate" value={r.value} grade={r.grade} tip={r.tip} detail={`${sales.adsWon} won of ${sales.adsLeads} leads`} />; })()}
                 {sp?.notes.paid && <em className="dh-split-note">{sp.notes.paid}</em>}
+                <DetailToggles value={detail} onChange={setDetail} items={[["ads-pages", "Landing pages"], ["ads-kw", "Keywords"]]} />
               </div>; })()}
             {(() => { const meta = m.meta; const camps = meta?.campaigns || []; const c = camps.find((x) => x.id === mCamp); const spend = c ? c.spend : meta?.spend; const clicks = c ? c.clicks : meta?.clicks; const leads = c ? c.leads : meta?.leads;
               return <div className="dh-split-col"><div className="dh-split-head"><BrandIcon id="meta-ads" size={20} fallback={null} /><b>Meta Ads</b>{camps.length > 0 && <div className="dh-camp-wrap"><CampaignPicker label="Meta Ads campaign" currency={cur} value={mCamp} onChange={setMCamp} options={camps.map((x) => ({ value: x.id, name: x.name, logo: clientOf(clientId)?.logo, spend: x.spend, status: x.status }))} /></div>}</div>
@@ -209,11 +235,32 @@ export function DashboardHub({ salesStats = null, activityPanel = null, scopeCli
               {sales && (() => { const r = closeGrade(sales.won, sales.leads); return <span className={`dh-close dh-grade-${r.grade}`} title={`${sales.won} won of ${sales.leads} leads (${sales.periodLabel})`}><span>Close rate</span><b>{r.value}</b>{r.grade === "low" && <GradeTip tip={r.tip} />}</span>; })()}
             </div>
           </div>; })()}
-        {m.gsc && !m.gsc.error && ((m.gsc.pages || []).length > 0 || (m.gsc.queries || []).length > 0) && <div className="dh-gsc">
-          <div className="dh-gsc-col"><h3 className="dh-sub">Top pages from Google</h3>{(m.gsc.pages || []).map((p) => <div key={p.page} className="dh-gsc-row"><span title={p.page}>{p.page}</span><b>{num(p.clicks)}</b><small>{num(p.impressions)} seen{p.position != null ? ` · #${p.position}` : ""}</small></div>)}</div>
-          <div className="dh-gsc-col"><h3 className="dh-sub">Top searches</h3>{(m.gsc.queries || []).map((q) => <div key={q.query} className="dh-gsc-row"><span title={q.query}>{q.query}</span><b>{num(q.clicks)}</b><small>{q.position != null ? `#${q.position}` : ""}</small></div>)}</div>
-          <div className="dh-gsc-col"><h3 className="dh-sub">🔥 Trending searches</h3>{(m.gsc.trending || []).length ? (m.gsc.trending || []).map((q) => <div key={q.query} className="dh-gsc-row"><span title={q.query}>{q.query}</span><b className="good">▲ {num(q.change)}</b><small>{num(q.impressions)} seen</small></div>) : <p className="dh-muted">No rising searches vs the previous month.</p>}</div>
-        </div>}
+        {detail && (() => {
+          const d: { gsc: Gsc | null; ads: AdsDetail | null } = sample ? sampleDetail(m) : { gsc: m.gsc && !m.gsc.error ? m.gsc : null, ads: m.adsDetail || null };
+          const camp = (m.googleCampaigns || []).find((x) => x.id === gCamp);
+          const ads: AdsDetail | null = d.ads;
+          const adPages = (ads?.landingPages || []).filter((r) => !gCamp || r.campaignId === gCamp);
+          const adKws = (ads?.keywords || []).filter((r) => !gCamp || r.campaignId === gCamp);
+          const pathOf = (u: string) => { try { const x = new URL(u); return { path: (x.pathname + x.search) || "/", host: x.hostname.replace(/^www\./, "") }; } catch { return { path: u || "/", host: "" }; } };
+          const Link = ({ url, path }: { url?: string; path: string }) => url && /^https?:/.test(url) ? <a className="dh-rank-term dh-link" href={url} target="_blank" rel="noreferrer" title={url} onClick={(e) => e.stopPropagation()}>{path}</a> : <span className="dh-rank-term" title={path}>{path}</span>;
+          const close = <button type="button" className="text-button" onClick={() => setDetail("")}>Close</button>;
+          const empty = (t: string) => <p className="dh-muted">{t}</p>;
+          if (detail === "org-pages") { const rows = d.gsc?.pages || []; return <div className="dh-rank-drop dh-detail"><div className="dh-rank-drop-head"><b>Organic landing pages</b><span><small>From Search Console · clicks</small>{close}</span></div>
+            {rows.length ? rows.map((p) => <div key={p.page} className="dh-rank-row dh-detail-row"><span className={`dh-pos ${p.position == null ? "" : p.position <= 3 ? "top" : p.position <= 10 ? "mid" : "low"}`}>{p.position != null ? `#${p.position}` : "—"}</span><Link url={p.url} path={p.page} /><b>{num(p.clicks)} clicks</b><small>{num(p.impressions)} seen</small></div>) : empty(m.gsc?.error || "No landing pages from Google yet. Connect Search Console in Operations → Launchpad.")}</div>; }
+          if (detail === "org-kw") { const rows = d.gsc?.queries?.length ? d.gsc.queries.map((q) => ({ term: q.query, pos: q.position, extra: `${num(q.clicks)} clicks`, sub: `${num(q.impressions)} seen` })) : (m.google?.keywords || []).map((k) => ({ term: k.keyword, pos: k.position, extra: k.volume != null ? `${num(k.volume)}/mo` : "", sub: "tracked" }));
+            return <div className="dh-rank-drop dh-detail"><div className="dh-rank-drop-head"><b>Organic keywords</b><span><small>{d.gsc?.queries?.length ? "Searches people used to find the site" : "Tracked keywords"}</small>{close}</span></div>
+            {rows.length ? rows.map((r) => <div key={r.term} className="dh-rank-row dh-detail-row"><span className={`dh-pos ${r.pos == null ? "" : r.pos <= 3 ? "top" : r.pos <= 10 ? "mid" : "low"}`}>{r.pos != null ? `#${Math.round(r.pos * 10) / 10}` : "—"}</span><span className="dh-rank-term">{r.term}</span><b>{r.extra}</b><small>{r.sub}</small></div>) : empty("No organic keywords yet. Connect Search Console or add keywords in Operations → SEO.")}</div>; }
+          if (detail === "org-trend") { const rows = d.gsc?.trending || []; return <div className="dh-rank-drop dh-detail"><div className="dh-rank-drop-head"><b>Trending searches</b><span><small>Growing vs the previous period</small>{close}</span></div>
+            {rows.length ? rows.map((q) => <div key={q.query} className="dh-rank-row dh-detail-row"><span className="dh-pos top">▲</span><span className="dh-rank-term">{q.query}</span><b className="good">+{num(q.change)}</b><small>{num(q.impressions)} seen</small></div>) : empty("No rising searches vs the previous period.")}</div>; }
+          const scopeNote = camp ? camp.name : "All campaigns";
+          if (detail === "ads-pages") { const rows = adPages; const merged = [...rows.reduce((map, r) => { const g = map.get(r.url) || { ...r, clicks: 0, impressions: 0, spend: 0, conversions: 0 }; g.clicks += r.clicks; g.impressions += r.impressions; g.spend += r.spend; g.conversions += r.conversions; map.set(r.url, g); return map; }, new Map<string, AdsDetail["landingPages"][number]>()).values()].sort((a, b) => b.clicks - a.clicks);
+            return <div className="dh-rank-drop dh-detail"><div className="dh-rank-drop-head"><b>Ad landing pages</b><span><small>{scopeNote}</small>{close}</span></div>
+            {merged.length ? merged.map((r) => { const u = pathOf(r.url); return <div key={r.url} className="dh-rank-row dh-detail-row"><span className={`dh-pos ${r.conversions > 0 ? "top" : "mid"}`}>{r.conversions > 0 ? `${num(r.conversions)} conv` : "0 conv"}</span><Link url={r.url} path={u.path} /><b>{num(r.clicks)} clicks</b><small>{money(r.spend, cur)}{r.clicks ? ` · ${money2(r.spend / r.clicks, cur)} CPC` : ""}{u.host ? ` · ${u.host}` : ""}</small></div>; }) : empty(d.ads?.error || (m.adsDetail === undefined && !sample ? "Link a Google Ads account to this client to see landing pages." : "No landing page clicks in this period."))}</div>; }
+          if (detail === "ads-kw") { const rows = adKws.slice().sort((a, b) => b.clicks - a.clicks || b.spend - a.spend);
+            return <div className="dh-rank-drop dh-detail"><div className="dh-rank-drop-head"><b>Ad keywords</b><span><small>{scopeNote}</small>{close}</span></div>
+            {rows.length ? rows.map((k, i) => <div key={`${k.keyword}-${k.matchType}-${i}`} className="dh-rank-row dh-detail-row"><span className={`dh-pos ${k.qualityScore == null ? "" : k.qualityScore >= 7 ? "top" : k.qualityScore >= 5 ? "mid" : "low"}`} title="Quality score">{k.qualityScore != null ? `QS ${k.qualityScore}` : "—"}</span><span className="dh-rank-term">{k.keyword}<em className="dh-match">{k.matchType.toLowerCase()}</em></span><b>{num(k.clicks)} clicks</b><small>{money(k.spend, cur)} · {num(k.conversions)} conv</small></div>) : empty(d.ads?.error || "No keywords with impressions in this period.")}</div>; }
+          return null;
+        })()}
         {(() => { const bp = sample ? SAMPLE_GBP : m.businessProfile; const tp = sample ? { status: "ok", rating: 4.8, total: 63 } as typeof m.trustpilot : m.trustpilot; const gR = sample ? { total: 214, averageRating: 4.9 } : gReviews; return <>
           <h3 className="dh-sub">Reviews &amp; Google Business</h3>
           <div className="dh-reviews">

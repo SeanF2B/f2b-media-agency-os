@@ -2671,3 +2671,21 @@ html body .app-shell .crv-theme button:not(.on):hover { background: #fff; transf
 
 /* ===== Agency icon in the top bar: no tile behind it (light or dark mode) ===== */
 html body .app-shell.topnav-layout .tn-bar .tn-brand .tn-logo:not(.tn-logo-client) { background: transparent !important; box-shadow: none !important; border: 0 !important; padding: 0 !important; }
+
+/* Landing pages / keywords drop-downs at the foot of the Organic and Google Ads cards */
+html body .app-shell .dh-detail-toggles{display:flex;flex-wrap:wrap;gap:6px;margin-top:auto;padding-top:10px}
+html body .app-shell .dh-detail-btn{display:inline-flex;align-items:center;gap:6px;border:1px solid #e3e8ee;background:#f7f9fb;color:#344054;border-radius:999px;padding:5px 11px;font-size:12px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s,transform .15s,box-shadow .15s}
+html body .app-shell .dh-detail-btn span{font-size:9px;color:#8a96a3}
+html body .app-shell .dh-detail-btn:hover{border-color:var(--brand-secondary,var(--brand-primary,#98a2b3));transform:translateY(-1px);box-shadow:0 3px 8px rgba(16,24,40,.08)}
+html body .app-shell .dh-detail-btn.open{background:var(--brand-primary,#101828);border-color:var(--brand-primary,#101828);color:#fff}
+html body .app-shell .dh-detail-btn.open span{color:#fff}
+html body .app-shell .dh-split-col{display:flex;flex-direction:column}
+html body .app-shell .dh-detail .dh-rank-drop-head>span{display:flex;align-items:center;gap:12px}
+html body .app-shell .dh-detail{max-height:420px;overflow-y:auto}
+html body .app-shell .dh-detail-row .dh-pos{white-space:nowrap}
+html body .app-shell .dh-link{color:inherit;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html body .app-shell .dh-link:hover{text-decoration:underline}
+html body .app-shell .dh-match{font-style:normal;font-size:10.5px;color:#8a96a3;margin-left:8px;text-transform:capitalize}
+body.f2b-dark .app-shell .dh-detail-btn{background:#1a2025 !important;border-color:#33404a !important;color:#e7edf1 !important;-webkit-text-fill-color:#e7edf1 !important}
+body.f2b-dark .app-shell .dh-detail-btn.open{background:var(--brand-primary,#3a4752) !important;color:#fff !important;-webkit-text-fill-color:#fff !important}
+body.f2b-dark .app-shell .dh-link{color:#e7edf1 !important;-webkit-text-fill-color:#e7edf1 !important}
