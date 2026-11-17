@@ -2836,3 +2836,13 @@ html body .app-shell .tn-menu-clock { display: none; }
   html body .app-shell.topnav-layout .tn-right.menu-open .top-actions .notes-quick-trigger > span:not(.f2b-ico) { position: static !important; margin-left: auto; order: 9; color: #fff !important; -webkit-text-fill-color: #fff !important; background: var(--brand-primary, #3b82f6) !important; }
   html body .app-shell.topnav-layout .tn-right.menu-open .top-actions .notes-quick-trigger::after { content: "Work notes" !important; }
 }
+/* ===== Lead card pop-up: Schedule appointment + Save footer ===== */
+html body .crm-detail-foot { flex: none; display: flex; justify-content: flex-end; gap: 10px; padding: 12px 18px; border-top: 1px solid #e5e9ee; background: inherit; }
+html body .crm-detail-foot button { display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 18px; border-radius: 12px; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; transition: transform .15s ease, box-shadow .15s ease, background .15s ease; }
+html body .crm-detail-foot .crm-detail-book { background: #fff; color: #0f172a; border: 1px solid #d5dbe1; }
+html body .crm-detail-foot .crm-detail-save { background: var(--brand-primary, #0b78b0); color: #fff; border: 1px solid transparent; }
+html body .crm-detail-foot button:hover { transform: translateY(-1px); box-shadow: 0 6px 16px color-mix(in srgb, var(--brand-secondary, var(--brand-primary, #0b78b0)) 25%, transparent); }
+html body .crm-detail-foot .crm-detail-book:hover { border-color: var(--brand-secondary, var(--brand-primary, #0b78b0)); }
+html body .app-shell.dark-mode .crm-detail-foot, html body.f2b-dark .crm-detail-foot { border-top-color: #3a393d; }
+html body .app-shell.dark-mode .crm-detail-foot .crm-detail-book, html body.f2b-dark .crm-detail-foot .crm-detail-book { background: #27272a; color: #fff; border-color: #3f3f46; }
+@media (max-width: 700px) { html body .crm-detail-foot button { flex: 1; justify-content: center; padding: 0 10px; } }
