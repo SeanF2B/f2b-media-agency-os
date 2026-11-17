@@ -590,3 +590,34 @@ html body .app-shell.dark-mode .sch-dash-panel-tools .sch-seg button.on{backgrou
 .app-shell.dark-mode .sch-tl .sch-tl-track{background:#1b2227}
 .app-shell.dark-mode .sch-tl .sch-tl-free{background:#26313a;box-shadow:inset 0 0 0 1px #2f3a41}
 @media(max-width:760px){.sch-tl .sch-tl-row{grid-template-columns:1fr auto}.sch-tl .sch-tl-track{grid-column:1/-1;order:3}}
+
+/* Phones: compact header and stats so the calendar is near the top, and the week fits the screen width */
+@media(max-width:640px){
+  .sch{max-width:100%;min-width:0;overflow-x:hidden}
+  .sch>.iv-head{display:grid;gap:8px;margin-bottom:8px}
+  .sch>.iv-head h1{font-size:22px;line-height:1.15;margin:2px 0 0}
+  .sch>.iv-head p:not(.eyebrow){display:none}
+  .sch>.iv-head .iv-head-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;width:100%}
+  .sch>.iv-head .iv-head-actions>button{min-width:0;padding:8px 10px;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;justify-content:center}
+  .sch>.iv-head .iv-head-actions>button:only-child{grid-column:1/-1}
+  .sch>.dh-sample-banner{font-size:11px;padding:6px 10px;margin:0 0 8px}
+  .sch>.iv-stats{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:6px!important;margin-bottom:8px}
+  .sch>.iv-stats>div{padding:7px 8px!important;min-width:0}
+  .sch>.iv-stats small{font-size:9.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+  .sch>.iv-stats b{font-size:16px}
+  .sch>.iv-stats .sch-perstaff{display:none!important}
+  .sch-toolbar{display:grid;gap:6px;min-width:0}
+  .sch-toolbar .iv-tabs{display:flex;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;max-width:100%}
+  .sch-toolbar .iv-tabs::-webkit-scrollbar{display:none}
+  .sch-toolbar .iv-tabs button{white-space:nowrap;flex:0 0 auto}
+  .sch-filters{display:grid!important;grid-template-columns:1fr 1fr;gap:6px}
+  .sch-filters .sch-select{min-width:0}
+  .sch-filters .sch-select select{min-width:0!important;width:100%}
+  .sch-week-card{padding:6px!important;max-width:100%;overflow:hidden}
+  .sch-week-nav{gap:4px}
+  .sch-week{grid-template-columns:30px repeat(7,minmax(0,1fr))!important;overflow-x:hidden!important}
+  .sch-week .sch-day-head{font-size:10px;padding:4px 0}
+  .sch-week .sch-hours{font-size:9px}
+  .sch-week .sch-day-body>*{font-size:9.5px;padding:2px 3px!important;min-width:0}
+  .sch-week .sch-day-body>* img,.sch-week .sch-day-body>* .sch-avatar{display:none}
+}

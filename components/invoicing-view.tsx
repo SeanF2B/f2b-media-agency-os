@@ -161,3 +161,20 @@ function SettingsPanel({ settings, onSave }: { settings: Settings; onSave: (s: S
     <label>Footer note (optional)<input value={s.footerNote} onChange={(e) => set({ footerNote: e.target.value })} placeholder="Thanks for your business!" /></label>
     <div className="iv-foot">{msg && <span className="iv-ok">{msg}</span>}<button type="button" className="primary-button" disabled={busy} onClick={async () => { setBusy(true); try { await onSave(s); setMsg("Saved."); } catch (e) { setMsg(e instanceof Error ? e.message : "Could not save."); } finally { setBusy(false); } }}>{busy ? "Saving…" : "Save settings"}</button></div></div>;
 }
+
+// Invoice straight from somewhere else (e.g. a Leads card): the usual invoice editor, prefilled.
+export function QuickInvoice({ prefill, onClose, onDone }: { prefill: { name: string; email?: string; description?: string; amount?: number }; onClose: () => void; onDone?: (msg: string) => void }) {
+  const [data, setData] = useState<Data | null>(null);
+  const [err, setErr] = useState("");
+  useEffect(() => { let live = true; call<Data>().then((d) => { if (live) setData(d); }).catch((e) => { if (live) setErr(e instanceof Error ? e.message : "Invoicing couldn't load."); }); return () => { live = false; }; }, []);
+  if (err) return <Modal title="New invoice" onClose={onClose} footer={null}><div className="iv-error" role="alert">{err}</div></Modal>;
+  if (!data) return <Modal title="New invoice" onClose={onClose} footer={null}><p className="iv-small">Loading invoicing…</p></Modal>;
+  const s = data.settings;
+  const draft: Draft = { clientId: "", clientName: prefill.name, clientEmail: prefill.email || "", clientAddress: "", issueDate: iso(), dueDate: plus(iso(), s.paymentTermsDays), items: [{ description: prefill.description || "", qty: 1, unit: Number(prefill.amount) || 0 }], vatRate: 0, notes: "", currency: data.currency };
+  return <InvoiceEditor draft={draft} clients={data.clients} terms={s.paymentTermsDays} onClose={onClose} onSave={async (d, send) => {
+    const r = await call<{ id: string }>({ action: "save-invoice", ...d });
+    let sendErr = ""; if (send) { try { await call({ action: "send", id: r.id }); } catch (e) { sendErr = e instanceof Error ? e.message : "The email could not be sent."; } }
+    onDone?.(sendErr ? `Invoice saved as a draft but not sent: ${sendErr}` : send ? `Invoice sent to ${d.clientEmail || d.clientName}.` : "Invoice saved as a draft in Books → Invoicing.");
+    onClose();
+  }} />;
+}

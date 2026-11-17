@@ -2668,3 +2668,43 @@ html body .app-shell .crv-theme { display: inline-flex; padding: 3px; gap: 2px; 
 html body .app-shell .crv-theme button { border: 0; background: none; padding: 5px 12px; border-radius: 7px; font: inherit; font-size: 13px; font-weight: 600; color: #475569; cursor: pointer; }
 html body .app-shell .crv-theme button.on { background: #14213d; color: #fff; }
 html body .app-shell .crv-theme button:not(.on):hover { background: #fff; transform: translateY(-1px); }
+
+/* Agency Dashboard · Client view (admins only) */
+.cov-panel{padding:16px;margin:0 0 16px}
+.cov-pick{display:flex;align-items:center;gap:8px}
+.cov-pick select{min-width:180px}
+.cov-logo{width:30px;height:30px;object-fit:contain;border-radius:6px}
+.cov-note{margin:8px 0 0;font-size:11px;color:var(--muted-foreground,#63727b)}
+.cov-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:12px 0}
+.cov-grid>div{display:grid;gap:4px;padding:12px;border:1px solid var(--line,#dce3e7);border-radius:9px;background:var(--surface,#fff)}
+.cov-grid small{font-size:10px;font-weight:750}
+.cov-grid strong{font-size:19px}
+.cov-grid span{font-size:10px;color:var(--muted-foreground,#63727b)}
+.cov-grid .good strong{color:#178a4c}
+.cov-grid .bad strong{color:#c0392b}
+.dark-mode .cov-grid>div{border-color:var(--dark-border,#3b3e43);background:var(--dark-panel-2,#2b2c30)}
+@media(max-width:900px){.cov-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.cov-panel .overview-pipeline-heading{flex-wrap:wrap}}
+
+/* Phones: brand + client picker on the first row, period / clock / sample / menu on a second row (no overlap) */
+@media (max-width: 640px) {
+  html body .app-shell.topnav-layout .tn-bar { grid-template-columns: minmax(0, 1fr) !important; row-gap: 8px !important; }
+  html body .app-shell.topnav-layout .tn-left { min-width: 0; overflow: hidden; }
+  html body .app-shell.topnav-layout .tn-left .client-scope-trigger { max-width: none; min-width: 0; flex: 0 1 auto; }
+  html body .app-shell.topnav-layout .tn-left .client-scope-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  html body .app-shell.topnav-layout .tn-right { grid-column: 1 / -1; width: 100%; justify-content: flex-start !important; gap: 8px; padding-top: 8px; border-top: 1px solid rgba(127,138,160,.18); }
+  html body .app-shell.topnav-layout .tn-right .tn-date-slot { flex: 1 1 auto; min-width: 0; display: flex; }
+  html body .app-shell.topnav-layout .tn-right .tn-date { width: 100%; }
+  html body .app-shell.topnav-layout .tn-right .tn-date select { max-width: none; width: 100%; }
+  html body .app-shell.topnav-layout .tn-right .tn-more { margin-left: auto; }
+  html body .app-shell.topnav-layout .tn-right .tn-clock, html body .app-shell.topnav-layout .tn-right .tn-sample { flex: 0 0 auto; }
+}
+/* Phones: no page may be wider than the screen */
+@media (max-width: 640px) {
+  html body .app-shell .page-content { max-width: 100vw; overflow-x: hidden; }
+  html body .app-shell .page-content > * { max-width: 100%; min-width: 0; }
+}
+/* Lead details pop-up: action footer */
+html body .crm-detail-foot { position: sticky; bottom: 0; display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid rgba(127,138,160,.2); background: inherit; background-color: var(--surface, #fff); z-index: 2; }
+html body .crm-detail-foot > button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; white-space: nowrap; }
+.dark-mode .crm-detail-foot { background-color: var(--dark-panel, #1f2023) !important; }
+@media (max-width: 420px) { html body .crm-detail-foot { grid-template-columns: 1fr 1fr; } html body .crm-detail-foot > .primary-button { grid-column: 1 / -1; } }
