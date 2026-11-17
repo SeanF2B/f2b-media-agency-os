@@ -408,7 +408,7 @@ body.dark .kwp-letter{background:#2f6ff0}body.dark .kwp-t th{background:#1d3a63;
 body.dark .kwp-row.kwp-low td{background:#12301f}body.dark .kwp-row.kwp-medium td{background:#2f2810}body.dark .kwp-row.kwp-high td{background:#33161b}body.dark .kwp-row.kwp-unknown td{background:#1a2438}body.dark .kwp-row td{color:var(--ink)}
 body.dark .kwp-low{background:#153a24;color:#7ee2a2}body.dark .kwp-medium{background:#3a3010;color:#ffd46b}body.dark .kwp-high{background:#3d1a1f;color:#ff9a9a}body.dark .kwp-unknown{background:#222d42;color:#b7c4d8}
 body.dark .kwp-split{background:#1f2a40}body.dark .kwp-win{background:#12301f;border-color:#1f4d33}body.dark .kwp-win small{color:#8fd6a8}body.dark .kwp-split .kwp-low{background:#4caf50}body.dark .kwp-split .kwp-medium{background:#f2c037}body.dark .kwp-split .kwp-high{background:#e05252}body.dark .kwp-split .kwp-unknown{background:#5b6678}
-@page{margin:0}@media print{body.dark{background:#0b1220 !important;min-height:100vh}body.dark .page{background:#0b1220;padding:24px!important}.page{width:1200px;padding:0;zoom:.6}.card,.kpi{box-shadow:none}.row{break-inside:avoid}body:not(.dark){background:#fff}}`;
+@page{margin:0}@media print{body.dark{background:#0b1220 !important;min-height:100vh}.page{padding:24px!important}body.dark .page{background:#0b1220}.page{width:1200px;padding:0;zoom:.6}.card,.kpi{box-shadow:none}.row{break-inside:avoid}body:not(.dark){background:#fff}}`;
 
 export function renderClientReportHtml(report: ClientReport, opts: Opts) {
   const body = report.type === "ads" ? adsBody(report, opts) : report.type === "audit" || report.type === "audit-ads" || report.type === "audit-website" ? auditBody(report, opts) : report.type === "keywords" ? keywordsBody(report, opts) : seoBody(report, opts);
