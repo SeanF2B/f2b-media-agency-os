@@ -1,7 +1,7 @@
 "use client";
 import { useSampleData } from "@/hooks/use-sample-data";
 import { useEffect, useMemo, useState, type ReactNode, lazy, Suspense } from "react";
-import { BarChart3, BookOpen, CalendarPlus, CheckCircle2, ClipboardList, Compass, ListChecks, Image as ImageIcon, Mail, MessageSquare, MousePointerClick, Phone, Plus, Sparkles, TrendingUp, UserPlus, Users } from "lucide-react";
+import { BarChart3, BookOpen, CalendarCheck, CalendarPlus, CheckCircle2, ClipboardList, Compass, ListChecks, Image as ImageIcon, Mail, MessageSquare, MousePointerClick, Phone, Plus, Sparkles, TrendingUp, UserPlus, Users } from "lucide-react";
 import { BrandIcon } from "./brand-icon";
 
 // ROAS and close rate, graded only when there's enough data to judge fairly.
@@ -112,6 +112,8 @@ export function DashboardHub({ salesStats = null, activityPanel = null, scopeCli
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(false);
   const [apprOpen, setApprOpen] = useState<"" | "ai" | "human">("");
+  // Appointments that have finished but nobody has marked (attended / no-show / cancelled) yet.
+  const [apptUpdates, setApptUpdates] = useState<{ n: number; oldestHours: number } | null>(null);
   const [rankOpen, setRankOpen] = useState<"" | "google" | "chatgpt">("");
   // Drop-down under the Organic / Google Ads cards: landing pages (URLs) and keywords.
   const [detail, setDetail] = useState<DetailKey>("");
@@ -162,6 +164,22 @@ export function DashboardHub({ salesStats = null, activityPanel = null, scopeCli
   const cur = m?.currency || "EUR";
 
   const showAppts = !scopeClientId || clients.find((c) => c.id === scopeClientId)?.appointmentBased !== false;
+  useEffect(() => {
+    if (!showAppts) { setApptUpdates(null); return; }
+    if (sample) { setApptUpdates({ n: 3, oldestHours: 30 }); return; }
+    let live = true;
+    const from = new Date(Date.now() - 30 * 86_400_000).toISOString(), to = new Date().toISOString();
+    fetch(`/api/scheduling?clientId=${encodeURIComponent(scopeClientId || "agency")}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { cache: "no-store" })
+      .then((r) => r.ok ? r.json() : null)
+      .then((j: { bookings?: Array<{ status: string; end: string }> } | null) => {
+        if (!live || !j) return;
+        const cutoff = Date.now() - 15 * 60_000;
+        const pending = (j.bookings || []).filter((b) => b.status === "booked" && Date.parse(b.end) < cutoff);
+        const oldest = pending.reduce((min, b) => Math.min(min, Date.parse(b.end)), Date.now());
+        setApptUpdates({ n: pending.length, oldestHours: pending.length ? Math.round((Date.now() - oldest) / 3_600_000) : 0 });
+      }).catch(() => {});
+    return () => { live = false; };
+  }, [showAppts, sample, scopeClientId]);
   const actions: Array<{ label: string; hint: string; icon: ReactNode; run: () => void; tint: string }> = [
     { label: "Open tasks", hint: "Board, approvals & history", icon: <ListChecks size={18} />, run: () => onNavigate("Tasks"), tint: "blue" },
     ...(!scopeClientId ? [{ label: "Operations", hint: "Ads, SEO, websites, email", icon: <Compass size={18} />, run: () => onNavigate("Operations"), tint: "violet" }] : []),
@@ -179,6 +197,14 @@ export function DashboardHub({ salesStats = null, activityPanel = null, scopeCli
 
     <section className="dh-approvals" aria-label="Pending approvals">
       {[{ key: "ai" as const, label: "AI approvals", n: aiPending, mine: aiMine.length, icon: <Sparkles size={18} />, hint: "Changes the AI wants you to approve" }, { key: "human" as const, label: "Team approvals", n: humanPending, mine: humanMine.length, icon: <Users size={18} />, hint: "Work your team submitted for review" }].map((a) => { const t = tone(a.mine); return <button type="button" key={a.key} className={`dh-approval ${t} ${apprOpen === a.key ? "open" : ""}`} aria-expanded={apprOpen === a.key} onClick={() => setApprOpen(apprOpen === a.key ? "" : a.key)}><span className="dh-approval-icon">{a.icon}</span><span className="dh-approval-text"><b>{a.label}</b><small>{t === "overload" ? `${a.mine} waiting on you — catch up` : a.mine ? `${a.mine} waiting on you` : a.n ? `${a.n} with others · nothing for you` : "All done"}</small></span><span className="dh-approval-n">{a.mine || (a.n ? a.n : "✓")}</span></button>; })}
+      {showAppts && apptUpdates && (() => {
+        // amber as they build up, red when there are 5+ or one has waited over 2 days
+        const t = !apptUpdates.n ? "clear" : apptUpdates.n >= 5 || apptUpdates.oldestHours >= 48 ? "overload" : "waiting";
+        return <button type="button" className={`dh-approval dh-appt-updates ${t}`} onClick={() => { try { sessionStorage.removeItem("f2b-sched-catchup"); } catch { /* ignore */ } onNavigate("Scheduling"); }} title="Mark finished appointments as attended, no-show or cancelled">
+          <span className="dh-approval-icon"><CalendarCheck size={18} /></span>
+          <span className="dh-approval-text"><b>Appointment updates</b><small>{!apptUpdates.n ? "All appointments marked" : t === "overload" ? `${apptUpdates.n} to mark — ${apptUpdates.oldestHours >= 48 ? `oldest ${Math.floor(apptUpdates.oldestHours / 24)} days ago` : "catch up"}` : `${apptUpdates.n} finished, not marked yet`}</small></span>
+          <span className="dh-approval-n">{apptUpdates.n || "✓"}</span></button>;
+      })()}
     </section>
     {apprOpen && (() => { const list = apprOpen === "ai" ? aiList : humanList; const who = (id?: string) => staff.find((p) => p.id === id)?.name || ""; return <section className="dh-appr-list" aria-label="Approvals">
       <div className="dh-appr-list-head"><b>{apprOpen === "ai" ? "AI approvals" : "Team approvals"}</b><button type="button" className="text-button" onClick={() => setApprOpen("")}>Close</button></div>
