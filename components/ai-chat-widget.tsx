@@ -63,7 +63,7 @@ const PAGE_FOCUS: Record<string, RegExp> = { CRM: /lead|follow|conversation|repl
 // Only pages with a clear match get task recommendations; other pages get help for that page instead.
 const forPage = (list: Suggestion[], page: string) => { const focus = PAGE_FOCUS[page]; if (!focus) return []; const hits = list.filter((item) => focus.test(`${item.source || ""} ${item.title} ${item.why}`)); return hits.length ? hits : []; };
 
-export function AiChatWidget({ page, pageName, clientId, avatar, enabled, onCommand, onNavigate, onSuggestion, clients = [], onTicket }: { clients?: Array<{ id: string; name: string }>; onTicket?: () => void; page: string; pageName?: string; clientId?: string; avatar: ReactNode; enabled: boolean; onCommand: (command: AiCommand) => void; onNavigate: (page: string) => void; onSuggestion: (item: Suggestion) => void }) {
+export function AiChatWidget({ userName = "", page, pageName, clientId, avatar, enabled, onCommand, onNavigate, onSuggestion, clients = [], onTicket }: { userName?: string; clients?: Array<{ id: string; name: string }>; onTicket?: () => void; page: string; pageName?: string; clientId?: string; avatar: ReactNode; enabled: boolean; onCommand: (command: AiCommand) => void; onNavigate: (page: string) => void; onSuggestion: (item: Suggestion) => void }) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [prompt, setPrompt] = useState("");
@@ -74,7 +74,8 @@ export function AiChatWidget({ page, pageName, clientId, avatar, enabled, onComm
   const dragRef = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   const hideBot = () => { setHiddenBot(true); setOpen(false); setToast(null); try { localStorage.setItem("f2b-ai-hidden", "1"); } catch { /* ignore */ } };
   const showBot = () => { setHiddenBot(false); try { localStorage.setItem("f2b-ai-hidden", "0"); } catch { /* ignore */ } };
-  const onLauncherDown = (event: RPointerEvent<HTMLButtonElement>) => { dragRef.current = { x: event.clientX, y: event.clientY, moved: false }; (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId); };
+  const onLauncherDown = (event: RPointerEvent<HTMLButtonElement>) => { if (typeof window !== "undefined" && window.matchMedia("(max-width: 860px)").matches) return; // anchored on mobile
+    dragRef.current = { x: event.clientX, y: event.clientY, moved: false }; (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId); };
   const onLauncherMove = (event: RPointerEvent<HTMLButtonElement>) => { const d = dragRef.current; if (!d) return; if (!d.moved && Math.hypot(event.clientX - d.x, event.clientY - d.y) < 6) return; d.moved = true; const size = 64; setDock({ right: Math.max(8, Math.min(window.innerWidth - size - 8, window.innerWidth - event.clientX - size / 2)), bottom: Math.max(8, Math.min(window.innerHeight - size - 8, window.innerHeight - event.clientY - size / 2)) }); };
   const onLauncherUp = () => { const d = dragRef.current; if (d?.moved) { setDock((current) => { try { localStorage.setItem("f2b-ai-dock", JSON.stringify(current)); } catch { /* ignore */ } return current; }); window.setTimeout(() => { dragRef.current = null; }, 0); } else dragRef.current = null; };
   const [employee, setEmployee] = useState(() => { try { return localStorage.getItem("f2b-ai-employee") || ""; } catch { return ""; } });
@@ -156,7 +157,14 @@ export function AiChatWidget({ page, pageName, clientId, avatar, enabled, onComm
     let last = 0; try { last = Number(window.sessionStorage.getItem(`f2b-ai-nudge-${page}`) || 0); } catch { /* ignore */ }
     if (Date.now() - last < 3 * 60_000) return;
     const h = new Date().getHours();
-    const hello = ["Hey boss 👋", h < 12 ? "Morning boss ☀️" : h < 18 ? "Afternoon boss 👋" : "Evening boss 🌙", "Hi boss 👋"][Math.floor(Math.random() * 3)];
+    // Varied greeting: by name most of the time, the odd "boss", sometimes just straight to the point.
+    const name = userName.trim().split(/\s+/)[0] || "";
+    const part = h < 12 ? "Morning" : h < 18 ? "Afternoon" : "Evening";
+    const named = name ? [`Hey ${name},`, `${part} ${name},`, `Hi ${name},`, `${name},`, `Good to see you ${name},`, `Right ${name},`] : [];
+    const general = [`${part},`, "Hey,", "Hi there,", "Quick one,", "Hey boss,", "Hi boss,"];
+    const pool = Math.random() < 0.7 && named.length ? named : general;
+    let hello = pool[Math.floor(Math.random() * pool.length)];
+    try { const prev = window.sessionStorage.getItem("f2b-ai-hello"); if (hello === prev) hello = pool[(pool.indexOf(hello) + 1) % pool.length]; window.sessionStorage.setItem("f2b-ai-hello", hello); } catch { /* ignore */ }
     const line = lines[Math.floor(Math.random() * lines.length)];
     const timer = window.setTimeout(() => { try { window.sessionStorage.setItem(`f2b-ai-nudge-${page}`, String(Date.now())); } catch { /* ignore */ } setToast((current) => current || { text: `${hello} ${line}`, action: { label: "Yes please", run: () => openChat() } }); }, 3500);
     return () => window.clearTimeout(timer);

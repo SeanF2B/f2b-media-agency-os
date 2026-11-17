@@ -2689,3 +2689,50 @@ html body .app-shell .dh-match{font-style:normal;font-size:10.5px;color:#8a96a3;
 body.f2b-dark .app-shell .dh-detail-btn{background:#1a2025 !important;border-color:#33404a !important;color:#e7edf1 !important;-webkit-text-fill-color:#e7edf1 !important}
 body.f2b-dark .app-shell .dh-detail-btn.open{background:var(--brand-primary,#3a4752) !important;color:#fff !important;-webkit-text-fill-color:#fff !important}
 body.f2b-dark .app-shell .dh-link{color:#e7edf1 !important;-webkit-text-fill-color:#e7edf1 !important}
+
+/* ===== Phones: top bar fits on one tidy layout; AI bot anchored above the bottom bar ===== */
+@media (max-width: 600px) {
+  html body .app-shell.topnav-layout .tn-bar { display: grid !important; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; column-gap: 6px; row-gap: 6px; }
+  html body .app-shell.topnav-layout .tn-left { grid-column: 1; grid-row: 1; min-width: 0; overflow: hidden; }
+  html body .app-shell.topnav-layout .tn-right { display: contents !important; }
+  html body .app-shell.topnav-layout .tn-right .tn-clock { grid-column: 2; grid-row: 1; width: 36px; min-width: 36px; height: 36px; padding: 0 !important; justify-content: center; }
+  html body .app-shell.topnav-layout .tn-right .tn-clock > b { display: none; }
+  html body .app-shell.topnav-layout .tn-right .tn-sample { grid-column: 3; grid-row: 1; }
+  html body .app-shell.topnav-layout .tn-right .tn-more { grid-column: 4; grid-row: 1; }
+  html body .app-shell.topnav-layout .tn-right .tn-date-slot { grid-column: 1 / -1; grid-row: 2; min-width: 0; }
+  html body .app-shell.topnav-layout .tn-right .tn-date-slot .tn-date { width: 100%; justify-content: flex-start; }
+  html body .app-shell.topnav-layout .tn-right .tn-date-slot .tn-date select { max-width: none; flex: 1 1 auto; }
+  html body .app-shell.topnav-layout .tn-bar .client-scope-trigger { min-width: 0 !important; max-width: 100% !important; }
+  html body .app-shell.topnav-layout .tn-bar .client-scope-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions { top: calc(100% + 8px) !important; right: 8px !important; }
+  html body .app-shell.topnav-layout .tn-left { gap: 6px !important; }
+  html body .app-shell.topnav-layout .tn-brand .tn-logo, html body .app-shell.topnav-layout .tn-brand .tn-logo-client { width: 34px !important; min-width: 34px !important; height: 34px !important; }
+  html body .app-shell.topnav-layout .tn-left > .client-scope:not(.client-focus) { flex: 0 0 auto; }
+  html body .app-shell.topnav-layout .tn-left > .client-scope:not(.client-focus) .client-scope-trigger { padding: 6px 9px !important; }
+  html body .app-shell.topnav-layout .tn-left > .client-scope.client-focus { flex: 1 1 auto; min-width: 0; }
+  html body .app-shell.topnav-layout .tn-left > .client-scope.client-focus .client-scope-trigger { width: 100% !important; padding: 6px 8px !important; }
+  /* the period picker makes the bar two rows: keep page content clear of it */
+  html body .app-shell.topnav-layout:has(.tn-date-slot:not(:empty)) .main-area { padding-top: 104px !important; }
+}
+@media (max-width: 860px) {
+  html body .ai-chat-dock .ai-chat-launcher, html body .ai-chat-dock.is-moved .ai-chat-launcher { right: 12px !important; bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important; left: auto !important; top: auto !important; cursor: pointer; }
+  html body .ai-chat-dock.is-moved .ai-chat-toast, html body .ai-chat-dock .ai-chat-toast { right: 12px !important; bottom: calc(148px + env(safe-area-inset-bottom, 0px)) !important; }
+  html body .ai-chat-dock.is-moved .ai-chat-panel { right: 8px !important; bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important; }
+}
+
+/* Scheduling on phones: booking only — calendar for one day, big New appointment button, nothing else */
+@media (max-width: 860px) {
+  html body .app-shell .sch.is-phone .iv-head { display: flex !important; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px !important; }
+  html body .app-shell .sch.is-phone .iv-head p, html body .app-shell .sch.is-phone .iv-head .eyebrow { display: none !important; }
+  html body .app-shell .sch.is-phone .iv-head h1 { font-size: 22px !important; margin: 0 !important; }
+  html body .app-shell .sch.is-phone .iv-head-actions .secondary-button { display: none !important; }
+  html body .app-shell .sch.is-phone .iv-head-actions .primary-button { height: 44px; padding: 0 16px !important; font-size: 15px !important; }
+  html body .app-shell .sch.is-phone :is(.iv-stats, .iv-tabs, .dh-sample-banner, .iv-warn) { display: none !important; }
+  html body .app-shell .sch.is-phone .sch-toolbar { margin: 0 0 8px !important; }
+  html body .app-shell .sch.is-phone .sch-filters { width: 100%; display: flex; gap: 8px; }
+  html body .app-shell .sch.is-phone .sch-filters .sch-select { flex: 1 1 0; min-width: 0; }
+  html body .app-shell .sch.is-phone .sch-week-card { padding: 8px !important; }
+  html body .app-shell .sch.is-phone .sch-week { grid-template-columns: 44px minmax(0, 1fr) !important; touch-action: pan-y; }
+  html body .app-shell .sch.is-phone .sch-day-body { touch-action: pan-y; }
+  html body .app-shell .sch.is-phone .sch-block { cursor: pointer; }
+}
