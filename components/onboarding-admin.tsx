@@ -95,7 +95,7 @@ function Share({ data }: { data: Data }) {
   useEffect(() => {
     if (kind !== "crm" || query.trim().length < 2) { setContacts([]); return; }
     const timer = window.setTimeout(() => {
-      fetch(`/api/onboarding?contacts=${encodeURIComponent(query.trim())}`, { cache: "no-store" }).then((response) => response.json()).then((result: { contacts?: unknown }) => {
+      fetch(`/api/onboarding?contacts=${encodeURIComponent(query.trim())}`, { cache: "no-store" }).then((response) => response.json() as Promise<{ contacts?: unknown }>).then((result) => {
         setContacts(((result.contacts || []) as Array<{ id: string; name: string; email: string; company: string }>).slice(0, 8));
       }).catch(() => setContacts([]));
     }, 300);
