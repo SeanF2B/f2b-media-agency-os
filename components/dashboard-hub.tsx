@@ -264,7 +264,7 @@ export function DashboardHub({ salesStats = null, activityPanel = null, scopeCli
         <div className="dh-appt-foot"><button type="button" className="text-button" onClick={() => onNavigate("Scheduling")}>Open Scheduling →</button>{sample && <small>Sample data — marking here doesn’t save.</small>}</div>
       </section>;
     })()}
-    {showAppts && <Suspense fallback={null}><AppointmentsDashboard key={scopeClientId || "agency"} scopeClientId={scopeClientId} sample={sample} clientName={clients.find((c) => c.id === scopeClientId)?.name || ""} periodStart={periodStart} periodEnd={periodEnd} periodLabel={periodLabel} onOpen={() => onNavigate("Scheduling")} /></Suspense>}
+    {showAppts && <Suspense fallback={null}><AppointmentsDashboard key={scopeClientId || "agency"} showStaffHours scopeClientId={scopeClientId} sample={sample} clientName={clients.find((c) => c.id === scopeClientId)?.name || ""} periodStart={periodStart} periodEnd={periodEnd} periodLabel={periodLabel} onOpen={() => onNavigate("Scheduling")} /></Suspense>}
     {valuePanel}
     <section className="panel dh-panel" aria-label="Website and marketing results">
       <div className="dh-head"><div><p className="eyebrow">📈 {periodLabel.toUpperCase()}</p><h2>Marketing</h2></div>

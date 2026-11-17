@@ -876,7 +876,7 @@ export function StaffSchedulingPanel({ staffId, staffName = "", scope = "" }: { 
 }
 
 /** Dashboard panel for appointment-based businesses: staff selector, Day (appointments + availability) and Week calendar. */
-export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, clientName = "", periodStart = "", periodEnd = "", periodLabel = "" }: { scopeClientId: string; onOpen: () => void; sample?: boolean; clientName?: string; periodStart?: string; periodEnd?: string; periodLabel?: string }) {
+export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, clientName = "", periodStart = "", periodEnd = "", periodLabel = "", showStaffHours = false }: { scopeClientId: string; onOpen: () => void; sample?: boolean; clientName?: string; periodStart?: string; periodEnd?: string; periodLabel?: string; /** Staff hours & earnings only on the main Dashboard, never inside the Scheduling tab. */ showStaffHours?: boolean }) {
   const [realData, setData] = useState<Data | null>(null);
   const [err, setErr] = useState("");
   const [view, setView] = useState<"day" | "week" | "month">(() => { try { const v = localStorage.getItem("f2b-dash-appt-view"); return v === "week" || v === "month" ? v : "day"; } catch { return "day"; } });
@@ -983,7 +983,7 @@ export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, c
       <button type="button" className="sch-dash-wday-head" onClick={() => { setDay(d); setMode("day"); }}><small>{d.toLocaleDateString("en-IE", { weekday: "short" })}</small><b>{d.getDate()}</b>{list.length > 0 && <em>{list.length}</em>}</button>
       <div className="sch-dash-wday-body">{list.length ? list.slice(0, 6).map((b) => { const cal = calById.get(b.calendarId); return <button type="button" key={b.id} className="sch-dash-chip" style={{ ["--c" as string]: cal?.color || "#2563eb" }} onClick={() => setDetail(b)} title={`${time(b.start)} ${b.name} · ${cal?.name || ""}`}><span className="sch-chip-top"><b>{time(b.start)}</b><span className="sch-chip-avs">{b.staffIds.slice(0, 2).map((id) => <Avatar key={id} person={personOf(id)} size={20} />)}</span></span><span>{b.name}</span>{(() => { const pic = bookingPhoto(b); return pic ? <img className="sch-chip-img" src={pic} alt="" loading="lazy" onError={(ev) => { (ev.currentTarget as HTMLImageElement).style.display = "none"; }} /> : null; })()}</button>; }) : <span className="sch-dash-free">Free</span>}{list.length > 6 && <small className="iv-small">+{list.length - 6} more</small>}</div>
     </div>; })}</div>}
-    {data && realData?.isAdmin && <StaffHoursPanel data={data} scopeClientId={scopeClientId} sample={sample} periodStart={periodStart} periodEnd={periodEnd} periodLabel={periodLabel} />}
+    {showStaffHours && data && realData?.isAdmin && <StaffHoursPanel data={data} scopeClientId={scopeClientId} sample={sample} periodStart={periodStart} periodEnd={periodEnd} periodLabel={periodLabel} />}
     {detail && data && <AppointmentDetail key={detail.id} data={data} scope={scopeClientId} booking={detail} onClose={() => setDetail(null)} onSaved={(msg) => { setDetail(null); void msg; setRefresh((n) => n + 1); }} />}
   </section>;
 }
