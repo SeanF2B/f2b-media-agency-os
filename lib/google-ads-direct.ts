@@ -608,3 +608,22 @@ export async function getGoogleAdsLandingPages(ownerId: string, customerId: stri
     spend: Number(row.metrics?.costMicros || 0) / 1_000_000, conversions: Number(row.metrics?.conversions || 0),
   })).filter((r) => r.url);
 }
+
+/** Ad-level stats (incl. phone calls when Google allows it) for a date window, keyed by ad id. */
+export async function getGoogleAdsAdMetrics(ownerId: string, customerId: string, window: { start: string; end: string }) {
+  const range = `segments.date BETWEEN '${window.start.replace(/[^0-9-]/g, "")}' AND '${window.end.replace(/[^0-9-]/g, "")}'`;
+  const run = async (calls: boolean) => {
+    const { payload } = await googleAdsPost(ownerId, customerId, "googleAds:searchStream", { query: `SELECT ad_group_ad.ad.id, metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions${calls ? ", metrics.phone_calls" : ""} FROM ad_group_ad WHERE ${range} AND ad_group_ad.status != 'REMOVED' AND metrics.impressions > 0 LIMIT 2000` });
+    const out = new Map<string, { impressions: number; clicks: number; spend: number; conversions: number; calls: number | null }>();
+    for (const row of (payload as Array<{ results?: Array<any> }>).flatMap((batch) => batch.results || [])) {
+      const id = String(row.adGroupAd?.ad?.id || ""); if (!id) continue;
+      const cur = out.get(id) || { impressions: 0, clicks: 0, spend: 0, conversions: 0, calls: calls ? 0 : null };
+      cur.impressions += Number(row.metrics?.impressions || 0); cur.clicks += Number(row.metrics?.clicks || 0); cur.spend += Number(row.metrics?.costMicros || 0) / 1_000_000; cur.conversions += Number(row.metrics?.conversions || 0);
+      if (calls) cur.calls = (cur.calls || 0) + Number(row.metrics?.phoneCalls || 0);
+      out.set(id, cur);
+    }
+    return out;
+  };
+  try { return await run(true); } catch { return run(false); }
+}
+

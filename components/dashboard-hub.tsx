@@ -34,6 +34,7 @@ function GradedRow({ icon, label, value, grade, tip, detail }: { icon: ReactNode
 }
 const AppointmentsDashboard = lazy(() => import("./scheduling-view").then((module) => ({ default: module.AppointmentsDashboard })));
 import { CampaignPicker } from "./campaign-picker";
+import { PageDrill } from "./dashboard-page-drill";
 
 type HubTask = { id: string; clientId: string; title: string; status: string; assigneeId: string; due?: string; dueAt?: string; completedAt?: string; service?: string; reviewStatus?: string; reviewApproverId?: string; aiRunState?: string; aiApprovals?: Array<{ status: string }> };
 type HubClient = { id: string; name: string; logo?: string; googleAdsAccountId?: string; appointmentBased?: boolean };
@@ -87,7 +88,7 @@ function Tile({ icon, label, value, note, tone = "", children }: { icon: ReactNo
 }
 
 // Small chevron buttons at the foot of a results card; each opens its list below the cards.
-type DetailKey = "" | "org-pages" | "org-kw" | "org-trend" | "ads-pages" | "ads-kw";
+type DetailKey = "" | "org-pages" | "org-kw" | "org-trend" | "ads-pages" | "ads-kw" | "ads-assets";
 function DetailToggles({ value, onChange, items }: { value: DetailKey; onChange: (v: DetailKey) => void; items: Array<[Exclude<DetailKey, "">, string]> }) {
   return <div className="dh-detail-toggles">{items.map(([k, label]) => <button type="button" key={k} className={`dh-detail-btn ${value === k ? "open" : ""}`} aria-expanded={value === k} onClick={() => onChange(value === k ? "" : k)}><span>{value === k ? "▲" : "▼"}</span>{label}</button>)}</div>;
 }
@@ -227,7 +228,7 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
                 {!c && sales && (() => { const r = roasGrade(sales.adsWonValue, spend ?? null, sales.adsLeads); return <GradedRow icon={<TrendingUp size={15} />} label="Return on ad spend" value={r.value} grade={r.grade} tip={r.tip} detail={spend ? `${money(sales.adsWonValue, cur)} won from ${money(spend, cur)} spend` : "No spend yet"} />; })()}
                 {!c && sales && (() => { const r = closeGrade(sales.adsWon, sales.adsLeads); return <GradedRow icon={<CheckCircle2 size={15} />} label="Ads close rate" value={r.value} grade={r.grade} tip={r.tip} detail={`${sales.adsWon} won of ${sales.adsLeads} leads`} />; })()}
                 {sp?.notes.paid && <em className="dh-split-note">{sp.notes.paid}</em>}
-                <DetailToggles value={detail} onChange={setDetail} items={[["ads-pages", "Landing pages"], ["ads-kw", "Keywords"]]} />
+                <DetailToggles value={detail} onChange={setDetail} items={[["ads-pages", "Landing pages"], ["ads-kw", "Keywords"], ["ads-assets", "Assets"]]} />
               </div>; })()}
             {(() => { const meta = m.meta; const camps = meta?.campaigns || []; const c = camps.find((x) => x.id === mCamp); const spend = c ? c.spend : meta?.spend; const clicks = c ? c.clicks : meta?.clicks; const leads = c ? c.leads : meta?.leads;
               return <div className="dh-split-col"><div className="dh-split-head"><BrandIcon id="meta-ads" size={20} fallback={null} /><b>Meta Ads</b>{camps.length > 0 && <div className="dh-camp-wrap"><CampaignPicker label="Meta Ads campaign" currency={cur} value={mCamp} onChange={setMCamp} options={camps.map((x) => ({ value: x.id, name: x.name, logo: clientOf(clientId)?.logo, spend: x.spend, status: x.status }))} /></div>}</div>
@@ -254,6 +255,7 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
           const Link = ({ url, path }: { url?: string; path: string }) => url && /^https?:/.test(url) ? <a className="dh-rank-term dh-link" href={url} target="_blank" rel="noreferrer" title={url} onClick={(e) => e.stopPropagation()}>{path}</a> : <span className="dh-rank-term" title={path}>{path}</span>;
           const close = <button type="button" className="text-button" onClick={() => setDetail("")}>Close</button>;
           const empty = (t: string) => <p className="dh-muted">{t}</p>;
+          if (!sample && clientId && clientId !== "all" && (detail === "org-pages" || detail === "ads-pages" || detail === "ads-assets")) return <PageDrill kind={detail === "org-pages" ? "organic" : detail === "ads-pages" ? "ads" : "assets"} clientId={clientId} start={periodStart} end={periodEnd} currency={cur} onClose={() => setDetail("")} />;
           if (detail === "org-pages") { const rows = d.gsc?.pages || []; return <div className="dh-rank-drop dh-detail"><div className="dh-rank-drop-head"><b>Organic landing pages</b><span><small>{rows.length ? "From Search Console · clicks" : ga4.some((g) => g.organicSessions > 0) ? "From Google Analytics · organic visits, calls & leads" : "From Search Console · clicks"}</small>{close}</span></div>
             {rows.length ? rows.map((p) => { const g = ga4By.get(pageKey(p.url)); const extra = g ? perPage([[g.organic.calls, "call"], [g.organic.leads, "lead"]]) : ""; return <div key={p.page} className="dh-rank-row dh-detail-row"><span className={`dh-pos ${p.position == null ? "" : p.position <= 3 ? "top" : p.position <= 10 ? "mid" : "low"}`}>{p.position != null ? `#${p.position}` : "—"}</span><Link url={p.url} path={p.page} /><b>{num(p.clicks)} clicks</b><small>{num(p.impressions)} seen{extra ? ` · ${extra}` : ""}</small></div>; })
               : ga4.some((g) => g.organicSessions > 0) ? ga4.filter((g) => g.organicSessions > 0).sort((a, b) => b.organicSessions - a.organicSessions).map((g) => { const conv = g.organicKeyEvents; const extra = perPage([[g.organic.calls, "call"], [g.organic.leads, "lead"]]); return <div key={g.page} className="dh-rank-row dh-detail-row"><span className={`dh-pos ${conv > 0 ? "top" : "mid"}`}>{conv > 0 ? `${num(conv)} conv` : "0 conv"}</span><Link url={g.url} path={g.page} /><b>{num(g.organicSessions)} visits</b><small>{extra || "No calls or leads yet"} · GA4</small></div>; })
