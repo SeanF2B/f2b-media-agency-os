@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-// Big sections (Dashboard, Books) fold open/closed by tapping their header, on every screen size.
+// Big Dashboard sections fold open/closed by tapping their header, on every screen size.
 // Phones: closed until tapped (data-mopen), so the work is on screen without scrolling through everything.
 // Desktop: open by default; a folded section (data-dclosed) is remembered on this device.
 // Pure attribute toggle — React state is untouched. Tasks filters also fold away on phones.
@@ -10,9 +10,8 @@ export const MOBILE_COLLAPSE_HEADS = [
   ".dh > section.panel > :first-child",
   ".dh > .dh-grid > .panel > :first-child",
   ".dh > .dh-ads-wrap > .panel > :first-child",
-  ".overview-projection-panel > :first-child",
 ].join(", ");
-const PANELS = ".dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel, .overview-projection-panel";
+const PANELS = ".dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel";
 const STORE = "f2b-folded-sections";
 
 const keyOf = (panel: HTMLElement) => panel.getAttribute("aria-label") || panel.querySelector("h2, h3")?.textContent?.trim() || "";

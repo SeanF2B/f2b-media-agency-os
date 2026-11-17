@@ -2766,10 +2766,10 @@ body.f2b-dark .app-shell .dh-link{color:#e7edf1 !important;-webkit-text-fill-col
   html body .app-shell .dh-approvals .dh-approval-n { width: 28px !important; height: 28px !important; flex: none; font-size: 13px !important; }
   html body .app-shell .dh-chevrons { overflow: visible !important; }
   /* Dashboard + Books: big sections open on tap (see MobileCollapse) */
-  html body .app-shell :is(.dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel, .overview-projection-panel):not([data-mopen]) > :not(:first-child) { display: none !important; }
-  html body .app-shell :is(.dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel, .overview-projection-panel) > :first-child { position: relative; padding-right: 30px !important; cursor: pointer; }
-  html body .app-shell :is(.dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel, .overview-projection-panel) > :first-child::after { content: ""; position: absolute; right: 8px; top: 14px; width: 9px; height: 9px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); opacity: .55; transition: transform .2s; }
-  html body .app-shell :is(.dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel, .overview-projection-panel)[data-mopen] > :first-child::after { transform: rotate(-135deg); top: 18px; }
+  html body .app-shell :is(.dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel):not([data-mopen]) > :not(:first-child) { display: none !important; }
+  html body .app-shell :is(.dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel) > :first-child { position: relative; padding-right: 30px !important; cursor: pointer; }
+  html body .app-shell :is(.dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel) > :first-child::after { content: ""; position: absolute; right: 8px; top: 14px; width: 9px; height: 9px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); opacity: .55; transition: transform .2s; }
+  html body .app-shell :is(.dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel)[data-mopen] > :first-child::after { transform: rotate(-135deg); top: 18px; }
   html body .app-shell :is(.dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel) { margin-bottom: 8px !important; }
   html body .app-shell .dh-grid { display: grid !important; grid-template-columns: 1fr !important; gap: 8px !important; }
   /* Tasks: filters fold into one tap-to-open bar so the list is on screen */
@@ -3207,11 +3207,11 @@ html body .app-shell .ops-tasks .task-page-heading h1, html body .app-shell .ops
 
 /* ===== Desktop: Dashboard + Books sections fold open/closed from their header, like on phones (see MobileCollapse) ===== */
 @media (min-width: 861px) {
-  html body .app-shell :is(.dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel, .overview-projection-panel)[data-dclosed] > :not(:first-child) { display: none !important; }
-  html body .app-shell :is(.dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel, .overview-projection-panel) > :first-child { position: relative; padding-right: 34px !important; cursor: pointer; }
-  html body .app-shell :is(.dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel, .overview-projection-panel) > :first-child::after { content: ""; position: absolute; right: 10px; top: 18px; width: 9px; height: 9px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-135deg); opacity: .55; transition: transform .2s, opacity .2s; }
-  html body .app-shell :is(.dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel, .overview-projection-panel)[data-dclosed] > :first-child::after { transform: rotate(45deg); top: 12px; }
-  html body .app-shell :is(.dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel, .overview-projection-panel) > :first-child:hover::after { opacity: .9; }
+  html body .app-shell :is(.dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel)[data-dclosed] > :not(:first-child) { display: none !important; }
+  html body .app-shell :is(.dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel) > :first-child { position: relative; padding-right: 34px !important; cursor: pointer; }
+  html body .app-shell :is(.dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel) > :first-child::after { content: ""; position: absolute; right: 10px; top: 18px; width: 9px; height: 9px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-135deg); opacity: .55; transition: transform .2s, opacity .2s; }
+  html body .app-shell :is(.dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel)[data-dclosed] > :first-child::after { transform: rotate(45deg); top: 12px; }
+  html body .app-shell :is(.dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel) > :first-child:hover::after { opacity: .9; }
 }
 
 /* Tabs with an icon (Books, Scheduling): icon beside the label on desktop, like Leads and Operations */
@@ -3233,4 +3233,15 @@ html body .app-shell .dh > section.panel.sch-earn { margin-top: 0; }
 @media (max-width: 860px) {
   /* Books: same one-row period picker as the Dashboard, under the tabs */
   html body .app-shell .page-content:has(> .book-tabs) > .dh-date-inline { order: 3; }
+}
+/* Yearly estimate: period picker sits in the header, top right */
+html body .app-shell .overview-projection-head { align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+html body .app-shell .overview-projection-date { flex: none; }
+html body .app-shell .overview-projection-date .tn-date span { display: inline !important; }
+@media (max-width: 860px) {
+  html body .app-shell .overview-projection-head > div:first-child { flex: 1 1 100%; min-width: 0; }
+  html body .app-shell .overview-projection-date { flex: 1 1 100%; }
+  html body .app-shell .overview-projection-date .tn-date { width: 100%; height: 40px; box-sizing: border-box; }
+  html body .app-shell .overview-projection-date .tn-date select { flex: 1 1 auto; max-width: none !important; font-size: 16px !important; }
+  html body .app-shell .page-content:has(> .book-tabs) > .overview-projection-panel { order: 3; }
 }
