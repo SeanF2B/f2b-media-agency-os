@@ -172,6 +172,11 @@ const worker = {
           }
           await logSystemEmail(env.DB as never, { to: message.to, subject: message.subject, text: message.text || "" });
         } : undefined,
+        // "Make an AI call" step: queued on the account's AI phone agent (respects its switches, hours and DND).
+        aiCall: async (call) => {
+          const { queueOutboundCall } = await import("../lib/voice-agent/server");
+          return queueOutboundCall({ ownerId: call.ownerId, clientId: call.scopeId, trigger: "automation", to: call.phone, contactId: call.contactId, contactName: call.name, purpose: call.purpose, channel: call.channel, dedupeKey: call.dedupeKey });
+        },
       }),
       processDueAiTasks({ ...env, hasDirectSearchConsole: hasGoogleSearchConsoleConnection, readDirectSearchConsole: readGoogleSearchConsoleRows }, new Date(controller.scheduledTime)),
       processDueFinanceRecurring(env, new Date(controller.scheduledTime)),
@@ -183,6 +188,8 @@ const worker = {
       processExpiredMarketingSubmissions(env.DB!, env.BUCKET, new Date(controller.scheduledTime)),
       processMonthlyClientReports(env.DB, env.BUCKET as never, new Date(controller.scheduledTime)),
       processOutreach(new Date(controller.scheduledTime)),
+      // AI phone agent: place queued outbound calls (new-lead call-backs, automation calls, confirm calls).
+      import("../lib/voice-agent/server").then(({ processVoiceQueue }) => processVoiceQueue(new Date(controller.scheduledTime))),
       // Operations → Email campaigns: next email to up to 80 due contacts, one Resend batch call.
       processEmailCampaigns(env as never, new Date(controller.scheduledTime)),
       keepGoogleAdsTokensFresh(env.DB!),
@@ -221,6 +228,11 @@ const worker = {
     ]));
   },
   async fetch(request: Request, env: Cloudflare.Env, ctx: AccessContext) {
+    // AI phone agent: Twilio ConversationRelay WebSocket (public path; protected by a signed per-call token).
+    if (request.headers.get("Upgrade")?.toLowerCase() === "websocket" && new URL(request.url).pathname === "/api/marketing-public/voice/relay") {
+      const { handleRelaySocket } = await import("../lib/voice-agent/relay");
+      return handleRelaySocket(request, ctx);
+    }
     let binding = ctx.props?.CONNECTORS;
     // Local preview emulates the same request-scoped capability. This branch and
     // the auxiliary service binding are absent from production builds.

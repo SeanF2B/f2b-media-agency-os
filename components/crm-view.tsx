@@ -9,6 +9,7 @@ import { CrmNotesPanel, type CrmNote } from "@/components/crm-notes-panel";
 import { currencySymbol, getDisplayCurrency } from "@/lib/display-currency";
 import { EmailActionIcon, PhoneActionIcon, SmsActionIcon, toPhoneHref, toSmsHref, toWhatsAppNumber, WhatsAppActionIcon } from "@/components/contact-action-icons";
 const QuickBook = lazy(() => import("./scheduling-view").then((m) => ({ default: m.QuickBook })));
+const AiCallButton = lazy(() => import("./ai-agent-panel").then((m) => ({ default: m.AiCallButton })));
 const blockCrmDragSelection = (event: Event) => event.preventDefault();
 
 const timeAgo = (iso: string) => { const diff = Date.now() - Date.parse(iso); if (!Number.isFinite(diff)) return ""; const m = Math.round(diff / 60000), h = Math.round(diff / 3600000), d = Math.round(diff / 86400000); if (m < 1) return "just now"; if (m < 60) return `${m} min${m === 1 ? "" : "s"} ago`; if (h < 24) return `${h} hour${h === 1 ? "" : "s"} ago`; if (d < 7) return `${d} day${d === 1 ? "" : "s"} ago`; if (d < 30) { const w = Math.round(d / 7); return `${w} week${w === 1 ? "" : "s"} ago`; } const mo = Math.round(d / 30); if (mo < 12) return `${mo} month${mo === 1 ? "" : "s"} ago`; const y = Math.round(d / 365); return `${y} year${y === 1 ? "" : "s"} ago`; };
@@ -704,6 +705,7 @@ export function CrmView({ onOpenClient, scopeClientId = "", conversations, initi
           </div>
           <footer className="crm-detail-foot">
             <button type="button" className="crm-detail-book" onClick={() => { setDetailId(""); setBookFor({ clientId: item.client_id || scopeClientId || "", prefill: { name: person || companyName || item.title, phone: phoneValue, email, notes: [item.title, item.project_type, item.project_location].filter(Boolean).join(" · "), images } }); }}><Ico icon={CalendarPlus} size={16} /> Schedule appointment</button>
+            {phoneValue && <Suspense fallback={null}><AiCallButton className="crm-detail-book va-callbtn" clientId={item.client_id || scopeClientId || ""} phone={phoneValue} name={person || companyName || item.title} contactId={item.contact_id || undefined} /></Suspense>}
             <button type="button" className="crm-detail-save" onClick={async () => { if (valueEditId === item.id) await saveOpportunityValue(item); setDetailId(""); setNotice({ text: `“${item.title}” saved.` }); }}><Ico icon={Check} size={16} /> Save</button>
           </footer>
         </aside>

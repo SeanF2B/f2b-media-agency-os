@@ -3,7 +3,7 @@
 import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  ArrowLeft, Bell, Euro, CalendarCheck, CalendarClock, CalendarX, UserX, CircleCheck, Columns3, Copy, FileInput, FlaskConical, GitBranch, History, Hourglass, ListTodo,
+  ArrowLeft, Bell, PhoneCall, Euro, CalendarCheck, CalendarClock, CalendarX, UserX, CircleCheck, Columns3, Copy, FileInput, FlaskConical, GitBranch, History, Hourglass, ListTodo,
   Mail, Maximize, MessageSquare, Minus, Plus, Search, Tag, Trash2, X, Zap,
 } from "lucide-react";
 import {
@@ -17,7 +17,7 @@ type RunRow = { id: string; status: string; dry_run: number; trigger_summary: st
 type StepRow = { node_id: string; title: string; status: string; detail: string; created_at: string; updated_at: string };
 type Loaded = { automation: { id: string; name: string; status: "on" | "off"; sendsEmail: boolean; definition: AutomationDefinition }; options: Options; runs: RunRow[] };
 
-const ICONS: Record<string, typeof Mail> = { Euro, FileInput, Tag, Columns3, CircleCheck, CalendarCheck, CalendarClock, CalendarX, UserX, Mail, Bell, Hourglass, GitBranch, MessageSquare, ListTodo, TagRemove: Tag };
+const ICONS: Record<string, typeof Mail> = { Euro, FileInput, Tag, Columns3, CircleCheck, CalendarCheck, CalendarClock, CalendarX, UserX, Mail, Bell, PhoneCall, Hourglass, GitBranch, MessageSquare, ListTodo, TagRemove: Tag };
 const iconFor = (node: AutomationNode) => {
   if (node.type === "trigger") return ICONS[TRIGGERS.find((item) => item.type === node.config?.type)?.icon || ""] || Zap;
   if (node.type === "remove_tag") return Tag;
@@ -359,6 +359,12 @@ function StepPanel({ node, options, onSave, onCancel, onDelete, onDuplicate }: {
         {people.map((member) => <label key={member.id} className="ca-check"><input type="checkbox" checked={ids.includes(member.id)} onChange={(event) => set({ recipientIds: event.target.checked ? [...ids, member.id] : ids.filter((item) => item !== member.id) })} />{member.name}</label>)}
       </fieldset>
       <label className="ca-check"><input type="checkbox" checked={config.email !== false} onChange={(event) => set({ email: event.target.checked })} />Also send it by email</label>
+    </>;
+  } else if (node.type === "ai_call") {
+    body = <>
+      <Field label="What is the call for?" hint="The AI uses this as its goal. Merge fields like {{contact.first_name}} work."><textarea rows={4} value={str("purpose")} onChange={(event) => set({ purpose: event.target.value })} placeholder="e.g. They missed their appointment. Check they're OK and offer a new time." maxLength={600} /></Field>
+      <Field label="Call by"><select value={str("channel") || "phone"} onChange={(event) => set({ channel: event.target.value })}><option value="phone">Phone call</option><option value="whatsapp">WhatsApp call (falls back to phone)</option></select></Field>
+      <p className="ca-note">Needs the account&apos;s AI agent switched on for outbound calls, with “Automation step” allowed in AI agent settings. Calls only go out inside the agent&apos;s calling hours and never to Do-not-disturb contacts. The call is saved in Conversations as a voice note.</p>
     </>;
   } else if (node.type === "wait") {
     body = <>

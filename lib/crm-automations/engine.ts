@@ -24,7 +24,8 @@ export type Stmt = {
 };
 export type Db = { prepare(sql: string): Stmt; batch(statements: Stmt[]): Promise<unknown[]> };
 export type EmailMessage = { to: string; subject: string; text: string; html: string; idempotencyKey: string };
-export type Effects = { sendEmail?: (message: EmailMessage) => Promise<void> };
+export type AiCallRequest = { ownerId: string; scopeId: string; contactId: string; phone: string; name: string; purpose: string; channel: "phone" | "whatsapp"; dedupeKey: string };
+export type Effects = { sendEmail?: (message: EmailMessage) => Promise<void>; aiCall?: (request: AiCallRequest) => Promise<{ queued: boolean; reason?: string }> };
 
 type LiveAutomation = { id: string; owner_id: string; scope_id: string; trigger_type: string; definition: string; next_fire_at: string | null; parsed?: AutomationDefinition | null };
 type EventRow = { id: string; owner_id: string; scope_id: string; event_type: string; contact_id: string | null; payload: string; source_automation_id: string | null; created_at: string };
@@ -264,6 +265,15 @@ async function executeStep(ctx: StepContext): Promise<StepResult> {
         }
       }
       return { status: "done", detail: `Alert sent: "${message}".${emailed}` };
+    }
+    case "ai_call": {
+      const purpose = renderMerge(String(c.purpose || "Follow up with {{contact.first_name}} and offer to book an appointment."), contact).slice(0, 600);
+      const channel = c.channel === "whatsapp" ? "whatsapp" : "phone";
+      if (!contact.phone) return { status: "skipped", detail: "The contact has no phone number." };
+      if (dryRun) return { status: "done", detail: `Would ring ${contactName(contact)} by ${channel === "whatsapp" ? "WhatsApp" : "phone"}: "${purpose}"` };
+      if (!effects.aiCall) return { status: "skipped", detail: "AI calls aren't available here." };
+      const r = await effects.aiCall({ ownerId: run.owner_id, scopeId: run.scope_id || contact.client_id || "", contactId: contact.id, phone: contact.phone, name: contactName(contact), purpose, channel, dedupeKey: `auto:${run.id}:${node.id}` });
+      return r.queued ? { status: "done", detail: `AI call queued to ${contactName(contact)} (${channel === "whatsapp" ? "WhatsApp" : "phone"}).` } : { status: "skipped", detail: r.reason || "AI call not placed." };
     }
     case "wait": {
       const until = waitUntil(c, now);

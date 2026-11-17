@@ -2,7 +2,7 @@
 // Only erasable TypeScript syntax is used so `node --test` can load this file directly.
 
 export type TriggerType = "form_lead" | "tag_added" | "stage_changed" | "task_completed" | "schedule" | "appointment_booked" | "appointment_rescheduled" | "appointment_cancelled" | "appointment_no_show" | "appointment_completed";
-export type ActionType = "send_email" | "set_value" | "add_tag" | "remove_tag" | "move_stage" | "create_task" | "notify" | "wait" | "if_else";
+export type ActionType = "send_email" | "set_value" | "add_tag" | "remove_tag" | "move_stage" | "create_task" | "notify" | "ai_call" | "wait" | "if_else";
 export type NodeType = "trigger" | ActionType;
 export type Branch = "yes" | "no";
 
@@ -39,6 +39,7 @@ export const ACTIONS: Array<{ type: ActionType | "sms"; label: string; help: str
   { type: "move_stage", label: "Move pipeline stage", help: "Move the contact's deal to a stage.", icon: "Columns3" },
   { type: "create_task", label: "Create task", help: "Add a task for a teammate or bot.", icon: "ListTodo" },
   { type: "notify", label: "Notify me", help: "Get an alert in the app and by email.", icon: "Bell" },
+  { type: "ai_call", label: "Make an AI call", help: "The account's AI phone agent rings the contact (phone or WhatsApp).", icon: "PhoneCall" },
   { type: "wait", label: "Wait", help: "Pause before the next step.", icon: "Hourglass" },
   { type: "if_else", label: "If / Else", help: "Split into two paths based on a rule.", icon: "GitBranch" },
   { type: "sms", label: "Send SMS", help: "Text messages are coming soon.", icon: "MessageSquare", comingSoon: true },
@@ -227,6 +228,7 @@ export function nodeSummary(node: AutomationNode, lookup: Lookup = {}): string {
     case "move_stage": return c.stageId ? `Move to · ${stage(c.stageId)}` : "Choose a stage";
     case "create_task": return text(c.title) ? `Task · ${text(c.title, 60)}${c.assigneeId && lookup.staffName ? ` for ${lookup.staffName(String(c.assigneeId))}` : ""}` : "Describe the task";
     case "notify": return text(c.message) ? `Notify · ${text(c.message, 60)}` : "Write the alert";
+    case "ai_call": return text(c.purpose) ? `AI call${c.channel === "whatsapp" ? " (WhatsApp)" : ""} · ${text(c.purpose, 60)}` : "Say what the call is for";
     case "wait":
       if (c.mode === "until") return text(c.until) ? `Wait until ${text(c.until).replace("T", " at ")}` : "Choose a date";
       return Number(c.amount) > 0 ? `Wait ${Number(c.amount)} ${unitLabel(String(c.unit || "days"), Number(c.amount))}` : "Choose how long";

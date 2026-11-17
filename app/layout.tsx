@@ -6,6 +6,7 @@ import "./ai-history.css";
 import "./f2b-icons-glass.css";
 import "./f2b-topnav.css";
 import "./f2b-apis.css";
+import "./f2b-voice-agent.css";
 
 // No auto-zoom when tapping into a form field on phones.
 export const viewport: Viewport = { width: "device-width", initialScale: 1, maximumScale: 1, viewportFit: "cover" };
