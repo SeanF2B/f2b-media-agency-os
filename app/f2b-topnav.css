@@ -3411,3 +3411,12 @@ html body .app-shell a.contact-action.contact-action { display: inline-flex !imp
 html body .app-shell a.contact-action .crm-contact-action-icon, html body .app-shell a.contact-action svg { width: 16px !important; height: 16px !important; padding: 0 !important; margin: 0 !important; background: transparent !important; border: 0 !important; box-shadow: none !important; border-radius: 0 !important; flex: none; }
 html body .app-shell a.contact-action.whatsapp-action { border-color: rgba(127,138,160,.28) !important; }
 html body .app-shell a.contact-action.whatsapp-action svg { color: #25d366; }
+
+/* Phones: ☰ menu rows sit flush with the panel's own 8px padding (no left gutter); Clock in removed */
+@media (max-width: 860px) {
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions { padding: 8px !important; grid-template-columns: minmax(0, 1fr) !important; justify-items: stretch !important; justify-content: stretch !important; }
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions > * { margin: 0 !important; justify-self: stretch !important; min-width: 0 !important; max-width: none !important; width: 100% !important; }
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions > :is(button, a, label),
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions > :is(.activity-quick-wrap, .profile-menu-wrap) > button { padding: 0 12px !important; justify-content: flex-start !important; }
+  html body .app-shell.topnav-layout .tn-right.menu-open .top-actions .activity-quick-popover { display: none !important; }
+}
