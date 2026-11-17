@@ -12,7 +12,9 @@ export type OpsClient = {
   googleBusinessProfileAccountId?: string; googleBusinessProfileLocationId?: string; wordpressSiteUrl?: string; website?: string;
 };
 
-// Every connection a client can have, shown as an icon with a green (connected) or red (missing) dot.
+// Every connection a client can have, shown as an icon with a green (linked to this client) or red (not linked) dot.
+// Red means this client's own account/property isn't linked — even if the agency's Google login is connected in Launchpad —
+// so a click opens the page where that client's account is linked (not Launchpad).
 const CONNECTIONS: Array<{ key: string; label: string; page: string; ok: (client: OpsClient, hasSite: boolean) => boolean; icon: React.ReactNode }> = [
   { key: "gads", label: "Google Ads", page: "Google Ads", ok: (c) => Boolean(c.googleAdsAccountId), icon: <svg viewBox="0 0 24 24"><path fill="currentColor" d="M9.4 3.6a3 3 0 0 1 4.1 1.1l6.6 11.4a3 3 0 1 1-5.2 3l-6.6-11.4a3 3 0 0 1 1.1-4.1ZM5 15.5a3 3 0 1 1 0 6 3 3 0 0 1 0-6Z" /></svg> },
   { key: "meta", label: "Meta Ads", page: "Meta Ads", ok: (c) => Boolean(c.metaAdsAccountId), icon: <svg viewBox="0 0 24 24"><path fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" d="M3 15c0-4 2-8 4.5-8C11 7 13 17 16.5 17 19 17 21 14.5 21 12s-1.5-5-3.5-5C14 7 12 17 7.5 17 5 17 3 16 3 15Z" /></svg> },
@@ -24,7 +26,7 @@ const CONNECTIONS: Array<{ key: string; label: string; page: string; ok: (client
 export function ConnectionDots({ client, hasSite, onOpen }: { client: OpsClient; hasSite: boolean; onOpen: (page: string) => void }) {
   const done = CONNECTIONS.filter((item) => item.ok(client, hasSite)).length;
   const pct = Math.round(done / CONNECTIONS.length * 100);
-  return <span className="ops-conn"><span className={`ops-conn-pct ${pct >= 80 ? "good" : pct >= 50 ? "mid" : "low"}`} style={{ ["--pct" as string]: `${pct}%` }} title={`${done} of ${CONNECTIONS.length} connected`}><b>{pct}%</b></span>{CONNECTIONS.map((item) => { const ok = item.ok(client, hasSite); return <button key={item.key} type="button" className={ok ? "ok" : "missing"} title={`${item.label}: ${ok ? "connected" : "not connected"}`} aria-label={`${item.label} ${ok ? "connected" : "not connected"}`} onClick={() => onOpen(ok ? item.page : "Integrations")}><BrandIcon id={item.key} size={16} fallback={item.icon} /><i /></button>; })}{done < CONNECTIONS.length && <QuickConnectLink client={client} missing={CONNECTIONS.filter((item) => !item.ok(client, hasSite)).map((item) => item.label)} />}</span>;
+  return <span className="ops-conn"><span className={`ops-conn-pct ${pct >= 80 ? "good" : pct >= 50 ? "mid" : "low"}`} style={{ ["--pct" as string]: `${pct}%` }} title={`${done} of ${CONNECTIONS.length} connected`}><b>{pct}%</b></span>{CONNECTIONS.map((item) => { const ok = item.ok(client, hasSite); return <button key={item.key} type="button" className={ok ? "ok" : "missing"} title={`${item.label}: ${ok ? `linked to ${client.name}` : `not linked to ${client.name} yet — click to link it`}`} aria-label={`${item.label} ${ok ? "linked" : "not linked"} for ${client.name}`} onClick={() => onOpen(item.page)}><BrandIcon id={item.key} size={16} fallback={item.icon} /><i /></button>; })}{done < CONNECTIONS.length && <QuickConnectLink client={client} missing={CONNECTIONS.filter((item) => !item.ok(client, hasSite)).map((item) => item.label)} />}</span>;
 }
 // Quick link a client can open to connect their own accounts (their Launchpad), copied or emailed in one click.
 function QuickConnectLink({ client, missing }: { client: OpsClient; missing: string[] }) {
