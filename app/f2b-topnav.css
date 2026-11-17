@@ -3320,3 +3320,14 @@ html body .app-shell .tn-date select { background-repeat: no-repeat !important; 
   html body .app-shell .client-tax[data-dclosed] > .client-tax-head::after { transform: rotate(45deg); top: 12px; }
 }
 html body .app-shell .client-tax + .client-tax { margin-top: 14px; }
+/* Agency Books: Income / expenses folds open/closed from its header — closed by default on phones, open on desktop */
+html body .app-shell .finance-panel > .panel-heading { position: relative; padding-right: 34px !important; cursor: pointer; }
+html body .app-shell .finance-panel > .panel-heading::after { content: ""; position: absolute; right: 10px; top: 16px; width: 9px; height: 9px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-135deg); opacity: .55; transition: transform .2s; }
+@media (min-width: 861px) {
+  html body .app-shell .finance-panel[data-dclosed] > :not(.panel-heading) { display: none !important; }
+  html body .app-shell .finance-panel[data-dclosed] > .panel-heading::after { transform: rotate(45deg); top: 10px; }
+}
+@media (max-width: 860px) {
+  html body .app-shell .finance-panel:not([data-mopen]) > :not(.panel-heading) { display: none !important; }
+  html body .app-shell .finance-panel:not([data-mopen]) > .panel-heading::after { transform: rotate(45deg); top: 10px; }
+}

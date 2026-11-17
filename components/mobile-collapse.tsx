@@ -11,10 +11,11 @@ export const MOBILE_COLLAPSE_HEADS = [
   ".dh > .dh-grid > .panel > :first-child",
   ".dh > .dh-ads-wrap > .panel > :first-child",
   ".client-tax > .client-tax-head",
+  ".finance-panel > .panel-heading",
 ].join(", ");
 // Phones only: Books yearly estimate folds too (on desktop it stays open with its period picker).
 const PHONE_HEADS = `${MOBILE_COLLAPSE_HEADS}, .overview-projection-panel > :first-child`;
-const PANELS = ".dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel, .client-tax";
+const PANELS = ".dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel, .client-tax, .finance-panel";
 const STORE = "f2b-folded-sections";
 
 const keyOf = (panel: HTMLElement) => panel.getAttribute("aria-label") || panel.querySelector("h2, h3")?.textContent?.trim() || "";
