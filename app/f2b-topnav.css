@@ -3420,3 +3420,54 @@ html body .app-shell a.contact-action.whatsapp-action svg { color: #25d366; }
   html body .app-shell.topnav-layout .tn-right.menu-open .top-actions > :is(.activity-quick-wrap, .profile-menu-wrap) > button { padding: 0 12px !important; justify-content: flex-start !important; }
   html body .app-shell.topnav-layout .tn-right.menu-open .top-actions .activity-quick-popover { display: none !important; }
 }
+/* ===== Phones: Leads (Contacts / Pipeline / Conversations) redesign — no gaps, no sideways scrolling, tidy padding ===== */
+@media (max-width: 860px) {
+  /* header: no forced height (it was leaving a big gap above and below the title) */
+  html body .app-shell .crm-workspace.crm-workspace { align-content: start !important; gap: 0 !important; }
+  html body .app-shell .crm-workspace > .crm-heading.crm-heading { min-height: 0 !important; margin: 0 0 10px !important; padding: 0 2px !important; }
+  html body .app-shell .crm-workspace > .crm-tabs.crm-tabs { margin: 0 0 10px !important; }
+  html body .app-shell .crm-tabs.crm-tabs > * { min-width: 0 !important; padding: 0 2px !important; font-size: 11px !important; overflow: hidden; }
+  html body .app-shell .crm-tabs.crm-tabs:has(> :nth-child(5)) > * { font-size: 9.5px !important; letter-spacing: -.01em; }
+  html body .app-shell .crm-workspace > .crm-toolbar.crm-toolbar { margin: 0 0 10px !important; padding: 8px !important; gap: 8px !important; }
+
+  /* Conversations list: only as tall as what's in it (no empty white block); an open chat still fills the screen */
+  html body .app-shell .cv-grid.cv-grid:not(.has-thread) { height: auto !important; min-height: 0 !important; max-height: calc(100dvh - var(--tn-bar-h, 62px) - 200px) !important; }
+  html body .app-shell .cv-grid:not(.has-thread) > .cv-list { flex: 0 1 auto !important; }
+  html body .app-shell .cv-grid:not(.has-thread) .cv-rows { flex: 0 1 auto !important; }
+
+  /* Contacts: phone-friendly cards instead of a wide table */
+  html body .app-shell .crm-contacts-manager { display: grid; gap: 10px; }
+  html body .app-shell .crm-contacts-manager .cm-lists { margin: 0 !important; }
+  html body .app-shell .crm-contacts-manager .cm-card { padding: 10px !important; margin: 0 !important; border-radius: 14px !important; }
+  html body .app-shell .crm-contacts-manager .cm-toolbar { display: flex !important; flex-wrap: nowrap !important; align-items: center; gap: 6px !important; margin: 0 0 8px !important; padding: 0 !important; }
+  html body .app-shell .crm-contacts-manager .cm-toolbar > :is(.cm-cols, .cm-search, .cm-spacer) { display: none !important; }
+  html body .app-shell .crm-contacts-manager .cm-toolbar .cm-tool { height: 34px !important; padding: 0 10px !important; font-size: 12.5px !important; flex: none; }
+  html body .app-shell .crm-contacts-manager .cm-toolbar .cm-sort { flex: 1 1 auto; min-width: 0; }
+  html body .app-shell .crm-contacts-manager .cm-toolbar .cm-sort select { font-size: 13px !important; min-width: 0; width: 100%; height: 32px; padding-right: 18px !important; }
+  html body .app-shell .crm-contacts-manager .cm-toolbar .cm-count { flex: none; font-size: 11.5px !important; padding: 0 8px !important; height: 26px; display: inline-flex; align-items: center; white-space: nowrap; }
+  html body .app-shell .crm-contacts-manager .cm-table-wrap { overflow: visible !important; border: 0 !important; }
+  html body .app-shell .crm-contacts-manager .cm-table, html body .app-shell .crm-contacts-manager .cm-table tbody { display: block !important; width: 100% !important; min-width: 0 !important; }
+  html body .app-shell .crm-contacts-manager .cm-table thead { display: none !important; }
+  html body .app-shell .crm-contacts-manager .cm-table tr { display: grid !important; grid-template-columns: 26px minmax(0, 1fr); column-gap: 8px; row-gap: 2px; padding: 10px 8px; border: 1px solid rgba(127,138,160,.22); border-radius: 12px; margin: 0 0 8px; }
+  html body .app-shell .crm-contacts-manager .cm-table tr:last-child { margin-bottom: 0; }
+  html body .app-shell .crm-contacts-manager .cm-table td { width: auto !important; position: static !important; display: block; grid-column: 2; padding: 0 !important; border: 0 !important; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+  html body .app-shell .crm-contacts-manager .cm-table td:empty { display: none; }
+  html body .app-shell .crm-contacts-manager .cm-table td.cm-check { grid-column: 1; grid-row: 1; align-self: center; width: auto !important; }
+  html body .app-shell .crm-contacts-manager .cm-table td.cm-c-name { grid-row: 1; }
+  html body .app-shell .crm-contacts-manager .cm-table td.cm-c-name .cm-name { max-width: 100%; }
+  html body .app-shell .crm-contacts-manager .cm-table td.cm-c-name .cm-name-text { font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
+  html body .app-shell .crm-contacts-manager .cm-table td:is(.cm-date, .cm-c-activity, .cm-c-source, .cm-c-client) { display: none !important; }
+  html body .app-shell .crm-contacts-manager .cm-table td:is(.cm-c-phone, .cm-c-email, .cm-c-company) { color: #63727b; font-size: 12.5px; }
+  html body .app-shell .crm-contacts-manager .cm-table td.cm-c-tags { white-space: normal; padding-top: 4px !important; }
+  html body .app-shell .crm-contacts-manager .cm-table td.cm-actions { grid-column: 1 / -1; margin-top: 6px; padding-top: 8px !important; border-top: 1px solid rgba(127,138,160,.18) !important; overflow: visible; }
+  html body .app-shell .crm-contacts-manager .cm-table td.cm-actions .cm-row-actions { display: flex !important; flex-wrap: wrap; gap: 6px; justify-content: flex-start; opacity: 1 !important; visibility: visible !important; }
+  html body .app-shell .crm-contacts-manager .crm-bulk-bar { flex-wrap: wrap !important; }
+
+  /* Pipeline: stages stacked down the page, full width — no sideways scrolling */
+  html body .app-shell .crm-kanban.crm-kanban { display: grid !important; grid-auto-flow: row !important; grid-template-columns: minmax(0, 1fr) !important; overflow: visible !important; scroll-snap-type: none !important; gap: 10px !important; padding: 0 !important; height: auto !important; max-height: none !important; }
+  html body .app-shell .crm-kanban.crm-kanban > .crm-stage { flex: none !important; width: 100% !important; max-width: 100% !important; min-width: 0 !important; height: auto !important; max-height: none !important; min-height: 0 !important; }
+  html body .app-shell .crm-kanban > .crm-stage > :not(.crm-stage-header) { max-height: none !important; }
+  html body .app-shell .crm-kanban .crm-empty-stage { padding: 10px !important; min-height: 0 !important; font-size: 12px !important; }
+}
+/* Books: no Filing button in the page header on phones */
+@media (max-width: 860px) { html body .app-shell .filing-open-button { display: none !important; } }
