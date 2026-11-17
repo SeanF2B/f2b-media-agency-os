@@ -3283,3 +3283,12 @@ html body .app-shell .overview-projection-metrics { display: grid !important; gr
   html body .app-shell .overview-projection-head h2 { font-size: 21px !important; }
   html body .app-shell .overview-projection-panel { padding: 14px !important; }
 }
+/* Phones: Books yearly estimate sits at the bottom and folds open/closed from its header, like Dashboard sections */
+@media (max-width: 860px) {
+  html body .app-shell .page-content:has(> .book-tabs) > .overview-projection-panel.overview-projection-panel { order: 20; }
+  html body .app-shell .overview-projection-panel:not([data-mopen]) > :not(:first-child) { display: none !important; }
+  html body .app-shell .overview-projection-panel > :first-child { position: relative; padding-right: 30px !important; cursor: pointer; }
+  html body .app-shell .overview-projection-panel > :first-child::after { content: ""; position: absolute; right: 8px; top: 14px; width: 9px; height: 9px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); opacity: .55; transition: transform .2s; }
+  html body .app-shell .overview-projection-panel[data-mopen] > :first-child::after { transform: rotate(-135deg); top: 18px; }
+  html body .app-shell .overview-projection-head p:not(.eyebrow) { display: none; }
+}

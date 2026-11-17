@@ -11,6 +11,8 @@ export const MOBILE_COLLAPSE_HEADS = [
   ".dh > .dh-grid > .panel > :first-child",
   ".dh > .dh-ads-wrap > .panel > :first-child",
 ].join(", ");
+// Phones only: Books yearly estimate folds too (on desktop it stays open with its period picker).
+const PHONE_HEADS = `${MOBILE_COLLAPSE_HEADS}, .overview-projection-panel > :first-child`;
 const PANELS = ".dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel";
 const STORE = "f2b-folded-sections";
 
@@ -54,7 +56,7 @@ export function MobileCollapse() {
         if (toolbar && target === toolbar) { toolbar.toggleAttribute("data-mopen"); return; }
       }
       if (target.closest("button, a, select, input, label, textarea, [role='tab'], [role='button']")) return;
-      const head = target.closest<HTMLElement>(MOBILE_COLLAPSE_HEADS);
+      const head = target.closest<HTMLElement>(phone.matches ? PHONE_HEADS : MOBILE_COLLAPSE_HEADS);
       const panel = head?.parentElement;
       if (!panel) return;
       if (phone.matches) { panel.toggleAttribute("data-mopen"); return; }
