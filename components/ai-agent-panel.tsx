@@ -29,7 +29,7 @@ const OUTCOME: Record<string, string> = { booked: "Booked", message_taken: "Mess
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s) % 60).padStart(2, "0")}`;
 
 /** The three switches on a client card. */
-export function AiSwitches({ clientId, clientName }: { clientId: string; clientName: string }) {
+export function AiSwitches({ clientId, clientName, chat = true, phone = true }: { clientId: string; clientName: string; chat?: boolean; phone?: boolean }) {
   const [t, setT] = useState<Toggles | null>(null);
   const [busy, setBusy] = useState("");
   const [note, setNote] = useState("");
@@ -46,10 +46,10 @@ export function AiSwitches({ clientId, clientName }: { clientId: string; clientN
   const Sw = ({ k, label, title }: { k: "chat" | "inbound" | "outbound"; label: string; title: string }) => <label className={`va-switch ${t[k] ? "on" : ""}`} title={title}><input type="checkbox" role="switch" checked={t[k]} disabled={busy === k} onChange={(e) => void flip(k, e.target.checked)} /><span aria-hidden="true" />{label}</label>;
   return <div className="va-switches" role="group" aria-label={`AI for ${clientName}`}>
     <span className="va-switches-label"><AiEyesIcon /> AI</span>
-    <Sw k="chat" label="Chat" title="AI replies to SMS and WhatsApp messages" />
-    <Sw k="inbound" label="Calls in" title="AI answers this account's phone number and books appointments" />
-    <Sw k="outbound" label="Calls out" title="AI rings leads and contacts (choose which kinds in settings)" />
-    <button type="button" className="va-gear" title="AI agent settings: voice, training, calendars, number" aria-label="AI agent settings" onClick={() => setOpen(true)}><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></svg></button>
+    {chat && <Sw k="chat" label="Chat" title="AI replies to SMS and WhatsApp messages" />}
+    {phone && <Sw k="inbound" label="Calls in" title="AI answers this account's phone number and books appointments" />}
+    {phone && <Sw k="outbound" label="Calls out" title="AI rings leads and contacts (choose which kinds in settings)" />}
+    {phone && <button type="button" className="va-gear" title="AI agent settings: voice, training, calendars, number" aria-label="AI agent settings" onClick={() => setOpen(true)}><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></svg></button>}
     {note && <small className="va-note" role="status">{note}</small>}
     {open && <AiAgentSettings clientId={clientId} clientName={clientName} onClose={() => { setOpen(false); load(); }} />}
   </div>;

@@ -80,3 +80,22 @@ html body .va-callbtn svg { width: 16px; height: 16px; }
   html body .va-rule-body { grid-template-columns: 1fr; }
   html body .va-dialog { padding: 16px; max-height: calc(100dvh - 24px); }
 }
+
+/* Client workroom: Services section with Add service picker */
+html body .client-services-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+html body .service-picker { position: relative; }
+html body .service-add { padding: 6px 12px !important; font-size: 13px !important; }
+html body .service-picker-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; width: min(420px, 90vw); max-height: 70vh; overflow: auto; background: #fff; color: #1f2a33; border-radius: 14px; box-shadow: 0 18px 50px rgba(15,23,42,.22); padding: 8px; display: grid; gap: 6px; }
+html body .service-picker-group { display: grid; gap: 2px; }
+html body .service-picker-group > small { font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #6b7882; padding: 6px 8px 2px; }
+html body .service-picker-group button { display: flex; align-items: center; gap: 10px; text-align: left; border: 0; background: transparent; color: #1f2a33; padding: 8px; border-radius: 10px; cursor: pointer; transition: background .12s, transform .12s; }
+html body .service-picker-group button:hover:not(:disabled) { background: color-mix(in srgb, var(--brand-secondary, #3b82f6) 12%, transparent); transform: translateY(-1px); }
+html body .service-picker-group button:disabled { opacity: .5; cursor: default; }
+html body .service-picker-group button b { display: block; font-size: 13.5px; }
+html body .service-picker-group button em { display: block; font-style: normal; font-size: 12px; color: #66737d; }
+html body .service-picker-icon { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; background: #f1f5f8; flex: none; }
+html body .service-chip { position: relative; }
+html body .service-chip-x { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 50%; border: 0; background: rgba(15,23,42,.08); color: inherit; font-size: 14px; line-height: 1; cursor: pointer; opacity: 0; transition: opacity .12s; }
+html body .service-chip:hover .service-chip-x, html body .service-chip-x:focus-visible { opacity: 1; }
+@media (hover: none) { html body .service-chip-x { opacity: .7; } }
+html body .client-tool-row:empty { display: none; }
