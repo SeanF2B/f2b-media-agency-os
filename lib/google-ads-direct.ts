@@ -627,3 +627,24 @@ export async function getGoogleAdsAdMetrics(ownerId: string, customerId: string,
   try { return await run(true); } catch { return run(false); }
 }
 
+/** Same inventory as listGoogleAdsCampaignAssets, but each level is read on its own (one failing level
+ *  doesn't hide the rest) and a level that rejects the date window is retried without stats. */
+export async function listGoogleAdsAssetsResilient(ownerId: string, customerId: string, dateWindow?: { start: string; end: string }) {
+  const withDates = googleAdsAssetQueries(undefined, dateWindow);
+  const noDates = googleAdsAssetQueries(undefined);
+  const levels = [["customer", "Account"], ["campaign", "Campaign"], ["adGroup", "Ad group"], ["assetGroup", "Performance Max asset group"]] as const;
+  const errors: string[] = [];
+  const results = await Promise.all(levels.map(async ([key, scope]) => {
+    const read = async (query: string) => {
+      const { payload } = await googleAdsPost(ownerId, customerId, "googleAds:searchStream", { query });
+      return normalizeGoogleAdsAssetRows((payload as Array<{ results?: any[] }>).flatMap((batch) => batch.results || []), scope);
+    };
+    try { return await read(withDates[key]); }
+    catch (first) {
+      try { return await read(noDates[key]); }
+      catch (second) { errors.push(`${scope}: ${(second instanceof Error ? second.message : String(second)).slice(0, 160)}`); void first; return []; }
+    }
+  }));
+  return { assets: results.flat(), errors };
+}
+

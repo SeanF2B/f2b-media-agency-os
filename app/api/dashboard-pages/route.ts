@@ -4,7 +4,7 @@ import { fullTeamPermissions, getTeamPermissions, type TeamPermissions } from "@
 import { loadCachedMarketingData } from "@/lib/marketing-data-history";
 import { hasGoogleSearchConsoleConnection, readGoogleSearchConsoleRows } from "@/lib/google-search-console-direct";
 import { hasGoogleAnalyticsDirectConnection, readGoogleAnalyticsReport } from "@/lib/google-analytics-direct";
-import { getGoogleAdsAdMetrics, getGoogleAdsKeywordPerformance, getGoogleAdsLandingPages, listGoogleAdsCampaignAssets, listGoogleAdsResponsiveSearchAds } from "@/lib/google-ads-direct";
+import { getGoogleAdsAdMetrics, getGoogleAdsKeywordPerformance, getGoogleAdsLandingPages, listGoogleAdsAssetsResilient, listGoogleAdsResponsiveSearchAds } from "@/lib/google-ads-direct";
 
 // Dashboard → Marketing → Landing pages, per page in full:
 //  kind=organic: every site page (sitemap + Search Console + GA4) with its live meta title, description,
@@ -183,7 +183,7 @@ export async function GET(request: Request) {
     cache("Google Ads", JSON.stringify({ report: "dash-ads-rsa", accountId }), () => listGoogleAdsResponsiveSearchAds(ownerId, accountId)).catch(() => null),
     cache("Google Ads", key("dash-ads-admetrics"), async () => Object.fromEntries(await getGoogleAdsAdMetrics(ownerId, accountId, period))).catch(() => null),
     cache("Google Ads", key("dash-ads-keywords-full"), () => getGoogleAdsKeywordPerformance(ownerId, accountId, undefined, { startDate: period.start, endDate: period.end }).then((r) => r.keywords)).catch(() => null),
-    cache("Google Ads", key("dash-ads-assets"), () => listGoogleAdsCampaignAssets(ownerId, accountId, undefined, period)).catch(() => null),
+    cache("Google Ads", key("dash-ads-assets-v2"), () => listGoogleAdsAssetsResilient(ownerId, accountId, period)).catch((e) => ({ assets: null, errors: [e instanceof Error ? e.message : "Assets couldn’t be read."] })),
   ]);
   type AdRow = { adId: string; campaign: string; adGroup: string; adGroupId: string; status: string; headlines: string[]; descriptions: string[]; finalUrls: string[]; impressions: number; clicks: number; spend: number; conversions: number; calls: number | null };
   const stats = (adStats || {}) as Record<string, { impressions: number; clicks: number; spend: number; conversions: number; calls: number | null }>;
@@ -191,7 +191,7 @@ export async function GET(request: Request) {
   type Kw = { adGroupId: string; keyword: string; matchType: string; status?: string; clicks: number; impressions: number; spend: number; conversions: number; qualityScore?: number | null };
   const kws = (kwData || []) as unknown as Kw[];
   type Asset = { type: string; fieldType: string; scope: string; campaignName: string; adGroupName: string; status: string; performanceLabel: string; text: string[]; finalUrls: string[]; imageUrl: string; impressions: number; clicks: number; spend: number; conversions: number };
-  const assetRows = (assets || []) as unknown as Asset[];
+  const assetRows = (assets?.assets || []) as unknown as Asset[];
 
   const pages = new Map<string, { path: string; url: string; clicks: number; impressions: number; spend: number; conversions: number }>();
   for (const r of landing || []) { const k = pathKey(r.url); const p = pages.get(k) || { path: k, url: r.url.split("?")[0], clicks: 0, impressions: 0, spend: 0, conversions: 0 }; p.clicks += r.clicks; p.impressions += r.impressions; p.spend += r.spend; p.conversions += r.conversions; pages.set(k, p); }
@@ -210,5 +210,5 @@ export async function GET(request: Request) {
   const assetList = assetRows.filter((a) => !/^(HEADLINE|DESCRIPTION)$/i.test(a.fieldType) || a.scope === "Performance Max asset group")
     .sort((a, b) => (order.indexOf(a.type) + 1 || 99) - (order.indexOf(b.type) + 1 || 99) || b.clicks - a.clicks || b.impressions - a.impressions)
     .slice(0, 200).map((a) => ({ type: a.type, fieldType: a.fieldType, scope: a.scope, campaign: a.campaignName, adGroup: a.adGroupName, status: a.status, performance: a.performanceLabel, text: a.text, finalUrls: a.finalUrls, imageUrl: a.imageUrl, clicks: a.clicks, impressions: a.impressions, spend: a.spend, conversions: a.conversions }));
-  return reply({ kind, period, pages: list, assets: assetList, notes: { ads: landing == null && ads == null ? "Google Ads didn’t return data." : "", assets: assets == null ? "Google Ads assets couldn’t be read." : "", analytics: gaNote }, sources: ["Google Ads API", "Google Analytics 4"] });
+  return reply({ kind, period, pages: list, assets: assetList, notes: { ads: landing == null && ads == null ? "Google Ads didn’t return data." : "", assets: assets?.errors?.length ? `Some assets couldn’t be read (${assets.errors.join("; ")})` : "", analytics: gaNote }, sources: ["Google Ads API", "Google Analytics 4"] });
 }
