@@ -135,16 +135,7 @@ export function buildDeck(input: {
     notification: "New enquiry",
     notificationText: "You have received a new enquiry.",
   });
-  const audience = (ai.audience && ai.audience.length ? ai.audience : String(inputs.audience || brand.audience || "").split(/[,\n;]+/)).map((item) => String(item).trim()).filter(Boolean).slice(0, 6);
-  if (audience.length) add("audience", { heading: first(ai.audienceHeading || "", "Target Audience:"), items: audience });
-  const findings = (ai.findings || []).filter((item) => item?.title).slice(0, 4);
-  if (findings.length || inputs.sources.some((source) => source.kind === "audit" || source.kind === "report")) {
-    add("findings", {
-      heading: "Where you are now",
-      intro: first(ai.findingsIntro || "", "What we found reviewing your current marketing."),
-      items: findings.length ? findings : [{ title: "Visibility", detail: "Add audit findings here." }, { title: "Website", detail: "Add audit findings here." }, { title: "Tracking", detail: "Add audit findings here." }],
-    });
-  }
+  // Kept simple like the original proposals: cover, goal, one slide per service, timeline, CRM, investment.
   core.forEach((item, index) => {
     const copy = aiService(item.key);
     add("service", {
@@ -153,7 +144,7 @@ export function buildDeck(input: {
       heading: first(copy?.heading || "", `Phase ${index + 1}: ${item.def.name}`),
       cardTitle: first(copy?.cardTitle || "", item.def.name),
       cardBody: first(copy?.cardBody || "", item.def.summary),
-      bullets: (copy?.bullets?.length ? copy.bullets : item.def.deliverables).slice(0, 5),
+      bullets: (copy?.bullets?.length ? copy.bullets : item.def.deliverables).slice(0, 4),
       ...(item.def.visual === "search" ? {
         keywords: (ai.keywords?.filter(Boolean).length ? ai.keywords : defaultKeywords(brand)).slice(0, 6),
         adHeadline: first(ai.searchAd?.headline || "", `${brand.businessName || name} | ${titleCase(businessServices(brand)[0] || "Local Experts")}`),
@@ -161,32 +152,11 @@ export function buildDeck(input: {
       } : {}),
       ...(["social", "retarget"].includes(item.def.visual) ? { ads: (ai.ads?.filter((ad) => ad?.primaryText).length ? ai.ads : defaultAds(brand)).slice(0, 3) } : {}),
     });
-    if (index === 0 && (item.def.visual === "search" || item.def.visual === "landing" || item.def.visual === "site")) {
-      const labels = (copy?.labels?.length ? copy.labels : businessServices(brand).map(titleCase)).map((label) => String(label).trim()).filter(Boolean).slice(0, 3);
-      add("examples", { heading: "Example:", cardTitle: item.def.name, cardBody: "Splitting keywords and landing pages by service keeps every ad matched to search intent and maximises your chance of conversion.", labels: labels.length ? labels : ["Service one", "Service two", "Service three"] });
-    }
   });
-  if (picked.some((item) => ["google-ads", "meta-ads", "retargeting", "landing"].includes(item.key))) {
-    add("cycle", { heading: "Marketing Cycle", stages: [
-      { title: "Discovery", text: "Users search for your services" }, { title: "Paid Visibility", text: "Your brand appears at the right moment" },
-      { title: "Capture", text: "You capture leads on your landing page" }, { title: "Retarget", text: "Re-engage visitors on social" }, { title: "Conversion", text: "Qualified enquiries are turned into real sales" },
-    ] });
-  }
-  add("dashboard", { heading: "Dashboard / Tracking", cardTitle: "CRM / Mobile App", cardBody: "Track every sale, lead and enquiry in one centralised CRM system and mobile app.", labels: ["Lead Count", "Ad Spend", "Pipeline"], leadCount: "75", spend: money(788, currency), cpl: money(23, currency) });
-  const phases = (ai.phases && ai.phases.length ? ai.phases : [
-    ...core.map((item, index) => ({ title: `Phase ${index + 1} - ${item.def.name}`, text: item.def.summary })),
-    { title: `Phase ${core.length + 1} - Tracking & Reporting`, text: "Call and form tracking with a clear lead view and monthly reporting." },
-    { title: `Phase ${core.length + 2} - Optimisation`, text: "Review search behaviour, lead quality and campaign performance to guide ongoing improvements." },
-  ]).slice(0, 6);
-  add("implementation", { heading: "Marketing Implementation", phases });
   const months = monthsFrom(inputs.startMonth, 4);
   const captions = ["In this stage we will be working together closely", "Launch — testing & optimising", "Starting to see an increase in enquiries", "Organic growth supports paid campaigns with a steady flow of enquiries"];
   add("timeline", { heading: "Project Timeline", steps: months.map((month, index) => ({ month, caption: first(ai.timeline?.[index]?.caption || "", captions[index]) })) });
-  add("expect", { heading: first(ai.expectHeading || "", "What to Expect (Realistically)"), paragraphs: (ai.expect && ai.expect.length ? ai.expect : [
-    "Results build over the first 60–90 days as campaigns gather data and we refine targeting.",
-    "Success is judged on the quality of conversations and booked work, not just volume.",
-    "In practice, a small number of additional enquiries can cover the investment many times over.",
-  ]).slice(0, 4) });
+  add("dashboard", { heading: "Your CRM & AI Assistant", cardTitle: "One place for every lead", cardBody: `Every call, form and message lands in your own CRM and mobile app — branded for ${name}. Our AI assistant replies instantly, answers questions and books appointments 24/7.`, bullets: ["Live pipeline with lead values", "AI replies & books in seconds", "Calls, forms & WhatsApp in one inbox", "Monthly results report"], labels: ["Lead Count", "Ad Spend", "Pipeline"] });
   const setup = core.reduce((sum, item) => sum + item.setupFee, 0);
   const monthly = core.reduce((sum, item) => sum + item.monthlyFee, 0);
   add("investment", {

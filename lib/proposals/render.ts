@@ -154,9 +154,27 @@ export function renderProposalHtml(deck: ProposalDeck, brand: ProposalBrand, opt
       case "social": case "retarget": return `<div class="feed a d2">${[0, 1, 2].map((index) => `${index ? `<span class="arrow">→</span>` : ""}${phone(adPost(slide, index), "sm")}`).join("")}</div>`;
       case "email": return `<div class="duo a d2">${phone(`<div class="mail"><div class="mail-head">${logoMark()}</div><h4>${esc(slide.data.cardTitle || "Your latest news")}</h4>${photo(slide, "images.0", photoAt(0), "mail-img")}<p></p><p></p><span class="mail-btn">Book a consultation</span><div class="mail-cards">${[1, 2].map((index) => `<span>${photo(slide, `images.${index}`, photoAt(index))}<b>${esc(tc(services[index - 1] || (index === 1 ? "Latest work" : "Customer stories")))}</b></span>`).join("")}</div></div>`, "solo")}</div>`;
       case "whatsapp": return `<div class="feed a d2">${phone(`<div class="formui"><div class="mail-head">${logoMark()}</div><b>Tell us about your project</b><i></i><i></i><i></i><i class="tall"></i><span>Request a quote →</span></div>`, "sm")}<span class="arrow">→</span>${phone(`<div class="chatui"><div class="chat-top"><i class="ad-av">${logoMark()}</i>${esc(name)}</div><p class="in">Hi! Thanks for your enquiry — when suits you for a quick call?</p><p class="out">Tomorrow afternoon would be perfect</p><p class="in">Great — you're booked in for 2pm ✓</p></div>`, "sm")}</div>`;
-      case "dashboard": return dashboardGraphic(slide);
+      case "dashboard": return crmGraphic();
       default: return `<div class="duo a d2">${desktop(browser(site(slide, "brand.screenshotDesktop", "d")), "big")}${phone(site(slide, "brand.screenshotMobile", "m", 1), "front")}</div>`;
     }
+  };
+  const crmGraphic = () => {
+    const svc = (i: number) => tc(services[i % Math.max(services.length, 1)] || ["New enquiry", "Quote request", "Consultation"][i % 3]);
+    const cols: Array<[string, Array<[string, string, string]>]> = [
+      ["New lead", [["Sarah M.", svc(0), "€850"], ["Tom K.", svc(1), "€1,200"], ["Aoife R.", svc(2), "€640"]]],
+      ["Contacted", [["James B.", svc(1), "€2,400"], ["Niamh O.", svc(0), "€950"]]],
+      ["Quote sent", [["Mark D.", svc(2), "€3,100"], ["Lisa F.", svc(0), "€1,750"]]],
+      ["Won", [["Ciara H.", svc(1), "€4,200"]]],
+    ];
+    return `<div class="crmwrap a d2">${desktop(`<div class="crm"><div class="crm-top"><span class="crm-logo">${logoMark()}</span><span class="crm-nav"><i class="on">Dashboard</i><i>Leads</i><i>Scheduling</i><i>Reports</i></span><span class="crm-me"></span></div>
+      <div class="crm-kpis">${[["New leads", "24"], ["Pipeline", "€18,450"], ["Booked", "9"], ["Won this month", "€7,200"]].map(([k, v]) => `<span><small>${k}</small><b>${v}</b></span>`).join("")}</div>
+      <div class="crm-pipe">${cols.map(([title, cards]) => `<div class="crm-col"><small>${title}<em>${cards.length}</em></small>${cards.map(([who, what, val]) => `<span class="crm-card"><b>${who}</b><i>${esc(what)}</i><em>${val}</em></span>`).join("")}</div>`).join("")}</div></div>`, "crm-mac")}
+      ${phone(`<div class="bot"><div class="bot-top"><i class="ad-av">${logoMark()}</i><span><b>${esc(name)}</b><small><i></i>AI assistant · online</small></span></div>
+        <p class="in">Hi, do you do ${esc((services[0] || "your services").toLowerCase())}${area ? ` in ${esc(area)}` : ""}?</p>
+        <p class="out">Yes, we do! ${area ? `We cover all of ${esc(area)}. ` : ""}Would you like a free quote? I have Thursday 10am or Friday 2pm.</p>
+        <p class="in">Thursday 10am please</p>
+        <p class="out">Booked ✓ You'll get a text confirmation shortly.</p>
+        <span class="bot-booked">${icon("check")} Appointment booked · added to CRM</span></div>`, "bot-phone")}</div>`;
   };
   const dashboardGraphic = (slide: Slide) => `<div class="dash a d2">
     <div class="dash-tile">${desktop(`<div class="kpi"><small>Leads</small><strong class="count" data-to="${attr(String(slide.data.leadCount || "75").replace(/\D/g, "") || "75")}">${esc(slide.data.leadCount || "75")}</strong><div class="spark">${[30, 45, 38, 60, 52, 74, 88].map((h) => `<i style="height:${h}%"></i>`).join("")}</div></div>`)}<span class="pill">${esc((slide.data.labels || [])[0] || "Lead Count")}</span></div>
@@ -199,7 +217,7 @@ export function renderProposalHtml(deck: ProposalDeck, brand: ProposalBrand, opt
         </div>${n}</div></section>`;
       }
       case "dashboard": return `<section class="slide dashboard" id="s-${attr(slide.id)}"><div class="in">${t(slide, "heading", "h2", "title a")}
-        <div class="svc"><div class="svc-panel a">${card(slide, "gear", "cardTitle", "cardBody")}</div><div class="svc-visual">${dashboardGraphic(slide)}</div></div>${n}</div></section>`;
+        <div class="svc"><div class="svc-panel a">${card(slide, "gear", "cardTitle", "cardBody")}<ul class="ticks">${(d.bullets || []).map((_: string, i: number) => `<li class="a" style="--d:${i + 2}">${icon("check")}${t(slide, `bullets.${i}`)}</li>`).join("")}</ul></div><div class="svc-visual">${crmGraphic()}</div></div>${n}</div></section>`;
       case "implementation": return `<section class="slide implementation" id="s-${attr(slide.id)}"><div class="in">${swoosh("tl")}${t(slide, "heading", "h2", "title up a")}
         <div class="phases">${(d.phases || []).map((_: unknown, i: number) => `<div class="phase a" style="--d:${i}"><span class="phase-n">${i + 1}</span><div>${t(slide, `phases.${i}.title`, "b")}${t(slide, `phases.${i}.text`, "p")}</div></div>`).join("")}</div>${swoosh("br")}${n}</div></section>`;
       case "timeline": return `<section class="slide timeline" id="s-${attr(slide.id)}"><div class="in">${swoosh("tl")}<div class="tl-head a"><h2 class="title up">${t(slide, "heading")}</h2><span class="tl-clock">${icon("clock")}</span></div>
@@ -530,6 +548,32 @@ h1,h2,b{font-weight:800}
 .ad-react{font-size:10.5u;padding:9u 12u}.ad-react svg{width:12u;height:12u}.ad-r i{width:18u;height:18u}
 .listing .ad-av .lg{max-height:none;max-width:none}
 .mail-cards{display:grid;grid-template-columns:1fr 1fr;gap:10u;width:100%;margin-top:6u}.mail-cards span{display:grid;gap:5u;text-align:left}.mail-cards .slot{height:86u;border-radius:10u}.mail-cards b{font-size:11u}
+/* our CRM with their logo + pipeline, and the AI conversation bot */
+.crmwrap{position:relative;width:100%;padding-right:150u}
+.crm-mac{width:100%}
+.crm{position:absolute;inset:0;container-type:inline-size;background:#f4f6fa;display:flex;flex-direction:column;color:#111}
+.crm-top{display:flex;align-items:center;gap:2.4cqw;padding:1.4cqw 2.4cqw;background:#fff;border-bottom:1px solid #e6e9ef}
+.crm-logo .lg{height:3.6cqw;max-width:16cqw;object-fit:contain}.crm-logo .lg-t{font-size:2cqw;color:var(--brand)}
+.crm-nav{display:flex;gap:.8cqw}.crm-nav i{font-style:normal;font-size:1.35cqw;font-weight:700;color:#5b6475;padding:.7cqw 1.4cqw;border-radius:99px}.crm-nav i.on{background:var(--accent);color:#fff}
+.crm-me{margin-left:auto;width:3.4cqw;height:3.4cqw;border-radius:50%;background:linear-gradient(135deg,#c7d2fe,#93c5fd)}
+.crm-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:1.4cqw;padding:1.8cqw 2.4cqw 0}
+.crm-kpis span{background:#fff;border-radius:1.2cqw;padding:1.3cqw 1.6cqw;box-shadow:0 .4cqw 1.2cqw rgba(15,23,42,.06);display:grid;gap:.3cqw}
+.crm-kpis small{font-size:1.15cqw;color:#6b7280;font-weight:600}.crm-kpis b{font-size:2.6cqw}
+.crm-pipe{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,1fr);gap:1.2cqw;padding:1.6cqw 2.4cqw 2cqw}
+.crm-col{background:#eaedf3;border-radius:1.2cqw;padding:1cqw;display:flex;flex-direction:column;gap:.8cqw;overflow:hidden}
+.crm-col small{display:flex;justify-content:space-between;font-size:1.2cqw;font-weight:800;color:#374151;padding:.2cqw .3cqw}.crm-col small em{font-style:normal;background:#fff;border-radius:99px;padding:0 .8cqw;color:#6b7280}
+.crm-card{background:#fff;border-radius:.9cqw;padding:.9cqw 1cqw;display:grid;gap:.2cqw;border-left:.45cqw solid var(--brand);box-shadow:0 .3cqw .8cqw rgba(15,23,42,.06)}
+.crm-card b{font-size:1.25cqw}.crm-card i{font-style:normal;font-size:1.05cqw;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.crm-card em{font-style:normal;font-size:1.15cqw;font-weight:800;color:#15803d}
+.bot-phone{position:absolute;right:0;bottom:30u;width:250u}
+.bot{height:100%;background:#f5f7fb;display:flex;flex-direction:column;gap:8u;padding:0 10u}
+.bot-top{display:flex;align-items:center;gap:8u;margin:0 -10u 4u;padding:48u 12u 10u;background:#fff;border-bottom:1px solid #e6e9ef}
+.bot-top span{display:grid}.bot-top b{font-size:12.5u}.bot-top small{font-size:9.5u;color:#16a34a;display:flex;align-items:center;gap:4u}.bot-top small i{width:7u;height:7u;border-radius:50%;background:#22c55e}
+.bot p{max-width:86%;font-size:11u;line-height:1.4;padding:8u 10u;border-radius:14u;opacity:0;transform:translateY(8u);transition:.45s ease}
+.bot p.in{background:#fff;align-self:flex-start;border-bottom-left-radius:4u;box-shadow:0 2u 6u rgba(0,0,0,.05)}
+.bot p.out{background:var(--accent);color:#fff;align-self:flex-end;border-bottom-right-radius:4u}
+.on .bot p{opacity:1;transform:none}.on .bot p:nth-of-type(2){transition-delay:.6s}.on .bot p:nth-of-type(3){transition-delay:1.2s}.on .bot p:nth-of-type(4){transition-delay:1.8s}
+.bot-booked{margin-top:auto;margin-bottom:22u;display:flex;align-items:center;gap:6u;justify-content:center;background:#dcfce7;color:#15803d;font-size:10.5u;font-weight:800;padding:8u;border-radius:12u}.bot-booked svg{width:13u;height:13u}
+@media print{.bot p{opacity:1!important;transform:none!important}}
 .print-btn{position:fixed;top:16px;right:16px;padding:12px 20px;border:0;border-radius:12px;background:var(--accent);color:#fff;font:700 15px Poppins,system-ui;cursor:pointer;z-index:9;box-shadow:0 10px 30px rgba(20,99,255,.4)}
 @page{size:297mm 215.3mm;margin:0}
 @media print{html,body{background:#fff;padding:0;display:block}.slide{width:297mm;border-radius:0;box-shadow:none;page-break-after:always;break-after:page}.slide[data-hidden]{display:none}.no-print{display:none}.a,.notif,.serp-row,.rank i,.seg,.node,.chatui p{opacity:1!important;transform:none!important;transition:none!important}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
