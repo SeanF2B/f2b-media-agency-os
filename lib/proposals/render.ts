@@ -68,6 +68,19 @@ export function renderProposalHtml(deck: ProposalDeck, brand: ProposalBrand, opt
       <div class="s-hero">${kind === "d" ? copy + media : media + copy}</div>
       ${kind === "d" ? `<div class="s-cards">${(services.length ? services : ["Our services", "Why choose us", "Get in touch"]).slice(0, 3).map((item) => `<span><i></i>${esc(tc(item))}</span>`).join("")}</div>` : ""}</div>`;
   };
+  /** A dedicated service landing page (like the Red Island examples): photo hero + headline + quote form. */
+  const landingMock = (kind: "d" | "m", hero: string, service: string) => {
+    const head = `${tc(service)}${area ? ` in ${area}` : ""}`;
+    const form = `<div class="lp-form"><b>Request a free quote</b><span class="lp-f">Name</span><span class="lp-f">Phone</span><span class="lp-f">Email</span><span class="lp-f tall">What do you need help with?</span><span class="s-btn">Get my free quote →</span></div>`;
+    return `<div class="site lp ${kind}"><div class="s-nav">${logoMark()}${kind === "d" ? `<span class="s-links"><i>Call us today</i></span><b class="s-btn sm">Get a quote</b>` : `<span class="s-burger"><i></i><i></i><i></i></span>`}</div>
+      <div class="lp-hero"><div class="lp-photo">${tile()}${hero ? `<img src="${attr(hero)}" alt="" loading="lazy" onerror="this.remove()">` : ""}<div class="lp-copy"><small>${esc(tc(service))}${area ? ` · ${esc(area)}` : ""}</small><h6>${esc(head)}</h6><p>${esc(`Fast, friendly ${service.toLowerCase()} from ${name}. Free quotes, no obligation.`)}</p>${kind === "m" ? `<span class="s-btn">Get my free quote →</span>` : ""}</div></div>${kind === "d" ? form : ""}</div>
+      ${kind === "d" ? `<div class="lp-trust">${["Free quote", "Local team", "Fast response"].map((item) => `<span>${icon("check")}${item}</span>`).join("")}</div>` : form}</div>`;
+  };
+  const landing = (slide: Slide, key: "images.0" | "images.1", kind: "d" | "m", service: string, heroIndex = 0) => {
+    const own = valueAt(slide, key);
+    const hero = own === "none" ? "" : img(own) || photoAt(heroIndex);
+    return `<div class="slot site-slot"${slotAttr(slide, key)}>${landingMock(kind, hero, service)}</div>`;
+  };
   const site = (slide: Slide, key: "brand.screenshotDesktop" | "brand.screenshotMobile", kind: "d" | "m", heroIndex = 0) => {
     const shot = img(valueAt(slide, key));
     return `<div class="slot site-slot"${slotAttr(slide, key)}>${siteMock(kind, photoAt(heroIndex))}${shot ? `<img class="shotimg" src="${attr(shot)}" alt="${attr(name)} website" loading="lazy" onerror="this.remove()">` : ""}</div>`;
@@ -149,12 +162,13 @@ export function renderProposalHtml(deck: ProposalDeck, brand: ProposalBrand, opt
     switch (visual) {
       case "search": return desktop(searchScreen(slide), "big a d2");
       case "maps": return `<div class="mapwrap a d2"><div class="map"><svg class="map-svg" viewBox="0 0 400 260" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="400" height="260" fill="#eef1f4"/><path d="M290 0 C 300 70 360 90 400 110 L400 0Z" fill="#cfe3f7"/><rect x="40" y="150" width="90" height="60" rx="14" fill="#d7ecd9"/><rect x="250" y="170" width="70" height="50" rx="12" fill="#d7ecd9"/><g stroke="#fff" stroke-linecap="round" fill="none"><path d="M-10 120 C 100 100 200 140 410 90" stroke-width="12"/><path d="M150 -10 C 160 80 140 180 175 270" stroke-width="10"/><path d="M-10 40 L 410 60" stroke-width="5"/><path d="M-10 200 L 410 230" stroke-width="5"/><path d="M60 -10 L 90 270" stroke-width="5"/><path d="M240 -10 L 230 270" stroke-width="5"/><path d="M320 -10 L 350 270" stroke-width="5"/></g><g stroke="#f8d77a" stroke-linecap="round" fill="none"><path d="M-10 120 C 100 100 200 140 410 90" stroke-width="3"/></g></svg>${[18, 42, 66, 30, 78, 55].map((x, index) => `<i class="pin${index === 2 ? " me" : ""}" style="left:${x}%;top:${[30, 62, 38, 22, 55, 75][index]}%">${icon("pin")}</i>`).join("")}</div><div class="listing"><span class="listing-top"><i class="ad-av">${logoMark()}</i><b>${esc(name)}</b></span><small>${esc(tc(services[0] || "Local business"))}${area ? ` · ${esc(area)}` : ""}</small><span class="listing-btns"><em>Call</em><em>Directions</em><em>Website</em></span></div></div>`;
-      case "seo": return `<div class="duo a d2">${desktop(browser(site(slide, "brand.screenshotDesktop", "d")), "big")}${phone(site(slide, "brand.screenshotMobile", "m", 1), "front")}<div class="rank">${[38, 52, 64, 78, 92].map((h, index) => `<i style="height:${h}%;--d:${index}"></i>`).join("")}<span>Organic traffic</span></div></div>`;
       case "ai": return `<div class="aiq a d2"><div class="aiq-ask">${icon("chat")}<span>Who's the best for ${esc((services[0] || "this service").toLowerCase())}${area ? ` in ${esc(area)}` : " near me"}?</span></div><div class="aiq-ans"><span class="aiq-ico">${icon("spark")}</span><p><b>${esc(name)}</b> is a strong option${area ? ` in ${esc(area)}` : ""}. ${esc(String(brand.description || "They're a well-reviewed local business.").split(/(?<=[.!])\s/)[0].slice(0, 140))}</p><div class="aiq-src"><span>${logoMark()}</span><span>${esc(domain)}</span></div></div></div>`;
       case "social": case "retarget": return `<div class="feed a d2">${[0, 1, 2].map((index) => `${index ? `<span class="arrow">→</span>` : ""}${phone(adPost(slide, index), "sm")}`).join("")}</div>`;
       case "email": return `<div class="duo a d2">${phone(`<div class="mail"><div class="mail-head">${logoMark()}</div><h4>${esc(slide.data.cardTitle || "Your latest news")}</h4>${photo(slide, "images.0", photoAt(0), "mail-img")}<p></p><p></p><span class="mail-btn">Book a consultation</span><div class="mail-cards">${[1, 2].map((index) => `<span>${photo(slide, `images.${index}`, photoAt(index))}<b>${esc(tc(services[index - 1] || (index === 1 ? "Latest work" : "Customer stories")))}</b></span>`).join("")}</div></div>`, "solo")}</div>`;
       case "whatsapp": return `<div class="feed a d2">${phone(`<div class="formui"><div class="mail-head">${logoMark()}</div><b>Tell us about your project</b><i></i><i></i><i></i><i class="tall"></i><span>Request a quote →</span></div>`, "sm")}<span class="arrow">→</span>${phone(`<div class="chatui"><div class="chat-top"><i class="ad-av">${logoMark()}</i>${esc(name)}</div><p class="in">Hi! Thanks for your enquiry — when suits you for a quick call?</p><p class="out">Tomorrow afternoon would be perfect</p><p class="in">Great — you're booked in for 2pm ✓</p></div>`, "sm")}</div>`;
       case "dashboard": return crmGraphic();
+      case "landing": return `<div class="duo a d2">${desktop(browser(landing(slide, "images.0", "d", services[0] || "Our services", 0)), "big")}${phone(landing(slide, "images.1", "m", services[1] || services[0] || "Our services", 1), "front")}</div>`;
+      case "seo": return `<div class="duo a d2">${desktop(browser(`<div class="slot site-slot"${slotAttr(slide, "images.0")}>${siteMock("d", (valueAt(slide, "images.0") === "none" ? "" : img(valueAt(slide, "images.0")) || photoAt(2)), `${tc(services[1] || services[0] || name)}${area ? ` in ${area}` : ""}`)}</div>`), "big")}${phone(site(slide, "brand.screenshotMobile", "m", 1), "front")}<div class="rank">${[38, 52, 64, 78, 92].map((h, index) => `<i style="height:${h}%;--d:${index}"></i>`).join("")}<span>Organic traffic</span></div></div>`;
       default: return `<div class="duo a d2">${desktop(browser(site(slide, "brand.screenshotDesktop", "d")), "big")}${phone(site(slide, "brand.screenshotMobile", "m", 1), "front")}</div>`;
     }
   };
@@ -574,6 +588,23 @@ h1,h2,b{font-weight:800}
 .on .bot p{opacity:1;transform:none}.on .bot p:nth-of-type(2){transition-delay:.6s}.on .bot p:nth-of-type(3){transition-delay:1.2s}.on .bot p:nth-of-type(4){transition-delay:1.8s}
 .bot-booked{margin-top:auto;margin-bottom:22u;display:flex;align-items:center;gap:6u;justify-content:center;background:#dcfce7;color:#15803d;font-size:10.5u;font-weight:800;padding:8u;border-radius:12u}.bot-booked svg{width:13u;height:13u}
 @media print{.bot p{opacity:1!important;transform:none!important}}
+/* service landing page (Red Island style) */
+.lp-hero{flex:1;min-height:0;display:grid;grid-template-columns:1.55fr 1fr;gap:2.4cqw;padding:2.4cqw 3cqw}
+.lp-photo{position:relative;border-radius:1.6cqw;overflow:hidden}
+.lp-photo>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1}
+.lp-copy{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;justify-content:flex-end;padding:3cqw;color:#fff;background:linear-gradient(180deg,rgba(0,0,0,0) 20%,rgba(0,0,0,.72))}
+.lp-copy small{font-size:1.3cqw;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#fff;opacity:.9}
+.lp-copy h6{font-size:4.4cqw;line-height:1.05;font-weight:800;margin:.6cqw 0 1cqw}
+.lp-copy p{font-size:1.5cqw;line-height:1.5;opacity:.92;max-width:90%}
+.lp-form{background:#fff;border-radius:1.6cqw;padding:2.2cqw;box-shadow:0 1.4cqw 3.6cqw rgba(15,23,42,.14);display:flex;flex-direction:column;gap:1cqw;border-top:.6cqw solid var(--brand)}
+.lp-form b{font-size:2cqw;margin-bottom:.4cqw}
+.lp-f{display:block;border:1px solid #e3e6ec;border-radius:.8cqw;padding:1.1cqw 1.2cqw;font-size:1.25cqw;color:#9aa1ad}.lp-f.tall{height:7cqw}
+.lp-form .s-btn{text-align:center;margin-top:auto}
+.lp-trust{display:flex;justify-content:center;gap:4cqw;padding:0 3cqw 2cqw;font-size:1.4cqw;font-weight:700;color:#374151}
+.lp-trust span{display:flex;align-items:center;gap:.8cqw}.lp-trust svg{width:1.8cqw;height:1.8cqw;color:var(--brand)}
+.site.lp.m .lp-hero{grid-template-columns:1fr;padding:3cqw 4cqw;flex:none;height:46%}
+.site.lp.m .lp-copy{padding:5cqw}.site.lp.m .lp-copy small{font-size:3cqw}.site.lp.m .lp-copy h6{font-size:8cqw}.site.lp.m .lp-copy p{font-size:3.4cqw}.site.lp.m .lp-copy .s-btn{display:none}
+.site.lp.m .lp-form{margin:0 4cqw 4cqw;padding:4.5cqw;gap:2.4cqw;border-radius:4cqw;flex:1}.site.lp.m .lp-form b{font-size:5cqw}.site.lp.m .lp-f{font-size:3.4cqw;padding:3cqw;border-radius:2cqw}.site.lp.m .lp-f.tall{height:14cqw}
 .print-btn{position:fixed;top:16px;right:16px;padding:12px 20px;border:0;border-radius:12px;background:var(--accent);color:#fff;font:700 15px Poppins,system-ui;cursor:pointer;z-index:9;box-shadow:0 10px 30px rgba(20,99,255,.4)}
 @page{size:297mm 215.3mm;margin:0}
 @media print{html,body{background:#fff;padding:0;display:block}.slide{width:297mm;border-radius:0;box-shadow:none;page-break-after:always;break-after:page}.slide[data-hidden]{display:none}.no-print{display:none}.a,.notif,.serp-row,.rank i,.seg,.node,.chatui p{opacity:1!important;transform:none!important;transition:none!important}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
