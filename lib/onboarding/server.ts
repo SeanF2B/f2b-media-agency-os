@@ -60,6 +60,15 @@ export async function agencyOwnerId(): Promise<string> {
   return id;
 }
 
+/** The agency's own brand (Settings → Branding): colours, logo and name for the public onboarding page. */
+export async function agencyBranding(): Promise<{ primary: string; secondary: string; logo: string; name: string }> {
+  const row = await db().prepare("SELECT json_extract(data, '$.settings.branding') AS branding, json_extract(data, '$.settings.agencyName') AS agency FROM workspace_documents WHERE id = 'f2b-agency'").first<{ branding: string | null; agency: string | null }>().catch(() => null);
+  const b = parse<Row>(row?.branding, {});
+  const hex = (value: unknown, fallback: string) => /^#[0-9a-f]{6}$/i.test(String(value || "")) ? String(value).toLowerCase() : fallback;
+  const logo = typeof b.logo === "string" && /^(data:image\/(png|jpeg|webp|svg\+xml);base64,|https:\/\/)/i.test(b.logo) && b.logo.length < 400_000 ? b.logo : "";
+  return { primary: hex(b.primary, "#1463ff"), secondary: hex(b.secondary, "#1e3a8a"), logo, name: String(b.name || row?.agency || "F2B Media").slice(0, 60) };
+}
+
 export type OnboardingSettings = {
   publicEnabled: boolean; limits: Limits; pricing: Pricing; embedOrigins: string[]; localCountry: string; bookingSlug: string;
   freeFindings: number; consentText: string; stripeMode: "test" | "live";

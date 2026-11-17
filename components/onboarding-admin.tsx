@@ -31,7 +31,7 @@ async function api(body: Record<string, unknown>) {
   return result;
 }
 
-export function OnboardingAdmin() {
+export function OnboardingAdmin({ onStartWizard }: { onStartWizard?: () => void } = {}) {
   const [data, setData] = useState<Data | null>(null);
   const [section, setSection] = useState<(typeof SECTIONS)[number]>("Overview");
   const [error, setError] = useState("");
@@ -50,6 +50,7 @@ export function OnboardingAdmin() {
   return <div className="onb-admin">
     <div className="onb-admin-head">
       <div><h3>Online onboarding</h3><p>One engine for the public funnel at <a href={data.startUrl} target="_blank" rel="noreferrer">/f/start</a> and this wizard. {s.stripeMode === "live" ? <b className="onb-pill live">Live payments</b> : <b className="onb-pill test">Test mode — no real charges</b>}{!s.publicEnabled && <b className="onb-pill off">Paused</b>}</p></div>
+      <div className="onb-admin-actions">{onStartWizard && <button type="button" className="primary-button" onClick={onStartWizard}>Onboard a client</button>}<a className="secondary-button" href={data.startUrl} target="_blank" rel="noreferrer">Open public page ↗</a></div>
       <nav className="onb-admin-tabs" role="tablist">{SECTIONS.map((name) => <button key={name} type="button" role="tab" aria-selected={section === name} className={section === name ? "on" : ""} onClick={() => { setSection(name); setNote(""); }}>{name}</button>)}</nav>
     </div>
     {error && <p className="onb-error" role="alert">{error}</p>}

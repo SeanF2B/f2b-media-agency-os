@@ -8,7 +8,7 @@ export function canOpenPage(page: string, permissions: TeamPermissions, isAdmin:
     : page === "CRM" || page === "Conversations" ? isAdmin || (hasClientScope && (CRM_ROLES as readonly string[]).includes(role))
     : page === "CRM Automations" || page === "Invoicing" || page === "Bookkeeping" ? isAdmin
     : page === "Tasks" ? permissions.tasks || permissions.aiTasks
-    : page === "Operations" || page === "Operating World" ? isAdmin
+    : page === "Operations" || page === "Operating World" || page === "Onboarding" ? isAdmin
     : page === "SEO" || page === "Media Library" ? permissions.clients || hasClientScope || isAdmin
     : page === "Tracking & Analytics" ? permissions.reports || isAdmin
     : page === "Email Marketing" || page === "Cold Outreach" ? isAdmin
