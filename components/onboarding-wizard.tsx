@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 // Guided client onboarding (Operations → Onboarding). Saves into the existing client record and creates
 // setup checklists in the existing Tasks system — one per selected service, never duplicated.
+// Shares the onboarding engine with the public /f/start funnel: same website extractor + profile cache,
+// same AI field helper (suggest / improve / shorter / professional / alternatives), same session records.
 
 export type OnboardingClient = {
   id: string; name: string; company?: string; contact?: string; email?: string; phone?: string; website?: string; wordpressSiteUrl?: string;
@@ -138,7 +140,12 @@ export function OnboardingWizard({ clients, initialClientId = "", existingSetupS
       answers: { ...answers, updatedAt: new Date().toISOString(), completedAt: answers.completedAt || new Date().toISOString() },
       servicesToSetUp: newSetups,
     };
-    try { const ok = await onSave(result); if (!ok) setError("Couldn’t save onboarding. Try again."); }
+    try {
+      const ok = await onSave(result);
+      if (!ok) setError("Couldn’t save onboarding. Try again.");
+      // Same engine as the public funnel: record the run and update the shared business profile (never blocks saving).
+      else void fetch("/api/onboarding", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "record_internal", clientId: result.clientId, client: result.client, answers: result.answers }) }).catch(() => undefined);
+    }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Couldn’t save onboarding."); }
     finally { setSaving(false); }
   };

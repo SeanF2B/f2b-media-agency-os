@@ -283,8 +283,15 @@ export async function PUT(request: Request) {
       // browser snapshot was loaded (for example, the next recurring task).
       for (const task of latestData.tasks || []) {
         const id = String(task?.id || "");
-        if (id && !baselineTasks.has(id) && !incomingTaskIds.has(id)) mergedTasks.unshift(task);
+        // Setup checklists created by online onboarding (after payment) are kept for 15 minutes even if this browser's
+        // snapshot predates them; after that a missing task means someone deleted it, so it isn't brought back.
+        const freshOnboardingTask = task?.createdVia === "onboarding" && Date.now() - Date.parse(String(task?.createdAt || "")) < 15 * 60_000;
+        if (id && !incomingTaskIds.has(id) && (!baselineTasks.has(id) || freshOnboardingTask)) mergedTasks.unshift(task);
       }
+      // Clients created by online onboarding after this browser loaded. Client removal goes through DELETE, so a
+      // client missing from a full save is only ever a stale snapshot, never a deletion.
+      const incomingClientIds = new Set((savedWorkspace.clients as any[]).map((client: any) => String(client?.id || "")));
+      const serverCreatedClients = (latestData.clients || []).filter((client: any) => client?.createdVia === "onboarding" && !incomingClientIds.has(String(client?.id || "")));
       const mergedWorkspace = {
         ...savedWorkspace,
         tasks: mergedTasks,
@@ -295,7 +302,7 @@ export async function PUT(request: Request) {
         clockIns: latestData.clockIns || {},
         // Google properties are linked automatically on the server: an older browser copy with an empty
         // field must not unlink them. A value typed in the browser always wins.
-        clients: (savedWorkspace.clients as any[]).map((client: any) => {
+        clients: [...(savedWorkspace.clients as any[]).map((client: any) => {
           const stored = (latestData.clients || []).find((item: any) => item?.id === client?.id);
           if (!stored) return client;
           const keep: Record<string, string> = {};
@@ -304,7 +311,7 @@ export async function PUT(request: Request) {
           }
           if (!String(client.wordpressSiteUrl || "").trim() && String(stored.wordpressSiteUrl || "").trim() && keep.googleSearchConsoleAccountId) keep.wordpressSiteUrl = stored.wordpressSiteUrl;
           return Object.keys(keep).length ? { ...client, ...keep } : client;
-        }),
+        }), ...serverCreatedClients],
       };
       const version = `workspace-${crypto.randomUUID()}`;
       const result = await env.DB!.prepare("UPDATE workspace_documents SET data = json_set(?1, '$.chessGames', json(COALESCE(json_extract(data, '$.chessGames'), '[]'))), updated_at = ?2 WHERE id = ?3 AND updated_at = ?4")

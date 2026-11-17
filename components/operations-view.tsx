@@ -12,6 +12,7 @@ import { SiteFormsPanel } from "./site-forms-panel";
 import { SetupWizard } from "./setup-wizard";
 const SocialPlanner = lazy(() => import("./social-planner").then((module) => ({ default: module.SocialPlanner })));
 const DomainsDnsView = lazy(() => import("./domains-dns-view").then((module) => ({ default: module.DomainsDnsView })));
+const OnboardingAdmin = lazy(() => import("./onboarding-admin").then((module) => ({ default: module.OnboardingAdmin })));
 const EmailMarketingView = lazy(() => import("./email-marketing-view").then((module) => ({ default: module.EmailMarketingView })));
 
 // Operations Centre: one admin-only page that reuses existing features (SEO, Google Ads, Websites,
@@ -139,6 +140,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
   const [sites, setSites] = useState<SiteRow[] | null>(null);
   const [siteError, setSiteError] = useState("");
   const [query, setQuery] = useState("");
+  const [onbView, setOnbView] = useState<"wizard" | "online">("wizard");
   const [statusView, setStatusView] = useState<"active" | "inactive" | "all">("active");
   const active = useMemo(() => clients.filter((client) => client.status !== "Inactive" && client.status !== "Archived" && !/^agency$/i.test(client.name.trim())), [clients]);
   useEffect(() => {
@@ -243,7 +245,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
     {tab === "sites" && sitesTab === "automations" && automations && <div className="ops-embed ops-automations">{automations}</div>}
 
 
-    {tab === "onboarding" && <><button type="button" className="text-button ops-back" onClick={() => onTab("clients")}>← Back to clients</button>{onboarding}</>}
+    {tab === "onboarding" && <><div className="ops-onb-switch"><button type="button" className="text-button ops-back" onClick={() => onTab("clients")}>← Back to clients</button><span className="ops-status-filter" role="tablist" aria-label="Onboarding view">{(["wizard", "online"] as const).map((key) => <button key={key} type="button" role="tab" aria-selected={onbView === key} className={onbView === key ? "on" : ""} onClick={() => setOnbView(key)}>{key === "wizard" ? "Onboard a client" : "Online onboarding"}</button>)}</span></div>{onbView === "wizard" ? onboarding : <Suspense fallback={<div className="page-loading" role="status" aria-label="Loading online onboarding…"><i /></div>}><OnboardingAdmin /></Suspense>}</>}
 
     {tab === "reports" && renderTool && selected && <>
       <div className="ops-subbar">{seg(reportMode, setReportMode, [["reports", "Client reports"], ["audits", "Audits"], ["report-keywords", "Keywords"]], "Reports sections")}</div>

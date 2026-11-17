@@ -85,6 +85,8 @@ export function triggerMatches(automation: { id: string; scope_id: string; trigg
       return true;
     case "appointment_booked": case "appointment_rescheduled": case "appointment_cancelled": case "appointment_no_show": case "appointment_completed":
       return !config.calendarId || config.calendarId === payload.calendarId;
+    case "onboarding_started": case "audit_completed": case "guidance_requested": case "checkout_completed": case "payment_failed":
+      return !config.route || config.route === payload.route;
     default: return false;
   }
 }
