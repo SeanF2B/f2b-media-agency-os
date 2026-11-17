@@ -66,8 +66,13 @@ export function KeywordReportBuilder({ clientId, clientName, picked, onPicked, p
       const r = await fetch("/api/seo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId, seeds: list, geo: "2372", locationName: area.trim() || "Ireland" }) });
       const j = await r.json() as { results?: Idea[]; location?: string; error?: string; message?: string };
       if (!r.ok) throw new Error(j.error || j.message || "Keyword ideas couldn't be found.");
-      setIdeas(j.results || []); setLocation(j.location || area || "Ireland"); setTicked(new Set());
-      if (!j.results?.length) setMsg("No ideas came back. Try broader words.");
+      // Searching again keeps what you've ticked: ticked keywords stay (at the top, still ticked), new ideas follow.
+      const fresh = j.results || [];
+      const keep = (ideas || []).filter((i) => ticked.has(i.keyword));
+      const keptKeys = new Set(keep.map((i) => i.keyword.toLowerCase()));
+      setIdeas([...keep, ...fresh.filter((i) => !keptKeys.has(i.keyword.toLowerCase()))]);
+      setLocation(j.location || area || "Ireland");
+      if (!fresh.length) setMsg(keep.length ? `No new ideas came back — your ${keep.length} ticked keyword${keep.length === 1 ? " is" : "s are"} kept.` : "No ideas came back. Try broader words.");
     } catch (e) { setMsg(e instanceof Error ? e.message : "Keyword ideas couldn't be found."); }
     finally { setBusy(""); }
   };
