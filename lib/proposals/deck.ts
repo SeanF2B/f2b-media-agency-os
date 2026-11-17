@@ -26,15 +26,9 @@ export type SelectedService = { key: string; setupFee: number; monthlyFee: numbe
 export const SLIDE_KINDS: Array<{ kind: SlideKind; label: string; hint: string }> = [
   { kind: "cover", label: "Cover", hint: "Welcome slide with their website on a desktop" },
   { kind: "goal", label: "Goal", hint: "What we're setting out to achieve" },
-  { kind: "audience", label: "Target audience", hint: "Who we'll reach" },
-  { kind: "findings", label: "Where you are now", hint: "Key findings from audits and reports" },
-  { kind: "service", label: "Service", hint: "One service with its graphic" },
-  { kind: "examples", label: "Examples", hint: "Their pages shown on devices" },
-  { kind: "cycle", label: "Marketing cycle", hint: "Discovery → visibility → capture → retarget → conversion" },
-  { kind: "dashboard", label: "Dashboard & tracking", hint: "CRM, lead count, ad spend and pipeline" },
-  { kind: "implementation", label: "Implementation", hint: "Phase-by-phase plan" },
+  { kind: "service", label: "Service", hint: "One service with a branded example" },
   { kind: "timeline", label: "Project timeline", hint: "Month-by-month roadmap" },
-  { kind: "expect", label: "What to expect", hint: "Realistic expectations" },
+  { kind: "dashboard", label: "CRM & AI assistant", hint: "Their CRM dashboard, pipeline and AI bot" },
   { kind: "investment", label: "Investment", hint: "Pricing summary" },
   { kind: "addons", label: "Optional add-ons", hint: "Extras not included" },
   { kind: "closing", label: "Next steps", hint: "Closing slide and call to action" },
@@ -156,7 +150,7 @@ export function buildDeck(input: {
   const months = monthsFrom(inputs.startMonth, 4);
   const captions = ["In this stage we will be working together closely", "Launch — testing & optimising", "Starting to see an increase in enquiries", "Organic growth supports paid campaigns with a steady flow of enquiries"];
   add("timeline", { heading: "Project Timeline", steps: months.map((month, index) => ({ month, caption: first(ai.timeline?.[index]?.caption || "", captions[index]) })) });
-  add("dashboard", { heading: "Your CRM & AI Assistant", cardTitle: "One place for every lead", cardBody: `Every call, form and message lands in your own CRM and mobile app — branded for ${name}. Our AI assistant replies instantly, answers questions and books appointments 24/7.`, bullets: ["Live pipeline with lead values", "AI replies & books in seconds", "Calls, forms & WhatsApp in one inbox", "Monthly results report"], labels: ["Lead Count", "Ad Spend", "Pipeline"] });
+  add("dashboard", { heading: "Your CRM & AI Assistant", cardTitle: "One place for every lead", cardBody: `Every call, form and message lands in one simple app with the ${name} logo. Our AI assistant replies straight away, answers questions and books customers in, day or night.`, bullets: ["See every enquiry in one place", "AI replies and books for you", "Calls, forms & WhatsApp together", "Simple monthly results"], labels: ["Lead Count", "Ad Spend", "Pipeline"] });
   const setup = core.reduce((sum, item) => sum + item.setupFee, 0);
   const monthly = core.reduce((sum, item) => sum + item.monthlyFee, 0);
   add("investment", {
@@ -208,10 +202,12 @@ export const AI_COPY_SCHEMA = {
 
 export const AI_COPY_INSTRUCTIONS = [
   "You write premium, personalised marketing proposals for F2B Media, a digital marketing agency in Ireland. UK/Irish English.",
-  "Tone: confident, warm, plain-spoken, specific to this business. Short punchy slide copy — never generic AI filler, no buzzwords, no emojis, no exclamation marks.",
+  "The reader is a busy business owner, not a marketer. Write in plain, everyday English: say what they get and why it helps them win more customers.",
+  "NO jargon or acronyms: never say CRO, CTR, CPC, ROAS, conversion rate, A/B testing, pixel, schema, SERP, funnel, optimisation, KPIs, negative keywords, impressions or similar. Say 'enquiries', 'calls', 'customers', 'top of Google' instead.",
+  "Tone: confident, warm, specific to this business. Short punchy slide copy — never generic AI filler, no buzzwords, no emojis, no exclamation marks.",
   "Use ONLY facts from the business profile, website text, imported audits/reports, discovery notes, requirements and uploaded documents. Never invent statistics, results, awards, client names, prices or guarantees.",
   "Findings: up to 4, only from the supplied audits/reports/notes (empty array if none). Each title 2–4 words; detail one sentence with the real number if given.",
-  "services: one entry for every selected core service key, in the order given. heading like 'Phase 1: Paid Search' (max 6 words). cardTitle 1–3 words. cardBody 35–55 words explaining how this service works for THIS business. bullets: 3–5 deliverables, max 8 words each. labels: up to 3 of the business's own services/pages (1–3 words each) to label example screenshots.",
+  "services: one entry for every selected core service key, in the order given. heading like 'Phase 1: Paid Search' (max 6 words). cardTitle 1–3 words. cardBody 35–55 words explaining how this service works for THIS business. bullets: 3–4 plain-English benefits, max 7 words each (e.g. 'Your ads at the top of Google'). labels: up to 3 of the business's own services/pages (1–3 words each) to label example screenshots.",
   "coverTitle + coverHighlight read as one headline split in two (e.g. 'Your Client' + 'Acquisition System', or 'Bringing Digital Support' + 'to Your Existing Pipeline'). coverSubtitle max 10 words.",
   "goal: 35–55 words. audience: 2–5 short audience groups. phases: one per core service plus tracking and optimisation, title like 'Phase 1 - Google Ads Launch', text one or two sentences.",
   "timeline: exactly 4 captions, max 12 words each, for months 1–4. expect: 2–4 short realistic paragraphs (max 35 words each), no guaranteed numbers unless supplied.",
@@ -221,6 +217,9 @@ export const AI_COPY_INSTRUCTIONS = [
   "ads: exactly 3 Facebook/Instagram ads, each promoting a DIFFERENT one of the business's own services. primaryText: 1–2 short sentences in their voice. headline max 40 chars. offer: a short, realistic promotional hook to suggest (e.g. 'Free quote in 24 hours', '10% off first service') — never claim discounts are already running. cta: one of Get Quote, Book Now, Learn More, Call Now, Send Message.",
 ].join("\n");
 
+
+/** Wording from the first catalogue (too technical). Saved decks still using it unedited get today's plain-English copy. */
+const LEGACY_COPY: Record<string, { summary: string; deliverables: string[] }> = {"google-ads": {"summary": "Search campaigns built around high-intent keywords, with landing pages that match what people are actually searching for, so your budget goes on enquiries rather than browsing.", "deliverables": ["Keyword research & campaign structure", "Ad copy and assets written for each service", "Conversion tracking on calls and forms", "Weekly optimisation and negative keyword management", "Monthly performance report"]}, "seo": {"summary": "Technical fixes, service and location pages and ongoing content that help you rank for the searches your customers make, using real search data to decide what to write.", "deliverables": ["Technical SEO audit & fixes", "Service and location pages", "Keyword tracking (15 priority keywords)", "On-page optimisation", "Monthly ranking report"]}, "geo": {"summary": "We structure your content, reviews and brand mentions so AI assistants understand who you are and recommend you when people ask for a business like yours.", "deliverables": ["AI visibility baseline test", "Entity & brand consistency fixes", "Content written for AI citation", "Structured data (schema)", "Monthly AI visibility tracking"]}, "aeo": {"summary": "Clear, expert answers to the questions your customers ask, formatted for Google's AI Overviews, featured snippets and voice search.", "deliverables": ["Customer question research", "FAQ and answer content", "FAQ / HowTo schema", "Featured snippet targeting", "Answer visibility tracking"]}, "gbp": {"summary": "A fully optimised Google Business Profile with regular posts, photos and a steady flow of reviews, so you show up in the map pack when locals search.", "deliverables": ["Profile audit & full optimisation", "Weekly Google posts", "Review request automation", "Review reply drafts", "Local ranking grid tracking"]}, "website": {"summary": "A custom-designed, mobile-first website with clear service pages, strong calls to action and lead capture connected straight into your CRM.", "deliverables": ["Custom design in your branding", "Up to 8 pages incl. service pages", "Mobile-first, fast loading", "Forms connected to your CRM", "Hosting, SSL & care plan"]}, "landing": {"summary": "Dedicated landing pages for each campaign and service, with one clear action, social proof and ongoing conversion testing to lower your cost per lead.", "deliverables": ["Campaign landing pages", "Lead forms with thank-you tracking", "Heatmap & behaviour review", "A/B testing", "Monthly conversion report"]}, "meta-ads": {"summary": "Scroll-stopping Facebook and Instagram campaigns aimed at your ideal customers, with lead forms and tracking that connect straight into your pipeline.", "deliverables": ["Audience research & targeting", "Ad creative and copy", "Lead form or landing page setup", "Pixel & conversion tracking", "Weekly optimisation"]}, "retargeting": {"summary": "Light-touch ads that follow up with people who visited your website, keeping your work in front of them without pushing too hard.", "deliverables": ["Website visitor audiences", "Instagram, Facebook & Google retargeting", "Creative refreshed monthly", "Frequency caps", "Assisted conversion reporting"]}, "social": {"summary": "A planned content calendar with posts, reels and stories written and designed in your brand voice, published for you every week.", "deliverables": ["Monthly content calendar", "12 posts / month", "Stories & reels", "Community replies", "Monthly engagement report"]}, "email": {"summary": "Automated follow-ups and regular newsletters that keep you front of mind, share your latest work and make the next step easy.", "deliverables": ["Welcome & follow-up sequences", "Monthly newsletter", "List segmentation", "Templates in your branding", "Open & click reporting"]}, "whatsapp": {"summary": "When someone submits a form they get an instant WhatsApp follow-up, and an AI assistant can answer questions and book them in.", "deliverables": ["Instant WhatsApp follow-up", "AI replies to common questions", "Appointment booking", "Missed-call text back", "Hand-over to your team"]}, "crm": {"summary": "Every enquiry, call and sale tracked in one CRM and mobile app, with a live dashboard showing ad spend, leads, cost per lead and revenue.", "deliverables": ["CRM & mobile app", "Call and form tracking", "Live reporting dashboard", "Pipeline & stage values", "Monthly review call"]}};
 /** Validates a stored deck from the database/browser. Unknown kinds are dropped; text is clipped. */
 export function sanitizeDeck(value: unknown): ProposalDeck | null {
   const raw = value as Partial<ProposalDeck> | null;
@@ -234,7 +233,17 @@ export function sanitizeDeck(value: unknown): ProposalDeck | null {
     if (input && typeof input === "object") return Object.fromEntries(Object.entries(input).slice(0, 30).map(([key, item]) => [key.slice(0, 40), clip(item, depth + 1)]));
     return null;
   };
-  const slides = raw.slides.slice(0, 40).filter((slide) => slide && kinds.has(slide.kind as SlideKind)).map((slide) => ({ id: String(slide.id || sid()).slice(0, 20), kind: slide.kind as SlideKind, hidden: Boolean(slide.hidden), data: (clip(slide.data) || {}) as Record<string, any> }));
+  const slides = raw.slides.slice(0, 40).filter((slide) => slide && kinds.has(slide.kind as SlideKind) && !(slide.kind === "service" && (slide.data as Record<string, unknown>)?.serviceKey === "landing")).map((slide) => ({ id: String(slide.id || sid()).slice(0, 20), kind: slide.kind as SlideKind, hidden: Boolean(slide.hidden), data: (clip(slide.data) || {}) as Record<string, any> }));
+  const current = catalogueByKey(SERVICE_CATALOGUE);
+  for (const slide of slides) {
+    const key = String(slide.data.serviceKey || "");
+    const old = LEGACY_COPY[key], now = current.get(key);
+    if (slide.kind !== "service" || !old || !now) continue;
+    if (slide.data.cardBody === old.summary) slide.data.cardBody = now.summary;
+    if (Array.isArray(slide.data.bullets) && slide.data.bullets.every((item: unknown) => old.deliverables.includes(String(item)))) slide.data.bullets = now.deliverables.slice(0, 4);
+    if (typeof slide.data.heading === "string") slide.data.heading = slide.data.heading.replace(/Landing Pages & CRO|Website Design & Development/, now.name).replace(/: Meta Ads$/, ": Facebook & Instagram Ads");
+    if (typeof slide.data.cardTitle === "string" && /^(Website Design & Development|Meta Ads|CRM, Tracking & Reporting|Social Media Management|WhatsApp & AI Automation)$/.test(slide.data.cardTitle)) slide.data.cardTitle = now.name;
+  }
   const accent = /^#[0-9a-f]{6}$/i.test(String(raw.accent || "")) ? String(raw.accent) : "#1463ff";
   return { version: 1, accent, slides };
 }

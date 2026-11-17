@@ -219,7 +219,7 @@ export function renderProposalHtml(deck: ProposalDeck, brand: ProposalBrand, opt
       }
       case "examples": return `<section class="slide examples" id="s-${attr(slide.id)}"><div class="in">${t(slide, "heading", "h2", "title a")}
         <div class="ex"><div class="ex-panel a">${card(slide, "search", "cardTitle", "cardBody")}</div>
-        <div class="ex-grid">${[0, 1, 2].map((i) => `<div class="ex-item a" style="--d:${i + 1}">${desktop(browser(pageSlot(slide, i, `${(d.labels || [])[i] || tc(services[i] || name)}${area ? ` in ${area}` : ""}`)))}${t(slide, `labels.${i}`, "span", "pill")}</div>`).join("")}</div></div>${n}</div></section>`;
+        <div class="ex-grid">${[0, 1, 2].map((i) => `<div class="ex-item a" style="--d:${i + 1}">${(() => { const raw = String((d.labels || [])[i] || ""); const label = raw && !/^(google ads|seo|geo|aeo|meta ads|retargeting|email|website|landing pages?|social media|crm|google business profile)$/i.test(raw.trim()) ? raw : tc(services[i] || services[0] || name); return `${desktop(browser(pageSlot(slide, i, `${label}${area ? ` in ${area}` : ""}`)))}<span class="pill">${esc(label)}</span>`; })()}</div>`).join("")}</div></div>${n}</div></section>`;
       case "cycle": {
         const stages = (d.stages || []).slice(0, 6);
         const count = Math.max(stages.length, 1), r = 150, c = 2 * Math.PI * r, gap = 14, seg = c / count - gap;
@@ -371,7 +371,7 @@ h1,h2,b{font-weight:800}
 .serp-q{display:flex;align-items:center;gap:12u;padding:12u 22u;border-bottom:1px solid #eef0f3;font-size:20u}.serp-q svg,.serp-row svg{width:20u;height:20u;color:#9aa3b2;flex:none}
 .serp-row{display:flex;align-items:center;gap:12u;padding:9u 22u;font-size:18u;color:#374151;opacity:0;transform:translateX(-14u);transition:.45s ease calc(var(--d)*.12s + .5s)}
 .on .serp-row{opacity:1;transform:none}.serp-row:nth-child(3){background:#f3f6fb}
-.duo{position:relative;width:100%}.duo .phone.front{position:absolute;right:-30u;bottom:60u;width:190u}
+.duo{position:relative;width:100%;padding-right:110u}.duo .phone.front{position:absolute;right:0;bottom:-10u;width:180u}
 .duo .phone.solo,.inv-phone .phone{width:340u;margin:auto}
 .rank{position:absolute;left:-30u;bottom:120u;width:230u;height:170u;background:#fff;border-radius:20u;box-shadow:0 20u 40u rgba(0,0,0,.2);padding:20u 20u 40u;display:flex;align-items:flex-end;gap:10u}
 .rank i{flex:1;background:linear-gradient(var(--accent),#7fb0ff);border-radius:6u 6u 2u 2u;transform-origin:bottom;transform:scaleY(0);transition:.7s cubic-bezier(.2,.8,.2,1) calc(var(--d)*.1s + .6s)}
