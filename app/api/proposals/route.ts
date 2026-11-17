@@ -46,7 +46,7 @@ export async function POST(request: Request) {
       const file = form.get("file");
       if (!(file instanceof File)) throw new ProposalError("Choose a file to upload.");
       if (file.size > 10_000_000) throw new ProposalError("That file is too large (max 10 MB).", 413);
-      return reply({ proposal: await uploadFile(context, String(form.get("id") || ""), { name: file.name, type: file.type, bytes: new Uint8Array(await file.arrayBuffer()) }) });
+      return reply(await uploadFile(context, String(form.get("id") || ""), { name: file.name, type: file.type, bytes: new Uint8Array(await file.arrayBuffer()) }));
     }
     const body = await request.json().catch(() => ({})) as Record<string, any>;
     const id = String(body.id || "");
