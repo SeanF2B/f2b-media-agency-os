@@ -3221,3 +3221,12 @@ html body .app-shell .sch .iv-filters button { display: inline-flex; align-items
 
 /* Staff hours & earnings as its own Dashboard section */
 html body .app-shell .dh > section.panel.sch-earn { margin-top: 0; }
+
+/* ===== Phones: breathing room under the top bar on every page; tidy in-page period picker ===== */
+@media (max-width: 860px) {
+  html body.topnav-layout .app-shell .page-content, html body .app-shell.topnav-layout .page-content { padding-top: 18px !important; }
+  html body .app-shell .page-content > :first-child h1, html body .app-shell .page-content > header:first-child { margin-top: 0 !important; }
+  html body .app-shell .dh-date-inline .tn-date { display: flex !important; align-items: center !important; gap: 8px !important; padding: 0 12px !important; box-sizing: border-box; border: 1px solid rgba(127,138,160,.25) !important; }
+  html body .app-shell .dh-date-inline .tn-date svg { flex: none; margin: 0 !important; position: static !important; }
+  html body .app-shell .dh-date-inline .tn-date select { height: 100% !important; border: 0 !important; background-color: transparent !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; font-size: 16px !important; font-weight: 700; color: inherit; outline: none; }
+}
