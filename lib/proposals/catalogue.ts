@@ -3,7 +3,7 @@
 // Operations → Reports → Proposals → Catalogue (saved per agency in proposal_settings.catalogue).
 // Pure data — imported by the API, the renderer and the browser editor.
 
-export type ServiceVisual = "search" | "maps" | "seo" | "ai" | "site" | "landing" | "social" | "retarget" | "email" | "whatsapp" | "dashboard";
+export type ServiceVisual = "search" | "maps" | "seo" | "ai" | "site" | "landing" | "handover" | "social" | "retarget" | "email" | "whatsapp" | "dashboard";
 
 export type CatalogueService = {
   key: string;
@@ -69,6 +69,10 @@ export const SERVICE_CATALOGUE: CatalogueService[] = [
     tagline: "Reply to every enquiry in seconds, day or night.",
     summary: "When someone gets in touch they get an instant, friendly reply on WhatsApp, and our AI assistant can answer questions and book them in for you.",
     deliverables: ["Instant WhatsApp replies", "Answers common questions", "Books appointments for you", "Hands over to you anytime"] },
+  { key: "setup", name: "Technical Setup & Handover", group: "Websites", visual: "handover", setupFee: 0, monthlyFee: 0,
+    tagline: "We handle the whole switch-over — fast, with no setbacks.",
+    summary: "We take care of the entire handover: your domain, Google Analytics (GA4) and call & form tracking. Your Google rankings belong to your domain, so all your existing SEO work is kept. It's done quickly, with no downtime and no setbacks.",
+    deliverables: ["Domain and email moved safely", "Google Analytics (GA4) set up", "Call & form tracking working", "All your SEO work kept"] },
   { key: "crm", name: "CRM & Reporting", group: "Automation", visual: "dashboard", setupFee: 0, monthlyFee: 97,
     tagline: "See every enquiry and sale in one place.",
     summary: "Every call, form and message in one simple app, with a clear view of what your marketing costs and what it brings in.",

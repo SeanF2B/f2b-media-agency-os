@@ -111,6 +111,8 @@ export function buildDeck(input: {
   const name = first(brand.businessName, "Your business");
   const picked = input.services.map((item) => ({ ...item, def: catalogue.get(item.key) })).filter((item): item is SelectedService & { def: CatalogueService } => Boolean(item.def));
   const core = picked.filter((item) => !item.addon);
+  const handover = core.find((item) => item.key === "setup");
+  const coreServices = core.filter((item) => item.key !== "setup");
   const addons = picked.filter((item) => item.addon);
   const currency = inputs.currency || "EUR";
   const aiService = (key: string) => (ai.services || []).find((item) => item?.key === key);
@@ -130,7 +132,7 @@ export function buildDeck(input: {
     notificationText: "You have received a new enquiry.",
   });
   // Kept simple like the original proposals: cover, goal, one slide per service, timeline, CRM, investment.
-  core.forEach((item, index) => {
+  coreServices.forEach((item, index) => {
     const copy = aiService(item.key);
     add("service", {
       serviceKey: item.key,
@@ -153,13 +155,17 @@ export function buildDeck(input: {
   add("dashboard", { heading: "Your CRM & AI Assistant", cardTitle: "One place for every lead", cardBody: `Every call, form and message lands in one simple app with the ${name} logo. Our AI assistant replies straight away, answers questions and books customers in, day or night.`, bullets: ["See every enquiry in one place", "AI replies and books for you", "Calls, forms & WhatsApp together", "Simple monthly results"], labels: ["Lead Count", "Ad Spend", "Pipeline"] });
   const setup = core.reduce((sum, item) => sum + item.setupFee, 0);
   const monthly = core.reduce((sum, item) => sum + item.monthlyFee, 0);
+  if (handover) {
+    const copy = aiService("setup");
+    add("service", { serviceKey: "setup", heading: "Technical Setup & Handover", cardTitle: first(copy?.cardTitle || "", "We handle everything"), cardBody: first(copy?.cardBody || "", handover.def.summary), bullets: (copy?.bullets?.length ? copy.bullets : handover.def.deliverables).slice(0, 4) });
+  }
   add("investment", {
     heading: "Investment",
     packageName: "Client Acquisition System",
     setupLabel: `Initial setup: ${money(setup, currency)} / one time`,
     setupItems: core.filter((item) => item.setupFee > 0).map((item) => `${item.def.name} setup`),
     monthlyLabel: `Ongoing: ${money(monthly, currency)} / month`,
-    monthlyItems: core.map((item) => `${item.def.name} — ${money(item.monthlyFee, currency)}`),
+    monthlyItems: core.map((item) => `${item.def.name} — ${item.monthlyFee || item.setupFee ? money(item.monthlyFee, currency) : "included"}`),
     mediaLabel: core.some((item) => item.def.mediaNote) ? "Ad spend" : "",
     mediaItems: core.map((item) => item.def.mediaNote).filter(Boolean),
     addonsLabel: addons.length ? "Optional add-ons (see below)" : "",

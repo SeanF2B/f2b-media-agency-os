@@ -125,8 +125,8 @@ export function renderProposalHtml(deck: ProposalDeck, brand: ProposalBrand, opt
     };
     return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[iconName] || paths.spark}</svg>`;
   };
-  const visualIcon: Record<string, string> = { search: "search", maps: "pin", seo: "chart", ai: "spark", site: "monitor", landing: "cursor", social: "social", retarget: "repeat", email: "mail", whatsapp: "chat", dashboard: "gear" };
-  const serviceVisual = (key: string) => ({ "google-ads": "search", seo: "seo", geo: "ai", aeo: "ai", gbp: "maps", website: "site", landing: "landing", "meta-ads": "social", retargeting: "retarget", social: "social", email: "email", whatsapp: "whatsapp", crm: "dashboard" } as Record<string, string>)[key] || "site";
+  const visualIcon: Record<string, string> = { search: "search", maps: "pin", seo: "chart", ai: "spark", site: "monitor", landing: "cursor", social: "social", retarget: "repeat", email: "mail", whatsapp: "chat", dashboard: "gear", handover: "repeat" };
+  const serviceVisual = (key: string) => ({ "google-ads": "search", seo: "seo", geo: "ai", aeo: "ai", gbp: "maps", website: "site", landing: "landing", "meta-ads": "social", retargeting: "retarget", social: "social", email: "email", whatsapp: "whatsapp", crm: "dashboard", setup: "handover" } as Record<string, string>)[key] || "site";
   const card = (slide: Slide, iconName: string, titlePath: string, bodyPath: string) => `<div class="icard a"><span class="icard-ico">${icon(iconName)}</span>${t(slide, titlePath, "b")}${t(slide, bodyPath, "p")}</div>`;
   const browser = (inner: string) => `<div class="browser"><div class="browser-bar"><i></i><i></i><i></i><span>${esc(domain)}</span></div><div class="browser-body">${inner}</div></div>`;
 
@@ -168,6 +168,12 @@ export function renderProposalHtml(deck: ProposalDeck, brand: ProposalBrand, opt
       case "email": return `<div class="duo a d2">${phone(`<div class="mail"><div class="mail-head">${logoMark()}</div><h4>${esc(slide.data.cardTitle || "Your latest news")}</h4>${photo(slide, "images.0", photoAt(0), "mail-img")}<p></p><p></p><span class="mail-btn">Book a consultation</span><div class="mail-cards">${[1, 2].map((index) => `<span>${photo(slide, `images.${index}`, photoAt(index))}<b>${esc(tc(services[index - 1] || (index === 1 ? "Latest work" : "Customer stories")))}</b></span>`).join("")}</div></div>`, "solo")}</div>`;
       case "whatsapp": return `<div class="feed a d2">${phone(`<div class="formui"><div class="mail-head">${logoMark()}</div><b>Tell us about your project</b><i></i><i></i><i></i><i class="tall"></i><span>Request a quote →</span></div>`, "sm")}<span class="arrow">→</span>${phone(`<div class="chatui"><div class="chat-top"><i class="ad-av">${logoMark()}</i>${esc(name)}</div><p class="in">Hi! Thanks for your enquiry — when suits you for a quick call?</p><p class="out">Tomorrow afternoon would be perfect</p><p class="in">Great — you're booked in for 2pm ✓</p></div>`, "sm")}</div>`;
       case "dashboard": return crmGraphic();
+      case "handover": return `<div class="hand a d2">
+        <div class="hand-flow"><div class="hand-card old"><small>Today</small><b>${esc(domain)}</b><span>Current setup</span></div>
+          <div class="hand-arrow"><i></i><i></i><i></i><em>${icon("repeat")}</em></div>
+          <div class="hand-card new"><small>With F2B</small>${logoMark()}<span>Moved, connected &amp; tracked</span></div></div>
+        <div class="hand-grid">${[["globe", "Domain & email", "Moved safely"], ["chart", "Google Analytics (GA4)", "Set up and connected"], ["target", "Call & form tracking", "Every enquiry counted"], ["star", "Your Google rankings", "All SEO work kept"]].map(([ic, title, sub], index) => `<div class="hand-tile" style="--d:${index + 2}"><span class="hand-ico">${icon(ic)}</span><div><b>${title}</b><small>${sub}</small></div><i class="hand-ok">${icon("check")}</i></div>`).join("")}</div>
+        <div class="hand-badge">${icon("check")} No downtime · No lost rankings · Done fast</div></div>`;
       case "landing": return `<div class="duo a d2">${desktop(browser(landing(slide, "images.0", "d", services[0] || "Our services", 0)), "big")}${phone(landing(slide, "images.1", "m", services[1] || services[0] || "Our services", 1), "front")}</div>`;
       case "seo": return `<div class="duo a d2">${desktop(browser(`<div class="slot site-slot"${slotAttr(slide, "images.0")}>${siteMock("d", (valueAt(slide, "images.0") === "none" ? "" : img(valueAt(slide, "images.0")) || photoAt(2)), `${tc(services[1] || services[0] || name)}${area ? ` in ${area}` : ""}`)}</div>`), "big")}${phone(site(slide, "brand.screenshotMobile", "m", 1), "front")}</div>`;
       default: return `<div class="duo a d2">${desktop(browser(site(slide, "brand.screenshotDesktop", "d")), "big")}${phone(site(slide, "brand.screenshotMobile", "m", 1), "front")}</div>`;
@@ -606,6 +612,28 @@ h1,h2,b{font-weight:800}
 .site.lp.m .lp-hero{grid-template-columns:1fr;padding:3cqw 4cqw;flex:none;height:46%}
 .site.lp.m .lp-copy{padding:5cqw}.site.lp.m .lp-copy small{font-size:3cqw}.site.lp.m .lp-copy h6{font-size:8cqw}.site.lp.m .lp-copy p{font-size:3.4cqw}.site.lp.m .lp-copy .s-btn{display:none}
 .site.lp.m .lp-form{margin:0 4cqw 4cqw;padding:4.5cqw;gap:2.4cqw;border-radius:4cqw;flex:1}.site.lp.m .lp-form b{font-size:5cqw}.site.lp.m .lp-f{font-size:3.4cqw;padding:3cqw;border-radius:2cqw}.site.lp.m .lp-f.tall{height:14cqw}
+/* technical setup & handover */
+.hand{width:100%;max-width:900u;display:grid;gap:26u}
+.hand-flow{display:grid;grid-template-columns:1fr 170u 1fr;align-items:center;gap:10u}
+.hand-card{border-radius:24u;padding:26u 28u;display:grid;gap:6u;justify-items:start;min-height:170u;align-content:center}
+.hand-card small{font-size:14u;font-weight:800;text-transform:uppercase;letter-spacing:.1em;opacity:.7}
+.hand-card b{font-size:24u;word-break:break-all}.hand-card span{font-size:15u;opacity:.8}
+.hand-card.old{background:#eef0f4;color:#374151;border:2u dashed #c9ced8}
+.hand-card.new{background:#fff;color:#111;box-shadow:0 20u 50u rgba(15,23,42,.14);border:3u solid var(--accent)}
+.hand-card.new .lg{height:44u;max-width:240u;object-fit:contain}.hand-card.new .lg-t{font-size:26u;color:var(--brand)}
+.hand-arrow{position:relative;display:flex;align-items:center;justify-content:center;gap:12u;height:60u}
+.hand-arrow i{width:14u;height:14u;border-radius:50%;background:var(--accent);opacity:.25;animation:handdot 1.4s ease-in-out infinite}
+.hand-arrow i:nth-child(2){animation-delay:.2s}.hand-arrow i:nth-child(3){animation-delay:.4s}
+.hand-arrow em{position:absolute;top:-46u;width:56u;height:56u;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;box-shadow:0 10u 24u rgba(20,99,255,.35)}.hand-arrow em svg{width:28u;height:28u}
+@keyframes handdot{50%{opacity:1;transform:scale(1.25)}}
+.hand-grid{display:grid;grid-template-columns:1fr 1fr;gap:16u}
+.hand-tile{display:flex;align-items:center;gap:14u;background:#fff;border-radius:18u;padding:18u 20u;box-shadow:0 10u 30u rgba(15,23,42,.08);opacity:0;transform:translateY(16u);transition:.6s cubic-bezier(.2,.8,.2,1) calc(var(--d)*.12s)}
+.on .hand-tile{opacity:1;transform:none}
+.hand-ico{flex:none;width:52u;height:52u;border-radius:14u;background:color-mix(in srgb,var(--accent) 12%,#fff);color:var(--accent);display:grid;place-items:center}.hand-ico svg{width:28u;height:28u}
+.hand-tile div{flex:1;display:grid}.hand-tile b{font-size:18u}.hand-tile small{font-size:14u;color:#6b7280}
+.hand-ok{flex:none;width:30u;height:30u;border-radius:50%;background:#16a34a;color:#fff;display:grid;place-items:center}.hand-ok svg{width:18u;height:18u}
+.hand-badge{justify-self:center;display:flex;align-items:center;gap:10u;background:#0b0d12;color:#fff;font-weight:700;font-size:18u;padding:14u 26u;border-radius:999px}.hand-badge svg{width:22u;height:22u;color:#4ade80}
+@media print{.hand-tile{opacity:1!important;transform:none!important}}
 .print-btn{position:fixed;top:16px;right:16px;padding:12px 20px;border:0;border-radius:12px;background:var(--accent);color:#fff;font:700 15px Poppins,system-ui;cursor:pointer;z-index:9;box-shadow:0 10px 30px rgba(20,99,255,.4)}
 @page{size:297mm 215.3mm;margin:0}
 @media print{html,body{background:#fff;padding:0;display:block}.slide{width:297mm;border-radius:0;box-shadow:none;page-break-after:always;break-after:page}.slide[data-hidden]{display:none}.no-print{display:none}.a,.notif,.serp-row,.rank i,.seg,.node,.chatui p{opacity:1!important;transform:none!important;transition:none!important}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
