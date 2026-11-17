@@ -231,14 +231,16 @@ function ProposalWorkspace({ id, catalogue, onBack }: { id: string; catalogue: C
     const result = await api<{ proposal: Proposal; warning?: string }>({ action: "generate", id });
     setProposal(result.proposal); if (result.warning) setNotice(result.warning); setTab("editor");
   });
-  const upload = (files: FileList | null) => run("upload", async () => {
-    for (const file of Array.from(files || []).slice(0, 10)) {
-      const form = new FormData(); form.set("id", id); form.set("file", file);
-      const response = await fetch("/api/proposals", { method: "POST", body: form });
-      const payload = await response.json() as { proposal?: Proposal; error?: string };
-      if (!response.ok || !payload.proposal) throw new Error(payload.error || `Couldn't upload ${file.name}.`);
-      setProposal(payload.proposal);
-    }
+  const uploadOne = async (file: File) => {
+    await flush();
+    const form = new FormData(); form.set("id", id); form.set("file", file);
+    const response = await fetch("/api/proposals", { method: "POST", body: form });
+    const payload = await response.json() as { proposal?: Proposal; asset?: string; error?: string };
+    if (!response.ok || !payload.proposal) throw new Error(payload.error || `Couldn't upload ${file.name}.`);
+    return payload as { proposal: Proposal; asset: string };
+  };
+  const upload = (files: FileList | File[] | null) => run("upload", async () => {
+    for (const file of Array.from(files || []).slice(0, 10)) setProposal((await uploadOne(file)).proposal);
   });
 
   if (!proposal) return <section className="ps">{error ? <><button type="button" className="text-button" onClick={onBack}>← All proposals</button><p className="error-text" role="alert">{error}</p></> : <div className="page-loading" role="status" aria-label="Loading proposal…"><i /></div>}</section>;
@@ -255,13 +257,13 @@ function ProposalWorkspace({ id, catalogue, onBack }: { id: string; catalogue: C
     {notice && <p className="ps-notice" role="status">{notice}</p>}
     {busy === "generate" ? <ReportGeneratingAnimation steps={GEN_STEPS} title={`Designing ${proposal.businessName}'s proposal`} /> : tab === "brief"
       ? <Brief proposal={proposal} catalogue={catalogue} sources={sources} busy={busy} change={change} onExtract={extract} onUpload={upload} onImport={(ref) => run("import", async () => { const { proposal: next } = await api<{ proposal: Proposal }>({ action: "import", id, ref }); setProposal(next); })} onGenerate={generate} />
-      : proposal.deck && <Editor proposal={proposal} change={change} flush={flush} setProposal={setProposal} onUpload={upload} onRegenerate={() => { if (window.confirm("Rewrite the whole proposal from the brief? Your text edits will be replaced.")) void generate(); }} />}
+      : proposal.deck && <Editor proposal={proposal} change={change} flush={flush} setProposal={setProposal} onUpload={upload} uploadOne={uploadOne} onRegenerate={() => { if (window.confirm("Rewrite the whole proposal from the brief? Your text edits will be replaced.")) void generate(); }} />}
   </section>;
 }
 
 function Brief({ proposal, catalogue, sources, busy, change, onExtract, onUpload, onImport, onGenerate }: {
   proposal: Proposal; catalogue: CatalogueService[]; sources: SourceRef[]; busy: string; change: (next: Partial<Proposal>) => void;
-  onExtract: (website?: string) => void; onUpload: (files: FileList | null) => void; onImport: (ref: string) => void; onGenerate: () => void;
+  onExtract: (website?: string) => void; onUpload: (files: FileList | File[] | null) => void; onImport: (ref: string) => void; onGenerate: () => void;
 }) {
   const { brand, inputs } = proposal;
   const setBrand = (patch: Partial<ProposalBrand>) => change({ brand: { ...brand, ...patch } });
@@ -294,8 +296,8 @@ function Brief({ proposal, catalogue, sources, busy, change, onExtract, onUpload
         <TextField proposalId={proposal.id} field="description" label="What they do" value={brand.description} onChange={(v) => setBrand({ description: v })} rows={3} />
         <TextField proposalId={proposal.id} field="services" label="Their services" value={brand.services} onChange={(v) => setBrand({ services: v })} rows={3} />
       </div>
-      <div className="ps-images"><span className="ps-label">Photos for mockups <small>({brand.images.length}) · click × to remove</small></span>
-        <div className="ps-thumbs">{brand.images.map((src) => <span key={src} className="ps-thumb"><img src={imgSrc(proposal.id, src)} alt="" loading="lazy" /><button type="button" aria-label="Remove photo" onClick={() => setBrand({ images: brand.images.filter((item) => item !== src) })}>×</button></span>)}
+      <div className="ps-images"><span className="ps-label">Photos for mockups <small>({brand.images.length}) · drag photos here to add · × to remove</small></span>
+        <div className="ps-thumbs ps-drop" onDragOver={(event) => { event.preventDefault(); event.currentTarget.classList.add("over"); }} onDragLeave={(event) => event.currentTarget.classList.remove("over")} onDrop={(event) => { event.preventDefault(); event.currentTarget.classList.remove("over"); onUpload(Array.from(event.dataTransfer.files as FileList)); }}>{brand.images.map((src) => <span key={src} className="ps-thumb"><img src={imgSrc(proposal.id, src)} alt="" loading="lazy" /><button type="button" aria-label="Remove photo" onClick={() => setBrand({ images: brand.images.filter((item) => item !== src) })}>×</button></span>)}
           <label className="ps-thumb add"><input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,application/pdf,text/plain,.md,.csv,.html" multiple hidden onChange={(event) => { onUpload(event.currentTarget.files); event.currentTarget.value = ""; }} />{busy === "upload" ? "Uploading…" : "+ Upload"}</label></div>
       </div>
     </section>
@@ -339,7 +341,7 @@ function Brief({ proposal, catalogue, sources, busy, change, onExtract, onUpload
   </div>;
 }
 
-function Editor({ proposal, change, flush, setProposal, onUpload, onRegenerate }: { proposal: Proposal; change: (next: Partial<Proposal>) => void; flush: () => Promise<void>; setProposal: (p: Proposal) => void; onUpload: (files: FileList | null) => void; onRegenerate: () => void }) {
+function Editor({ proposal, change, flush, setProposal, onUpload, uploadOne, onRegenerate }: { proposal: Proposal; change: (next: Partial<Proposal>) => void; flush: () => Promise<void>; setProposal: (p: Proposal) => void; onUpload: (files: FileList | File[] | null) => void; uploadOne: (file: File) => Promise<{ proposal: Proposal; asset: string }>; onRegenerate: () => void }) {
   const deck = proposal.deck!;
   const [selectedId, setSelectedId] = useState(deck.slides[0]?.id || "");
   const [renderKey, setRenderKey] = useState(0);
@@ -365,6 +367,12 @@ function Editor({ proposal, change, flush, setProposal, onUpload, onRegenerate }
         const slide = deckRef.current.slides.find((item) => item.id === data.slide);
         if (slide) updateSlide(slide.id, setPath(slide.data, data.path, String(data.value ?? "").replace(/\n{3,}/g, "\n\n")), false);
       } else if (data.type === "f2b-proposal-image" && data.slide && data.key) setPicker({ slide: data.slide, key: data.key });
+      else if (data.type === "f2b-proposal-image-delete" && data.slide && data.key) setSlotImage(data.slide, data.key, data.key.startsWith("brand.") ? "" : "none");
+      else if (data.type === "f2b-proposal-set-image" && data.slide && data.key && /^https:\/\//.test(String((data as { src?: string }).src || ""))) setSlotImage(data.slide, data.key, String((data as { src?: string }).src));
+      else if (data.type === "f2b-proposal-drop" && data.slide && data.key && (data as { file?: unknown }).file instanceof Blob) {
+        const file = (data as unknown as { file: File }).file; const slideId = data.slide, key = data.key;
+        uploadOne(file).then(({ proposal: next, asset }) => { setProposal(next); brandLive.current = next.brand; setSlotImage(slideId, key, asset); }).catch((reason) => { window.alert(reason instanceof Error ? reason.message : "Couldn't upload that image."); rerender(); });
+      }
       else if ((data.type === "f2b-proposal-select" || data.type === "f2b-proposal-visible") && data.slide) setSelectedId(data.slide);
     };
     window.addEventListener("message", onMessage);
@@ -372,12 +380,13 @@ function Editor({ proposal, change, flush, setProposal, onUpload, onRegenerate }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const scrollTo = (slideId: string) => { setSelectedId(slideId); frame.current?.contentWindow?.postMessage({ type: "f2b-proposal-scroll", slide: slideId }, "*"); };
   const move = (index: number, delta: number) => { const slides = [...deck.slides]; const [item] = slides.splice(index, 1); slides.splice(Math.max(0, Math.min(slides.length, index + delta)), 0, item); setDeck({ ...deck, slides }); };
-  const pickImage = (src: string) => {
-    if (!picker) return;
-    if (picker.key.startsWith("brand.")) { change({ brand: { ...proposal.brand, [picker.key.slice(6)]: src } }); }
-    else { const slide = deck.slides.find((item) => item.id === picker.slide); if (slide) updateSlide(slide.id, setPath(slide.data, picker.key, src), false); }
-    setPicker(null); window.setTimeout(rerender, 0);
+  const brandLive = useRef(proposal.brand); brandLive.current = proposal.brand;
+  const setSlotImage = (slideId: string, key: string, src: string) => {
+    if (key.startsWith("brand.")) change({ brand: { ...brandLive.current, [key.slice(6)]: src } });
+    else { const slide = deckRef.current.slides.find((item) => item.id === slideId); if (slide) updateSlide(slide.id, setPath(slide.data, key, src), false); }
+    window.setTimeout(rerender, 0);
   };
+  const pickImage = (src: string) => { if (!picker) return; setSlotImage(picker.slide, picker.key, src); setPicker(null); };
   const fullHtml = (print: boolean) => renderProposalHtml(deck, proposal.brand, { assetUrl: (name) => `${window.location.origin}${assetUrl(proposal.id)(name)}`, agencyLogo: AGENCY_LOGO, printButton: true, title: proposal.title }).replace("</body>", print ? `<script>window.addEventListener("load",function(){document.fonts.ready.then(function(){setTimeout(function(){print()},500)})})</script></body>` : "</body>");
   const openWindow = (print: boolean) => { const win = window.open("", "_blank"); if (!win) { window.alert("Allow pop-ups for this site to open the proposal."); return; } win.document.open(); win.document.write(fullHtml(print)); win.document.close(); };
   const shareUrl = proposal.shareToken ? `${window.location.origin}/f/proposal/${proposal.shareToken}` : "";
@@ -423,8 +432,10 @@ function Editor({ proposal, change, flush, setProposal, onUpload, onRegenerate }
     {picker && <div className="ps-modal-back" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setPicker(null); }}>
       <div className="ps-modal wide" role="dialog" aria-modal="true" aria-label="Choose image" data-no-ai>
         <header><h3>Choose an image</h3><button type="button" className="ps-x" onClick={() => setPicker(null)} aria-label="Close">×</button></header>
-        <div className="ps-thumbs big">{images.map((src) => <button type="button" key={src} className="ps-thumb" onClick={() => pickImage(src)}><img src={imgSrc(proposal.id, src)} alt="" loading="lazy" /></button>)}
-          <label className="ps-thumb add"><input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" multiple hidden onChange={(event) => { onUpload(event.currentTarget.files); event.currentTarget.value = ""; }} />+ Upload</label></div>
+        <p className="muted">Click an image to use it, drag one in from your computer, or remove the image from this spot.</p>
+        <div className="ps-thumbs big ps-drop" onDragOver={(event) => { event.preventDefault(); event.currentTarget.classList.add("over"); }} onDragLeave={(event) => event.currentTarget.classList.remove("over")} onDrop={(event) => { event.preventDefault(); event.currentTarget.classList.remove("over"); const file = Array.from(event.dataTransfer.files as FileList).find((item: File) => item.type.startsWith("image/")); const target = picker; if (file && target) { setPicker(null); uploadOne(file).then(({ proposal: next, asset }) => { setProposal(next); brandLive.current = next.brand; setSlotImage(target.slide, target.key, asset); }).catch((reason) => window.alert(reason instanceof Error ? reason.message : "Couldn't upload that image.")); } }}>{images.map((src) => <button type="button" key={src} className="ps-thumb" onClick={() => pickImage(src)}><img src={imgSrc(proposal.id, src)} alt="" loading="lazy" /></button>)}
+          <label className="ps-thumb add"><input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; const target = picker; if (file && target) { setPicker(null); uploadOne(file).then(({ proposal: next, asset }) => { setProposal(next); brandLive.current = next.brand; setSlotImage(target.slide, target.key, asset); }).catch((reason) => window.alert(reason instanceof Error ? reason.message : "Couldn't upload that image.")); } }} />+ Upload</label></div>
+        <button type="button" className="text-button danger" onClick={() => { if (picker) { setSlotImage(picker.slide, picker.key, picker.key.startsWith("brand.") ? "" : "none"); setPicker(null); } }}>Remove image from this spot</button>
         <form className="ps-row" onSubmit={(event) => { event.preventDefault(); const value = String(new FormData(event.currentTarget).get("url") || "").trim(); if (/^https:\/\//.test(value)) pickImage(value); }}><label className="ps-field grow"><span className="ps-label">…or paste an image URL</span><input name="url" placeholder="https://…" /></label><button type="submit" className="secondary-button">Use URL</button></form>
       </div>
     </div>}
@@ -434,7 +445,7 @@ function Editor({ proposal, change, flush, setProposal, onUpload, onRegenerate }
 /** Generic editor for a slide's text data (strings, lists and lists of items), each with AI Suggest. */
 function DataEditor({ proposalId, slide, onChange }: { proposalId: string; slide: Slide; onChange: (data: Record<string, any>) => void }) {
   const set = (path: string, value: unknown) => onChange(setPath(slide.data, path, value));
-  const entries = Object.entries(slide.data).filter(([key]) => !["serviceKey", "images", "searchTerm"].includes(key) || key === "searchTerm");
+  const entries = Object.entries(slide.data).filter(([key]) => !["serviceKey", "images", "searchTerm"].includes(key));
   const field = (path: string, label: string, value: string) => <label className="ps-field" key={path}>
     <span className="ps-label">{label}<AiSuggest proposalId={proposalId} field={path.split(".").pop() || path} label={label} value={value} onChange={(v) => set(path, v)} slideKind={slide.kind} /></span>
     {value.length > 60 ? <textarea rows={Math.min(6, Math.ceil(value.length / 42))} value={value} onChange={(event) => set(path, event.target.value)} /> : <input value={value} onChange={(event) => set(path, event.target.value)} />}

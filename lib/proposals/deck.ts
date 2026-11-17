@@ -63,7 +63,50 @@ export type AiCopy = {
   timeline: Array<{ caption: string }>;
   expectHeading: string; expect: string[];
   closingHeading: string; closing: string;
+  /** What people type into Google to find this business (their services + area), e.g. "boiler repair dublin". */
+  keywords: string[];
+  searchAd: { headline: string; description: string };
+  /** Example Meta/Instagram ads: each promotes one of THEIR services with an offer. */
+  ads: Array<{ service: string; primaryText: string; headline: string; offer: string; cta: string }>;
 };
+
+const F2B_SERVICE_NAMES = /^(google ads|seo|geo|aeo|google business profile|gbp|meta ads|facebook ads|retargeting|social media( management)?|email( marketing)?|website( design)?|landing pages?|cro|crm|whatsapp)$/i;
+const titleCase = (text: string) => text.replace(/\b\w/g, (c) => c.toUpperCase());
+/** The business's OWN services (never F2B's), from the extracted services field or their description. */
+export function businessServices(brand: Pick<ProposalBrand, "services" | "description">): string[] {
+  const listed = String(brand.services || "").split(/[,\n;•|]+/).map((item) => item.trim()).filter((item) => item && !F2B_SERVICE_NAMES.test(item));
+  if (listed.length) return listed.slice(0, 8);
+  const match = String(brand.description || "").match(/(?:provides?|offers?|specialis\w* in|delivers?|does|for)\s+(.+?)(?:\s+(?:across|in|throughout|for|to)\s+[A-Z]|[.!]|$)/);
+  return match ? match[1].split(/,|\band\b|&/).map((item) => item.trim().replace(/^(?:all|professional|expert|reliable)\s+/i, "")).filter((item) => item.length > 2 && item.length < 40).slice(0, 6) : [];
+}
+export function businessArea(brand: Pick<ProposalBrand, "areas" | "description">): string {
+  const area = String(brand.areas || "").split(/[,\n;]/)[0].trim();
+  if (area && area.length > 2) return area;
+  return String(brand.description || "").match(/(?:across|in|throughout|serving)\s+((?:County |Co\. )?[A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/)?.[1] || "";
+}
+/** Fallback search keywords from their services + area. */
+export function defaultKeywords(brand: ProposalBrand): string[] {
+  const area = businessArea(brand).toLowerCase();
+  const services = businessServices(brand).map((item) => item.toLowerCase());
+  const base = services.length ? services : [String(brand.businessName || "local service").toLowerCase()];
+  const out = base.flatMap((service) => [area ? `${service} ${area}` : service, `${service} near me`]);
+  return [...new Set(out)].slice(0, 6);
+}
+export function defaultAds(brand: ProposalBrand) {
+  const services = businessServices(brand);
+  const area = businessArea(brand);
+  const picks = (services.length ? services : ["Our services"]).slice(0, 3);
+  while (picks.length < 3) picks.push(picks[picks.length - 1]);
+  const offers = ["Free quote in 24 hours", "10% off your first job", "Limited slots this month"];
+  const ctas = ["Get Quote", "Book Now", "Learn More"];
+  return picks.map((service, index) => ({
+    service: titleCase(service),
+    primaryText: index === 0 ? `Need ${service.toLowerCase()}${area ? ` in ${area}` : ""}? ${brand.businessName || "We"} can help — fast, friendly and fully sorted.` : index === 1 ? `${titleCase(service)} done right, first time. Trusted by homeowners${area ? ` across ${area}` : ""}.` : `Planning ${service.toLowerCase()}? Talk to the local team at ${brand.businessName || "our team"}.`,
+    headline: titleCase(service) + (area ? ` · ${area}` : ""),
+    offer: offers[index],
+    cta: ctas[index],
+  }));
+}
 
 export function buildDeck(input: {
   brand: ProposalBrand; inputs: ProposalInputs; services: SelectedService[]; catalogue?: CatalogueService[]; ai?: Partial<AiCopy> | null; agencyContact?: string;
@@ -111,10 +154,15 @@ export function buildDeck(input: {
       cardTitle: first(copy?.cardTitle || "", item.def.name),
       cardBody: first(copy?.cardBody || "", item.def.summary),
       bullets: (copy?.bullets?.length ? copy.bullets : item.def.deliverables).slice(0, 5),
-      searchTerm: `${(brand.services.split(/[,\n]/)[0] || item.def.name).trim().toLowerCase()} ${(brand.areas.split(/[,\n]/)[0] || "").trim().toLowerCase()}`.trim(),
+      ...(item.def.visual === "search" ? {
+        keywords: (ai.keywords?.filter(Boolean).length ? ai.keywords : defaultKeywords(brand)).slice(0, 6),
+        adHeadline: first(ai.searchAd?.headline || "", `${brand.businessName || name} | ${titleCase(businessServices(brand)[0] || "Local Experts")}`),
+        adDescription: first(ai.searchAd?.description || "", String(brand.description || "").slice(0, 150)),
+      } : {}),
+      ...(["social", "retarget"].includes(item.def.visual) ? { ads: (ai.ads?.filter((ad) => ad?.primaryText).length ? ai.ads : defaultAds(brand)).slice(0, 3) } : {}),
     });
     if (index === 0 && (item.def.visual === "search" || item.def.visual === "landing" || item.def.visual === "site")) {
-      const labels = (copy?.labels?.length ? copy.labels : brand.services.split(/[,\n]/)).map((label) => String(label).trim()).filter(Boolean).slice(0, 3);
+      const labels = (copy?.labels?.length ? copy.labels : businessServices(brand).map(titleCase)).map((label) => String(label).trim()).filter(Boolean).slice(0, 3);
       add("examples", { heading: "Example:", cardTitle: item.def.name, cardBody: "Splitting keywords and landing pages by service keeps every ad matched to search intent and maximises your chance of conversion.", labels: labels.length ? labels : ["Service one", "Service two", "Service three"] });
     }
   });
@@ -181,8 +229,11 @@ export const AI_COPY_SCHEMA = {
     timeline: { type: "array", items: { type: "object", additionalProperties: false, properties: { caption: { type: "string" } }, required: ["caption"] } },
     expectHeading: { type: "string" }, expect: { type: "array", items: { type: "string" } },
     closingHeading: { type: "string" }, closing: { type: "string" },
+    keywords: { type: "array", items: { type: "string" } },
+    searchAd: { type: "object", additionalProperties: false, properties: { headline: { type: "string" }, description: { type: "string" } }, required: ["headline", "description"] },
+    ads: { type: "array", items: { type: "object", additionalProperties: false, properties: { service: { type: "string" }, primaryText: { type: "string" }, headline: { type: "string" }, offer: { type: "string" }, cta: { type: "string" } }, required: ["service", "primaryText", "headline", "offer", "cta"] } },
   },
-  required: ["coverEyebrow", "coverTitle", "coverHighlight", "coverSubtitle", "goalHeading", "goal", "audienceHeading", "audience", "findingsIntro", "findings", "services", "phases", "timeline", "expectHeading", "expect", "closingHeading", "closing"],
+  required: ["coverEyebrow", "coverTitle", "coverHighlight", "coverSubtitle", "goalHeading", "goal", "audienceHeading", "audience", "findingsIntro", "findings", "services", "phases", "timeline", "expectHeading", "expect", "closingHeading", "closing", "keywords", "searchAd", "ads"],
 } as const;
 
 export const AI_COPY_INSTRUCTIONS = [
@@ -195,6 +246,9 @@ export const AI_COPY_INSTRUCTIONS = [
   "goal: 35–55 words. audience: 2–5 short audience groups. phases: one per core service plus tracking and optimisation, title like 'Phase 1 - Google Ads Launch', text one or two sentences.",
   "timeline: exactly 4 captions, max 12 words each, for months 1–4. expect: 2–4 short realistic paragraphs (max 35 words each), no guaranteed numbers unless supplied.",
   "closing: 20–35 words inviting them to approve and book onboarding. Follow any extra instructions from the agency.",
+  "keywords: 6 real Google searches a customer would type to find THIS business — their own services plus their town/area where known (e.g. 'boiler repair dublin', 'emergency plumber near me'). Never marketing terms like 'google ads' or 'seo'.",
+  "searchAd: a Google search ad for the business itself — headline max 30 chars per part, can use ' | ' (e.g. 'Heatwise | Boiler Repairs Dublin'); description max 90 chars about their service.",
+  "ads: exactly 3 Facebook/Instagram ads, each promoting a DIFFERENT one of the business's own services. primaryText: 1–2 short sentences in their voice. headline max 40 chars. offer: a short, realistic promotional hook to suggest (e.g. 'Free quote in 24 hours', '10% off first service') — never claim discounts are already running. cta: one of Get Quote, Book Now, Learn More, Call Now, Send Message.",
 ].join("\n");
 
 /** Validates a stored deck from the database/browser. Unknown kinds are dropped; text is clipped. */

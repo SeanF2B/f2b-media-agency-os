@@ -175,7 +175,6 @@ export async function createProposal(ctx: ProposalContext, input: { clientId?: s
   if (!name) throw new ProposalError("Choose a client or prospect, or enter the business name.");
   const brand = emptyBrand(name, website ? (safeHttps(website)?.toString() || "") : "");
   if (client?.logo && /^https:\/\//.test(client.logo)) brand.logo = client.logo;
-  if (client) brand.services = ((client.services || []) as Row[]).map((s) => s.name).filter(Boolean).join(", ");
   const inputs = emptyInputs(client?.currency || ctx.workspace.settings?.currency || "EUR");
   if (notes) inputs.discoveryNotes = notes;
   const next = new Date(); next.setMonth(next.getMonth() + 1);
@@ -249,7 +248,8 @@ async function captureScreenshot(ownerId: string, proposalId: string, website: s
   const url = safeHttps(website);
   if (!url) return "";
   const shotUrl = `https://s.wordpress.com/mshots/v1/${encodeURIComponent(url.toString())}?${mobile ? "vpw=390&vph=844&w=390&h=844" : "vpw=1440&vph=900&w=1440&h=900"}`;
-  for (let attempt = 0; attempt < 5; attempt++) {
+  // mShots renders on first request and serves a placeholder until ready (usually 15–45s), so keep polling.
+  for (let attempt = 0; attempt < 12; attempt++) {
     try {
       const response = await fetch(shotUrl, { signal: AbortSignal.timeout(10_000), headers: { "User-Agent": "F2B-AgencyOS-Proposals/1.0" } });
       const type = response.headers.get("content-type") || "";
@@ -258,9 +258,24 @@ async function captureScreenshot(ownerId: string, proposalId: string, website: s
         if (bytes.byteLength > 6_000 && bytes.byteLength < 6_000_000) return putAsset(ownerId, proposalId, `screenshot-${mobile ? "mobile" : "desktop"}-${Date.now().toString(36)}.jpg`, bytes, type.split(";")[0]);
       }
     } catch { /* retry below */ }
-    await new Promise((resolve) => setTimeout(resolve, 2_500));
+    await new Promise((resolve) => setTimeout(resolve, attempt < 2 ? 3_000 : 5_000));
   }
   return "";
+}
+/** Copies a photo/logo from the business's site into R2 so slides never hotlink (blocked/broken images). */
+async function cacheImage(ownerId: string, proposalId: string, url: string, prefix: string, minBytes = 6_000) {
+  try {
+    if (!/^https:\/\//.test(url) || /i\.ytimg\.com|gravatar|\/emoji\/|pixel|spacer/i.test(url)) return "";
+    const response = await fetch(url, { signal: AbortSignal.timeout(8_000), headers: { "User-Agent": "Mozilla/5.0 (F2B-AgencyOS-Proposals)", Accept: "image/avif,image/webp,image/png,image/jpeg,image/svg+xml,*/*" } });
+    const type = (response.headers.get("content-type") || "").split(";")[0].trim();
+    if (!response.ok || !/^image\/(png|jpeg|webp|gif|svg\+xml|avif)$/.test(type)) return "";
+    const bytes = await response.arrayBuffer();
+    if (bytes.byteLength < (type === "image/svg+xml" ? 200 : minBytes) || bytes.byteLength > 5_000_000) return "";
+    if (type === "image/svg+xml" && /<script|on\w+\s*=|javascript:/i.test(new TextDecoder().decode(bytes))) return "";
+    const digest = [...new Uint8Array(await crypto.subtle.digest("SHA-1", new TextEncoder().encode(url)))].slice(0, 6).map((b) => b.toString(16).padStart(2, "0")).join("");
+    const ext = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif", "image/svg+xml": "svg", "image/avif": "avif" }[type] || "img";
+    return await putAsset(ownerId, proposalId, `${prefix}-${digest}.${ext}`, bytes, type);
+  } catch { return ""; }
 }
 /** Photo URLs from the home page (og:image, large <img>/srcset), skipping icons, logos, tracking pixels and SVGs. */
 function collectImages(html: string, base: URL) {
@@ -296,15 +311,21 @@ export async function extractForProposal(ctx: ProposalContext, id: string, websi
   const profile = "profile" in profileResult ? profileResult.profile as Row : {};
   const value = (key: string) => String(profile?.[key]?.value || "").trim();
   const [desktop, mobile] = await Promise.all([captureScreenshot(ctx.ownerId, current.id, target.toString(), false), captureScreenshot(ctx.ownerId, current.id, target.toString(), true)]);
-  const images = html ? collectImages(html, target) : [];
+  const found = html ? collectImages(html, target) : [];
+  const logoUrl = current.brand.logo || value("logo") || (signals?.logo && /^https:\/\//.test(signals.logo) ? signals.logo : "");
+  const [logoCached, ...cachedImages] = await Promise.all([
+    logoUrl.startsWith("r2:") ? Promise.resolve(logoUrl) : cacheImage(ctx.ownerId, current.id, logoUrl, "logo", 300),
+    ...found.slice(0, 12).map((url) => cacheImage(ctx.ownerId, current.id, url, "img", 15_000)),
+  ]);
+  const images = cachedImages.filter(Boolean);
   const brand: ProposalBrand = {
     ...current.brand,
     businessName: current.brand.businessName || value("businessName") || current.businessName,
     website: target.toString(),
-    logo: current.brand.logo || value("logo") || (signals?.logo && /^https:\/\//.test(signals.logo) ? signals.logo : ""),
+    logo: logoCached || logoUrl,
     colours: [value("primaryColour"), value("secondaryColour"), ...(signals?.topColours || [])].filter((c) => /^#[0-9a-f]{6}$/i.test(c)).filter((c, i, all) => all.indexOf(c) === i).slice(0, 6),
     description: value("description") || current.brand.description,
-    services: value("services") || current.brand.services,
+    services: value("services") || (/^(\s*(google ads|seo|geo|aeo|meta ads|retargeting|email|website|landing pages|social media|crm|google business profile)\s*,?)+$/i.test(current.brand.services) ? "" : current.brand.services),
     areas: value("serviceAreas") || current.brand.areas,
     audience: value("targetCustomers") || current.brand.audience,
     screenshotDesktop: desktop || current.brand.screenshotDesktop,
@@ -382,7 +403,7 @@ export async function uploadFile(ctx: ProposalContext, id: string, file: { name:
   const brand = image ? { ...current.brand, images: [`r2:${name}`, ...current.brand.images].slice(0, 24) } : current.brand;
   const inputs = text.trim() ? { ...current.inputs, sources: [{ id: `upload:${name}`, label: `Document · ${upload.name}`, kind: "upload" as const, text: text.slice(0, 6000) }, ...current.inputs.sources].slice(0, 12) } : current.inputs;
   await db().prepare("UPDATE proposals SET uploads = ?3 WHERE owner_id = ?1 AND id = ?2").bind(ctx.ownerId, current.id, JSON.stringify(uploads)).run();
-  return updateProposal(ctx, current.id, { brand, inputs });
+  return { proposal: await updateProposal(ctx, current.id, { brand, inputs }), asset: `r2:${name}`, image };
 }
 
 // ============================ AI ============================
