@@ -1282,7 +1282,7 @@ html body .ai-chat-launcher .ai-chat-eyes .ai-eyes-antenna, html body .ai-chat-l
 @media (max-width: 860px) {
   /* never let the page slide sideways; wide tab rows scroll inside themselves */
   html, body { overflow-x: hidden; }
-  html body .app-shell .main-area { max-width: 100vw; overflow-x: clip; }
+  html body .app-shell .main-area { max-width: 100%; overflow-x: clip; }
   html body .app-shell :is(.crm-tabs, .iv-tabs, .settings-tabs, .ops-tabs, [role="tablist"]) { display: flex !important; flex-wrap: nowrap !important; overflow-x: auto !important; max-width: 100%; scrollbar-width: none; -webkit-overflow-scrolling: touch; gap: 4px; }
   html body .app-shell :is(.crm-tabs, .iv-tabs, .settings-tabs, .ops-tabs, [role="tablist"])::-webkit-scrollbar { display: none; }
   html body .app-shell :is(.crm-tabs, .iv-tabs, .settings-tabs, .ops-tabs, [role="tablist"]) > * { flex: none !important; white-space: nowrap; }
@@ -2918,4 +2918,37 @@ html body .app-shell .dh-approvals:has(.dh-appt-updates) { grid-template-columns
 html body .app-shell .tn-side-foot { display: none; }
 @media (min-width: 861px) {
   html body .app-shell.topnav-layout.nav-side .tn-side-foot { display: flex; flex-direction: column; gap: 4px; margin-top: auto; padding-top: 10px; border-top: 1px solid rgba(127,138,160,.18); }
+}
+
+/* ===== Phones: nothing under the scrollbar, slim bar, footer close to the edge, cleaner Leads ===== */
+@media (max-width: 860px) {
+  /* size to the visible width (100vw includes the scrollbar, which hid the right edge) */
+  html body .app-shell.topnav-layout .tn-bar { left: 0 !important; right: 0 !important; width: auto !important; max-width: 100% !important; box-sizing: border-box; }
+  html body .app-shell .page-content { max-width: 100%; box-sizing: border-box; }
+  /* period picker now in the page: one-row bar, content starts right under it */
+  html body .app-shell.topnav-layout .tn-right .tn-date-slot { display: none !important; }
+  html body .app-shell.topnav-layout .main-area { padding-top: 62px !important; }
+  html body .app-shell .dh-date-inline { margin: 0 0 10px; }
+  html body .app-shell .dh-date-inline .tn-date { width: 100%; height: 40px; border-radius: 12px; background: rgba(255,255,255,.7); }
+  html body.f2b-dark .app-shell .dh-date-inline .tn-date { background: rgba(255,255,255,.06); }
+  html body .app-shell .dh-date-inline .tn-date span { display: inline !important; }
+  html body .app-shell .dh-date-inline .tn-date select { flex: 1 1 auto; max-width: none !important; }
+  /* bottom bar: hug the bottom edge (home-bar space only, minus the extra gap) */
+  html body .app-shell.topnav-layout .tn-bar .tn-nav { bottom: max(6px, calc(env(safe-area-inset-bottom, 0px) - 14px)) !important; left: 8px !important; right: 8px !important; }
+  html body .ai-chat-dock .ai-chat-launcher, html body .ai-chat-dock.is-moved .ai-chat-launcher { bottom: calc(max(6px, calc(env(safe-area-inset-bottom, 0px) - 14px)) + 70px) !important; }
+  html body .ai-chat-dock .ai-chat-toast, html body .ai-chat-dock.is-moved .ai-chat-toast { bottom: calc(max(6px, calc(env(safe-area-inset-bottom, 0px) - 14px)) + 136px) !important; }
+  html body .app-shell .page-content { padding-bottom: 96px !important; }
+
+  /* Leads: compact header, the five sections as one row of icon tabs */
+  html body .app-shell .crm-heading { margin: 0 0 8px !important; gap: 8px !important; }
+  html body .app-shell .crm-heading h1 { font-size: 21px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  html body .app-shell .crm-heading .primary-button { flex: none; height: 36px; padding: 0 12px !important; font-size: 13px !important; white-space: nowrap; }
+  html body .app-shell .page-content .crm-tabs { display: grid !important; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)) !important; grid-auto-flow: column; gap: 2px !important; padding: 4px !important; margin: 0 0 8px !important; border-radius: 14px !important; }
+  html body .app-shell .page-content .crm-tabs > * { display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; gap: 3px !important; height: 52px !important; padding: 4px 2px !important; font-size: 10.5px !important; line-height: 1.1; border-radius: 10px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0 !important; }
+  html body .app-shell .page-content .crm-tabs > * svg { width: 18px !important; height: 18px !important; margin: 0 !important; flex: none; }
+  html body .app-shell .page-content .crm-tabs > * { align-items: stretch !important; text-align: center !important; font-size: 10px !important; }
+  html body .app-shell .page-content .crm-tabs > * svg { align-self: center; }
+  html body.topnav-layout .app-shell .page-content, html body .app-shell.topnav-layout .page-content { padding-top: 8px !important; }
+  html body .app-shell .page-content .crm-workspace { gap: 8px !important; }
+  html body .app-shell .page-content .crm-toolbar { margin-bottom: 8px !important; }
 }
