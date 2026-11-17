@@ -2780,3 +2780,30 @@ body.f2b-dark .app-shell .dh-link{color:#e7edf1 !important;-webkit-text-fill-col
   /* notices that push the work down */
   html body .app-shell .page-content :is(.crm-notice, .conv-twilio-note, .iv-note-info) { display: none !important; }
 }
+
+/* Scheduling on phones: full frame with Day | Week | Month */
+@media (max-width: 860px) {
+  html body .app-shell .sch.is-phone .sch-m-views { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; margin: 6px 0; border-radius: 12px; background: rgba(127,138,160,.12); }
+  html body .app-shell .sch.is-phone .sch-m-views button { height: 34px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-size: 14px; font-weight: 700; color: inherit; }
+  html body .app-shell .sch.is-phone .sch-m-views button.on { background: #fff; color: #1f2a33; box-shadow: 0 1px 4px rgba(15,23,42,.12); }
+  html body .app-shell .sch.is-phone.m-month .sch-week { display: none !important; }
+  html body .app-shell .sch.is-phone.m-week .sch-week { grid-template-columns: 34px repeat(7, minmax(0, 1fr)) !important; }
+  html body .app-shell .sch.is-phone.m-week .sch-day-head { height: 40px; } html body .app-shell .sch.is-phone.m-week .sch-day-head small { font-size: 9px; }
+  html body .app-shell .sch.is-phone.m-week .sch-block { padding: 2px 3px !important; font-size: 10px !important; border-left-width: 3px !important; }
+  html body .app-shell .sch.is-phone.m-week .sch-block :is(span, em, .sch-block-avs) { display: none !important; }
+  html body .app-shell .sch.is-phone.m-week .sch-hours span { font-size: 9px; }
+  html body .app-shell .sch.is-phone .sch-month { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+  html body .app-shell .sch.is-phone .sch-month-h { text-align: center; font-size: 11px; font-weight: 700; opacity: .55; padding: 4px 0; }
+  html body .app-shell .sch.is-phone .sch-month-d { position: relative; aspect-ratio: 1 / 1.15; border: 1px solid rgba(127,138,160,.22); border-radius: 10px; background: #fff; color: #1f2a33; font: inherit; display: grid; place-items: start center; padding-top: 6px; }
+  html body .app-shell .sch.is-phone .sch-month-d b { font-size: 14px; }
+  html body .app-shell .sch.is-phone .sch-month-d.out { opacity: .4; }
+  html body .app-shell .sch.is-phone .sch-month-d.today b { background: var(--brand-primary, #3b82f6); color: var(--brand-primary-fg, #fff); border-radius: 999px; padding: 0 7px; }
+  html body .app-shell .sch.is-phone .sch-month-d i { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); min-width: 20px; height: 18px; padding: 0 5px; border-radius: 999px; background: color-mix(in srgb, var(--brand-primary, #3b82f6) 18%, #fff); color: #1f2a33; font-size: 11px; font-weight: 800; font-style: normal; display: grid; place-items: center; }
+  html body.f2b-dark .app-shell .sch.is-phone .sch-month-d { background: #1d2429; color: #eef3f6; border-color: #33404a; }
+  html body.f2b-dark .app-shell .sch.is-phone .sch-month-d i { background: #2a3a4a; color: #eef3f6; }
+  html body.f2b-dark .app-shell .sch.is-phone .sch-m-views button.on { background: #2a333a; color: #fff; }
+}
+/* Phones: tapping into a field never zooms the page (iOS zooms anything under 16px) */
+@media (max-width: 860px) {
+  html body :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea) { font-size: 16px !important; }
+}
