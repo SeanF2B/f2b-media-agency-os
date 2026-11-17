@@ -2976,3 +2976,22 @@ html body .app-shell .dh-appt-foot small { opacity: .6; font-size: 11.5px; }
 }
 html body .app-shell .dh-appt-list .dh-appt-tabs[role="tablist"] { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)) !important; overflow: visible !important; }
 html body .app-shell .dh-appt-list .dh-appt-tabs[role="tablist"] > button { flex: none !important; width: 100% !important; font-size: 12px !important; padding: 0 4px !important; }
+
+/* Dashboard Marketing on phones: one source at a time (Organic | Google Ads | Meta) */
+html body .app-shell .dh-msrc { display: none; }
+@media (max-width: 860px) {
+  html body .app-shell .dh-msrc[role="tablist"] { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 4px; padding: 4px; margin: 0 0 8px; border-radius: 12px; background: rgba(127,138,160,.1); overflow: visible !important; }
+  html body .app-shell .dh-msrc > button { flex: none !important; width: 100% !important; height: 34px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-size: 13px; font-weight: 700; color: inherit; }
+  html body .app-shell .dh-msrc > button.on { background: #fff; color: #1f2a33; box-shadow: 0 1px 4px rgba(15,23,42,.12); }
+  html body.f2b-dark .app-shell .dh-msrc > button.on { background: #2a333a; color: #fff; }
+  html body .app-shell .dh-split { display: grid !important; grid-template-columns: 1fr !important; gap: 8px !important; }
+  html body .app-shell .dh-split.m-src-organic > .dh-split-col:not(:nth-child(1)),
+  html body .app-shell .dh-split.m-src-ads > .dh-split-col:not(:nth-child(2)),
+  html body .app-shell .dh-split.m-src-meta > .dh-split-col:not(:nth-child(3)) { display: none !important; }
+  html body .app-shell .dh-split-col { min-height: 0 !important; padding: 10px !important; }
+  html body .app-shell .dh-split-row { padding: 8px 10px !important; font-size: 13.5px; }
+  html body .app-shell .dh-split-total { flex-wrap: wrap; gap: 6px 10px !important; padding: 10px !important; }
+  html body .app-shell .dh-split-total small { flex-basis: 100%; order: 9; }
+  html body .app-shell .dh-detail { overflow-x: auto; }
+  html body .app-shell .dh-detail :is(.dh-rank-drop-head, .dh-detail-head) { flex-wrap: wrap; gap: 6px; }
+}
