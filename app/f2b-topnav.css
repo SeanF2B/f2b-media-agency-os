@@ -3388,3 +3388,21 @@ html body .app-shell .settings-subtabs.crm-tabs > button { display: inline-flex;
   html body .app-shell .cv-email-compose > div .cv-note { display: none !important; }
   html body .app-shell .cv-email-compose > div .primary-button { height: 38px !important; padding: 0 16px !important; margin-left: auto; border-radius: 19px !important; }
 }
+
+/* ===== Phones: Outreach overview clean — compact bar, small stat tiles in a tidy 2-column grid ===== */
+@media (max-width: 860px) {
+  html body .app-shell .ox-bar { display: grid !important; grid-template-columns: minmax(0, 1fr) !important; gap: 8px !important; margin-bottom: 8px !important; }
+  html body .app-shell .ox-tabs { display: grid !important; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); width: 100% !important; box-sizing: border-box; padding: 3px !important; overflow: hidden !important; }
+  html body .app-shell .ox-tabs > * { justify-content: center !important; padding: 0 6px !important; height: 38px !important; font-size: 13px !important; white-space: nowrap; min-width: 0; }
+  html body .app-shell .ox-bar-filters { display: flex !important; gap: 6px; width: 100%; min-width: 0; }
+  html body .app-shell .ox-bar-filters > * { flex: 1 1 0; min-width: 0; max-width: 100%; }
+  html body .app-shell .ox-bar-filters select, html body .app-shell .ox-bar-filters input { width: 100%; height: 38px; font-size: 16px !important; }
+  html body .app-shell .ox-kpis { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
+  html body .app-shell .ox-kpi { padding: 10px 12px !important; min-height: 0 !important; gap: 2px !important; border-radius: 14px !important; text-align: left; }
+  html body .app-shell .ox-kpi span { font-size: 12px !important; }
+  html body .app-shell .ox-kpi strong { font-size: 22px !important; line-height: 1.15 !important; overflow-wrap: anywhere; }
+  html body .app-shell .ox-kpi small, html body .app-shell .ox-kpi em { font-size: 11px !important; }
+  html body .app-shell .ox-kpi:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  html body .app-shell .ox-panel { padding: 12px !important; }
+  html body .app-shell .ox-panel .ox-table { display: block; overflow-x: auto; }
+}
