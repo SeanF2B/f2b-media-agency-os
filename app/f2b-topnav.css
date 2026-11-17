@@ -2995,3 +2995,7 @@ html body .app-shell .dh-msrc { display: none; }
   html body .app-shell .dh-detail { overflow-x: auto; }
   html body .app-shell .dh-detail :is(.dh-rank-drop-head, .dh-detail-head) { flex-wrap: wrap; gap: 6px; }
 }
+/* Lead pop-up: Schedule appointment at the top */
+html body .crm-detail-quick { flex: none; padding: 10px 18px 0; }
+html body .crm-detail-quick .crm-detail-book { width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 42px; border-radius: 12px; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; background: var(--brand-primary, #0b78b0); color: #fff; border: 1px solid transparent; transition: transform .15s, box-shadow .15s; }
+html body .crm-detail-quick .crm-detail-book:hover { transform: translateY(-1px); box-shadow: 0 6px 16px color-mix(in srgb, var(--brand-secondary, var(--brand-primary, #0b78b0)) 25%, transparent); }
