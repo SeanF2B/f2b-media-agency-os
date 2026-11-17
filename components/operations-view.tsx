@@ -12,6 +12,7 @@ import { SiteFormsPanel } from "./site-forms-panel";
 import { SetupWizard } from "./setup-wizard";
 const SocialPlanner = lazy(() => import("./social-planner").then((module) => ({ default: module.SocialPlanner })));
 const DomainsDnsView = lazy(() => import("./domains-dns-view").then((module) => ({ default: module.DomainsDnsView })));
+const ProposalStudioView = lazy(() => import("./proposal-studio-view").then((module) => ({ default: module.ProposalStudioView })));
 const OnboardingAdmin = lazy(() => import("./onboarding-admin").then((module) => ({ default: module.OnboardingAdmin })));
 const EmailMarketingView = lazy(() => import("./email-marketing-view").then((module) => ({ default: module.EmailMarketingView })));
 
@@ -69,7 +70,7 @@ type SiteMode = "sites" | "settings" | "media" | "templates";
 export function normalizeOpsTab(value: string): { tab: OperationsTab; sub?: string } {
   const legacy: Record<string, { tab: OperationsTab; sub?: string }> = {
     keywords: { tab: "seo", sub: "keywords" }, ai: { tab: "seo", sub: "ai" }, backlinks: { tab: "seo", sub: "backlinks" }, competitors: { tab: "seo", sub: "competitors" }, ranks: { tab: "seo", sub: "ranks" }, pages: { tab: "seo", sub: "pages" },
-    local: { tab: "clients", sub: "maps" }, audits: { tab: "reports", sub: "audits" },
+    local: { tab: "clients", sub: "maps" }, audits: { tab: "reports", sub: "audits" }, proposals: { tab: "reports", sub: "proposals" },
     websites: { tab: "sites", sub: "overview" }, media: { tab: "sites", sub: "media" }, "media-library": { tab: "sites", sub: "media" }, templates: { tab: "sites", sub: "templates" }, forms: { tab: "sites", sub: "forms" }, submissions: { tab: "sites", sub: "submissions" },
     email: { tab: "sites", sub: "email" }, emails: { tab: "sites", sub: "email" }, domains: { tab: "sites", sub: "domains" }, dns: { tab: "sites", sub: "domains" }, automations: { tab: "sites", sub: "automations" }, "system-emails": { tab: "sites", sub: "system" }, leadfactory: { tab: "clients" },
   };
@@ -116,7 +117,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
   const { tab, sub } = normalizeOpsTab(rawTab === "overview" ? "clients" : rawTab);
   const [workroom, setWorkroom] = useState(false); // client workroom (full client profile) open inside the Clients tab
   const [siteMode, setSiteMode] = useState<SiteMode>("sites");
-  const [reportMode, setReportMode] = useState<"audits" | "reports" | "report-keywords">("reports");
+  const [reportMode, setReportMode] = useState<"audits" | "reports" | "report-keywords" | "proposals">("reports");
   const [seoMode, setSeoMode] = useState<SeoMode>("pages");
   const [adsMode, setAdsMode] = useState<AdsMode | null>(null); // null = Performance for connected accounts, Setup otherwise
   const [sitesTab, setSitesTab] = useState<SitesTab>("overview");
@@ -126,7 +127,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
   useEffect(() => {
     if (!sub) return;
     if (tab === "seo") setSeoMode(sub as SeoMode);
-    else if (tab === "reports") setReportMode(sub === "keywords" ? "report-keywords" : sub as "audits");
+    else if (tab === "reports") setReportMode(sub === "keywords" ? "report-keywords" : sub as "audits" | "proposals");
     else if (tab === "sites") {
       if (sub === "forms" || sub === "submissions") { setSitesTab("forms"); setFormsView(sub); }
       else if (sub === "domains" || sub === "dns") setSitesTab("domains");
@@ -180,7 +181,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
       {OPS_TABS.filter(([key]) => (key !== "clients" || clientsView) && (!["seo", "ads", "reports"].includes(key) || renderTool)).map(([key, label, Icon]) => { const on = tab === key || (key === "clients" && tab === "onboarding"); return <button type="button" role="tab" key={key} aria-selected={on} className={on ? "active" : ""} onClick={() => { if (key === "clients") setWorkroom(false); onTab(key); }}><Icon size={16} strokeWidth={1.9} aria-hidden="true" className="ops-tab-icon" />{label}</button>; })}
     </div>
 
-    {tab === "clients" && <p className="ops-more">Also: {[["Meta Ads", "Meta Ads"], ["Proposal Studio", "Proposals"]].map(([page, label], index) => <span key={page}>{index ? " · " : ""}<button type="button" className="text-button" onClick={() => onOpenPage(page)}>{label}</button></span>)}</p>}
+    {tab === "clients" && <p className="ops-more">Also: {[["Meta Ads", "Meta Ads"], ["Proposals", "Proposals"]].map(([page, label], index) => <span key={page}>{index ? " · " : ""}<button type="button" className="text-button" onClick={() => { if (page === "Proposals") { setReportMode("proposals"); onTab("reports"); } else onOpenPage(page); }}>{label}</button></span>)}</p>}
     {tab === "clients" && <>
       <div className="ops-summary">
         <div><b>{active.length}</b><span>Active clients</span></div>
@@ -247,14 +248,16 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
 
     {tab === "onboarding" && <><div className="ops-onb-switch"><button type="button" className="text-button ops-back" onClick={() => onTab("clients")}>← Back to clients</button><span className="ops-status-filter" role="tablist" aria-label="Onboarding view">{(["wizard", "online"] as const).map((key) => <button key={key} type="button" role="tab" aria-selected={onbView === key} className={onbView === key ? "on" : ""} onClick={() => setOnbView(key)}>{key === "wizard" ? "Onboard a client" : "Online onboarding"}</button>)}</span></div>{onbView === "wizard" ? onboarding : <Suspense fallback={<div className="page-loading" role="status" aria-label="Loading online onboarding…"><i /></div>}><OnboardingAdmin /></Suspense>}</>}
 
-    {tab === "reports" && renderTool && selected && <>
-      <div className="ops-subbar">{seg(reportMode, setReportMode, [["reports", "Client reports"], ["audits", "Audits"], ["report-keywords", "Keywords"]], "Reports sections")}</div>
-      <div className="ops-embed" key={`rep-${reportMode}-${selected.id}`}>{renderTool(reportMode, selected.id)}</div>
+    {tab === "reports" && renderTool && (selected || reportMode === "proposals") && <>
+      <div className="ops-subbar">{seg(reportMode, setReportMode, [["reports", "Client reports"], ["audits", "Audits"], ["report-keywords", "Keywords"], ["proposals", "Proposals"]], "Reports sections")}</div>
+      {reportMode === "proposals"
+        ? <div className="ops-embed ops-proposals"><Suspense fallback={<div className="page-loading" role="status" aria-label="Loading proposals…"><i /></div>}><ProposalStudioView clients={clients} defaultClientId={selected?.id} /></Suspense></div>
+        : selected && <div className="ops-embed" key={`rep-${reportMode}-${selected.id}`}>{renderTool(reportMode, selected.id)}</div>}
     </>}
     {tab === "seo" && seoMode === "ai" && selected && <>
       <div className="ops-embed" key={`ai-${selected.id}`}><AiVisibilityPanel clientId={selected.id} clientName={selected.name} area={seoLocation} services={(selected.services || []).map((service) => service.name).concat((selected as OpsClient & { seoServices?: string[] }).seoServices || [])} /></div>
     </>}
-    {!selected && ["seo", "ads", "reports"].includes(tab) && <p className="ops-empty">No active clients.</p>}
+    {!selected && ["seo", "ads", "reports"].includes(tab) && !(tab === "reports" && reportMode === "proposals") && <p className="ops-empty">No active clients.</p>}
 
   </section>;
 }
