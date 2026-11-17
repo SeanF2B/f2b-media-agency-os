@@ -3109,3 +3109,30 @@ html body .app-shell .ops-tasks .task-page-heading h1, html body .app-shell .ops
 @media (max-width: 380px) {
   html body .app-shell .ops-summary { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
 }
+
+/* ===== Phones (17 Nov): every pop-up fits the screen — above the top bar, bottom bar and AI bubble, full width, scrolls inside ===== */
+@media (max-width: 860px) {
+  html body :is(.modal-backdrop, .crm-modal-backdrop, .cv-modal, .iv-modal, .ps-modal-back, .ox-drawer-backdrop, .ow-modal-scrim, .stage-pop-backdrop, .upload-backdrop, .review-backdrop, .preview-backdrop) { z-index: 3000 !important; }
+  html body :is(.modal-backdrop, .crm-modal-backdrop, .cv-modal, .iv-modal, .ps-modal-back, .ox-drawer-backdrop, .ow-modal-scrim, .stage-pop-backdrop, .upload-backdrop, .review-backdrop, .preview-backdrop, .task-popup-backdrop, .bt-backdrop, .sp-backdrop, .spp-drawer-backdrop) {
+    position: fixed !important; inset: 0 !important; box-sizing: border-box !important; overflow: hidden !important;
+    display: flex !important; align-items: flex-end !important; justify-content: center !important;
+    padding: max(10px, env(safe-area-inset-top, 0px)) 8px max(8px, env(safe-area-inset-bottom, 0px)) !important;
+  }
+  html body :is(.modal-backdrop, .crm-modal-backdrop, .cv-modal, .iv-modal, .ps-modal-back, .ox-drawer-backdrop, .ow-modal-scrim, .stage-pop-backdrop, .upload-backdrop, .review-backdrop, .preview-backdrop, .task-popup-backdrop, .bt-backdrop, .sp-backdrop, .spp-drawer-backdrop) > :not(style):not(script) {
+    position: relative !important; inset: auto !important; transform: none !important; margin: 0 !important;
+    width: 100% !important; min-width: 0 !important; max-width: 100% !important;
+    max-height: calc(100dvh - max(10px, env(safe-area-inset-top, 0px)) - max(8px, env(safe-area-inset-bottom, 0px))) !important;
+    overflow-y: auto !important; overflow-x: hidden !important; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+    box-sizing: border-box !important; border-radius: 20px !important;
+  }
+  /* nothing inside a pop-up is wider than the pop-up */
+  html body :is(.modal-backdrop, .crm-modal-backdrop, .cv-modal, .iv-modal, .ps-modal-back, .ox-drawer-backdrop, .ow-modal-scrim, .stage-pop-backdrop, .upload-backdrop, .review-backdrop, .preview-backdrop, .task-popup-backdrop, .bt-backdrop, .sp-backdrop, .spp-drawer-backdrop) :is(input, select, textarea, img, video, table, pre) { max-width: 100%; box-sizing: border-box; }
+  html body :is(.modal-backdrop, .crm-modal-backdrop, .cv-modal, .iv-modal, .task-popup-backdrop, .bt-backdrop, .sp-backdrop) :is(.form-grid, .iv-grid, .iv-form-grid, .two-col, .grid-2) { grid-template-columns: minmax(0, 1fr) !important; }
+  html body :is(.modal-backdrop, .crm-modal-backdrop, .cv-modal, .iv-modal, .task-popup-backdrop, .bt-backdrop, .sp-backdrop) :is(.form-grid, .iv-grid, .iv-form-grid) > * { grid-column: auto !important; min-width: 0; }
+  /* header and buttons stay in view while the form scrolls */
+  html body .modal-backdrop > .modal > .modal-head { position: sticky; top: -1px; z-index: 2; background: inherit; padding-top: 4px; }
+  html body .modal-backdrop > .modal > .modal-actions { position: sticky; bottom: -1px; z-index: 2; background: inherit; padding: 10px 0 2px !important; margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+  html body .modal-backdrop > .modal > .modal-actions > * { flex: 1 1 0; min-width: 0; }
+  /* the AI bubble and its greeting never sit on top of a pop-up */
+  html body:has(:is(.modal-backdrop, .crm-modal-backdrop, .cv-modal, .iv-modal, .ps-modal-back, .ox-drawer-backdrop, .ow-modal-scrim, .stage-pop-backdrop, .upload-backdrop, .review-backdrop, .preview-backdrop, .task-popup-backdrop, .bt-backdrop, .sp-backdrop, .spp-drawer-backdrop)) :is(.ai-chat-launcher, .ai-chat-toast) { display: none !important; }
+}
