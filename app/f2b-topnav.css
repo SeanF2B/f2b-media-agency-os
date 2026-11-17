@@ -2974,3 +2974,5 @@ html body .app-shell .dh-appt-foot small { opacity: .6; font-size: 11.5px; }
   html body .app-shell .dh-appt-row .dh-appr-acts > * { height: 36px; }
   html body .app-shell .dh-appt-row .dh-appr-acts:has(.dh-appt-badge) { display: flex !important; width: auto; }
 }
+html body .app-shell .dh-appt-list .dh-appt-tabs[role="tablist"] { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)) !important; overflow: visible !important; }
+html body .app-shell .dh-appt-list .dh-appt-tabs[role="tablist"] > button { flex: none !important; width: 100% !important; font-size: 12px !important; padding: 0 4px !important; }
