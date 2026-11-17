@@ -2736,3 +2736,11 @@ body.f2b-dark .app-shell .dh-link{color:#e7edf1 !important;-webkit-text-fill-col
   html body .app-shell .sch.is-phone .sch-day-body { touch-action: pan-y; }
   html body .app-shell .sch.is-phone .sch-block { cursor: pointer; }
 }
+@media (max-width: 860px) {
+  html body .app-shell .sch.is-phone .iv-head > div:first-child { min-width: 0; }
+  html body .app-shell .sch.is-phone .iv-head h1 { font-size: 19px !important; line-height: 1.15; }
+  html body .app-shell .sch.is-phone .iv-head-actions { flex: 0 0 auto; }
+  html body .app-shell .sch.is-phone .iv-head-actions .primary-button { padding: 0 12px !important; font-size: 14px !important; white-space: nowrap; }
+  html body .app-shell .sch.is-phone .sch-toolbar { width: 100%; max-width: 100%; }
+  html body .app-shell .sch.is-phone .sch-filters .sch-select select { min-width: 0; width: 100%; text-overflow: ellipsis; }
+}
