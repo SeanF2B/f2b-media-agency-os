@@ -15,7 +15,7 @@ export function ensureReportArchive(db: D1Database) {
   return ready;
 }
 
-type Bucket = { put(key: string, value: string, options?: Record<string, unknown>): Promise<unknown>; get(key: string): Promise<{ text(): Promise<string> } | null> } | undefined;
+type Bucket = { put(key: string, value: string, options?: Record<string, unknown>): Promise<unknown>; get(key: string): Promise<{ text(): Promise<string> } | null>; delete?(key: string): Promise<unknown> } | undefined;
 type ArchiveWorkspace = { ownerId?: string; clients?: Array<{ id: string; name: string; status?: string; googleAdsAccountId?: string; googleAnalyticsAccountId?: string; googleSearchConsoleAccountId?: string; googleBusinessProfileLocationId?: string; services?: Array<{ name?: string }>; seoServices?: string[] }> };
 
 export async function saveClientReport(db: D1Database, bucket: Bucket, workspace: ArchiveWorkspace, clientId: string, type: ReportType, period: { start: string; end: string }, kind: "monthly" | "manual", origin = APP_ORIGIN, options: { keywordGroups?: string[] } = {}) {
@@ -54,6 +54,15 @@ export async function readClientReportHtml(db: D1Database, bucket: Bucket, owner
   if (row.html) return row.html;
   if (row.storage_key && bucket) return (await (await bucket.get(row.storage_key))?.text()) || null;
   return null;
+}
+
+export async function deleteClientReport(db: D1Database, bucket: Bucket, ownerId: string, clientId: string, id: string) {
+  await ensureReportArchive(db);
+  const row = await db.prepare("SELECT storage_key FROM client_report_archive WHERE owner_id = ?1 AND client_id = ?2 AND id = ?3").bind(ownerId, clientId, id).first<{ storage_key: string }>();
+  if (!row) return false;
+  await db.prepare("DELETE FROM client_report_archive WHERE owner_id = ?1 AND client_id = ?2 AND id = ?3").bind(ownerId, clientId, id).run();
+  if (row.storage_key && bucket?.delete) await bucket.delete(row.storage_key).catch(() => undefined);
+  return true;
 }
 
 function dublinParts(now: Date) {

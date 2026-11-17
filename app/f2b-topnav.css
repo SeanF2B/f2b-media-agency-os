@@ -3010,3 +3010,24 @@ html body .app-shell .crecent-meta { display: grid; gap: 3px; padding: 9px 11px 
 html body .app-shell .crecent-meta .cfolder-badge { justify-self: start; }
 html body .app-shell .crecent-meta b { font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 html body .app-shell .crecent-meta small { font-size: 12px; opacity: .72; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Report export / delete actions (Recent reports cards + Reports folder rows). */
+html body .app-shell .rep-actions { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+html body .app-shell .rep-export { position: relative; display: inline-flex; }
+html body .app-shell .rep-btn { display: inline-grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--f2b-border, #d9dee3); border-radius: 8px; background: var(--f2b-white, #fff); color: inherit; cursor: pointer; transition: transform .15s ease, border-color .15s ease, color .15s ease; }
+html body .app-shell .rep-btn:hover { transform: translateY(-1px); border-color: var(--brand-secondary, var(--brand-primary, #0b74b8)); color: var(--brand-secondary, var(--brand-primary, #0b74b8)); }
+html body .app-shell .rep-btn.danger:hover { border-color: #d92d20; color: #d92d20; }
+html body .app-shell .rep-btn:disabled { opacity: .5; cursor: progress; }
+html body .app-shell.dark-mode .rep-btn { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.16); color: #fff; }
+html body .app-shell .rep-menu { position: absolute; top: calc(100% + 4px); right: 0; z-index: 30; display: grid; min-width: 170px; padding: 4px; border: 1px solid var(--f2b-border, #d9dee3); border-radius: 10px; background: #fff; color: #111; box-shadow: 0 12px 28px rgba(15,23,42,.18); }
+html body .app-shell .rep-menu button { padding: 8px 10px; border: 0; border-radius: 7px; background: transparent; color: #111; font: inherit; font-size: 13px; text-align: left; cursor: pointer; white-space: nowrap; }
+html body .app-shell .rep-menu button:hover { background: #f1f5f9; }
+html body .app-shell .cfolder-line { display: flex; align-items: center; gap: 6px; }
+html body .app-shell .cfolder-line > .cfolder-row { flex: 1; min-width: 0; }
+html body .app-shell .cfolder-audit { position: relative; }
+html body .app-shell .cfolder-audit > .rep-actions { position: absolute; top: 6px; right: 34px; }
+html body .app-shell .crecent-card { position: relative; }
+html body .app-shell .crecent-open { display: grid; width: 100%; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+html body .app-shell .crecent-card > .rep-actions { position: absolute; top: 8px; right: 8px; opacity: 0; transition: opacity .15s ease; }
+html body .app-shell .crecent-card:hover > .rep-actions, html body .app-shell .crecent-card:focus-within > .rep-actions { opacity: 1; }
+@media (hover: none) { html body .app-shell .crecent-card > .rep-actions { opacity: 1; } }

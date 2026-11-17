@@ -3,7 +3,7 @@ import { getChatGPTUser } from "../../chatgpt-auth";
 import { fullTeamPermissions, getTeamPermissions, type TeamPermissions } from "@/lib/access-permissions";
 import { buildClientReport, type ReportType } from "@/lib/client-report-data";
 import { renderClientReportHtml } from "@/lib/client-report-render";
-import { listClientReports, readClientReportHtml, saveClientReport } from "@/lib/client-report-archive";
+import { deleteClientReport, listClientReports, readClientReportHtml, saveClientReport } from "@/lib/client-report-archive";
 import { resolveAgencyLogoUrl } from "@/lib/report-branding";
 
 // Visual SEO / Google Ads client reports. GET builds a live report (cached API reads) as JSON or HTML;
@@ -26,7 +26,7 @@ async function context(clientId: string) {
   if (!admin && !permissions.reports) return { response: reply({ error: "You do not have permission to view client reports." }, 403) };
   if (!(workspace.clients || []).some((client) => client.id === clientId)) return { response: reply({ error: "Choose a client in this workspace." }, 404) };
   if (!admin && staff?.limitClientAccess && !(staff.clientAccessIds || []).includes(clientId)) return { response: reply({ error: "You do not have access to this client." }, 403) };
-  return { db: env.DB, workspace, ownerId: String(workspace.ownerId || "") };
+  return { db: env.DB, workspace, ownerId: String(workspace.ownerId || ""), admin };
 }
 
 const validDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
@@ -74,4 +74,16 @@ export async function POST(request: Request) {
     const saved = await saveClientReport(ctx.db, env.BUCKET as never, ctx.workspace as never, String(body.clientId), period.type, { start: period.start, end: period.end }, "manual", new URL(request.url).origin, { keywordGroups: (Array.isArray(body.groups) ? body.groups : []).map((v: unknown) => String(v).slice(0, 80)).filter(Boolean).slice(0, 50) });
     return reply({ ok: true, id: saved.id, reports: await listClientReports(ctx.db, ctx.ownerId, String(body.clientId)) });
   } catch (error) { return reply({ error: error instanceof Error ? error.message : "The report could not be saved." }, 500); }
+}
+
+export async function DELETE(request: Request) {
+  const url = new URL(request.url);
+  const clientId = url.searchParams.get("clientId") || "";
+  const ctx = await context(clientId);
+  if ("response" in ctx) return ctx.response;
+  if (!ctx.admin) return reply({ error: "Only admins can delete saved reports." }, 403);
+  const id = (url.searchParams.get("archiveId") || "").slice(0, 80);
+  if (!id) return reply({ error: "Choose a report to delete." }, 400);
+  const removed = await deleteClientReport(ctx.db, env.BUCKET as never, ctx.ownerId, clientId, id);
+  return removed ? reply({ ok: true, reports: await listClientReports(ctx.db, ctx.ownerId, clientId) }) : reply({ error: "That saved report could not be found." }, 404);
 }
