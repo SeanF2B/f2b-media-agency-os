@@ -613,3 +613,4 @@ html body .app-shell.dark-mode .sch-dash-panel-tools .sch-seg button.on{backgrou
 }
 .sch .iv-stats.sch-stats-under{margin:0 0 12px}
 .sch-custom-dur{align-items:center;margin-top:6px}.sch-custom-dur input{width:64px;font-size:16px}.sch-custom-dur span{font-size:12px;opacity:.75}
+.books-staff-hours{position:relative;margin-top:16px}.books-staff-hours-bar{display:flex;width:100%;align-items:center;justify-content:space-between;cursor:pointer;border:1px solid var(--line,#e6eaee);padding:14px 18px;text-align:left;color:inherit}.books-staff-hours-bar .eyebrow{margin:0}.books-staff-hours-close{display:flex;margin:0 0 4px auto;border:0;background:transparent;cursor:pointer;color:inherit;opacity:.7;padding:4px}.books-staff-hours-close:hover{opacity:1}

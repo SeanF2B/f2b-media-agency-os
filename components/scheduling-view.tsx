@@ -3,7 +3,7 @@
 import { useSampleData } from "@/hooks/use-sample-data";
 import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ImagePlus, Sparkles, CalendarDays, ChevronLeft, ChevronRight, Clock, Copy, Link2, MapPin, Plus, RefreshCw, Settings2, Trash2, UserRound, Users, Video, Phone, Building2, LayoutDashboard, ClipboardList, CalendarRange, CalendarClock, History, CircleX } from "lucide-react";
+import { ImagePlus, Sparkles, CalendarDays, ChevronLeft, ChevronRight, Clock, Copy, Link2, MapPin, Plus, RefreshCw, Settings2, Trash2, UserRound, Users, Video, Phone, Building2, LayoutDashboard, ClipboardList, CalendarRange, CalendarClock, History, CircleX, ChevronDown, ChevronUp } from "lucide-react";
 import { useAppointmentUpdates } from "@/components/appointment-updates";
 import "./scheduling.css";
 import { ReportGeneratingAnimation, currencySymbolFor } from "./report-generating-animation";
@@ -1075,6 +1075,21 @@ export function QuickBook({ scopeClientId, prefill, onClose, onBooked }: { scope
 
 // Staff hours & earnings from appointments: pick a period (day / week / month / custom dates) and a person.
 // Earnings use each person's pay setting (hourly rate or % commission of the appointment price).
+/** Books → bottom of the Books tab: the same Staff hours & earnings panel as the Dashboard (admins only), collapsible. */
+export function BooksStaffHours({ scopeClientId, sample = false, clientName = "" }: { scopeClientId: string; sample?: boolean; clientName?: string }) {
+  const [realData, setData] = useState<Data | null>(null);
+  const [open, setOpen] = useState(() => { try { return localStorage.getItem("f2b-books-staff-hours") !== "0"; } catch { return true; } });
+  useEffect(() => { let live = true; const now = new Date(); api<Data>(scopeClientId, undefined, `&from=${addDays(now, -40).toISOString()}&to=${addDays(now, 40).toISOString()}`).then((d) => { if (live) setData(d); }).catch(() => { /* no Scheduling access: hide quietly */ }); return () => { live = false; }; }, [scopeClientId]);
+  const site = useSiteSample(scopeClientId, sample);
+  const data = useMemo(() => sample ? (!site.loaded ? null : sampleSchedule(realData, mondayOf(new Date()), clientName, site)) : realData, [sample, realData, clientName, site]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!data || !realData?.isAdmin) return null;
+  const toggle = () => { const v = !open; setOpen(v); try { localStorage.setItem("f2b-books-staff-hours", v ? "1" : "0"); } catch { /* optional */ } };
+  return <div className={`books-staff-hours ${open ? "open" : "closed"}`}>
+    {!open ? <button type="button" className="panel books-staff-hours-bar" onClick={toggle} aria-expanded={false}><span className="eyebrow">⏱ STAFF HOURS &amp; EARNINGS <span className="admin-badge">ADMIN</span></span><ChevronDown size={16} /></button>
+      : <><button type="button" className="books-staff-hours-close" onClick={toggle} aria-label="Collapse staff hours" aria-expanded><ChevronUp size={16} /></button><StaffHoursPanel data={data} scopeClientId={scopeClientId} sample={sample} /></>}
+  </div>;
+}
+
 function StaffHoursPanel({ data: base, scopeClientId, sample, periodStart = "", periodEnd = "", periodLabel = "" }: { data: Data; scopeClientId: string; sample: boolean; periodStart?: string; periodEnd?: string; periodLabel?: string }) {
   const [period, setPeriod] = useState<"day" | "week" | "month" | "custom">(() => { try { const v = localStorage.getItem("f2b-staff-hours-period2"); return v === "day" || v === "week" || v === "custom" ? v : "month"; } catch { return "month"; } });
   const [anchor, setAnchor] = useState(() => new Date());
@@ -1202,7 +1217,7 @@ function StaffHoursPanel({ data: base, scopeClientId, sample, periodStart = "", 
         <div className="sch-earn-cell"><b>{money(r.aheadRevenue)}</b></div>
         <div className="sch-earn-cell lost"><b>{money(r.lost)}</b>{r.noShows > 0 && <em>{r.noShows} no-show{r.noShows === 1 ? "" : "s"}</em>}</div>
         <div className="sch-earn-cell"><b>{money(r.deposits)}</b></div>
-        <div className="sch-earn-cell earn">{editPay === r.p.id ? <PayEditor value={r.pr} onSave={(v) => void savePay(r.p, v)} onCancel={() => setEditPay("")} /> : <><b>{money(r.earned)}{r.scheduledPay > 0 && <small> +{money(r.scheduledPay)}</small>}</b><button type="button" className="sch-earn-chip sm" onClick={() => setEditPay(r.p.id)} title="Change this person's pay">{r.pr.payType === "hourly" ? `${money(r.pr.payRate)}/h` : r.pr.payType === "salary" ? `${money(r.pr.payRate)}/yr` : r.pr.payType === "commission" ? `${r.pr.payRate}%${(r.pr as { standard?: boolean }).standard ? "" : " (own)"}` : "Set pay"}</button></>}</div>
+        <div className="sch-earn-cell earn">{editPay === r.p.id ? <PayEditor value={r.pr} onSave={(v) => void savePay(r.p, v)} onCancel={() => setEditPay("")} /> : <><b>{money(r.earned)}{r.scheduledPay > 0 && <small> +{money(r.scheduledPay)}</small>}</b><button type="button" className="sch-earn-chip sm" onClick={() => setEditPay(r.p.id)} title="Set this person's own commission or pay">{r.pr.payType === "hourly" ? `${money(r.pr.payRate)}/h` : r.pr.payType === "salary" ? `${money(r.pr.payRate)}/yr` : r.pr.payType === "commission" ? `${r.pr.payRate}%${(r.pr as { standard?: boolean }).standard ? "" : " (own)"} ✎` : "Set pay"}</button></>}</div>
         <button type="button" className="sch-earn-cover" title={`Off sick or away? Move ${r.p.name.split("|")[0].trim()}'s bookings to someone else`} onClick={() => setCover({ staffId: r.p.id, to: "", from: ymd(new Date()), until: ymd(new Date()), dayOff: true })}>Reassign</button>
       </div>)}
       {!rows.length && <p className="dh-muted">No staff to show.</p>}
