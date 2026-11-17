@@ -903,3 +903,19 @@ body.f2b-dark { background:#222124 !important; color:#e6ecef; }
 .app-shell :is(input,textarea,[contenteditable="true"],[contenteditable="true"] *){user-select:text!important;-webkit-user-select:text!important}
 .lead-location-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.lead-location-chips button{border:1px solid var(--border,#d5dce5);border-radius:999px;background:var(--surface,#fff);color:inherit;padding:7px 11px;cursor:pointer}.lead-location-chips button.selected{border-color:#2684df;background:rgba(38,132,223,.14);color:#1464ad;font-weight:700}.lead-location-chips button:focus-visible{outline:2px solid #2684df;outline-offset:2px}.lead-profile-editor .field.full-field>small{display:block;margin-top:6px}
 .google-ads-task-setup-status{display:grid;gap:4px;min-width:min(420px,100%);padding:12px 14px;border:1px solid #dce8ef;border-radius:12px;background:#f8fbfd;color:#526477;font-size:12px}.google-ads-task-setup-status b{color:#24543e;font-size:13px}.google-ads-task-setup>footer{justify-content:flex-start;flex-wrap:wrap}.google-ads-task-setup>footer>button{min-height:42px}
+
+/* Task pop-up: Cancel / Delete row */
+.task-popup-danger-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(127, 138, 160, 0.2); }
+.task-popup-danger-actions .task-delete { background: #fdecec; color: #b42318; border: 1px solid #f5c2c0; border-radius: 10px; padding: 8px 14px; font-weight: 600; cursor: pointer; }
+.task-popup-danger-actions .task-delete:hover:not(:disabled) { background: #fbd5d3; }
+.task-popup-danger-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Task card: delete button beside Edit */
+.task-card-actions .task-card-delete { flex: 0 0 auto; width: 24px; height: 24px; display: inline-grid; place-items: center; padding: 0; margin-left: 4px; border: 1px solid #f5c2c0; border-radius: 6px; background: #fdecec; color: #b42318; font-size: 13px; line-height: 1; cursor: pointer; transition: transform .15s, background .15s; }
+.task-card-actions .task-card-delete:hover:not(:disabled) { background: #fbd5d3; transform: translateY(-1px); }
+.task-card-actions .task-card-delete:disabled { opacity: .45; cursor: not-allowed; }
+.dark-mode .task-card-actions .task-card-delete { background: #3a2224; border-color: #6b3034; color: #ff8a80; }
+.task-card-actions .task-card-cancel { flex: 0 0 auto; width: 24px; height: 24px; display: inline-grid; place-items: center; padding: 0; margin-left: 4px; border: 1px solid #f3d9a8; border-radius: 6px; background: #fff6e5; color: #9a5b00; font-size: 12px; line-height: 1; cursor: pointer; transition: transform .15s, background .15s; }
+.task-card-actions .task-card-cancel:hover:not(:disabled) { background: #ffeac2; transform: translateY(-1px); }
+.task-card-actions .task-card-cancel:disabled { opacity: .45; cursor: not-allowed; }
+.dark-mode .task-card-actions .task-card-cancel { background: #3a3020; border-color: #6b5530; color: #ffc46b; }
