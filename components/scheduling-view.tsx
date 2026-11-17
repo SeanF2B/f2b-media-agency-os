@@ -3,7 +3,7 @@
 import { useSampleData } from "@/hooks/use-sample-data";
 import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ImagePlus, Sparkles, CalendarDays, ChevronLeft, ChevronRight, Clock, Copy, Link2, MapPin, Plus, RefreshCw, Settings2, Trash2, UserRound, Users, Video, Phone, Building2 } from "lucide-react";
+import { ImagePlus, Sparkles, CalendarDays, ChevronLeft, ChevronRight, Clock, Copy, Link2, MapPin, Plus, RefreshCw, Settings2, Trash2, UserRound, Users, Video, Phone, Building2, LayoutDashboard, ClipboardList, CalendarRange, CalendarClock, History, CircleX } from "lucide-react";
 import "./scheduling.css";
 import { ReportGeneratingAnimation, currencySymbolFor } from "./report-generating-animation";
 import { computePayslip, maskPps, normalisePps, validPps, DEFAULT_PERSON, EMPTY_YTD, type PayrollEmployer, type PayrollPerson } from "@/lib/scheduling/payroll";
@@ -174,7 +174,7 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
     {!isPhone && <AiBar scope={scopeClientId} data={data} onCalendar={(c) => setEditCal(c)} onCreateCalendar={async (c) => Boolean(await act({ action: "saveCalendar", calendar: c }, `“${c.name}” created. Copy its booking link from Booking calendars.`))} onAppointment={(a) => setNewAppt(a)} onHours={async (hours) => { for (const h of hours) { const person = data.staff.find((x) => x.id === h.staffId); await act({ action: "saveAvailability", staffId: h.staffId, weekly: h.weekly, blocked: [...new Set([...(person?.blocked || []), ...h.daysOff])], dailyLimit: h.dailyLimit || person?.dailyLimit || 0, timezone: person?.timezone || "Europe/Dublin" }); } setNote("Working hours updated."); setTab("availability"); }} />}
 
     <div className="sch-toolbar">
-      <div className="iv-tabs" role="tablist" aria-label="Scheduling sections">{([["dashboard", "Dashboard"], ["calendar", "Calendar"], ["appointments", "Appointments"], ["calendars", "Booking calendars"], ["availability", "Staff & availability"]] as const).map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{l}</button>)}</div>
+      <div className="iv-tabs crm-tabs sch-tabs" role="tablist" aria-label="Scheduling sections">{([["dashboard", "Dashboard", LayoutDashboard], ["calendar", "Calendar", CalendarDays], ["appointments", "Appointments", ClipboardList], ["calendars", "Booking calendars", CalendarRange], ["availability", "Staff & availability", Users]] as const).map(([k, l, Icon]) => <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}><Icon size={16} strokeWidth={1.9} aria-hidden="true" />{l}</button>)}</div>
       {(tab === "calendar" || tab === "appointments") && <div className="sch-filters">
         <label className="sch-select"><Users size={14} /><select aria-label="Filter by staff member" value={staffFilter} onChange={(e) => setStaffFilter(e.target.value)}><option value="">Everyone</option>{data.staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
         <label className="sch-select"><CalendarDays size={14} /><select aria-label="Filter by booking calendar" value={calFilter} onChange={(e) => setCalFilter(e.target.value)}><option value="">All calendars</option>{data.calendars.map((c) => <option key={c.id} value={c.id}>{data.scope === null && c.clientId ? `${clientName(c.clientId)} · ` : ""}{c.name}</option>)}</select></label>
@@ -273,7 +273,7 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
     </div>}
 
     {tab === "appointments" && <div className="iv-card">
-      <div className="iv-filters">{(["upcoming", "past", "cancelled"] as const).map((m) => <button key={m} type="button" className={listMode === m ? "on" : ""} onClick={() => setListMode(m)}>{m === "upcoming" ? "Upcoming" : m === "past" ? "Past" : "Cancelled"}</button>)}</div>
+      <div className="iv-filters">{(["upcoming", "past", "cancelled"] as const).map((m) => <button key={m} type="button" className={listMode === m ? "on" : ""} onClick={() => setListMode(m)}>{m === "upcoming" ? <><CalendarClock size={15} strokeWidth={1.9} aria-hidden="true" />Upcoming</> : m === "past" ? <><History size={15} strokeWidth={1.9} aria-hidden="true" />Past</> : <><CircleX size={15} strokeWidth={1.9} aria-hidden="true" />Cancelled</>}</button>)}</div>
       {(() => { const now = Date.now(); const rows = visible.filter((b) => listMode === "cancelled" ? b.status === "cancelled" : listMode === "upcoming" ? b.status !== "cancelled" && Date.parse(b.end) >= now : b.status !== "cancelled" && Date.parse(b.end) < now).sort((a, b) => listMode === "upcoming" ? a.start.localeCompare(b.start) : b.start.localeCompare(a.start));
         return rows.length ? <div className="sch-list">{rows.map((b) => { const cal = calById.get(b.calendarId); return <button key={b.id} type="button" className="sch-row" onClick={() => setDetail(b)}>
           <span className="sch-dot" style={{ background: cal?.color }} /><span className="sch-when"><b>{new Date(b.start).toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short" })}</b><small>{time(b.start)}–{time(b.end)}</small></span>
@@ -920,7 +920,7 @@ export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, c
   };
   const step = (dir: 1 | -1) => setDay(view === "month" ? new Date(day.getFullYear(), day.getMonth() + dir, 1) : addDays(day, (view === "day" ? 1 : 7) * dir));
   const showRate = ov.done + ov.noShow ? Math.round((ov.done / (ov.done + ov.noShow)) * 100) : null;
-  return <section className="panel sch-dash-panel" aria-label="Appointments">
+  return <><section className="panel sch-dash-panel" aria-label="Appointments">
     <div className="sch-dash-panel-head">
       <div><p className="eyebrow">📅 APPOINTMENTS{sample && <span className="sch-sample-tag">Sample data</span>}</p><h2>{view === "day" ? (isToday ? "Today" : day.toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "short" })) : view === "month" ? monthFirst.toLocaleDateString("en-IE", { month: "long", year: "numeric" }) : `Week of ${week.toLocaleDateString("en-IE", { day: "numeric", month: "short" })}`}</h2></div>
       <div className="sch-dash-panel-tools">
@@ -984,9 +984,11 @@ export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, c
       <button type="button" className="sch-dash-wday-head" onClick={() => { setDay(d); setMode("day"); }}><small>{d.toLocaleDateString("en-IE", { weekday: "short" })}</small><b>{d.getDate()}</b>{list.length > 0 && <em>{list.length}</em>}</button>
       <div className="sch-dash-wday-body">{list.length ? list.slice(0, 6).map((b) => { const cal = calById.get(b.calendarId); return <button type="button" key={b.id} className="sch-dash-chip" style={{ ["--c" as string]: cal?.color || "#2563eb" }} onClick={() => setDetail(b)} title={`${time(b.start)} ${b.name} · ${cal?.name || ""}`}><span className="sch-chip-top"><b>{time(b.start)}</b><span className="sch-chip-avs">{b.staffIds.slice(0, 2).map((id) => <Avatar key={id} person={personOf(id)} size={20} />)}</span></span><span>{b.name}</span>{(() => { const pic = bookingPhoto(b); return pic ? <img className="sch-chip-img" src={pic} alt="" loading="lazy" onError={(ev) => { (ev.currentTarget as HTMLImageElement).style.display = "none"; }} /> : null; })()}</button>; }) : <span className="sch-dash-free">Free</span>}{list.length > 6 && <small className="iv-small">+{list.length - 6} more</small>}</div>
     </div>; })}</div>}
-    {showStaffHours && data && realData?.isAdmin && <StaffHoursPanel data={data} scopeClientId={scopeClientId} sample={sample} periodStart={periodStart} periodEnd={periodEnd} periodLabel={periodLabel} />}
     {detail && data && <AppointmentDetail key={detail.id} data={data} scope={scopeClientId} booking={detail} onClose={() => setDetail(null)} onSaved={(msg) => { setDetail(null); void msg; setRefresh((n) => n + 1); }} />}
-  </section>;
+  </section>
+  {/* Staff hours & earnings: its own Dashboard section (folds open/closed like the others) */}
+  {showStaffHours && data && realData?.isAdmin && <StaffHoursPanel data={data} scopeClientId={scopeClientId} sample={sample} periodStart={periodStart} periodEnd={periodEnd} periodLabel={periodLabel} />}
+  </>;
 }
 
 // Demo schedule for the Dashboard "Sample data" toggle (never saved). Uses the account's real team when there is one.
@@ -1137,9 +1139,9 @@ function StaffHoursPanel({ data: base, scopeClientId, sample, periodStart = "", 
   };
   const saveStd = async (v: { payType: "none" | "hourly" | "commission" | "salary"; payRate: number }) => { setStd(v); setEditStd(false); if (!sample) { try { await api(scopeClientId, { action: "saveDefaultPay", ...v }); } catch { /* keeps the local value */ } } };
   const rule = (pr: { payType: string; payRate: number; standard?: boolean }) => pr.payType === "hourly" ? `${money(pr.payRate)}/h` : pr.payType === "salary" ? `${money(pr.payRate)}/year` : pr.payType === "commission" ? `${pr.payRate}% / ${100 - pr.payRate}%${pr.standard ? " · standard" : ""}` : "No pay set";
-  return <section className="sch-earn" aria-label="Staff hours and earnings">
+  return <section className="panel sch-earn" aria-label="Staff hours and earnings">
     <div className="sch-earn-head">
-      <div><p className="eyebrow">⏱ STAFF HOURS &amp; EARNINGS <span className="admin-badge" title="Only admins can see staff pay and business profit">ADMIN</span></p><h3>{label}</h3></div>
+      <div><p className="eyebrow">⏱ STAFF HOURS &amp; EARNINGS <span className="admin-badge" title="Only admins can see staff pay and business profit">ADMIN</span></p><h2>{label}</h2></div>
       <div className="sch-dash-panel-tools">
         <label className="sch-select"><Users size={14} /><select aria-label="Staff member" value={who} onChange={(e) => setWho(e.target.value)}><option value="">Everyone</option>{data.staff.map((p) => <option key={p.id} value={p.id}>{p.name.split("|")[0].trim()}</option>)}</select></label>
         <div className="sch-seg" role="tablist" aria-label="Period">{(["day", "week", "month", "custom"] as const).map((k) => <button key={k} type="button" role="tab" aria-selected={period === k} className={period === k ? "on" : ""} onClick={() => setP(k)}>{k === "custom" ? "Dates" : k[0].toUpperCase() + k.slice(1)}</button>)}</div>

@@ -374,9 +374,9 @@ html body .app-shell.dark-mode .sch-dash-panel-tools .sch-seg button.on{backgrou
 .app-shell.dark-mode .sch-month-cell{background:#1a2025;border-color:rgba(255,255,255,.06)}.app-shell.dark-mode .sch-month-chip{background:color-mix(in srgb,var(--c) 28%,#1a2025);color:#f1f5f9}.app-shell.dark-mode .sch-month-chip span{color:#cbd5e1}.app-shell.dark-mode .sch-month-date em{background:#f1f5f9;color:#111827}
 @media(max-width:760px){.sch-month-cell{min-height:64px;padding:4px}.sch-month-chip span,.sch-month-chip .sch-avatar{display:none}}
 /* Staff hours & earnings */
-.sch-earn{margin-top:16px;border-top:1px solid rgba(127,138,160,.18);padding-top:14px;display:grid;gap:10px}
+.sch-earn{display:grid;gap:10px}
 .sch-earn-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
-.sch-earn-head h3{margin:2px 0 0;font-size:17px}
+.sch-earn-head h2{margin:2px 0 0}
 .sch-earn-dates{display:inline-flex;align-items:center;gap:6px;height:36px}.sch-earn-dates input{height:36px;border:1px solid #dce3e7;border-radius:10px;padding:0 8px;font:inherit;font-size:13px}
 .sch-earn-totals{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
 .sch-earn-totals>div{border:1px solid #e8edf1;border-radius:12px;padding:9px 12px;display:grid;gap:2px;background:#fff}

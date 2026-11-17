@@ -3204,3 +3204,20 @@ html body .app-shell .ops-tasks .task-page-heading h1, html body .app-shell .ops
   html body .app-shell .client-card-extras > * { min-width: 0; max-width: 100%; }
   html body .app-shell .client-card-extras .ops-conn { flex-wrap: wrap !important; width: 100% !important; }
 }
+
+/* ===== Desktop: Dashboard + Books sections fold open/closed from their header, like on phones (see MobileCollapse) ===== */
+@media (min-width: 861px) {
+  html body .app-shell :is(.dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel, .overview-projection-panel)[data-dclosed] > :not(:first-child) { display: none !important; }
+  html body .app-shell :is(.dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel, .overview-projection-panel) > :first-child { position: relative; padding-right: 34px !important; cursor: pointer; }
+  html body .app-shell :is(.dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel, .overview-projection-panel) > :first-child::after { content: ""; position: absolute; right: 10px; top: 18px; width: 9px; height: 9px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-135deg); opacity: .55; transition: transform .2s, opacity .2s; }
+  html body .app-shell :is(.dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel, .overview-projection-panel)[data-dclosed] > :first-child::after { transform: rotate(45deg); top: 12px; }
+  html body .app-shell :is(.dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel, .overview-projection-panel) > :first-child:hover::after { opacity: .9; }
+}
+
+/* Tabs with an icon (Books, Scheduling): icon beside the label on desktop, like Leads and Operations */
+html body .app-shell :is(.book-tabs, .sch-tabs) > button { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+html body .app-shell :is(.book-tabs, .sch-tabs) > button svg { flex: none; }
+html body .app-shell .sch .iv-filters button { display: inline-flex; align-items: center; gap: 6px; }
+
+/* Staff hours & earnings as its own Dashboard section */
+html body .app-shell .dh > section.panel.sch-earn { margin-top: 0; }
