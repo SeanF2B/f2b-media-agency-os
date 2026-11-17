@@ -3053,3 +3053,59 @@ html body .app-shell .tt-mobile-freq { display: none; }
 /* Tasks inside Operations: the Operations heading already names the page */
 html body .app-shell .ops-tasks { margin-top: 6px; }
 html body .app-shell .ops-tasks .task-page-heading h1, html body .app-shell .ops-tasks .task-page-heading .eyebrow { display: none; }
+
+/* ===== Phones (17 Nov): Operations + Books tabs as one row of icon tabs (like Leads), tidy headers that never hang off the edge ===== */
+.lbl-short { display: none; }
+@media (max-width: 860px) {
+  .lbl-long { display: none !important; } .lbl-short { display: inline !important; }
+  /* every page header: title shrinks, the action button stays fully on screen */
+  html body .app-shell :is(.page-heading, .welcome-row, .iv-head, .crm-heading) { min-width: 0; max-width: 100%; box-sizing: border-box; }
+  html body .app-shell :is(.page-heading, .welcome-row, .iv-head, .crm-heading) > div:first-child { flex: 1 1 auto; min-width: 0; }
+  html body .app-shell :is(.page-heading, .welcome-row, .iv-head, .crm-heading) h1 { font-size: 22px !important; line-height: 1.15 !important; overflow-wrap: anywhere; }
+  html body .app-shell :is(.page-heading, .welcome-row, .iv-head, .crm-heading) > :is(button, a, .iv-head-actions) { flex: 0 0 auto; max-width: 50%; }
+  html body .app-shell .iv-head-actions { display: flex; gap: 6px; min-width: 0; }
+  html body .app-shell .iv-head-actions .secondary-button { display: none !important; }
+  html body .app-shell :is(.page-heading, .welcome-row, .iv-head) :is(.primary-button, .filing-open-button) { height: 40px !important; padding: 0 14px !important; font-size: 14px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-flex; align-items: center; gap: 6px; }
+  html body .app-shell .page-content { padding-left: max(12px, env(safe-area-inset-left, 0px)) !important; padding-right: max(12px, env(safe-area-inset-right, 0px)) !important; }
+  html body .app-shell .page-content > * { min-width: 0; max-width: 100%; }
+
+  /* Operations + Books tabs: icon above label, one row, like the Leads tabs */
+  html body .app-shell .page-content :is(.ops-tabs, .book-tabs) { display: grid !important; grid-template-columns: none !important; grid-auto-flow: column !important; grid-auto-columns: minmax(0, 1fr) !important; gap: 2px !important; padding: 4px !important; margin: 0 0 8px !important; border-radius: 14px !important; overflow: hidden !important; width: 100%; box-sizing: border-box; }
+  html body .app-shell .page-content :is(.ops-tabs, .book-tabs) > * { display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; gap: 3px !important; height: 52px !important; padding: 4px 2px !important; font-size: 10px !important; line-height: 1.1 !important; border-radius: 10px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0 !important; text-align: center; }
+  html body .app-shell .page-content :is(.ops-tabs, .book-tabs) > * > span { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  html body .app-shell .page-content :is(.ops-tabs, .book-tabs) > * svg { width: 18px !important; height: 18px !important; margin: 0 !important; flex: none; }
+  html body .app-shell .page-content:has(> .book-tabs) > .book-tabs.book-tabs { grid-template-columns: none !important; grid-auto-columns: minmax(0, 1fr) !important; }
+  html body .app-shell .page-content:has(> .book-tabs) > .book-tabs.book-tabs > * { font-size: 10.5px !important; padding: 4px 2px !important; }
+
+  /* Operations: compact header and a one-row summary strip */
+  html body .app-shell .ops-heading { margin-bottom: 8px !important; }
+  html body .app-shell .ops-more { display: none !important; }
+  html body .app-shell .ops-summary { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 6px !important; margin-bottom: 8px; }
+  html body .app-shell .ops-summary > * { padding: 8px 6px !important; border-radius: 10px !important; text-align: center !important; min-width: 0; }
+  html body .app-shell .ops-summary b { font-size: 18px !important; line-height: 1.1; }
+  html body .app-shell .ops-summary span { font-size: 10px !important; line-height: 1.15; overflow-wrap: anywhere; }
+
+  /* Operations → Clients: the list uses the full width; search and Active/Inactive/All on their own rows */
+  html body .app-shell .clients-layout { grid-template-columns: minmax(0, 1fr) !important; }
+  html body .app-shell .clients-layout .client-list { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; width: 100% !important; max-width: 100%; }
+  html body .app-shell .clients-layout .client-list > :is(.client-list-search, .client-status-filter) { grid-column: 1 / -1; width: 100% !important; min-width: 0; box-sizing: border-box; }
+  html body .app-shell .clients-layout .client-status-filter { display: grid !important; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+  html body .app-shell .clients-layout .client-status-filter > * { min-width: 0 !important; justify-content: center; }
+  html body .app-shell .clients-layout .client-list-card { min-width: 0 !important; }
+
+  /* Books: period bar and Income & expenses fit the width */
+  html body .app-shell .overview-finance-toolbar { max-width: 100%; box-sizing: border-box; }
+  html body .app-shell .overview-finance-toolbar label { min-width: 0; }
+  html body .app-shell .overview-finance-toolbar select { min-width: 0 !important; width: 100%; }
+  html body .app-shell .finance-panel { max-width: 100%; box-sizing: border-box; overflow: hidden; }
+  html body .app-shell .finance-panel .finance-actions { display: grid !important; grid-template-columns: 1fr 1fr auto !important; gap: 6px !important; width: 100%; }
+  html body .app-shell .finance-panel .finance-actions > * { min-width: 0 !important; height: 40px; padding: 0 8px !important; font-size: 13px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  html body .app-shell .finance-panel .finance-row { display: flex !important; width: 100% !important; box-sizing: border-box; min-width: 0 !important; gap: 6px !important; }
+  html body .app-shell .finance-panel .finance-row .finance-kind { display: none !important; }
+  html body .app-shell .finance-panel .finance-row .finance-description { flex: 1 1 0 !important; min-width: 0 !important; }
+  html body .app-shell .finance-panel .finance-row > strong { flex: none; font-size: 13.5px !important; }
+  html body .app-shell .finance-panel .finance-row :is(.finance-icon-btn, .finance-delete) { flex: none; width: 30px !important; height: 30px !important; padding: 0 !important; }
+}
+@media (max-width: 380px) {
+  html body .app-shell .ops-summary { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
