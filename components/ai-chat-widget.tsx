@@ -82,6 +82,8 @@ export function AiChatWidget({ userName = "", page, pageName, clientId, avatar, 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [listening, setListening] = useState(false);
   const [toast, setToast] = useState<{ text: string; action?: { label: string; run: () => void } } | null>(null);
+  // Nudges are a small bubble that tidies itself away after a few seconds (the tour waits for you).
+  useEffect(() => { if (!toast || /tour/i.test(toast.text)) return; const timer = window.setTimeout(() => setToast(null), 7000); return () => window.clearTimeout(timer); }, [toast]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [tour, setTour] = useState<{ steps: TourStep[]; index: number } | null>(null);
   const [rect, setRect] = useState<DOMRect | null>(null);

@@ -3245,3 +3245,41 @@ html body .app-shell .overview-projection-date .tn-date span { display: inline !
   html body .app-shell .overview-projection-date .tn-date select { flex: 1 1 auto; max-width: none !important; font-size: 16px !important; }
   html body .app-shell .page-content:has(> .book-tabs) > .overview-projection-panel { order: 3; }
 }
+/* Phones: page content always starts below the fixed top bar (real height measured in MobileCollapse, incl. notch) */
+@media (max-width: 860px) {
+  html body .app-shell.topnav-layout .main-area.main-area, html body .app-shell.topnav-layout:has(.tn-date-slot:not(:empty)) .main-area.main-area { padding-top: calc(var(--tn-bar-h, calc(62px + env(safe-area-inset-top, 0px))) + 4px) !important; }
+}
+
+/* AI nudge: a small speech bubble beside the bot, not a big card */
+html body .ai-chat-dock .ai-chat-toast { width: auto !important; max-width: min(260px, calc(100vw - 96px)) !important; padding: 8px 28px 8px 12px !important; border-radius: 14px 14px 4px 14px !important; display: flex !important; flex-wrap: wrap; align-items: center; gap: 6px 8px !important; box-shadow: 0 6px 18px rgba(16,24,40,.14) !important; }
+html body .ai-chat-dock .ai-chat-toast p { margin: 0 !important; font-size: 12.5px !important; line-height: 1.35 !important; font-weight: 600; }
+html body .ai-chat-dock .ai-chat-toast .primary-button { height: 26px !important; min-height: 0 !important; padding: 0 10px !important; font-size: 12px !important; border-radius: 8px !important; }
+html body .ai-chat-dock .ai-chat-toast .ai-chat-toast-x { position: absolute !important; top: 4px !important; right: 4px !important; width: 20px !important; height: 20px !important; padding: 0 !important; display: grid; place-items: center; }
+
+/* Phones: Staff hours & earnings fits the screen */
+@media (max-width: 860px) {
+  html body .app-shell .panel.sch-earn { padding: 14px !important; min-width: 0 !important; max-width: 100% !important; box-sizing: border-box; overflow: hidden; }
+  html body .app-shell .sch-earn > * { min-width: 0; max-width: 100%; }
+  html body .app-shell .sch-earn-head { display: grid !important; grid-template-columns: minmax(0, 1fr); gap: 8px !important; }
+  html body .app-shell .sch-earn-head > * { min-width: 0; max-width: 100%; flex-wrap: wrap; }
+  html body .app-shell .sch-earn-head h2 { font-size: 20px !important; }
+  html body .app-shell .sch-earn-head :is(.iv-filters, [role="tablist"]) { display: grid !important; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); width: 100% !important; box-sizing: border-box; }
+  html body .app-shell .sch-earn-head :is(.iv-filters, [role="tablist"]) button { padding: 7px 4px !important; font-size: 13px !important; }
+  html body .app-shell .sch-earn-dates { display: grid !important; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); width: 100%; height: auto !important; }
+  html body .app-shell .sch-earn-dates input { min-width: 0; width: 100% !important; font-size: 16px !important; box-sizing: border-box; }
+  html body .app-shell .sch-earn-head select, html body .app-shell .sch-earn-head .sch-staff-pick, html body .app-shell .sch-earn-head > div > button { max-width: 100%; }
+  html body .app-shell .sch-earn-totals { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  html body .app-shell .sch-earn-row { grid-template-columns: minmax(0, 1fr) auto !important; gap: 6px !important; }
+  html body .app-shell .sch-earn-row > * { min-width: 0; }
+  html body .app-shell .sch-earn-split { flex-wrap: wrap; gap: 6px; }
+}
+/* Yearly estimate: income · staff payouts · profit · tax in one row (2×2 on phones) */
+html body .app-shell .overview-projection-metrics { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 10px !important; }
+@media (max-width: 1000px) { html body .app-shell .overview-projection-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
+@media (max-width: 860px) {
+  html body .app-shell .overview-projection-metrics > div { padding: 10px 12px !important; min-width: 0; }
+  html body .app-shell .overview-projection-metrics strong { font-size: 20px !important; }
+  html body .app-shell .overview-projection-metrics span { font-size: 11px !important; }
+  html body .app-shell .overview-projection-head h2 { font-size: 21px !important; }
+  html body .app-shell .overview-projection-panel { padding: 14px !important; }
+}

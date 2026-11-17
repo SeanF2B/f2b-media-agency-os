@@ -21,10 +21,19 @@ const writeFolded = (list: string[]) => { try { localStorage.setItem(STORE, JSON
 export function MobileCollapse() {
   useEffect(() => {
     const phone = window.matchMedia("(max-width: 860px)");
+    // Pages start right under the fixed top bar, whatever its real height (notch / safe area, wrapped controls).
+    let barObserver: ResizeObserver | null = null;
+    const trackBar = () => {
+      const bar = document.querySelector<HTMLElement>(".tn-bar");
+      if (!bar || barObserver) return;
+      barObserver = new ResizeObserver(() => { document.documentElement.style.setProperty("--tn-bar-h", `${Math.ceil(bar.getBoundingClientRect().height)}px`); });
+      barObserver.observe(bar);
+    };
     // Desktop: re-apply remembered folds as sections render (they load lazily).
     let queued = false;
     const apply = () => {
       queued = false;
+      trackBar();
       const folded = new Set(readFolded());
       if (!folded.size) return;
       document.querySelectorAll<HTMLElement>(PANELS).forEach((panel) => {
@@ -54,7 +63,7 @@ export function MobileCollapse() {
       if (key) { const list = readFolded().filter((k) => k !== key); writeFolded(closed ? [...list, key] : list); }
     };
     document.addEventListener("click", onClick);
-    return () => { document.removeEventListener("click", onClick); observer.disconnect(); };
+    return () => { document.removeEventListener("click", onClick); observer.disconnect(); barObserver?.disconnect(); };
   }, []);
   return null;
 }
