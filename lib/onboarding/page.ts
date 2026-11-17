@@ -193,14 +193,48 @@ body.wide .wrap{max-width:1080px}body.wide .device.laptop iframe{height:640px}
 .m-spark{fill:#f2b21b;transform-box:fill-box;transform-origin:center;animation:mtw 1.8s ease-in-out infinite}
 @keyframes mtw{0%,100%{transform:scale(.5);opacity:.3}50%{transform:scale(1);opacity:1}}
 @media (max-width:380px){.tiles,.tpls{grid-template-columns:1fr}}
+
+/* ---- Duolingo mobile app feel ---- */
+.hud{display:flex;align-items:center;gap:12px;margin:0 0 16px}
+.hud .x{flex:none;border:0;background:transparent;font-size:26px;line-height:1;color:#94a3b8;cursor:pointer;padding:2px 4px}
+.hud .bar{flex:1;height:16px;margin:0;border-radius:99px;background:#e5e7eb;overflow:hidden;position:relative}
+.hud .bar b{display:block;height:100%;width:0;border-radius:99px;background:var(--brand);position:relative;transition:width .6s cubic-bezier(.34,1.56,.64,1)}
+.hud .bar b:after{content:"";position:absolute;left:10px;right:10px;top:4px;height:4px;border-radius:99px;background:rgba(255,255,255,.35)}
+.hud .streak{flex:none;display:flex;align-items:center;gap:4px;font-weight:800;color:#f59e0b;font-size:16px;transition:transform .2s}
+.hud .streak.pop{animation:spop .5s ease}
+@keyframes spop{0%{transform:scale(1)}40%{transform:scale(1.45)}100%{transform:scale(1)}}
+.xp{position:fixed;z-index:30;font-weight:900;color:#f59e0b;font-size:20px;pointer-events:none;animation:xp 1s ease-out forwards;text-shadow:0 2px 0 #fff}
+@keyframes xp{from{opacity:0;transform:translateY(10px) scale(.8)}20%{opacity:1;transform:translateY(0) scale(1.15)}to{opacity:0;transform:translateY(-40px) scale(1)}}
+.shake{animation:shake .4s ease}
+@keyframes shake{0%,100%{transform:none}20%{transform:translateX(-10px)}40%{transform:translateX(10px)}60%{transform:translateX(-6px)}80%{transform:translateX(6px)}}
+.tile:active,.tpl:active,.btn3d:active{transition:transform .05s}
+.tile.press{animation:press .18s ease}
+@keyframes press{50%{transform:scale(.96)}}
+.cheer{padding:18px 20px calc(20px + env(safe-area-inset-bottom));font-size:22px;border-radius:20px 20px 0 0}
+.cheer small{display:block;font-size:14px;font-weight:700;opacity:.8}
+.cheer.bad{background:#fee2e2;border-top-color:#fecaca;color:#b91c1c}.cheer.bad b{background:#dc2626;color:#fff}
+.confetti{position:fixed;inset:0;pointer-events:none;z-index:40;overflow:hidden}
+.confetti i{position:absolute;top:-12px;width:10px;height:14px;border-radius:3px;animation:fall 1.6s ease-in forwards}
+@keyframes fall{to{transform:translateY(110vh) rotate(720deg);opacity:.9}}
+.hap{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden}
+@media (max-width:640px){
+  body{background:#fff}
+  .wrap{padding:max(10px,env(safe-area-inset-top)) 16px 120px}
+  .wrap>.top{display:none}
+  .card,.card.duo{border:0;box-shadow:none;padding:4px 0 0;background:transparent;border-radius:0}
+  .duo-foot{position:fixed;left:0;right:0;bottom:0;z-index:15;margin:0;padding:14px 16px calc(14px + env(safe-area-inset-bottom));background:#fff;border-top:2px solid #e5e7eb}
+  .duo h2{font-size:26px}
+  .mascot .face{width:72px;height:72px}.mascot .face:before{left:20px;top:26px}.mascot .face:after{right:20px;top:26px}.mascot .face i{left:25px;right:25px;bottom:18px}
+  .foot{display:none}
+}
 @media (max-width:520px){.card{padding:18px;border-radius:16px}.nav .btn{flex:1}.route{padding:15px}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="top"><div class="brand"><i>F2B</i><span>F2B Media</span></div><span><span class="save" id="save"></span><button class="mute" id="mute" type="button" aria-label="Sound on">🔊</button></span></div>
-  <div class="bar" id="bar"><b></b></div>
+  <div class="top"><div class="brand"><i>F2B</i><span>F2B Media</span></div><span class="save" id="save"></span></div>
+  <div class="hud"><button class="x" id="quit" type="button" aria-label="Start again">×</button><div class="bar" id="bar"><b></b></div><span class="streak" id="streak" aria-label="Answer streak">🔥 <span id="streakn">0</span></span><button class="mute" id="mute" type="button" aria-label="Sound and vibration on">🔊</button></div><label class="hap" aria-hidden="true"><input type="checkbox" switch id="hapsw" tabindex="-1"></label>
   <main id="app" aria-live="polite"><div class="card"><p class="muted">Loading…</p></div></main>
   <p class="foot">Secure · Your details are only used to prepare your recommendations.</p>
 </div>
@@ -242,7 +276,7 @@ function progress(){
 function resize(){ if (!embed) return; try { parent.postMessage({ type: "f2b-onboarding-height", height: document.documentElement.scrollHeight }, "*"); } catch (e) {} }
 new ResizeObserver(resize).observe(document.body);
 function setSession(s){ state.session = s; if (s && s.token) store(s.token); progress(); }
-function fail(e){ state.busy = false; state.error = e && e.message || "Something went wrong."; render(); }
+function fail(e){ state.busy = false; state.error = e && e.message || "Something went wrong."; render(); try { oops(state.error); } catch (x) {} }
 function q(key){ return state.config.questions[key] || { label: key, kind: "text" }; }
 function mountEl(node){ var key = "s:" + (state.session ? state.session.step + ":" + state.session.paymentStatus : "welcome"); if (state.shown !== key) node.classList.add("anim"); state.shown = key; app.replaceChildren(node); resize(); }
 // Mounts a screen. Only a new screen slides in; updates to the same screen (taps, AI chips) never move it.
@@ -277,7 +311,7 @@ function welcome(){
     return el("button", { cls: "route", type: "button", on: { click: function(){ begin(r.key); } } }, [el("span", { cls: "ic", text: icons[r.key] || "✨" }), el("span", {}, [el("b", { text: r.title }), el("span", { text: r.blurb })]), el("span", { cls: "go", text: "→" })]);
   });
   var card = el("div", { cls: "card" + (state.shown !== "welcome" ? " anim" : "") }, [
-    el("div", { cls: "assistant" }, [el("span", { cls: "av" }), el("div", { cls: "msg", text: "Hi! I'm your marketing assistant. I'll work alongside you to understand your business and show you exactly where more customers can come from." })]),
+    mascot("Hi! I'm your marketing assistant. Let's find you more customers. It only takes about 3 minutes."),
     el("h1", { text: "How can we help today?" }),
     el("p", { cls: "lead", text: "Pick a starting point. It takes about 3 minutes and you can change direction any time." }),
     el("div", { cls: "routes" }, routes),
@@ -321,10 +355,25 @@ var audio = null;
 function tone(freq, at, len, vol){ try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); var o = audio.createOscillator(), g = audio.createGain(); o.type = "sine"; o.frequency.value = freq; g.gain.setValueAtTime(0, audio.currentTime + at); g.gain.linearRampToValueAtTime(vol, audio.currentTime + at + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + at + len); o.connect(g); g.connect(audio.destination); o.start(audio.currentTime + at); o.stop(audio.currentTime + at + len + 0.02); } catch (e) {} }
 function ding(big){ if (muted) return; tone(784, 0, 0.18, 0.12); tone(1175, 0.09, big ? 0.35 : 0.22, 0.1); if (big) tone(1568, 0.2, 0.4, 0.08); }
 var mb = document.getElementById("mute");
-function paintMute(){ mb.textContent = muted ? "🔇" : "🔊"; mb.setAttribute("aria-label", muted ? "Sound off" : "Sound on"); }
+function paintMute(){ mb.textContent = muted ? "🔇" : "🔊"; mb.setAttribute("aria-label", muted ? "Sound and vibration off" : "Sound and vibration on"); }
 paintMute(); mb.addEventListener("click", function(){ muted = !muted; try { localStorage.setItem("f2b-onb-mute", muted ? "1" : "0"); } catch (e) {} paintMute(); if (!muted) ding(); });
 var CHEERS = ["Nice!", "Great choice!", "Perfect!", "Got it!", "Love it!", "Brilliant!"];
-function cheer(text){ ding(); var old = document.querySelector(".cheer"); if (old) old.remove(); var c = el("div", { cls: "cheer", role: "status" }, [el("b", { text: "✓" }), el("span", { text: text || CHEERS[Math.floor(Math.random() * CHEERS.length)] })]); document.body.appendChild(c); setTimeout(function(){ c.remove(); }, 900); }
+// ---------- haptics (Android: vibrate; iPhone Safari 17.4+: switch-toggle haptic) ----------
+var hapEl = document.getElementById("hapsw");
+function haptic(kind){
+  if (muted) return;
+  var pattern = { tap: 8, success: [12, 40, 18], error: [40, 60, 40, 60, 80], big: [15, 30, 15, 30, 60] }[kind] || 8;
+  try { if (navigator.vibrate) { navigator.vibrate(pattern); return; } } catch (e) {}
+  try { if (hapEl) { hapEl.parentNode.click(); if (kind !== "tap") setTimeout(function(){ hapEl.parentNode.click(); }, 90); } } catch (e) {}
+}
+var streak = 0;
+function bumpStreak(){ streak++; var n = document.getElementById("streakn"), box = document.getElementById("streak"); if (n) n.textContent = String(streak); if (box) { box.classList.remove("pop"); void box.offsetWidth; box.classList.add("pop"); } }
+function xp(amount){ Array.prototype.forEach.call(document.querySelectorAll(".xp"), function(n){ n.remove(); }); var bar = document.getElementById("bar"); var r = bar ? bar.getBoundingClientRect() : { right: window.innerWidth - 60, top: 20 }; var x = el("div", { cls: "xp", text: "+" + amount + " XP", style: "left:" + Math.max(10, r.right - 70) + "px;top:" + (r.top + 18) + "px" }); document.body.appendChild(x); setTimeout(function(){ x.remove(); }, 1000); }
+function confetti(){ var box = el("div", { cls: "confetti" }); var cols = [getComputedStyle(document.documentElement).getPropertyValue("--brand") || "#1463ff", "#f59e0b", "#22c55e", "#ec4899", "#38bdf8"]; for (var i = 0; i < 70; i++) { var c = el("i", { style: "left:" + Math.random() * 100 + "%;background:" + cols[i % cols.length] + ";animation-delay:" + Math.random() * 0.5 + "s;animation-duration:" + (1.2 + Math.random()) + "s;transform:rotate(" + Math.random() * 360 + "deg)" }); box.appendChild(c); } document.body.appendChild(box); setTimeout(function(){ box.remove(); }, 2600); }
+function oops(message){ haptic("error"); if (!muted) { tone(220, 0, 0.18, 0.1); tone(180, 0.12, 0.25, 0.08); } var card = document.querySelector(".card"); if (card) { card.classList.remove("shake"); void card.offsetWidth; card.classList.add("shake"); } var old = document.querySelector(".cheer"); if (old) old.remove(); var c = el("div", { cls: "cheer bad", role: "alert" }, [el("b", { text: "!" }), el("span", {}, [document.createTextNode("Not quite"), el("small", { text: message })])]); document.body.appendChild(c); setTimeout(function(){ c.remove(); }, 2200); }
+document.getElementById("quit").addEventListener("click", function(){ haptic("tap"); if (state.session && !confirm("Start again? Your answers so far are saved.")) return; store(""); location.href = location.pathname.replace(/\/f\/start\/.*$/, "/f/start") + (embed ? "?embed=1" : ""); });
+document.addEventListener("click", function(e){ var t = e.target && e.target.closest && e.target.closest(".tile,.tpl,.btn3d,.route,.opt,.aibtn,.chip,.svc"); if (t) { haptic("tap"); if (t.classList.contains("tile")) { t.classList.remove("press"); void t.offsetWidth; t.classList.add("press"); } } }, true);
+function cheer(text){ ding(); haptic("success"); bumpStreak(); xp(10); var old = document.querySelector(".cheer"); if (old) old.remove(); var c = el("div", { cls: "cheer", role: "status" }, [el("b", { text: "✓" }), el("span", {}, [document.createTextNode(text || CHEERS[Math.floor(Math.random() * CHEERS.length)]), el("small", { text: streak > 1 ? streak + " in a row 🔥" : "+10 XP" })])]); document.body.appendChild(c); setTimeout(function(){ c.remove(); }, 1000); }
 function mascot(text){ return el("div", { cls: "mascot" }, [el("span", { cls: "face" }, [el("i")]), el("div", { cls: "bubble", text: text })]); }
 var ICONS = { "More enquiries quickly": "M13 2 3 14h7l-1 8 10-12h-7z", "Rank higher on Google": "M11 4a7 7 0 1 0 4.9 12l4.6 4.6 1.4-1.4-4.6-4.6A7 7 0 0 0 11 4z", "A better website": "M3 4h18v12H3zM8 20h8M12 16v4", "All of the above": "M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z", "Not sure yet": "M9 9a3 3 0 1 1 4 2.8V14M12 18h.01", "Google Ads": "M4 17l6-11 6 11M7 12h6M18 6v12", "SEO": "M11 4a7 7 0 1 0 4.9 12l4.6 4.6 1.4-1.4-4.6-4.6A7 7 0 0 0 11 4z", "Website": "M3 4h18v12H3zM8 20h8M12 16v4", "Google Business Profile": "M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zM12 11a2 2 0 1 1 0-4 2 2 0 0 1 0 4z", "Meta Ads": "M2 12c2-5 5-7 7-4s4 7 6 4 3-4 7 0", "Email Marketing": "M3 6h18v12H3zM3 7l9 6 9-6" };
 function icon(name){ var d = ICONS[name] || "M5 12l5 5L20 7"; var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg"); svg.setAttribute("viewBox", "0 0 24 24"); svg.setAttribute("fill", "none"); svg.setAttribute("stroke", "currentColor"); svg.setAttribute("stroke-width", "2"); svg.setAttribute("stroke-linecap", "round"); svg.setAttribute("stroke-linejoin", "round"); var path = document.createElementNS("http://www.w3.org/2000/svg", "path"); path.setAttribute("d", d); svg.appendChild(path); return el("span", { cls: "ti" }, [svg]); }
@@ -381,7 +430,7 @@ function websiteStep(st, kids){
   kids.push(el("div", { cls: "q" }, [site]));
   if (state.error) kids.push(el("div", { cls: "err", text: state.error }));
   function read(){
-    if (!site.value.trim()) { state.error = "Pop your website address in first."; return render(); }
+    if (!site.value.trim()) { site.focus(); return oops("Pop your website address in first."); }
     state.error = ""; s.answers.website = site.value;
     generating("read", "Reading your website", ["Opening " + site.value.replace(/^https?:\/\//, ""), "Finding your logo and brand colours", "Reading your services and areas", "Picking out your photos", "Filling in your details"], function(){ return api({ action: "extract", t: t(), website: site.value }); })
       .then(function(r){ setSession(r.session); state.editBiz = false; cheer(r.filled ? "Found " + r.filled + " details!" : "Done!"); return api({ action: "save", t: t(), answers: state.session.answers, step: st.key, advance: true }); })
@@ -536,16 +585,16 @@ function next(st, auto){
   collect(st);
   var s = state.session, a = s.answers;
   var missing = (st.questions || []).filter(function(k){ return q(k).required && !String(a[k] || "").trim(); });
-  if (missing.length) { state.error = "Please add: " + missing.map(function(k){ return q(k).label; }).join(", "); return render(); }
+  if (missing.length) return oops("Please add: " + missing.map(function(k){ return q(k).label; }).join(", "));
   var extra = {};
   if (st.contact) {
     var c = document.getElementById("consent");
-    if (!a.email && !a.phone) { state.error = "Add an email or phone number so we can send your plan."; return render(); }
-    if (!c || !c.checked) { state.error = "Please tick the box so we can contact you about your plan."; return render(); }
+    if (!a.email && !a.phone) return oops("Add an email or phone number so we can send it to you.");
+    if (!c || !c.checked) return oops("Tick the box so we can send it to you.");
     extra.consent = true; extra.marketing = !!(document.getElementById("marketing") || {}).checked;
   }
   extra.advance = true;
-  if (st.contact) ding(true); else if (!auto) cheer();
+  if (st.contact) { ding(true); haptic("big"); confetti(); } else if (!auto) cheer();
   if (st.ui === "confirm") state.editBiz = false;
   go(st.key, extra);
 }
@@ -665,7 +714,7 @@ function launch(template){
   var timer = setInterval(function(){ if (state.launchStep < LAUNCH_STEPS.length - 1) { state.launchStep++; if (state.launching) launchLoader(); } }, template ? 350 : 1400);
   api({ action: "launch", t: t(), template: template || undefined }).then(function(r){
     clearInterval(timer); state.launchStep = LAUNCH_STEPS.length; launchLoader();
-    setTimeout(function(){ state.launching = false; setSession(r.session); ding(true); render(); }, 450);
+    setTimeout(function(){ state.launching = false; setSession(r.session); ding(true); haptic("big"); confetti(); render(); }, 450);
   }).catch(function(e){ clearInterval(timer); state.launching = false; fail(e); });
 }
 function requote(){ api({ action: "quote", t: t(), services: state.picked, manager: state.manager }).then(function(r){ state.quote = r.quote; render(); }).catch(fail); }
