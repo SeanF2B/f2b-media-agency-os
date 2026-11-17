@@ -106,7 +106,7 @@ function sampleDetail(m: Marketing): { gsc: Gsc | null; ads: AdsDetail } {
   };
 }
 
-export function DashboardHub({ salesStats = null, activityPanel = null, scopeClientId, clients, tasks, staff, onNavigate, onAddTask, onOpenTask, onReviewTask, currentStaffId = "", adsPanel, valuePanel, periodStart = "", periodEnd = "", periodLabel = "Last 30 days", focusClientId = "" }: { salesStats?: SalesStats | null; activityPanel?: ReactNode; focusClientId?: string; periodStart?: string; periodEnd?: string; periodLabel?: string; adsPanel?: ReactNode; valuePanel?: ReactNode; scopeClientId: string; clients: HubClient[]; tasks: HubTask[]; staff: HubStaff[]; onNavigate: (page: string) => void; onAddTask: () => void; onOpenTask?: (id: string) => void; onReviewTask?: (id: string, action: "approve" | "request_changes") => void; currentStaffId?: string }) {
+export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel = null, scopeClientId, clients, tasks, staff, onNavigate, onAddTask, onOpenTask, onReviewTask, currentStaffId = "", adsPanel, valuePanel, periodStart = "", periodEnd = "", periodLabel = "Last 30 days", focusClientId = "" }: { isAdmin?: boolean; salesStats?: SalesStats | null; activityPanel?: ReactNode; focusClientId?: string; periodStart?: string; periodEnd?: string; periodLabel?: string; adsPanel?: ReactNode; valuePanel?: ReactNode; scopeClientId: string; clients: HubClient[]; tasks: HubTask[]; staff: HubStaff[]; onNavigate: (page: string) => void; onAddTask: () => void; onOpenTask?: (id: string) => void; onReviewTask?: (id: string, action: "approve" | "request_changes") => void; currentStaffId?: string }) {
   const [pickedClient, setPickedClient] = useState(() => { try { return localStorage.getItem("f2b-dash-client") || ""; } catch { return ""; } });
   // Agency view defaults to all clients' Google Ads; a client can be picked for their full results.
   const clientId = scopeClientId || (clients.some((c) => c.id === focusClientId) ? focusClientId : (clients.find((c) => c.googleAdsAccountId) || clients[0])?.id || ""); void pickedClient; void setPickedClient;
@@ -192,8 +192,9 @@ export function DashboardHub({ salesStats = null, activityPanel = null, scopeCli
     </section>; })()}
     {appt.list}
     {showAppts && <Suspense fallback={null}><AppointmentsDashboard key={scopeClientId || "agency"} showStaffHours scopeClientId={scopeClientId} sample={sample} clientName={clients.find((c) => c.id === scopeClientId)?.name || ""} periodStart={periodStart} periodEnd={periodEnd} periodLabel={periodLabel} onOpen={() => onNavigate("Scheduling")} /></Suspense>}
-    {valuePanel}
-    <section className="panel dh-panel" aria-label="Website and marketing results">
+    {/* Admin-only money & marketing sections (tagged ADMIN) */}
+    {isAdmin && valuePanel}
+    {isAdmin && <section className="panel dh-panel" aria-label="Website and marketing results" data-admin="">
       <div className="dh-head"><div><p className="eyebrow">📈 {periodLabel.toUpperCase()}</p><h2>Marketing</h2></div>
         {!scopeClientId && marketingPicked && <span className="dh-client-note">{clients.find((c) => c.id === clientId)?.name}</span>}
       </div>
@@ -301,13 +302,13 @@ export function DashboardHub({ salesStats = null, activityPanel = null, scopeCli
         </div>}
         </>}
       </>}
-    </section>
+    </section>}
 
-    {adsPanel && <div className="dh-ads-wrap">{adsPanel}</div>}
-    {activityPanel}
-    <div className="dh-grid">
+    {isAdmin && adsPanel && <div className="dh-ads-wrap">{adsPanel}</div>}
+    {isAdmin && activityPanel}
+    {isAdmin && <div className="dh-grid">
 
-      <section className="panel dh-panel dh-email"><div className="dh-head"><div><p className="eyebrow"><Mail size={12} /> {periodLabel.toUpperCase()}</p><h2>Emails &amp; health</h2></div><button type="button" className="text-button" onClick={() => onNavigate("Conversations")}>Open inbox →</button></div>
+      <section className="panel dh-panel dh-email" data-admin=""><div className="dh-head"><div><p className="eyebrow"><Mail size={12} /> {periodLabel.toUpperCase()}</p><h2>Emails &amp; health</h2></div><button type="button" className="text-button" onClick={() => onNavigate("Conversations")}>Open inbox →</button></div>
         {(() => { const e = view?.emails; if (!e) return <p className="dh-muted">{loading ? "Loading…" : "No emails yet."}</p>; const rate = e.total ? Math.round(((e.delivered ?? e.total) / e.total) * 100) : null; const tone = rate == null ? "" : rate >= 98 ? "good" : rate >= 90 ? "warn" : "bad"; return <>
           {(() => { const deliv = e.total ? ((e.delivered ?? e.total) / e.total) * 100 : null; const bounce = e.total ? ((e.failed || 0) / e.total) * 100 : null; const reply = e.people ? Math.min(100, ((e.replies || 0) / e.people) * 100) : null;
             const score = e.total ? Math.max(0, Math.min(100, Math.round((deliv ?? 0) * 0.7 + Math.min(30, (reply ?? 0) * 1.5) - (bounce ?? 0) * 2 + (e.configured === false ? -20 : 0)))) : null;
@@ -328,7 +329,7 @@ export function DashboardHub({ salesStats = null, activityPanel = null, scopeCli
           {e.recent.length ? <ul className="dh-list dh-email-list">{e.recent.map((m, i) => <li key={i}><span className={`dh-logo dh-logo-fallback ${m.failed ? "is-bad" : ""}`}>{m.failed ? "!" : <Mail size={13} />}</span><span><b>{m.subject || "(no subject)"}</b><small>{m.to} · {when(m.at)}{m.failed ? " · failed" : ""}</small></span></li>)}</ul> : <p className="dh-muted">No emails sent in this period.</p>}
         </>; })()}
       </section>
-    </div>
+    </div>}
   </div>;
 }
 
