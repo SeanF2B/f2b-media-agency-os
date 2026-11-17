@@ -2913,3 +2913,9 @@ html body .app-shell .dh-approvals:has(.dh-appt-updates) { grid-template-columns
   html body .app-shell .dh-approvals:has(.dh-appt-updates) { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
   html body .app-shell .dh-approvals .dh-appt-updates { grid-column: 1 / -1; }
 }
+
+/* ===== Side menu: Team + Settings pinned to the bottom of the sidebar ===== */
+html body .app-shell .tn-side-foot { display: none; }
+@media (min-width: 861px) {
+  html body .app-shell.topnav-layout.nav-side .tn-side-foot { display: flex; flex-direction: column; gap: 4px; margin-top: auto; padding-top: 10px; border-top: 1px solid rgba(127,138,160,.18); }
+}
