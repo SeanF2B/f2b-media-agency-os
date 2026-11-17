@@ -59,7 +59,7 @@ async function aiFill(ownerId: string, instructions: string, input: Record<strin
     }),
     signal: AbortSignal.timeout(22_000),
   }).catch((error) => { throw new ExtractError(error instanceof Error && error.name === "TimeoutError" ? "The AI took too long. Try again." : "The AI provider didn’t respond. Try again.", 502); });
-  const payload = await response.json().catch(() => null);
+  const payload = await response.json().catch(() => null) as any;
   if (!response.ok) throw new ExtractError(payload?.error?.message || "The AI provider didn’t respond. Try again.", 502);
   try { return JSON.parse(outputText(payload) || "{}") as Record<string, string>; } catch { throw new ExtractError("Couldn’t read the AI reply. Try again.", 502); }
 }

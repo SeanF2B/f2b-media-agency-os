@@ -36,7 +36,7 @@ export async function GET(request: Request) {
     const settings = await getSettings(auth.ownerId);
     const since = new Date(Date.now() - Math.min(365, Math.max(1, Number(url.searchParams.get("days")) || 30)) * 86_400_000).toISOString();
     const rows = (await env.DB!.prepare("SELECT id, entry_route, status, step, domain, acquisition, contact_id, client_id, opportunity_id, audit_id, unlocked, consent_contact, booking_status, payment_status, subscription_status, json_extract(answers, '$.businessName') AS business, json_extract(answers, '$.email') AS email, staff, created_at, updated_at FROM onboarding_sessions WHERE owner_id = ?1 AND created_at >= ?2 AND entry_route != 'internal' ORDER BY updated_at DESC LIMIT 200").bind(auth.ownerId, since).all<Row>()).results || [];
-    const sessions = rows.map((row) => ({ ...row, acquisition: (() => { try { return JSON.parse(row.acquisition || "{}"); } catch { return {}; } })() }));
+    const sessions: Row[] = rows.map((row) => ({ ...row, acquisition: (() => { try { return JSON.parse(row.acquisition || "{}"); } catch { return {}; } })() }));
     const by = (key: (row: Row) => string) => sessions.reduce((acc: Record<string, { started: number; leads: number; audits: number; booked: number; paid: number }>, row) => {
       const k = key(row) || "Unknown"; acc[k] ||= { started: 0, leads: 0, audits: 0, booked: 0, paid: 0 };
       acc[k].started++; if (row.consent_contact) acc[k].leads++; if (row.audit_id) acc[k].audits++; if (row.booking_status) acc[k].booked++; if (row.payment_status === "paid") acc[k].paid++;

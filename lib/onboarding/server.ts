@@ -339,7 +339,7 @@ export async function aiAssist(ownerId: string, input: { action: string; field: 
     body: JSON.stringify({ model: aiModel(env, undefined, provider), instructions, input: JSON.stringify(payload), max_output_tokens: action === "alternatives" ? 700 : list ? 450 : 350, ...(provider?.name === "OpenRouter" ? { reasoning: { effort: "low" } } : {}), store: false }),
     signal: AbortSignal.timeout(20_000),
   }).catch((error) => { throw new OnboardingError(error instanceof Error && error.name === "TimeoutError" ? "The AI took too long. Try again." : "The AI didn't respond. Try again.", 502); });
-  const result = await response.json().catch(() => null);
+  const result = await response.json().catch(() => null) as Row | null;
   if (!response.ok) throw new OnboardingError(result?.error?.message || "The AI didn't respond. Try again.", 502);
   // Claims are checked against everything the business told us or that its own site/documents say.
   const support = [payload.sourceText, payload.currentAnswer, ...Object.values(payload.earlierAnswers), JSON.stringify(input.business || {})].join("\n");

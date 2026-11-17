@@ -37,7 +37,7 @@ export function OnboardingAdmin() {
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
   const load = useCallback(async () => {
-    try { const response = await fetch("/api/onboarding", { cache: "no-store" }); const result = await response.json(); if (!response.ok) throw new Error(result.error || "Couldn’t load onboarding."); setData(result as Data); setError(""); }
+    try { const response = await fetch("/api/onboarding", { cache: "no-store" }); const result = await response.json() as Data & { error?: string }; if (!response.ok) throw new Error(result.error || "Couldn’t load onboarding."); setData(result as Data); setError(""); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Couldn’t load onboarding."); }
   }, []);
   useEffect(() => { void load(); }, [load]);
@@ -95,7 +95,7 @@ function Share({ data }: { data: Data }) {
   useEffect(() => {
     if (kind !== "crm" || query.trim().length < 2) { setContacts([]); return; }
     const timer = window.setTimeout(() => {
-      fetch(`/api/onboarding?contacts=${encodeURIComponent(query.trim())}`, { cache: "no-store" }).then((response) => response.json()).then((result) => {
+      fetch(`/api/onboarding?contacts=${encodeURIComponent(query.trim())}`, { cache: "no-store" }).then((response) => response.json()).then((result: { contacts?: unknown }) => {
         setContacts(((result.contacts || []) as Array<{ id: string; name: string; email: string; company: string }>).slice(0, 8));
       }).catch(() => setContacts([]));
     }, 300);

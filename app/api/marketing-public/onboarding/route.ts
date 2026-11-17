@@ -306,7 +306,7 @@ async function preview(ctx: Ctx, session: SessionRow, body: Row) {
     body: JSON.stringify({ model: aiModel(env, undefined, provider), instructions, input: JSON.stringify({ business, answers: Object.fromEntries(Object.entries(session.answers).filter(([key]) => !["email", "phone", "contactName"].includes(key))), sourceText: sourceTextOf(profile).slice(0, 5000) }), max_output_tokens: 900, ...(provider?.name === "OpenRouter" ? { reasoning: { effort: "low" } } : {}), store: false }),
     signal: AbortSignal.timeout(25_000),
   }).catch(() => { throw new OnboardingError("The preview took too long. Try again.", 502); });
-  const result = await response.json().catch(() => null);
+  const result = await response.json().catch(() => null) as Row | null;
   if (!response.ok) throw new OnboardingError("The preview couldn't be generated. Try again.", 502);
   const raw = outputText(result).trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
   let parsed: Row = {};
