@@ -85,8 +85,8 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
   useEffect(() => { const mq = window.matchMedia("(max-width: 860px)"); const on = () => setIsPhone(mq.matches); on(); mq.addEventListener("change", on); return () => mq.removeEventListener("change", on); }, []);
   useEffect(() => { if (isPhone && tab !== "calendar") setTab("calendar"); }, [isPhone]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    // Fill the screen: on phones the whole working day fits above the bottom bar (full frame).
-    const fit = () => { const el = weekRef.current; if (!el) return; const top = el.getBoundingClientRect().top; const room = window.innerHeight - top - 52 - (isPhone ? 92 : 24); setPpm(Math.max(isPhone ? 0.5 : 1.05, Math.min(2.2, room / ((HOURS_TO - HOURS_FROM) * 60)))); };
+    // Fill the screen: the whole working day (07:00–21:00) fits inside the window on every device, no page scroll needed.
+    const fit = () => { const el = weekRef.current; if (!el) return; const top = el.getBoundingClientRect().top + window.scrollY; const room = window.innerHeight - top - 52 - (isPhone ? 92 : 24); setPpm(Math.max(0.42, Math.min(2.2, room / ((HOURS_TO - HOURS_FROM) * 60)))); };
     fit(); const t = window.setTimeout(fit, 250); window.addEventListener("resize", fit);
     return () => { window.clearTimeout(t); window.removeEventListener("resize", fit); };
   }, [tab, isPhone, phoneView]); // eslint-disable-line react-hooks/exhaustive-deps
