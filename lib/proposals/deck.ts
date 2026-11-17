@@ -6,7 +6,7 @@
 
 import { SERVICE_CATALOGUE, catalogueByKey, type CatalogueService } from "./catalogue";
 
-export type SlideKind = "cover" | "goal" | "audience" | "findings" | "service" | "examples" | "cycle" | "dashboard" | "implementation" | "timeline" | "expect" | "investment" | "addons" | "closing";
+export type SlideKind = "aiteam" | "cover" | "goal" | "audience" | "findings" | "service" | "examples" | "cycle" | "dashboard" | "implementation" | "timeline" | "expect" | "investment" | "addons" | "closing";
 export type Slide = { id: string; kind: SlideKind; hidden?: boolean; data: Record<string, any> };
 export type ProposalDeck = { version: 1; accent: string; slides: Slide[] };
 
@@ -29,6 +29,7 @@ export const SLIDE_KINDS: Array<{ kind: SlideKind; label: string; hint: string }
   { kind: "service", label: "Service", hint: "One service with a branded example" },
   { kind: "timeline", label: "Project timeline", hint: "Month-by-month roadmap" },
   { kind: "dashboard", label: "CRM & AI assistant", hint: "Their CRM dashboard, pipeline and AI bot" },
+  { kind: "aiteam", label: "Your AI team", hint: "Telegram briefing bot, CRM assistant and Conversation AI" },
   { kind: "investment", label: "Investment", hint: "Pricing summary" },
   { kind: "addons", label: "Optional add-ons", hint: "Extras not included" },
   { kind: "closing", label: "Next steps", hint: "Closing slide and call to action" },
@@ -111,6 +112,8 @@ export function buildDeck(input: {
   const name = first(brand.businessName, "Your business");
   const picked = input.services.map((item) => ({ ...item, def: catalogue.get(item.key) })).filter((item): item is SelectedService & { def: CatalogueService } => Boolean(item.def));
   const core = picked.filter((item) => !item.addon);
+  const handover = core.find((item) => item.key === "setup");
+  const coreServices = core.filter((item) => item.key !== "setup");
   const addons = picked.filter((item) => item.addon);
   const currency = inputs.currency || "EUR";
   const aiService = (key: string) => (ai.services || []).find((item) => item?.key === key);
@@ -130,7 +133,7 @@ export function buildDeck(input: {
     notificationText: "You have received a new enquiry.",
   });
   // Kept simple like the original proposals: cover, goal, one slide per service, timeline, CRM, investment.
-  core.forEach((item, index) => {
+  coreServices.forEach((item, index) => {
     const copy = aiService(item.key);
     add("service", {
       serviceKey: item.key,
@@ -151,15 +154,20 @@ export function buildDeck(input: {
   const captions = ["In this stage we will be working together closely", "Launch — testing & optimising", "Starting to see an increase in enquiries", "Organic growth supports paid campaigns with a steady flow of enquiries"];
   add("timeline", { heading: "Project Timeline", steps: months.map((month, index) => ({ month, caption: first(ai.timeline?.[index]?.caption || "", captions[index]) })) });
   add("dashboard", { heading: "Your CRM & AI Assistant", cardTitle: "One place for every lead", cardBody: `Every call, form and message lands in one simple app with the ${name} logo. Our AI assistant replies straight away, answers questions and books customers in, day or night.`, bullets: ["See every enquiry in one place", "AI replies and books for you", "Calls, forms & WhatsApp together", "Simple monthly results"], labels: ["Lead Count", "Ad Spend", "Pipeline"] });
+  add("aiteam", aiTeamData(name));
   const setup = core.reduce((sum, item) => sum + item.setupFee, 0);
   const monthly = core.reduce((sum, item) => sum + item.monthlyFee, 0);
+  if (handover) {
+    const copy = aiService("setup");
+    add("service", { serviceKey: "setup", heading: "Technical Setup & Handover", cardTitle: first(copy?.cardTitle || "", "We handle everything"), cardBody: first(copy?.cardBody || "", handover.def.summary), bullets: (copy?.bullets?.length ? copy.bullets : handover.def.deliverables).slice(0, 4) });
+  }
   add("investment", {
     heading: "Investment",
     packageName: "Client Acquisition System",
     setupLabel: `Initial setup: ${money(setup, currency)} / one time`,
     setupItems: core.filter((item) => item.setupFee > 0).map((item) => `${item.def.name} setup`),
     monthlyLabel: `Ongoing: ${money(monthly, currency)} / month`,
-    monthlyItems: core.map((item) => `${item.def.name} — ${money(item.monthlyFee, currency)}`),
+    monthlyItems: core.map((item) => `${item.def.name} — ${item.monthlyFee || item.setupFee ? money(item.monthlyFee, currency) : "included"}`),
     mediaLabel: core.some((item) => item.def.mediaNote) ? "Ad spend" : "",
     mediaItems: core.map((item) => item.def.mediaNote).filter(Boolean),
     addonsLabel: addons.length ? "Optional add-ons (see below)" : "",
@@ -233,6 +241,18 @@ export function renumberPhases(deck: ProposalDeck): ProposalDeck {
   });
   return { ...deck, slides };
 }
+/** "Your AI Team" slide: Telegram briefing bot, AI assistant in the CRM, and Conversation AI that learns from past chats. */
+export function aiTeamData(name: string) {
+  return {
+    heading: "Your AI Team",
+    intro: `Three AI helpers working for ${name || "you"} around the clock — so nothing slips through the cracks.`,
+    columns: [
+      { title: "AI Briefing Bot on Telegram", body: "Every morning you get a short message with everything that matters — no logging in needed.", bullets: ["New enquiries and bookings", "Ad spend and results", "Who needs a call back", "Ask it questions any time"] },
+      { title: "AI Assistant in your CRM", body: "Ask it anything about your business in plain English and it gets it done.", bullets: ["'Who hasn't been called back?'", "Writes follow-up messages", "Summarises calls and chats", "Creates tasks and reminders"] },
+      { title: "Conversation AI", body: "Replies to customers on your website chat, WhatsApp and Facebook in seconds — day or night — and books them in.", bullets: ["Learns from your past conversations", "Picks up your prices, tone and FAQs", "You approve what it learns", "Gets smarter every week"] },
+    ],
+  };
+}
 /** Validates a stored deck from the database/browser. Unknown kinds are dropped; text is clipped. */
 export function sanitizeDeck(value: unknown): ProposalDeck | null {
   const raw = value as Partial<ProposalDeck> | null;
@@ -258,6 +278,8 @@ export function sanitizeDeck(value: unknown): ProposalDeck | null {
     if (typeof slide.data.cardTitle === "string" && /^(Website Design & Development|Meta Ads|CRM, Tracking & Reporting|Social Media Management|WhatsApp & AI Automation)$/.test(slide.data.cardTitle)) slide.data.cardTitle = now.name;
   }
   const accent = /^#[0-9a-f]{6}$/i.test(String(raw.accent || "")) ? String(raw.accent) : "#1463ff";
+  const crmIndex = slides.findIndex((slide) => slide.kind === "dashboard");
+  if (crmIndex >= 0 && !slides.some((slide) => slide.kind === "aiteam")) slides.splice(crmIndex + 1, 0, { id: sid(), kind: "aiteam", hidden: false, data: aiTeamData("") });
   return renumberPhases({ version: 1, accent, slides });
 }
 
