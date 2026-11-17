@@ -238,9 +238,6 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
                   <Row icon={<CheckCircle2 size={15} />} label="Cost per lead" value={leads ? money2((spend || 0) / leads, cur) : "—"} />
                 </> : <em className="dh-split-note">{m.metaNote || "No Meta Ads account linked to this client."}</em>}
               </div>; })()}
-            <div className="dh-split-total"><UserPlus size={16} /><span>All leads · 30 days</span><b>{v(m.leads?.value)}</b>{sp?.otherLeads ? <small>{sp.otherLeads} from other or unknown sources</small> : null}
-              {sales && (() => { const r = closeGrade(sales.won, sales.leads); return <span className={`dh-close dh-grade-${r.grade}`} title={`${sales.won} won of ${sales.leads} leads (${sales.periodLabel})`}><span>Close rate</span><b>{r.value}</b>{r.grade === "low" && <GradeTip tip={r.tip} />}</span>; })()}
-            </div>
           </div></>; })()}
         {detail && (() => {
           const d: { gsc: Gsc | null; ads: AdsDetail | null } = sample ? sampleDetail(m) : { gsc: m.gsc && !m.gsc.error ? m.gsc : null, ads: m.adsDetail || null };
