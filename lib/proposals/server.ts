@@ -4,7 +4,7 @@ import { fullTeamPermissions, getTeamPermissions, type TeamPermissions } from "@
 import { aiConfigured, aiEndpoint, aiHeaders, aiModel, resolveAiProvider } from "@/lib/ai-provider";
 import { listClientReports, readClientReportHtml } from "@/lib/client-report-archive";
 import * as E from "@/lib/onboarding/engine.mjs";
-import { extractWebsiteCached, sourceTextOf } from "@/lib/onboarding/server";
+import { confirmCheckoutReturn, createProposalCheckout, extractWebsiteCached, getSession, proposalPaymentsReady, sourceTextOf } from "@/lib/onboarding/server";
 import { outputText, rawHtml, safeHttps, siteSignals } from "@/lib/onboarding/extract";
 import { mergeCatalogue, type CatalogueService } from "./catalogue";
 import { AI_COPY_INSTRUCTIONS, AI_COPY_SCHEMA, buildDeck, sanitizeDeck, type AiCopy, type ProposalBrand, type ProposalDeck, type ProposalInputs, type ProposalSource, type ProposalUpload, type SelectedService, type Slide } from "./deck";
@@ -50,6 +50,14 @@ export const PROPOSALS_SCHEMA_SQL = `CREATE TABLE IF NOT EXISTS proposals (
 );
 CREATE INDEX IF NOT EXISTS proposals_owner_updated_idx ON proposals(owner_id, updated_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS proposals_share_token_idx ON proposals(share_token);
+CREATE TABLE IF NOT EXISTS proposal_checkouts (
+  session_id TEXT PRIMARY KEY NOT NULL,
+  proposal_id TEXT NOT NULL,
+  owner_id TEXT NOT NULL,
+  addons TEXT NOT NULL DEFAULT '[]',
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS proposal_checkouts_proposal_idx ON proposal_checkouts(proposal_id);
 CREATE TABLE IF NOT EXISTS proposal_settings (
   owner_id TEXT PRIMARY KEY NOT NULL,
   catalogue TEXT NOT NULL DEFAULT '[]',
@@ -516,3 +524,52 @@ export async function searchProspects(ctx: ProposalContext, query: string) {
     : await db().prepare("SELECT id, first_name, last_name, email, company FROM crm_contacts WHERE owner_id = ?1 AND client_id IS NULL ORDER BY updated_at DESC LIMIT 15").bind(ctx.ownerId).all<Row>();
   return (rows.results || []).map((row) => ({ id: row.id, name: `${row.first_name} ${row.last_name}`.trim(), company: row.company, email: row.email }));
 }
+
+// ============================ client approval & payment ============================
+/** What the client is buying: the core package plus any optional add-ons they tick. Amounts in cents. */
+export async function proposalOrder(proposal: ProposalRecord & { ownerId: string }, addonKeys: string[] = []) {
+  const catalogue = await getCatalogue(proposal.ownerId);
+  const names = new Map(catalogue.map((item) => [item.key, item.name]));
+  const chosen = proposal.services.filter((item) => !item.addon || addonKeys.includes(item.key));
+  const lines = chosen.flatMap((item) => [
+    ...(item.setupFee > 0 ? [{ service: names.get(item.key) || item.key, label: `${names.get(item.key) || item.key} — one-off setup`, amount: item.setupFee * 100, recurring: false }] : []),
+    ...(item.monthlyFee > 0 ? [{ service: names.get(item.key) || item.key, label: `${names.get(item.key) || item.key} — monthly`, amount: item.monthlyFee * 100, recurring: true }] : []),
+  ]);
+  return {
+    currency: proposal.inputs.currency || "EUR",
+    core: proposal.services.filter((item) => !item.addon).map((item) => ({ key: item.key, name: names.get(item.key) || item.key, setupFee: item.setupFee, monthlyFee: item.monthlyFee })),
+    addons: proposal.services.filter((item) => item.addon).map((item) => ({ key: item.key, name: names.get(item.key) || item.key, setupFee: item.setupFee, monthlyFee: item.monthlyFee, tagline: catalogue.find((c) => c.key === item.key)?.tagline || "" })),
+    lines,
+    mediaNotes: chosen.map((item) => catalogue.find((c) => c.key === item.key)?.mediaNote).filter(Boolean) as string[],
+  };
+}
+export async function paymentsReady(ownerId: string) { return proposalPaymentsReady(ownerId); }
+/** Starts Stripe Checkout (card, Apple Pay, Google Pay) for the approved proposal + chosen add-ons. */
+export async function startProposalCheckout(token: string, addonKeys: string[], origin: string) {
+  const proposal = await getProposalByToken(token);
+  if (!proposal) throw new ProposalError("This proposal link is no longer available.", 404);
+  const order = await proposalOrder(proposal, addonKeys);
+  const contact = proposal.contactId ? await db().prepare("SELECT email FROM crm_contacts WHERE owner_id = ?1 AND id = ?2").bind(proposal.ownerId, proposal.contactId).first<Row>().catch(() => null) : null;
+  const base = `${origin}/f/proposal/${encodeURIComponent(token)}`;
+  const result = await createProposalCheckout({
+    ownerId: proposal.ownerId, proposalId: proposal.id, businessName: proposal.businessName, email: String(contact?.email || ""), website: proposal.brand.website,
+    contactId: proposal.contactId, clientId: proposal.clientId, currency: order.currency, lines: order.lines,
+    successUrl: `${base}?paid={CHECKOUT_SESSION_ID}&s={SESSION}`, cancelUrl: `${base}?approve=1&cancelled=1`,
+  });
+  await db().prepare("INSERT OR REPLACE INTO proposal_checkouts (session_id, proposal_id, owner_id, addons, created_at) VALUES (?1, ?2, ?3, ?4, ?5)").bind(result.sessionId, proposal.id, proposal.ownerId, JSON.stringify(addonKeys.slice(0, 20)), nowIso()).run();
+  return result.url;
+}
+/** Back from Stripe: confirm the payment, then mark the proposal approved. */
+export async function confirmProposalPayment(token: string, sessionId: string, checkoutId: string, origin: string) {
+  const proposal = await getProposalByToken(token);
+  if (!proposal) return null;
+  const link = await db().prepare("SELECT session_id FROM proposal_checkouts WHERE session_id = ?1 AND proposal_id = ?2").bind(clip(sessionId, 60), proposal.id).first<Row>();
+  if (!link) return { proposal, paid: false };
+  let session = await getSession(proposal.ownerId, String(link.session_id));
+  if (!session) return { proposal, paid: false };
+  session = await confirmCheckoutReturn(session, clip(checkoutId, 200), origin);
+  const paid = session.payment_status === "paid";
+  if (paid) await db().prepare("UPDATE proposals SET status = 'approved', approved_at = COALESCE(approved_at, ?2), updated_at = ?2 WHERE id = ?1").bind(proposal.id, nowIso()).run();
+  return { proposal, paid };
+}
+
