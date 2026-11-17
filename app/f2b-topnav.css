@@ -2850,3 +2850,59 @@ html body .app-shell.dark-mode .crm-detail-foot .crm-detail-book, html body.f2b-
   html body .app-shell .sch.is-phone .sch-m-views[role="tablist"] { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)) !important; overflow: visible !important; }
   html body .app-shell .sch.is-phone .sch-m-views[role="tablist"] > button { flex: none !important; width: 100% !important; text-align: center; }
 }
+/* ===== Phones: Books — the money list first, compact figures; Leads — no sideways stretch ===== */
+@media (max-width: 860px) {
+  /* Books: order = header, tabs, period, Income & expenses, figures, yearly estimate */
+  html body .app-shell .page-content:has(> .book-tabs) { display: flex; flex-direction: column; }
+  html body .app-shell .page-content:has(> .book-tabs) > * { order: 9; min-width: 0; }
+  html body .app-shell .page-content:has(> .book-tabs) > .welcome-row { order: 1; display: flex !important; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px !important; }
+  html body .app-shell .page-content:has(> .book-tabs) > .welcome-row h1 { font-size: 24px !important; margin: 0 !important; }
+  html body .app-shell .page-content:has(> .book-tabs) > .welcome-row :is(p, .eyebrow) { display: none !important; }
+  html body .app-shell .page-content:has(> .book-tabs) > .welcome-row .filing-open-button { height: 38px; padding: 0 12px !important; font-size: 13px !important; white-space: nowrap; }
+  html body .app-shell .page-content:has(> .book-tabs) > .book-tabs { order: 2; grid-template-columns: repeat(4, minmax(0, 1fr)) !important; margin-bottom: 8px !important; }
+  html body .app-shell .page-content:has(> .book-tabs) > .book-tabs > * { font-size: 12.5px !important; padding-inline: 4px !important; }
+  html body .app-shell .page-content:has(> .book-tabs) > .overview-finance-toolbar { order: 3; padding: 8px 10px !important; margin-bottom: 8px !important; }
+  html body .app-shell .page-content:has(> .book-tabs) > .overview-finance-toolbar :is(small, p, .form-hint) { display: none !important; }
+  html body .app-shell .page-content:has(> .book-tabs) > .overview-finance-toolbar label { display: flex !important; align-items: center; gap: 8px; flex-direction: row !important; }
+  html body .app-shell .page-content:has(> .book-tabs) > .overview-finance-toolbar select { flex: 1 1 auto; }
+  html body .app-shell .page-content:has(> .book-tabs) > .finance-panel { order: 4; padding: 12px !important; }
+  html body .app-shell .page-content:has(> .book-tabs) > .metric-grid { order: 5; }
+  html body .app-shell .page-content:has(> .book-tabs) > .overview-projection-panel { order: 6; }
+  /* Income & expenses: actions in one row; the summary repeats the figures cards, so it goes */
+  html body .app-shell .finance-panel .panel-heading { display: block !important; margin-bottom: 8px !important; padding: 0 !important; }
+  html body .app-shell .finance-panel .panel-heading h2 { font-size: 18px !important; margin: 0 0 8px !important; }
+  html body .app-shell .finance-panel .panel-heading :is(p, .eyebrow) { display: none !important; }
+  html body .app-shell .finance-panel .finance-actions { display: grid !important; grid-template-columns: 1fr 1fr auto; gap: 6px; }
+  html body .app-shell .finance-panel .finance-actions > * { min-width: 0; height: 40px; padding: 0 8px !important; font-size: 13px !important; white-space: nowrap; justify-content: center; }
+  html body .app-shell .finance-panel :is(.finance-summary, .finance-period-note) { display: none !important; }
+  /* money rows fit: description truncates, amount and buttons stay visible */
+  html body .app-shell .finance-panel :is(.finance-list, .finance-recurring) { min-width: 0; max-width: 100%; overflow: hidden; }
+  html body .app-shell .finance-panel .finance-row { width: 100% !important; min-width: 0 !important; gap: 8px !important; padding: 8px 6px !important; }
+  html body .app-shell .finance-panel .finance-row .finance-description { flex: 1 1 auto; min-width: 0 !important; width: auto !important; }
+  html body .app-shell .finance-panel .finance-row .finance-description :is(b, small) { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  html body .app-shell .finance-panel .finance-row > strong { flex: none; white-space: nowrap; font-size: 14px; }
+  html body .app-shell .finance-panel .finance-row .finance-icon-btn { flex: none; width: 30px !important; height: 30px !important; }
+  /* figures: two small cards per row */
+  html body .app-shell .page-content:has(> .book-tabs) > .metric-grid { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
+  html body .app-shell .page-content:has(> .book-tabs) > .metric-grid .metric-card { padding: 10px 12px !important; min-height: 0 !important; }
+  html body .app-shell .page-content:has(> .book-tabs) > .metric-grid .metric-card :is(p, small, .metric-note) { display: none !important; }
+  html body .app-shell .page-content:has(> .book-tabs) > .metric-grid .metric-card :is(strong, .metric-value, b) { font-size: 20px !important; }
+  html body .app-shell .page-content:has(> .book-tabs) > .metric-grid .metric-card > :first-child { font-size: 12px !important; }
+
+  /* Leads: the contacts table is wide — it scrolls inside its card instead of stretching the whole page (the Contacts ↔ Pipeline jump) */
+  html body .app-shell .crm-workspace { grid-template-columns: minmax(0, 1fr) !important; min-width: 0; max-width: 100%; }
+  html body .app-shell .crm-workspace > * { min-width: 0 !important; max-width: 100%; }
+  html body .app-shell :is(.crm-contacts-manager, .cm-lists, .cm-card, .cm-toolbar) { min-width: 0 !important; max-width: 100%; }
+  html body .app-shell .cm-table-wrap { overflow-x: auto !important; -webkit-overflow-scrolling: touch; max-width: 100%; }
+  html body .app-shell .cm-table { min-width: 720px !important; }
+  html body .app-shell .cm-table :is(th, td):nth-child(-n+2) { position: sticky; z-index: 1; background: var(--cm-sticky-bg, #fff); }
+  html body .app-shell .cm-table :is(th, td):nth-child(1) { left: 0; } html body .app-shell .cm-table :is(th, td):nth-child(2) { left: 36px; box-shadow: 6px 0 8px -6px rgba(15,23,42,.18); }
+  html body.f2b-dark .app-shell .cm-table { --cm-sticky-bg: #1a2025; }
+  html body .app-shell .crm-toolbar label.client-filter, html body .app-shell .crm-toolbar label { min-width: 0 !important; }
+  /* Leads header: compact, and notices that push the list down are hidden on phones */
+  html body .app-shell .crm-heading { margin-bottom: 6px !important; }
+  html body .app-shell .crm-heading h1 { font-size: 22px !important; }
+  html body .app-shell .crm-heading { flex-direction: row !important; text-align: left !important; justify-content: space-between !important; align-items: center !important; }
+  html body .app-shell .crm-heading > div { text-align: left !important; }
+  html body .app-shell .cv .cv-banner { display: none !important; }
+}
