@@ -9,6 +9,10 @@ const ROOTS = ".ops-centre, .seo-view, .google-ads-view, .studio-panel";
 const LIST_HINT = /(keyword|seed|phrase|negative|tags?\b|services?\b|locations?|areas?|competitor|questions?|ideas|topics|headlines|hashtags)/i;
 
 type Target = HTMLInputElement | HTMLTextAreaElement;
+const FACTUAL = /(phone|mobile|telephone|\btel\b|e-?mail|address|postcode|eircode|zip code|vat|company number|\biban\b|\bbic\b|customer id|account id|property id|location id|pixel id|price|budget €|password|act_\d|\d{3}-\d{3}-\d{4}|properties\/|locations\/|sc-domain)/i;
+const URL_FIELD = /domain|website|site url|\burl\b/i;
+type Mode = "suggest" | "improve" | "shorter" | "professional" | "alternatives" | "regenerate";
+const MODE_LABEL: Record<Mode, string> = { suggest: "Suggest with AI", improve: "Improve my answer", shorter: "Make it shorter", professional: "More professional", alternatives: "Alternatives", regenerate: "Regenerate" };
 
 function eligible(el: Element | null): el is Target {
   if (!el || !(el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement)) return false;
@@ -18,6 +22,8 @@ function eligible(el: Element | null): el is Target {
   if (el.closest(".crm-contacts-manager, .ops-toolbar, [data-no-ai]")) return false;
   const label = labelFor(el);
   if (/^search\b|search clients|filter/i.test(label) || /^search/i.test(el.placeholder || "")) return false;
+  // Simple factual fields (phone, email, address, IDs…) never get AI — it can't know them and shouldn't guess.
+  if (FACTUAL.test(label) || FACTUAL.test(el.placeholder || "") || FACTUAL.test(el.name || "")) return false;
   return true;
 }
 
@@ -89,34 +95,53 @@ export function AiFieldAssist() {
     return () => { window.removeEventListener("scroll", update, true); window.removeEventListener("resize", update); observer.disconnect(); };
   }, [target]);
 
-  const run = useCallback(async () => {
+  const [chips, setChips] = useState<string[]>([]);
+  const [lastSuggestion, setLastSuggestion] = useState("");
+  const [menu, setMenu] = useState(false);
+  useEffect(() => { setChips([]); setMenu(false); setLastSuggestion(""); }, [target]);
+
+  const run = useCallback(async (mode: Mode) => {
     if (!target || busy) return;
     const current = target.value;
     const field = labelFor(target);
     const list = target instanceof HTMLTextAreaElement && LIST_HINT.test(`${field} ${target.placeholder}`);
-    setBusy(true); setMessage("");
+    setBusy(true); setMessage(""); setMenu(false);
     try {
-      const response = await fetch("/api/ai-assist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId: scopedClientId(), clientName: selectedClientName(target), field, placeholder: target.placeholder, current, mode: current.trim() ? "polish" : "suggest", list, context: contextFor(target), page: document.querySelector(".ops-centre [aria-selected=\"true\"], .ops-centre .active")?.textContent?.trim() || "" }) });
-      const result = await response.json() as { text?: string; error?: string };
-      if (!response.ok || !result.text) throw new Error(result.error || "Couldn’t get a suggestion.");
+      // Website/domain fields are answered instantly from the client record (no AI call) by the existing endpoint.
+      const urlField = URL_FIELD.test(`${field} ${target.placeholder}`) && mode === "suggest";
+      const response = urlField
+        ? await fetch("/api/ai-assist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId: scopedClientId(), clientName: selectedClientName(target), field, placeholder: target.placeholder, current, mode: "suggest" }) })
+        : await fetch("/api/onboarding", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "ai", mode, clientId: scopedClientId(), clientName: selectedClientName(target), field, placeholder: target.placeholder, current, previous: lastSuggestion, list, context: contextFor(target), page: document.querySelector(".ops-centre [aria-selected=\"true\"], .ops-centre .active")?.textContent?.trim() || "" }) });
+      const result = await response.json() as { text?: string; suggestions?: string[]; removedClaims?: number; error?: string };
+      const options = result.suggestions || (result.text ? [result.text] : []);
+      if (!response.ok || !options.length) throw new Error(result.error || "Couldn’t get a suggestion.");
+      if (mode === "alternatives") { setChips(options); setMessage("Pick one — or keep yours"); target.focus(); return; }
       setUndo({ el: target, value: current });
-      setNativeValue(target, result.text);
+      setNativeValue(target, options[0]);
+      setLastSuggestion(options[0]);
       target.focus();
-      setMessage(current.trim() ? "Polished" : "Suggested — edit as needed");
+      setMessage(`${mode === "suggest" || mode === "regenerate" ? "Suggested — edit as needed" : "Updated"}${result.removedClaims ? " · unsupported claims removed" : ""}`);
     } catch (error) { setMessage(error instanceof Error ? error.message : "Couldn’t get a suggestion."); target.focus(); }
     finally { setBusy(false); }
-  }, [target, busy]);
+  }, [target, busy, lastSuggestion]);
 
   if (!target || !rect || rect.width < 120) return null;
   const empty = !target.value.trim();
   const last = empty ? recalled(target) : "";
+  const modes: Mode[] = empty ? ["suggest", "alternatives"] : ["improve", "shorter", "professional", "alternatives", ...(lastSuggestion ? ["regenerate" as Mode] : [])];
   const top = Math.max(4, rect.top - 30), left = Math.min(window.innerWidth - 230, Math.max(4, rect.right - 220));
+  const pick = (text: string) => { setUndo({ el: target, value: target.value }); setNativeValue(target, text); setLastSuggestion(text); setChips([]); setMessage("Added — edit as needed"); target.focus(); };
   return <div className="ai-field-assist" style={{ top, left }} onMouseDown={(event) => event.preventDefault()}>
-    <button type="button" className="ai-field-assist-btn" disabled={busy} onClick={() => void run()} title={empty ? "Let AI suggest a value for this field" : "Let AI polish what you've written"}>
-      <span aria-hidden="true">✨</span>{busy ? "Thinking…" : empty ? "AI suggest" : "AI polish"}
-    </button>
+    <span className="ai-field-assist-split">
+      <button type="button" className="ai-field-assist-btn" disabled={busy} onClick={() => void run(empty ? "suggest" : "improve")} title={empty ? "Let AI suggest an answer from the client's details" : "Let AI improve what you've written"}>
+        <span aria-hidden="true">✨</span>{busy ? "Thinking…" : empty ? "AI suggest" : "AI improve"}
+      </button>
+      <button type="button" className="ai-field-assist-more" aria-label="More AI options" aria-expanded={menu} disabled={busy} onClick={() => setMenu((open) => !open)}>▾</button>
+    </span>
+    {menu && <div className="ai-field-assist-menu" role="menu">{modes.map((mode) => <button key={mode} type="button" role="menuitem" onClick={() => void run(mode)}>{MODE_LABEL[mode]}</button>)}</div>}
     {last && !busy && <button type="button" className="ai-field-assist-undo" title={last} onClick={() => { setUndo({ el: target, value: "" }); setNativeValue(target, last); target.focus(); setMessage("Filled from last time"); }}>↺ Last used</button>}
     {undo && undo.el === target && !busy && <button type="button" className="ai-field-assist-undo" onClick={() => { setNativeValue(undo.el, undo.value); setUndo(null); setMessage("Undone"); }}>Undo</button>}
     {message && <span className="ai-field-assist-msg" role="status">{message}</span>}
+    {chips.length > 0 && <div className="ai-field-assist-chips" style={{ top: rect.height + 34 }}>{chips.map((chip, index) => <button key={index} type="button" title={chip} onClick={() => pick(chip)}>{chip.length > 140 ? `${chip.slice(0, 140)}…` : chip}</button>)}<button type="button" className="ai-field-assist-dismiss" onClick={() => { setChips([]); setMessage(""); }}>Dismiss</button></div>}
   </div>;
 }

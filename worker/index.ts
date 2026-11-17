@@ -190,6 +190,8 @@ const worker = {
       processOutreach(new Date(controller.scheduledTime)),
       // AI phone agent: place queued outbound calls (new-lead call-backs, automation calls, confirm calls).
       import("../lib/voice-agent/server").then(({ processVoiceQueue }) => processVoiceQueue(new Date(controller.scheduledTime))),
+      // Online onboarding: finish audits whose browser tab closed mid-way, time out stuck ones, prune usage counters.
+      (async () => { const { processStalledOnboardingAudits } = await import("../lib/onboarding/server"); return processStalledOnboardingAudits(); })(),
       // Operations → Email campaigns: next email to up to 80 due contacts, one Resend batch call.
       processEmailCampaigns(env as never, new Date(controller.scheduledTime)),
       keepGoogleAdsTokensFresh(env.DB!),

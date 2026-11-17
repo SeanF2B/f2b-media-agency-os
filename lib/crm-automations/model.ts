@@ -1,7 +1,7 @@
 // Shared model for native CRM Automations (used by the builder UI, the API and the runner).
 // Only erasable TypeScript syntax is used so `node --test` can load this file directly.
 
-export type TriggerType = "form_lead" | "tag_added" | "stage_changed" | "task_completed" | "schedule" | "appointment_booked" | "appointment_rescheduled" | "appointment_cancelled" | "appointment_no_show" | "appointment_completed";
+export type TriggerType = "form_lead" | "tag_added" | "stage_changed" | "task_completed" | "schedule" | "appointment_booked" | "appointment_rescheduled" | "appointment_cancelled" | "appointment_no_show" | "appointment_completed" | "onboarding_started" | "audit_completed" | "guidance_requested" | "checkout_completed" | "payment_failed";
 export type ActionType = "send_email" | "set_value" | "add_tag" | "remove_tag" | "move_stage" | "create_task" | "notify" | "ai_call" | "wait" | "if_else";
 export type NodeType = "trigger" | ActionType;
 export type Branch = "yes" | "no";
@@ -29,6 +29,11 @@ export const TRIGGERS: Array<{ type: TriggerType; label: string; help: string; i
   { type: "appointment_cancelled", label: "Appointment cancelled", help: "Starts when an appointment is cancelled.", icon: "CalendarX" },
   { type: "appointment_no_show", label: "Appointment no-show", help: "Starts when an appointment is marked as a no-show.", icon: "UserX" },
   { type: "appointment_completed", label: "Appointment completed", help: "Starts when an appointment is marked as completed (great for review requests).", icon: "CircleCheck" },
+  { type: "onboarding_started", label: "Online onboarding started", help: "Starts when a prospect leaves their details in the online onboarding (/f/start).", icon: "FileInput" },
+  { type: "audit_completed", label: "Business audit completed", help: "Starts when a prospect unlocks their free business audit.", icon: "CircleCheck" },
+  { type: "guidance_requested", label: "Guidance requested", help: "Starts when a prospect finishes the “I need some guidance” survey.", icon: "Bell" },
+  { type: "checkout_completed", label: "Online payment completed", help: "Starts when a customer pays through online checkout.", icon: "Euro" },
+  { type: "payment_failed", label: "Payment failed", help: "Starts when an online payment or subscription renewal fails.", icon: "CalendarX" },
 ];
 
 export const ACTIONS: Array<{ type: ActionType | "sms"; label: string; help: string; icon: string; comingSoon?: boolean }> = [
