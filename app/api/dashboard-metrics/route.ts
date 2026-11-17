@@ -8,6 +8,7 @@ import { summarizeMetaAdsRows, summarizeMetaAdsTotals } from "@/lib/meta-ads-per
 import { getGoogleAdsCallStats, getGoogleAdsKeywordPerformance, getGoogleAdsLandingPages } from "@/lib/google-ads-direct";
 import { hasGoogleSearchConsoleConnection, listGoogleSearchConsoleProperties, readGoogleSearchConsoleRows } from "@/lib/google-search-console-direct";
 import { loadCachedMarketingData } from "@/lib/marketing-data-history";
+import { hasGoogleAnalyticsDirectConnection, readGoogleAnalyticsReport } from "@/lib/google-analytics-direct";
 
 // Dashboard tiles: marketing results for one client (from the same cached reads as client reports),
 // upcoming appointments and emails the system sent. One request per dashboard load.
@@ -24,7 +25,7 @@ export async function GET(request: Request) {
   const db = env.DB;
   const row = await db.prepare("SELECT data FROM workspace_documents WHERE id = 'f2b-agency'").first<{ data: string }>();
   if (!row?.data) return reply({ error: "The workspace is unavailable." }, 503);
-  const workspace = JSON.parse(row.data) as { ownerId?: string; staff?: Staff[]; clients?: Array<{ id: string; name: string; googleAdsAccountId?: string; metaAdsAccountId?: string; website?: string; wordpressSiteUrl?: string; googleSearchConsoleAccountId?: string }> };
+  const workspace = JSON.parse(row.data) as { ownerId?: string; staff?: Staff[]; clients?: Array<{ id: string; name: string; googleAdsAccountId?: string; metaAdsAccountId?: string; website?: string; wordpressSiteUrl?: string; googleSearchConsoleAccountId?: string; googleAnalyticsAccountId?: string }> };
   const ownerId = String(workspace.ownerId || "");
   const owner = ownerId === user.userId;
   const staff = (workspace.staff || []).find((item) => !item.isBot && (item.id === user.userId || item.email?.toLowerCase() === user.email.toLowerCase()));
@@ -176,6 +177,40 @@ export async function GET(request: Request) {
         error: pages == null && kws == null ? "Google Ads didn’t return landing pages or keywords." : "",
       };
     })() : null;
+    // Per-page results from GA4: visits (organic / paid / all), calls, leads and other contact clicks for each page.
+    const ga4Id = String((workspace.clients || []).find((c) => c.id === clientId)?.googleAnalyticsAccountId || "").trim();
+    const ga4Pages = ga4Id && await hasGoogleAnalyticsDirectConnection(ownerId).catch(() => false) ? await (async () => {
+      const cache = <T,>(key: string, load: () => Promise<T>) => loadCachedMarketingData({ db: db as never, ownerId, clientId, service: "GA4", key: JSON.stringify({ report: key, ga4Id, a: period.start, b: period.end }), ttlMs: 6 * 3600_000 }, load).then((r) => r.data);
+      try {
+        const [landing, events] = await Promise.all([
+          cache("dash-ga4-landing", () => readGoogleAnalyticsReport(ownerId, ga4Id, period.start, period.end, ["landingPage", "sessionDefaultChannelGroup"], ["sessions", "keyEvents"])),
+          cache("dash-ga4-events", () => readGoogleAnalyticsReport(ownerId, ga4Id, period.start, period.end, ["pagePath", "eventName", "sessionDefaultChannelGroup"], ["eventCount"])),
+        ]);
+        const norm = (p: unknown) => { let v = String(p || "/").split("?")[0] || "/"; if (v === "(not set)") return ""; if (!v.startsWith("/")) v = `/${v}`; return v.length > 1 && !v.endsWith("/") && !/\.[a-z0-9]+$/i.test(v) ? `${v}/` : v; };
+        const kind = (ch: unknown) => /organic/i.test(String(ch)) ? "organic" : /paid|cpc|ppc/i.test(String(ch)) ? "paid" : "other";
+        type PageRow = { page: string; sessions: number; organicSessions: number; paidSessions: number; keyEvents: number; organicKeyEvents: number; paidKeyEvents: number; calls: number; leads: number; whatsapp: number; emails: number; ctaClicks: number; organic: { calls: number; leads: number }; paid: { calls: number; leads: number } };
+        const map = new Map<string, PageRow>();
+        const get = (page: string) => { let r = map.get(page); if (!r) { r = { page, sessions: 0, organicSessions: 0, paidSessions: 0, keyEvents: 0, organicKeyEvents: 0, paidKeyEvents: 0, calls: 0, leads: 0, whatsapp: 0, emails: 0, ctaClicks: 0, organic: { calls: 0, leads: 0 }, paid: { calls: 0, leads: 0 } }; map.set(page, r); } return r; };
+        for (const row of landing as Array<Record<string, unknown>>) {
+          const page = norm(row.landingPage); if (!page) continue;
+          const r = get(page), k = kind(row.sessionDefaultChannelGroup), ses = Number(row.sessions) || 0, ke = Number(row.keyEvents) || 0;
+          r.sessions += ses; r.keyEvents += ke;
+          if (k === "organic") { r.organicSessions += ses; r.organicKeyEvents += ke; } else if (k === "paid") { r.paidSessions += ses; r.paidKeyEvents += ke; }
+        }
+        for (const row of events as Array<Record<string, unknown>>) {
+          const page = norm(row.pagePath); if (!page) continue;
+          const name = String(row.eventName || ""), n = Number(row.eventCount) || 0, k = kind(row.sessionDefaultChannelGroup);
+          if (!/^(phone_click|click_to_call|generate_lead|form_submit|whatsapp_click|email_click|cta_click)$/.test(name)) continue;
+          const r = get(page);
+          if (name === "phone_click" || name === "click_to_call") { r.calls += n; if (k !== "other") r[k].calls += n; }
+          else if (name === "generate_lead" || name === "form_submit") { r.leads += n; if (k !== "other") r[k].leads += n; }
+          else if (name === "whatsapp_click") r.whatsapp += n; else if (name === "email_click") r.emails += n; else r.ctaClicks += n;
+        }
+        const site = (() => { const c = (workspace.clients || []).find((x) => x.id === clientId); try { return new URL(/^https?:/.test(c?.website || "") ? c!.website! : `https://${c?.website || c?.wordpressSiteUrl || ""}`).origin; } catch { return ""; } })();
+        const pages = [...map.values()].sort((a, b) => b.sessions - a.sessions || b.calls + b.leads - (a.calls + a.leads)).slice(0, 80).map((r) => ({ ...r, url: site ? site + r.page : r.page }));
+        return { pages, error: "" };
+      } catch (error) { return { pages: [], error: error instanceof Error ? error.message : "GA4 page data couldn’t be read." }; }
+    })() : null;
     const split = {
       organic: { clicks: traffic && /click/i.test(traffic.metric) ? traffic.current : null, visits: traffic && !/click/i.test(traffic.metric) ? traffic.current : null, calls: biz?.calls ?? null, leads: channels ? Number(channels.seo || 0) : null },
       paid: { clicks: adsData ? adsData.current.clicks : null, calls: adCalls ? (adCalls.calls ?? null) : null, callConversions: adCalls?.callConversions ?? null, leads: channels ? Number(channels.google_ads || 0) : null, conversions: adsData ? adsData.current.conversions : null },
@@ -183,7 +218,7 @@ export async function GET(request: Request) {
       notes: { organic: why(seo?.traffic) || (biz ? "" : why(seo?.business)), paid: accountId ? why(ads?.ads) : "No Google Ads account linked" },
     };
     return {
-      ...meta, split, gsc, trustpilot, adsDetail, businessProfile: biz ? { views: biz.impressions, calls: biz.calls, directions: biz.directions, websiteClicks: biz.websiteClicks, previous: biz.previous } : null,
+      ...meta, split, gsc, trustpilot, adsDetail, ga4Pages, businessProfile: biz ? { views: biz.impressions, calls: biz.calls, directions: biz.directions, websiteClicks: biz.websiteClicks, previous: biz.previous } : null,
       googleCampaigns: adsData ? adsData.campaigns.slice(0, 40).map((c) => ({ id: c.id, name: c.name, status: c.status, spend: c.spend, clicks: c.clicks, impressions: c.impressions, conversions: c.conversions })) : [],
       currency: seo?.client.currency || ads?.client.currency || "EUR",
       visits: traffic ? { value: traffic.current, previous: traffic.previous, metric: traffic.metric } : null, visitsNote: why(seo?.traffic),

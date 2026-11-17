@@ -39,7 +39,8 @@ async function digestKey(value: string) {
 export async function loadCachedMarketingData<T>(input: CacheInput, load: () => Promise<T>): Promise<{ data: T; cacheHit: boolean; fetchedAt: string }> {
   const now = input.now || new Date();
   const nowIso = now.toISOString();
-  const cacheKey = await digestKey(input.key);
+  // GA4 v2: earlier direct GA4 reads were parsed blank (wrong header fields), so ignore those cached rows.
+  const cacheKey = await digestKey(input.service === "GA4" ? `ga4v2:${input.key}` : input.key);
   try {
     const row = await input.db.prepare(
       "SELECT fetched_at, payload_json FROM marketing_data_cache WHERE owner_id = ?1 AND client_id = ?2 AND service = ?3 AND cache_key = ?4 AND expires_at > ?5 LIMIT 1",

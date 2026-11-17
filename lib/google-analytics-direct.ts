@@ -3,8 +3,8 @@ import { decryptGoogleAdsRefreshToken } from "@/lib/google-ads-direct";
 import { hasGoogleAnalyticsReadScope } from "@/lib/google-analytics-direct.mjs";
 
 export type GoogleAnalyticsReport = {
-  dimensions: string[];
-  metrics: string[];
+  dimensionHeaders?: Array<{ name?: string }>;
+  metricHeaders?: Array<{ name?: string; type?: string }>;
   rows: Array<{ dimensionValues?: Array<{ value?: string }>; metricValues?: Array<{ value?: string }> }>;
 };
 
@@ -83,8 +83,13 @@ export async function readGoogleAnalyticsReport(ownerId: string, id: string, sta
   if (filter) query.dimensionFilter = { filter: { fieldName: filter.dimension, stringFilter: { matchType: "EXACT", value: filter.value } } };
   const payload = await googleRequest<GoogleAnalyticsReport>(`https://analyticsdata.googleapis.com/v1beta/properties/${propertyId(id)}:runReport`, token, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(query) });
   if (payload.rows != null && !Array.isArray(payload.rows)) throw new Error("Google Analytics returned an unexpected report response.");
+  // GA4 returns column names as dimensionHeaders / metricHeaders (in request order); fall back to what we asked for.
+  const dimNames = (payload.dimensionHeaders || []).map((h) => h.name || "").filter(Boolean);
+  const metNames = (payload.metricHeaders || []).map((h) => h.name || "").filter(Boolean);
+  const dims = dimNames.length ? dimNames : dimensions;
+  const mets = metNames.length ? metNames : metrics;
   return (payload.rows || []).map((row) => Object.fromEntries([
-    ...(payload.dimensions || []).map((name, index) => [name, row.dimensionValues?.[index]?.value ?? ""]),
-    ...(payload.metrics || []).map((name, index) => [name, row.metricValues?.[index]?.value ?? null]),
+    ...dims.map((name, index) => [name, row.dimensionValues?.[index]?.value ?? ""]),
+    ...mets.map((name, index) => [name, row.metricValues?.[index]?.value ?? null]),
   ]));
 }
