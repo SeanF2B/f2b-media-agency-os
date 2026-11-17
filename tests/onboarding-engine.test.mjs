@@ -217,3 +217,31 @@ test("onboarding migration matches the runtime schema, replays twice and creates
   assert.equal(claim(), 1); assert.equal(claim(), 0);
   db.close();
 });
+
+test("website reading works without AI and AI errors never leak keys to customers", () => {
+  const basics = E.extractBasicsFromHtml(`<title>Roof Repairs | Apex Roofing</title><meta name="description" content="Roof repairs &amp; flat roofs."><script type="application/ld+json">{"@graph":[{"@type":"RoofingContractor","name":"Apex Roofing","telephone":"091 123456","areaServed":["Galway","Mayo"]}]}</script>`, "https://apex.ie");
+  assert.equal(basics.company, "Apex Roofing");
+  assert.equal(basics.description, "Roof repairs & flat roofs.");
+  assert.equal(basics.serviceAreas, "Galway, Mayo");
+  assert.equal(basics.phone, "091 123456");
+  const message = E.friendlyAiError("This request requires more credits, or fewer max_tokens. https://openrouter.ai/workspaces/default/keys/abc", "customer");
+  assert.doesNotMatch(message, /openrouter|https?:|credit/i);
+  assert.match(E.friendlyAiError("requires more credits", "agency"), /out of credit/);
+});
+
+test("Launch builds their new website from a template with their logo, colours and real photos", () => {
+  const photos = E.siteImages(`<meta property="og:image" content="/hero.jpg"><img src="/logo.png"><img src="/team.jpg" width="900"><img src="/icon.jpg" width="32"><img src="/x.svg">`, "https://apex.ie");
+  assert.deepEqual(photos, ["https://apex.ie/hero.jpg", "https://apex.ie/team.jpg"]);
+  assert.equal(E.pickTemplate("Tattoo studio"), "luxury");
+  assert.equal(E.pickTemplate("Roofing contractor"), "bold");
+  assert.equal(E.pickTemplate("Dental clinic"), "professional");
+  const site = E.buildPreviewSite({ answers: { businessName: "Apex Roofing", services: "Roof repairs, Flat roofs", serviceAreas: "Galway, Mayo", industry: "Roofing" }, profile: { logo: { value: "https://apex.ie/logo.png" }, primaryColour: { value: "#e4572e" } }, images: photos });
+  assert.equal(site.template, "bold");
+  assert.equal(site.theme.logo, "https://apex.ie/logo.png");
+  assert.equal(site.theme.primary, "#e4572e");
+  assert.equal(site.page.blocks[0].type, "hero");
+  assert.equal(site.page.blocks[0].props.image, "https://apex.ie/hero.jpg");
+  assert.equal(site.page.blocks[0].props.title, "Roof repairs in Galway");
+  assert.ok(!site.page.blocks.some((b) => ["reviews", "stats"].includes(b.type)), "no invented reviews or stats");
+  assert.equal(E.buildPreviewSite({ answers: { businessName: "Apex" }, template: "luxury" }).theme.font, "luxury");
+});
