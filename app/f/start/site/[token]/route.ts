@@ -1,5 +1,5 @@
 import * as E from "@/lib/onboarding/engine.mjs";
-import { agencyOwnerId, getSession, getSettings, linkSecret } from "@/lib/onboarding/server";
+import { agencyOwnerId, draftSitePreview, getSession, getSettings, linkSecret } from "@/lib/onboarding/server";
 import { renderPage } from "@/lib/site-content/site-render";
 
 // The customer's new-website preview from "Launch" (/f/start). Rendered by the same renderer as the website
@@ -8,14 +8,17 @@ export const dynamic = "force-dynamic";
 type RouteContext = { params: Promise<{ token: string }> };
 const notFound = () => new Response("This preview has expired.", { status: 404, headers: { "Content-Type": "text/plain; charset=utf-8", "X-Robots-Tag": "noindex" } });
 
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
   const { token } = await context.params;
   const payload = await E.readLinkToken(linkSecret(), String(token || "")).catch(() => null);
   if (!payload?.s) return notFound();
   const ownerId = await agencyOwnerId();
   const session = await getSession(ownerId, payload.s);
-  const site = (session?.recommended || {}).site as { page?: unknown; theme?: { primary: string; secondary: string; font: string; radius: number; name: string; logo?: string; phone?: string } } | undefined;
-  if (!session || !site?.page || !site.theme) return notFound();
+  if (!session) return notFound();
+  // ?draft=<template>: live mini-preview for the template picker (built on the fly, nothing stored).
+  const draft = new URL(request.url).searchParams.get("draft") || "";
+  const site = (E.SITE_TEMPLATES[draft] ? await draftSitePreview(session, draft) : (session.recommended || {}).site) as { page?: unknown; theme?: { primary: string; secondary: string; font: string; radius: number; name: string; logo?: string; phone?: string } } | undefined;
+  if (!site?.page || !site.theme) return notFound();
   const html = renderPage(site.page, { clientId: "preview", base: "#", theme: site.theme, pages: [], phone: site.theme.phone || "", current: "home" })
     // Preview only: the lead tracker and form posts are stripped; every link stays on the page.
     .replace(/<script>[\s\S]*?<\/script>/g, "")

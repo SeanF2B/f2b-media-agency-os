@@ -6,10 +6,12 @@ import * as E from "../lib/onboarding/engine.mjs";
 
 test("routes share one question bank and conditional steps drop out", () => {
   for (const route of ["grow", "audit", "guidance"]) for (const step of E.ROUTE_STEPS[route]) for (const key of step.questions || []) assert.ok(E.QUESTIONS[key], `${route}.${step.key} → ${key}`);
-  assert.ok(!E.stepsFor("grow", {}).some((step) => step.key === "site"));
-  assert.ok(E.stepsFor("grow", { servicesWanted: ["Website"] }).some((step) => step.key === "site"));
+  assert.deepEqual(E.stepsFor("grow", {}).map((step) => step.key), ["source", "confirm", "template", "goal", "help", "customers", "budget", "contact", "plan"]);
+  assert.ok(E.ROUTE_STEPS.audit.every((step) => !step.when) && E.stepsFor("guidance", {}).length === 5);
+  assert.equal(E.cleanAnswers({ template: "luxury" }).template, "luxury");
+  assert.equal(E.cleanAnswers({ template: "neon" }).template, undefined);
   assert.equal(E.resumeStep("grow", {}, ""), "source");
-  assert.equal(E.resumeStep("grow", { businessName: "Pro Roofers" }, "offer"), "offer");
+  assert.equal(E.resumeStep("grow", { businessName: "Pro Roofers" }, "template"), "template");
 });
 
 test("answers are cleaned: unknown keys, bad options and junk dropped", () => {
@@ -104,7 +106,7 @@ test("site signals and prospect findings are labelled verified / ai / unavailabl
   assert.ok(rec.services.some((s) => s.service === "Google Ads"));
   assert.equal(E.auditProgress(["site", "crawl"]), 40);
   assert.equal(E.nextAuditStage(["site"]), "crawl");
-  assert.deepEqual(E.resumeForAction("website", "audit"), { route: "grow", step: "site", preview: "website" });
+  assert.deepEqual(E.resumeForAction("website", "audit"), { route: "grow", step: "template", preview: "website" });
 });
 
 test("pricing: setup fees one-off, management monthly, bundle discount, never ad spend", () => {

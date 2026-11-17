@@ -130,13 +130,76 @@ body.wide .wrap{max-width:1080px}body.wide .device.laptop iframe{height:640px}
 .muted{color:var(--muted)}.small{font-size:13px}.center{text-align:center}.hide{display:none!important}
 .foot{text-align:center;color:var(--muted);font-size:12px;margin-top:18px}
 #ts{margin:14px 0 0;min-height:0}
+
+/* ---- Duolingo-style shell ---- */
+.mascot{display:flex;gap:12px;align-items:flex-end;margin:0 0 18px}
+.mascot .face{flex:none;width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,var(--brand),var(--brand2));position:relative;animation:bob 2.6s ease-in-out infinite;box-shadow:0 8px 18px color-mix(in srgb,var(--brand) 30%,transparent)}
+.mascot .face:before,.mascot .face:after{content:"";position:absolute;top:22px;width:9px;height:12px;border-radius:50%;background:#fff;animation:blink 4s infinite}
+.mascot .face:before{left:17px}.mascot .face:after{right:17px}
+.mascot .face i{position:absolute;left:21px;right:21px;bottom:15px;height:7px;border-radius:0 0 10px 10px;background:#fff}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@keyframes blink{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.1)}}
+.mascot .bubble{position:relative;background:#fff;border:2px solid var(--line);border-radius:16px;padding:12px 14px;font-weight:600;font-size:16px;line-height:1.4;color:#1e293b}
+.mascot .bubble:before{content:"";position:absolute;left:-9px;bottom:16px;width:14px;height:14px;background:#fff;border-left:2px solid var(--line);border-bottom:2px solid var(--line);transform:rotate(45deg)}
+.duo h2{font-size:24px;margin:0 0 14px}
+.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.tile{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:left;border:2px solid var(--line);border-bottom-width:5px;background:#fff;border-radius:16px;padding:14px;font:inherit;font-weight:700;font-size:15px;color:inherit;cursor:pointer;transition:transform .08s,border-color .12s,background .12s;min-height:74px}
+.tile:hover{border-color:color-mix(in srgb,var(--brand) 45%,var(--line))}
+.tile:active{transform:translateY(3px);border-bottom-width:2px;margin-bottom:3px}
+.tile .ti{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:color-mix(in srgb,var(--brand) 12%,#fff);color:var(--brand)}
+.tile .ti svg{width:18px;height:18px}
+.tile.on{border-color:var(--brand);background:color-mix(in srgb,var(--brand) 8%,#fff)}
+.tile.on:after{content:"✓";position:absolute;top:10px;right:10px;width:22px;height:22px;border-radius:50%;background:var(--brand);color:var(--onbrand,#fff);display:grid;place-items:center;font-size:13px}
+.tile.wide{grid-column:1/-1}
+.btn3d{display:flex;width:100%;justify-content:center;align-items:center;gap:8px;border:0;border-radius:16px;padding:15px 20px;font:inherit;font-weight:800;font-size:17px;letter-spacing:.02em;text-transform:uppercase;background:var(--brand);color:var(--onbrand,#fff);box-shadow:0 5px 0 color-mix(in srgb,var(--brand) 60%,#000);cursor:pointer;transition:transform .08s,box-shadow .08s;min-height:54px}
+.btn3d:active{transform:translateY(4px);box-shadow:0 1px 0 color-mix(in srgb,var(--brand) 60%,#000)}
+.btn3d[disabled]{opacity:.55;cursor:progress}
+.btn3d.ghost{background:#fff;color:var(--ink);border:2px solid var(--line);box-shadow:0 4px 0 var(--line)}
+.duo-foot{position:sticky;bottom:0;background:linear-gradient(180deg,transparent,var(--card) 30%);padding:16px 0 calc(6px + env(safe-area-inset-bottom));margin-top:18px;display:grid;gap:8px}
+.cheer{position:fixed;left:0;right:0;bottom:0;z-index:20;padding:16px 20px calc(16px + env(safe-area-inset-bottom));background:color-mix(in srgb,var(--brand) 14%,#fff);border-top:2px solid color-mix(in srgb,var(--brand) 30%,#fff);font-weight:800;font-size:18px;color:color-mix(in srgb,var(--brand) 80%,#000);display:flex;align-items:center;gap:10px;animation:up .25s ease-out}
+.cheer b{width:34px;height:34px;border-radius:50%;background:var(--brand);color:var(--onbrand,#fff);display:grid;place-items:center}
+@keyframes up{from{transform:translateY(100%)}to{transform:none}}
+.mute{border:0;background:transparent;font-size:18px;cursor:pointer;padding:4px 6px;opacity:.7}
+.skip{border:0;background:transparent;color:var(--muted);font:inherit;font-weight:700;cursor:pointer;padding:8px;text-align:center}
+.biz{border:2px solid var(--line);border-radius:18px;padding:18px;display:grid;gap:12px;background:#fff}
+.biz .top{display:flex;gap:12px;align-items:center;justify-content:flex-start;margin:0}.biz img{max-height:52px;max-width:150px;object-fit:contain;border-radius:8px;background:#f8fafc;padding:4px}
+.biz .nm{font-size:20px;font-weight:800}.biz .ind{color:var(--muted);font-size:14px}
+.sw{display:flex;gap:8px}.sw i{width:28px;height:28px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--line)}
+.tpls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.tpl{border:2px solid var(--line);border-bottom-width:5px;border-radius:16px;background:#fff;padding:8px;cursor:pointer;text-align:left;font:inherit;color:inherit;transition:transform .08s}
+.tpl:active{transform:translateY(3px)}.tpl.on{border-color:var(--brand)}
+.tpl .frame{position:relative;height:210px;border-radius:10px;overflow:hidden;background:#eef2f7}
+.tpl .frame iframe{position:absolute;top:0;left:0;width:400%;height:400%;border:0;transform:scale(.25);transform-origin:0 0;pointer-events:none}
+.tpl b{display:block;margin:8px 4px 0;font-size:15px}.tpl span{display:block;margin:0 4px 4px;color:var(--muted);font-size:12px}
+/* ---- Reports-style generating graphic ---- */
+.gen{display:grid;justify-items:center;gap:10px;padding:10px 0 4px;text-align:center}
+.gen svg{width:min(320px,90%);height:auto}
+.gen b{font-size:18px}.gen .step{color:#334155;font-size:15px;animation:in .4s ease both}
+.gen .pbar{width:min(360px,100%);height:8px;border-radius:99px;background:#e2e8f0;overflow:hidden}.gen .pbar i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--brand2));border-radius:99px;transition:width .8s ease}
+.m-shadow{fill:#1c2330;opacity:.08}.m-frame{fill:#1c2330}.m-stand{fill:#c7d0db}.m-chip{fill:#c9d6ea}.m-tile{fill:#fff;stroke:#dbe5f3}
+.m-brand{fill:var(--brand)}.m-brand2{fill:var(--brand2)}.m-soft{fill:color-mix(in srgb,var(--brand) 25%,#fff)}
+.m-pop{animation:mpop 2.4s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes mpop{0%,100%{opacity:.45}50%{opacity:1}}
+.m-drop{animation:mdrop 3s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes mdrop{0%{opacity:0;transform:translateY(-12px)}20%,80%{opacity:1;transform:none}100%{opacity:0}}
+.m-sweep{animation:msweep 3.2s ease-in-out infinite}
+@keyframes msweep{0%,100%{transform:translate(0,0)}33%{transform:translate(90px,26px)}66%{transform:translate(40px,62px)}}
+.m-hl{animation:mhl 3.2s ease-in-out infinite}
+@keyframes mhl{0%,100%{fill:#c9d6ea}50%{fill:var(--brand)}}
+.m-bar{fill:var(--brand);transform-box:fill-box;transform-origin:bottom;animation:mgrow 2.4s ease-in-out infinite}
+@keyframes mgrow{0%{transform:scaleY(.15)}45%,75%{transform:scaleY(1)}100%{transform:scaleY(.15)}}
+.m-line{fill:none;stroke:var(--brand2);stroke-width:3;stroke-linecap:round;stroke-dasharray:160;animation:mdraw 2.4s ease-in-out infinite}
+@keyframes mdraw{0%{stroke-dashoffset:160}55%,80%{stroke-dashoffset:0}100%{stroke-dashoffset:160}}
+.m-spark{fill:#f2b21b;transform-box:fill-box;transform-origin:center;animation:mtw 1.8s ease-in-out infinite}
+@keyframes mtw{0%,100%{transform:scale(.5);opacity:.3}50%{transform:scale(1);opacity:1}}
+@media (max-width:380px){.tiles,.tpls{grid-template-columns:1fr}}
 @media (max-width:520px){.card{padding:18px;border-radius:16px}.nav .btn{flex:1}.route{padding:15px}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="top"><div class="brand"><i>F2B</i><span>F2B Media</span></div><span class="save" id="save"></span></div>
+  <div class="top"><div class="brand"><i>F2B</i><span>F2B Media</span></div><span><span class="save" id="save"></span><button class="mute" id="mute" type="button" aria-label="Sound on">🔊</button></span></div>
   <div class="bar" id="bar"><b></b></div>
   <main id="app" aria-live="polite"><div class="card"><p class="muted">Loading…</p></div></main>
   <p class="foot">Secure · Your details are only used to prepare your recommendations.</p>
@@ -251,23 +314,119 @@ function render(){
   if (st.result === "plan") return planScreen();
   questionScreen(st);
 }
-function lines(){ return { source: "Let's start with what you already have. Share your website or files and I'll fill in as much as I can — you just check it.", basics: "Great. Now the basics — I've pre-filled what I could.", offer: "What do you sell, and where?", customers: "Who are your best customers? This shapes every ad and page we write.", help: "What would you like help with?", site: "A few quick details for your website.", contact: "Where should we send everything?", situation: "Where are you today?", challenge: "Nearly there — what's getting in the way?" }; }
+function lines(){ return { source: "Let's start with your website. I'll read it and fill everything in for you.", confirm: "Here's what I found. Is this you?", template: "Love it. Pick a look for your new website. These are built live with your logo and colours.", goal: "Quick one! Tap whatever fits best.", help: "Nice! Pick as many as you like.", customers: "Tell me about your best customers. This shapes every page and ad we write.", budget: "Nearly done! No commitment, it just helps me plan.", contact: "Last one! Where should we send your new website?", offer: "What do you sell, and where?", situation: "Where are you today?", challenge: "Nearly there. What's getting in the way?", basics: "A little context." }; }
+// ---------- sound + feedback ----------
+var muted = (function(){ try { return localStorage.getItem("f2b-onb-mute") === "1"; } catch (e) { return false; } })();
+var audio = null;
+function tone(freq, at, len, vol){ try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); var o = audio.createOscillator(), g = audio.createGain(); o.type = "sine"; o.frequency.value = freq; g.gain.setValueAtTime(0, audio.currentTime + at); g.gain.linearRampToValueAtTime(vol, audio.currentTime + at + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + at + len); o.connect(g); g.connect(audio.destination); o.start(audio.currentTime + at); o.stop(audio.currentTime + at + len + 0.02); } catch (e) {} }
+function ding(big){ if (muted) return; tone(784, 0, 0.18, 0.12); tone(1175, 0.09, big ? 0.35 : 0.22, 0.1); if (big) tone(1568, 0.2, 0.4, 0.08); }
+var mb = document.getElementById("mute");
+function paintMute(){ mb.textContent = muted ? "🔇" : "🔊"; mb.setAttribute("aria-label", muted ? "Sound off" : "Sound on"); }
+paintMute(); mb.addEventListener("click", function(){ muted = !muted; try { localStorage.setItem("f2b-onb-mute", muted ? "1" : "0"); } catch (e) {} paintMute(); if (!muted) ding(); });
+var CHEERS = ["Nice!", "Great choice!", "Perfect!", "Got it!", "Love it!", "Brilliant!"];
+function cheer(text){ ding(); var old = document.querySelector(".cheer"); if (old) old.remove(); var c = el("div", { cls: "cheer", role: "status" }, [el("b", { text: "✓" }), el("span", { text: text || CHEERS[Math.floor(Math.random() * CHEERS.length)] })]); document.body.appendChild(c); setTimeout(function(){ c.remove(); }, 900); }
+function mascot(text){ return el("div", { cls: "mascot" }, [el("span", { cls: "face" }, [el("i")]), el("div", { cls: "bubble", text: text })]); }
+var ICONS = { "More enquiries quickly": "M13 2 3 14h7l-1 8 10-12h-7z", "Rank higher on Google": "M11 4a7 7 0 1 0 4.9 12l4.6 4.6 1.4-1.4-4.6-4.6A7 7 0 0 0 11 4z", "A better website": "M3 4h18v12H3zM8 20h8M12 16v4", "All of the above": "M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z", "Not sure yet": "M9 9a3 3 0 1 1 4 2.8V14M12 18h.01", "Google Ads": "M4 17l6-11 6 11M7 12h6M18 6v12", "SEO": "M11 4a7 7 0 1 0 4.9 12l4.6 4.6 1.4-1.4-4.6-4.6A7 7 0 0 0 11 4z", "Website": "M3 4h18v12H3zM8 20h8M12 16v4", "Google Business Profile": "M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zM12 11a2 2 0 1 1 0-4 2 2 0 0 1 0 4z", "Meta Ads": "M2 12c2-5 5-7 7-4s4 7 6 4 3-4 7 0", "Email Marketing": "M3 6h18v12H3zM3 7l9 6 9-6" };
+function icon(name){ var d = ICONS[name] || "M5 12l5 5L20 7"; var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg"); svg.setAttribute("viewBox", "0 0 24 24"); svg.setAttribute("fill", "none"); svg.setAttribute("stroke", "currentColor"); svg.setAttribute("stroke-width", "2"); svg.setAttribute("stroke-linecap", "round"); svg.setAttribute("stroke-linejoin", "round"); var path = document.createElementNS("http://www.w3.org/2000/svg", "path"); path.setAttribute("d", d); svg.appendChild(path); return el("span", { cls: "ti" }, [svg]); }
+// ---------- the Reports-style generating graphic (monitor scene) ----------
+var MONITOR = '<ellipse cx="160" cy="206" rx="110" ry="8" class="m-shadow"/><rect x="132" y="168" width="56" height="26" rx="4" class="m-stand"/><rect x="104" y="190" width="112" height="10" rx="5" class="m-stand"/><rect x="30" y="14" width="260" height="160" rx="14" class="m-frame"/><rect x="42" y="26" width="236" height="134" rx="8" fill="#f5f9ff"/>';
+var SPARKS = '<path d="M296 30 l3 7 7 3 -7 3 -3 7 -3 -7 -7 -3 7 -3z" class="m-spark"/><path d="M22 90 l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2z" class="m-spark" style="animation-delay:.9s"/>';
+var ART = {
+  read: MONITOR + '<rect x="42" y="26" width="236" height="16" class="m-brand2"/><rect x="50" y="31" width="34" height="6" rx="3" fill="#fff" class="m-pop"/><rect x="52" y="50" width="120" height="10" rx="4" class="m-hl"/><rect x="52" y="66" width="200" height="6" rx="3" class="m-hl" style="animation-delay:.4s"/><rect x="52" y="78" width="170" height="6" rx="3" class="m-hl" style="animation-delay:.8s"/><rect x="52" y="96" width="62" height="46" rx="5" class="m-tile"/><rect x="122" y="96" width="62" height="46" rx="5" class="m-tile"/><rect x="192" y="96" width="62" height="46" rx="5" class="m-tile"/><g class="m-sweep"><circle cx="90" cy="70" r="20" fill="rgba(255,255,255,.35)" stroke="var(--brand)" stroke-width="5"/><rect x="104" y="84" width="8" height="26" rx="4" transform="rotate(-40 108 97)" class="m-brand"/></g>' + SPARKS,
+  build: MONITOR + '<rect x="42" y="26" width="236" height="18" class="m-brand2 m-drop"/><rect x="50" y="31" width="36" height="8" rx="3" fill="#fff" class="m-drop"/><rect x="42" y="44" width="236" height="44" class="m-brand m-drop" style="animation-delay:.4s"/><rect x="54" y="56" width="110" height="9" rx="4" fill="#fff" class="m-drop" style="animation-delay:.6s"/><rect x="54" y="70" width="44" height="10" rx="5" fill="#fff" class="m-drop" style="animation-delay:.8s"/><rect x="52" y="96" width="66" height="54" rx="6" class="m-tile m-drop" style="animation-delay:1s"/><rect x="127" y="96" width="66" height="54" rx="6" class="m-tile m-drop" style="animation-delay:1.2s"/><rect x="202" y="96" width="66" height="54" rx="6" class="m-tile m-drop" style="animation-delay:1.4s"/><rect x="60" y="104" width="50" height="22" rx="4" class="m-soft m-drop" style="animation-delay:1.1s"/><rect x="135" y="104" width="50" height="22" rx="4" class="m-soft m-drop" style="animation-delay:1.3s"/><rect x="210" y="104" width="50" height="22" rx="4" class="m-soft m-drop" style="animation-delay:1.5s"/>' + SPARKS,
+  audit: MONITOR + '<rect x="52" y="34" width="54" height="7" rx="3.5" class="m-chip"/><circle cx="262" cy="38" r="5" class="m-brand m-pop"/><rect x="52" y="48" width="40" height="22" rx="5" class="m-tile m-pop"/><rect x="98" y="48" width="40" height="22" rx="5" class="m-tile m-pop" style="animation-delay:.25s"/><rect x="144" y="48" width="40" height="22" rx="5" class="m-tile m-pop" style="animation-delay:.5s"/><rect x="54" y="124" width="10" height="26" rx="2.5" class="m-bar"/><rect x="69" y="110" width="10" height="40" rx="2.5" class="m-bar" style="animation-delay:.15s"/><rect x="84" y="117" width="10" height="33" rx="2.5" class="m-bar" style="animation-delay:.3s"/><rect x="99" y="98" width="10" height="52" rx="2.5" class="m-bar" style="animation-delay:.45s"/><rect x="114" y="104" width="10" height="46" rx="2.5" class="m-bar" style="animation-delay:.6s"/><path d="M150 140 L170 128 L188 132 L206 112 L224 116 L242 96 L262 90" class="m-line"/>' + SPARKS,
+};
+function gen(variant, title, steps, index, pct){
+  var art = document.createElement("div"); art.innerHTML = '<svg viewBox="0 0 320 220" aria-hidden="true">' + ART[variant] + '</svg>';
+  return el("div", { cls: "gen", role: "status" }, [art.firstChild, el("b", { text: title }), el("span", { cls: "step", text: steps[Math.min(index, steps.length - 1)] || "" }), el("div", { cls: "pbar" }, [el("i", { style: "width:" + Math.max(6, Math.min(100, pct)) + "%" })])]);
+}
+// Runs a request while the monitor scene plays; steps advance on a timer but the bar only completes when the work does.
+function generating(variant, title, steps, work){
+  var i = 0; var paint = function(pct){ mountEl(el("div", { cls: "card duo" }, [gen(variant, title, steps, i, pct)])); };
+  paint(8); var timer = setInterval(function(){ if (i < steps.length - 1) { i++; paint(Math.round((i / steps.length) * 90)); } }, 1700);
+  return work().then(function(r){ clearInterval(timer); i = steps.length - 1; paint(100); return new Promise(function(res){ setTimeout(function(){ res(r); }, 450); }); }, function(e){ clearInterval(timer); throw e; });
+}
 function questionScreen(st){
   var s = state.session, kids = [];
-  var first = s.steps[0] && s.steps[0].key === st.key;
-  var say = first && s.route === "guidance" ? "Happy to help. A few quick questions and I'll recommend the strategy that fits your business and budget — no jargon." : first && st.extract ? lines().source : lines()[st.key];
-  if (say) kids.push(el("div", { cls: "assistant" }, [el("span", { cls: "av" }), el("div", { cls: "msg", text: say })]));
+  var idx = s.steps.findIndex(function(x){ return x.key === st.key; });
+  var first = idx === 0;
+  var say = first && s.route === "guidance" ? "Happy to help. A few quick questions and I'll recommend the strategy that fits your business and budget." : lines()[st.key] || st.title;
+  kids.push(mascot(say));
+  if (st.ui === "website") return websiteStep(st, kids);
+  if (st.ui === "confirm" && !state.editBiz && hasProfile()) return confirmStep(st, kids);
+  if (st.ui === "template") return templateStep(st, kids);
   kids.push(el("h2", { text: st.title }));
-  if (st.extract) kids.push(sourcesBlock());
-  (st.questions || []).forEach(function(key){ if (st.extract && key === "website") return; kids.push(question(key)); });
+  if (st.extract && st.ui !== "website") kids.push(sourcesBlock());
+  (st.questions || []).forEach(function(key){ if (st.extract && key === "website") return; kids.push(question(key, st)); });
   if (st.contact) kids.push(consentBox());
   if (state.error) kids.push(el("div", { cls: "err", text: state.error }));
+  var singleTiles = st.ui === "tiles" && (st.questions || []).length === 1 && q(st.questions[0]).kind === "choice";
+  kids.push(footer(st, idx, singleTiles));
+  mountEl(el("div", { cls: "card duo" }, kids));
+}
+function footer(st, idx, hideContinue){
+  var s = state.session;
+  return el("div", { cls: "duo-foot" }, [
+    hideContinue ? null : el("button", { cls: "btn3d", type: "button", id: "next", text: st.contact ? "Send me my website" : "Continue", on: { click: function(){ next(st); } } }),
+    idx > 0 ? el("button", { cls: "skip", type: "button", text: "← Back", on: { click: function(){ go(s.steps[idx - 1].key); } } }) : null,
+  ]);
+}
+function hasProfile(){ var p = state.session.profile || {}; return !!(p.businessName || p.description || p.services || p.logo); }
+function websiteStep(st, kids){
+  var s = state.session;
+  kids.push(el("h2", { text: st.title }));
+  var site = el("input", { id: "f_website", type: "url", placeholder: "yourbusiness.ie", autocomplete: "url", inputmode: "url" }); site.value = val("website");
+  site.addEventListener("input", function(){ s.answers.website = site.value; });
+  site.addEventListener("keydown", function(e){ if (e.key === "Enter") read(); });
+  kids.push(el("div", { cls: "q" }, [site]));
+  if (state.error) kids.push(el("div", { cls: "err", text: state.error }));
+  function read(){
+    if (!site.value.trim()) { state.error = "Pop your website address in first."; return render(); }
+    state.error = ""; s.answers.website = site.value;
+    generating("read", "Reading your website", ["Opening " + site.value.replace(/^https?:\/\//, ""), "Finding your logo and brand colours", "Reading your services and areas", "Picking out your photos", "Filling in your details"], function(){ return api({ action: "extract", t: t(), website: site.value }); })
+      .then(function(r){ setSession(r.session); state.editBiz = false; cheer(r.filled ? "Found " + r.filled + " details!" : "Done!"); return api({ action: "save", t: t(), answers: state.session.answers, step: st.key, advance: true }); })
+      .then(function(r){ setSession(r.session); render(); })
+      .catch(function(e){ state.error = e.message; render(); });
+  }
   var idx = s.steps.findIndex(function(x){ return x.key === st.key; });
-  kids.push(el("div", { cls: "nav" }, [
-    idx > 0 ? el("button", { cls: "link", type: "button", text: "← Back", on: { click: function(){ go(s.steps[idx - 1].key); } } }) : el("span"),
-    el("button", { cls: "btn", type: "button", id: "next", text: st.contact ? "Continue" : "Next →", on: { click: function(){ next(st); } } }),
+  kids.push(el("div", { cls: "duo-foot" }, [
+    el("button", { cls: "btn3d", type: "button", text: "Read my website", on: { click: read } }),
+    el("button", { cls: "skip", type: "button", text: "I don't have a website", on: { click: function(){ state.editBiz = true; go(st.key, { advance: true }); } } }),
+    el("details", {}, [el("summary", { cls: "small muted", text: "Or upload a brochure, logo or photos" }), sourcesBlock(true)]),
+    idx > 0 ? el("button", { cls: "skip", type: "button", text: "← Back", on: { click: function(){ go(s.steps[idx - 1].key); } } }) : null,
   ]));
-  mount("q:" + st.key, kids);
+  mountEl(el("div", { cls: "card duo" }, kids));
+}
+function confirmStep(st, kids){
+  var s = state.session, p = s.profile || {}, a = s.answers;
+  var top = el("div", { cls: "top" }, [p.logo && /^https:\/\//.test(p.logo.value) ? el("img", { src: p.logo.value, alt: "", on: { error: function(ev){ ev.target.remove(); } } }) : null, el("div", {}, [el("div", { cls: "nm", text: a.businessName || (p.businessName && p.businessName.value) || "Your business" }), el("div", { cls: "ind", text: a.industry || (p.industry && p.industry.value) || "" })])]);
+  var cols = [p.primaryColour, p.secondaryColour].filter(function(c){ return c && /^#[0-9a-f]{6}$/i.test(c.value); });
+  var services = String(a.services || "").split(/[,\n]+/).map(function(x){ return x.trim(); }).filter(Boolean).slice(0, 8);
+  var card = el("div", { cls: "biz" }, [top,
+    a.description ? el("p", { cls: "small", style: "margin:0", text: a.description }) : null,
+    services.length ? el("div", { cls: "chiprow" }, services.map(function(x){ return el("span", { cls: "tag", text: x }); })) : null,
+    a.serviceAreas ? el("div", { cls: "small muted", text: "📍 " + a.serviceAreas }) : null,
+    cols.length ? el("div", { cls: "sw" }, cols.map(function(c){ return el("i", { style: "background:" + c.value, title: c.value }); })) : null]);
+  kids.push(el("h2", { text: st.title }), card);
+  var idx = s.steps.findIndex(function(x){ return x.key === st.key; });
+  kids.push(el("div", { cls: "duo-foot" }, [
+    el("button", { cls: "btn3d", type: "button", text: "Yes, that's us!", on: { click: function(){ state.confirm = (s.unconfirmed || []).map(function(u){ return u.field; }); cheer("Brilliant!"); go(st.key, { advance: true }); } } }),
+    el("button", { cls: "btn3d ghost", type: "button", text: "Edit details", on: { click: function(){ state.editBiz = true; render(); } } }),
+    el("button", { cls: "skip", type: "button", text: "← Back", on: { click: function(){ go(s.steps[idx - 1].key); } } }),
+  ]));
+  mountEl(el("div", { cls: "card duo" }, kids));
+}
+function templateStep(st, kids){
+  var s = state.session, chosen = s.answers.template;
+  var tpls = [["bold", "Bold", "Strong and direct"], ["modern", "Modern", "Clean and friendly"], ["professional", "Professional", "Calm and trustworthy"], ["luxury", "Luxury", "Elegant and premium"]];
+  kids.push(el("h2", { text: st.title }));
+  kids.push(el("div", { cls: "tpls" }, tpls.map(function(tp){
+    return el("button", { type: "button", cls: "tpl" + (chosen === tp[0] ? " on" : ""), "aria-pressed": chosen === tp[0] ? "true" : "false", on: { click: function(){ s.answers.template = tp[0]; cheer(tp[1] + "! Great choice."); go(st.key, { advance: true }); } } },
+      [el("div", { cls: "frame" }, [el("iframe", { src: "/f/start/site/" + t() + "?draft=" + tp[0], title: tp[1] + " template preview", loading: "lazy", tabindex: "-1" })]), el("b", { text: tp[1] }), el("span", { text: tp[2] })]);
+  })));
+  var idx = s.steps.findIndex(function(x){ return x.key === st.key; });
+  kids.push(el("div", { cls: "duo-foot" }, [el("button", { cls: "skip", type: "button", text: "← Back", on: { click: function(){ go(s.steps[idx - 1].key); } } })]));
+  mountEl(el("div", { cls: "card duo" }, kids));
 }
 function val(key){ var a = state.session.answers[key]; return Array.isArray(a) ? a : (a || ""); }
 function fromTag(key){
@@ -277,20 +436,24 @@ function fromTag(key){
   if (!unconfirmed || String(val(key)) !== p.value) return null;
   return el("div", { cls: "from" }, [el("span", { cls: "tag", text: label }), el("button", { cls: "mini", type: "button", text: "Looks right ✓", on: { click: function(ev){ ev.target.parentNode.replaceChildren(el("span", { cls: "tag ok", text: "Confirmed" })); state.confirm = (state.confirm || []).concat([key]); } } })]);
 }
-function question(key){
+function question(key, st){
   var spec = q(key), box = el("div", { cls: "q" }), input;
-  box.appendChild(el("label", { cls: "l", for: "f_" + key, text: spec.label + (spec.required ? " *" : "") }));
+  var tiles = st && st.ui === "tiles";
+  if (!tiles || (spec.kind !== "choice" && spec.kind !== "multi")) box.appendChild(el("label", { cls: "l", for: "f_" + key, text: spec.label + (spec.required ? " *" : "") }));
   if (spec.kind === "choice" || spec.kind === "multi") {
-    var cur = val(key), wrap = el("div", { cls: "opts", role: spec.kind === "multi" ? "group" : "radiogroup", "aria-label": spec.label });
-    spec.options.forEach(function(o){
+    var cur = val(key), wrap = el("div", { cls: tiles ? "tiles" : "opts", role: spec.kind === "multi" ? "group" : "radiogroup", "aria-label": spec.label });
+    spec.options.forEach(function(o, n){
       var on = spec.kind === "multi" ? cur.indexOf(o) >= 0 : cur === o;
-      wrap.appendChild(el("button", { type: "button", cls: "opt" + (on ? " on" : ""), "aria-pressed": on ? "true" : "false", text: o, on: { click: function(){
+      var last = tiles && n === spec.options.length - 1 && spec.options.length % 2 === 1;
+      wrap.appendChild(el("button", { type: "button", "data-v": o, cls: (tiles ? "tile" + (last ? " wide" : "") : "opt") + (on ? " on" : ""), "aria-pressed": on ? "true" : "false", on: { click: function(){
         var a = state.session.answers;
-        if (spec.kind === "multi") { var list = Array.isArray(a[key]) ? a[key].slice() : []; var i = list.indexOf(o); if (i >= 0) list.splice(i, 1); else list.push(o); a[key] = list; }
+        if (spec.kind === "multi") { var list = Array.isArray(a[key]) ? a[key].slice() : []; var i = list.indexOf(o); if (i >= 0) list.splice(i, 1); else { list.push(o); ding(); } a[key] = list; }
         else a[key] = o;
         // Update the buttons in place: no re-render, so nothing jumps.
-        Array.prototype.forEach.call(wrap.children, function(btn){ var picked = spec.kind === "multi" ? a[key].indexOf(btn.textContent) >= 0 : a[key] === btn.textContent; btn.classList.toggle("on", picked); btn.setAttribute("aria-pressed", picked ? "true" : "false"); });
-      } } }));
+        Array.prototype.forEach.call(wrap.children, function(btn){ var v = btn.getAttribute("data-v"), picked = spec.kind === "multi" ? a[key].indexOf(v) >= 0 : a[key] === v; btn.classList.toggle("on", picked); btn.setAttribute("aria-pressed", picked ? "true" : "false"); });
+        // One-tap questions move straight on, Duolingo style.
+        if (tiles && spec.kind === "choice" && st) { cheer(); setTimeout(function(){ next(st, true); }, 380); }
+      } } }, tiles ? [icon(o), el("span", { text: o })] : [o]));
     });
     box.appendChild(wrap); return box;
   }
@@ -326,7 +489,7 @@ function runAi(key, mode, input, btn){
       render();
     }).catch(function(e){ state.error = e.message; render(); });
 }
-function sourcesBlock(){
+function sourcesBlock(compact){
   var s = state.session, kids = [];
   var site = el("input", { id: "f_website", type: "url", placeholder: "yourbusiness.ie", autocomplete: "url", inputmode: "url" });
   site.value = val("website"); site.addEventListener("input", function(){ s.answers.website = site.value; });
@@ -335,15 +498,17 @@ function sourcesBlock(){
     read.disabled = true; read.textContent = "Reading your site…"; state.error = "";
     api({ action: "extract", t: t(), website: site.value }).then(function(r){ setSession(r.session); state.notice = r.aiUsed === false ? (r.filled ? "I read the basics from your website (" + r.filled + " details). Fill in anything I missed — I'll suggest more when AI is back." : "I couldn't find much on your website — just type the details in.") : r.filled ? ("I found " + r.filled + " details on your website. Check them as you go.") : "I read your site — fill in anything I missed."; render(); }).catch(fail);
   } } });
-  kids.push(el("div", { cls: "q" }, [el("label", { cls: "l", for: "f_website", text: q("website").label }), site, el("div", { cls: "aibar" }, [read])]));
+  if (!compact) kids.push(el("div", { cls: "q" }, [el("label", { cls: "l", for: "f_website", text: q("website").label }), site, el("div", { cls: "aibar" }, [read])]));
   if (state.notice) kids.push(el("div", { cls: "ok", text: state.notice }));
   var fileInput = el("input", { type: "file", multiple: true, accept: ".pdf,.png,.jpg,.jpeg,.webp,.svg,.zip,.html,.htm,.txt", cls: "hide" });
   var purpose = el("select", { "aria-label": "What are you uploading?" }, [["document", "Brochure / PDF"], ["logo", "Logo"], ["brand", "Brand guidelines"], ["photo", "Business photos"], ["site", "Website files (.zip)"]].map(function(o){ return el("option", { value: o[0], text: o[1] }); }));
   var drop = el("div", { cls: "drop", role: "button", tabindex: "0", text: "Drop files here or tap to upload — brochures, PDFs, logos, brand guidelines, photos or website files", on: { click: function(){ fileInput.click(); }, keydown: function(e){ if (e.key === "Enter") fileInput.click(); }, dragover: function(e){ e.preventDefault(); drop.classList.add("over"); }, dragleave: function(){ drop.classList.remove("over"); }, drop: function(e){ e.preventDefault(); drop.classList.remove("over"); upload(e.dataTransfer.files, purpose.value); } } });
   fileInput.addEventListener("change", function(){ upload(fileInput.files, purpose.value); });
   var list = el("div", { cls: "files" }, (s.files || []).map(function(f){ return el("div", {}, [el("span", { text: f.name }), el("span", { cls: "muted", text: Math.max(1, Math.round(f.size / 1024)) + " KB" })]); }));
-  kids.push(el("details", { open: (s.files || []).length ? true : null }, [el("summary", { cls: "small", text: "Or upload files instead" }), el("div", { cls: "sources" }, [purpose, drop, fileInput, list,
-    (s.files || []).some(function(f){ return f.kind === "pdf" || f.kind === "zip" || f.kind === "html" || f.kind === "text"; }) ? el("button", { cls: "btn ghost", type: "button", text: "Pull details from my files", on: { click: function(ev){ ev.currentTarget.disabled = true; ev.currentTarget.textContent = "Reading your files…"; api({ action: "extract_uploads", t: t() }).then(function(r){ setSession(r.session); state.notice = "Done — I've filled in what your files mention."; render(); }).catch(fail); } } }) : null])]));
+  var uploads = el("div", { cls: "sources" }, [purpose, drop, fileInput, list,
+    (s.files || []).some(function(f){ return f.kind === "pdf" || f.kind === "zip" || f.kind === "html" || f.kind === "text"; }) ? el("button", { cls: "btn ghost", type: "button", text: "Pull details from my files", on: { click: function(ev){ ev.currentTarget.disabled = true; ev.currentTarget.textContent = "Reading your files…"; api({ action: "extract_uploads", t: t() }).then(function(r){ setSession(r.session); state.notice = "Done — I've filled in what your files mention."; state.editBiz = false; cheer("Got it!"); if (step().ui === "website") go(step().key, { advance: true }); else render(); }).catch(fail); } } }) : null]);
+  if (compact) return uploads;
+  kids.push(el("details", { open: (s.files || []).length ? true : null }, [el("summary", { cls: "small", text: "Or upload files instead" }), uploads]));
   kids.push(el("p", { cls: "small muted", text: "No website or files? Just continue and type the details in." }));
   return el("div", {}, kids);
 }
@@ -367,7 +532,7 @@ function go(stepKey, extra){
   state.busy = true; state.error = ""; state.notice = ""; saving("Saving…");
   return api(Object.assign({ action: "save", t: t(), answers: state.session.answers, step: stepKey, confirm: state.confirm || [] }, extra || {})).then(function(r){ state.busy = false; state.confirm = []; saving("Saved"); setSession(r.session); window.scrollTo({ top: 0, behavior: "smooth" }); render(); }).catch(fail);
 }
-function next(st){
+function next(st, auto){
   collect(st);
   var s = state.session, a = s.answers;
   var missing = (st.questions || []).filter(function(k){ return q(k).required && !String(a[k] || "").trim(); });
@@ -380,6 +545,8 @@ function next(st){
     extra.consent = true; extra.marketing = !!(document.getElementById("marketing") || {}).checked;
   }
   extra.advance = true;
+  if (st.contact) ding(true); else if (!auto) cheer();
+  if (st.ui === "confirm") state.editBiz = false;
   go(st.key, extra);
 }
 
@@ -387,24 +554,22 @@ function next(st){
 function auditScreen(){
   var s = state.session;
   if (!state.audit || state.audit.id !== s.auditId) {
-    mountEl(el("div", { cls: "card" }, [loader({ progress: 0, stages: state.config.auditStages.map(function(x){ return { label: x.label }; }) })]));
+    mountEl(el("div", { cls: "card duo" }, [loader({ progress: 0, stages: state.config.auditStages.map(function(x){ return { label: x.label }; }) })]));
     api({ action: "audit_start", t: t() }).then(function(r){ state.audit = r.audit; setSession(Object.assign(s, { auditId: r.audit.id })); pump(); }).catch(function(e){ state.error = e.message; auditFailed(); });
     return;
   }
-  if (state.audit.status !== "done") { mountEl(el("div", { cls: "card" }, [loader(state.audit)])); return; }
+  if (state.audit.status !== "done") { mountEl(el("div", { cls: "card duo" }, [loader(state.audit)])); return; }
   report();
 }
 function pump(){
   if (!state.audit || state.audit.status === "done" || state.audit.status === "failed") { if (state.audit && state.audit.status === "failed") return auditFailed(); return render(); }
-  mountEl(el("div", { cls: "card" }, [loader(state.audit)])); resize();
+  mountEl(el("div", { cls: "card duo" }, [loader(state.audit)])); resize();
   api({ action: "audit_step", t: t() }).then(function(r){ state.audit = r.audit; setTimeout(pump, r.audit.status === "done" ? 0 : 400); }).catch(function(e){ state.error = e.message; setTimeout(pump, 2500); });
 }
 function loader(a){
-  var stages = (a.stages || []).map(function(x){ return el("div", { cls: "stage" + (x.done ? " done" : x.running ? " run" : "") }, [el("span", { cls: "dot", text: x.done ? "✓" : "" }), el("span", { text: x.label })]); });
-  return el("div", {}, [
-    el("div", { cls: "assistant" }, [el("span", { cls: "av" }), el("div", { cls: "msg", text: "I'm checking your website, Google visibility and lead generation now. Every step below is a real check — this usually takes under a minute." })]),
-    el("div", { cls: "screen", role: "status" }, [el("div", { cls: "scan" }), el("h3", { text: "> auditing " + ((state.session && state.session.answers.website) || "your business").replace(/^https?:\/\//, "") }), el("div", {}, stages), el("div", { cls: "pct", text: (a.progress || 0) + "%" })]),
-  ]);
+  var stages = a.stages || [];
+  var at = stages.findIndex(function(x){ return !x.done; });
+  return gen("audit", "Auditing " + ((state.session && state.session.answers.website) || "your business").replace(/^https?:\/\//, ""), stages.map(function(x){ return x.label + "…"; }), at < 0 ? stages.length - 1 : at, a.progress || 4);
 }
 function auditFailed(){ mountEl(el("div", { cls: "card" }, [el("h2", { text: "We couldn't finish the audit" }), el("div", { cls: "err", text: state.error || "The website didn't respond." }), el("div", { cls: "nav" }, [el("button", { cls: "link", type: "button", text: "← Change website", on: { click: function(){ state.audit = null; go("source"); } } }), el("button", { cls: "btn", type: "button", text: "See recommendations", on: { click: function(){ go("contact"); } } })])])); }
 function ring(v, label){
@@ -452,11 +617,11 @@ function planScreen(){
   if (!state.rec) { mountEl(el("div", { cls: "card" }, [el("p", { cls: "muted", text: "Putting your recommendations together…" })])); api({ action: "recommend", t: t() }).then(function(r){ state.rec = r.recommendation; state.quote = r.quote; state.picked = r.quote.services.slice(); render(); }).catch(fail); return; }
   if (state.launching) return launchLoader();
   var r = state.rec, cfg = state.config, cur = cfg.pricing.currency, site = s.site, kids = [];
-  kids.push(el("div", { cls: "assistant" }, [el("span", { cls: "av" }), el("div", { cls: "msg", text: site ? "Here's your new website, built from our templates with your logo, colours and photos. Try another style, then get started when you're ready." : (r.headline || "Here's what I'd recommend.") + " Hit Launch and I'll build your new website right now." })]));
+  kids.push(mascot(site ? "Here's your new website, built from our templates with your logo, colours and photos. Try another style, then get started when you're ready." : (r.headline || "Here's what I'd recommend.") + " Hit Launch and I'll build your new website right now."));
   kids.push(el("h2", { text: site ? "Your new website" : "Your plan" }));
   kids.push(el("div", { cls: "chiprow" }, (r.services || []).slice(0, 4).map(function(x){ return el("span", { cls: "tag ai", text: x.service }); })));
   if (!site) {
-    kids.push(el("div", { cls: "launch" }, [el("h3", { text: "See your new website" }), el("p", { text: "We'll build it from our proven templates using your logo, brand colours and photos from your current site." }), el("button", { cls: "btn", type: "button", text: "🚀 Launch", on: { click: function(){ launch(""); } } })]));
+    kids.push(el("div", { cls: "launch" }, [el("h3", { text: "See your new website" }), el("p", { text: "We'll build it from our proven templates using your logo, brand colours and photos from your current site." }), el("button", { cls: "btn3d", style: "max-width:260px", type: "button", text: "🚀 Launch", on: { click: function(){ launch(""); } } })]));
   } else {
     var view = state.device || "laptop";
     kids.push(el("div", { cls: "bar2" }, [
@@ -493,14 +658,14 @@ function packageEditor(){
 var LAUNCH_STEPS = ["Pulling your logo and brand colours", "Choosing the best template for your business", "Adding photos from your website", "Writing your pages", "Building your new website"];
 function launchLoader(){
   var i = state.launchStep || 0;
-  mountEl(el("div", { cls: "card" }, [el("div", { cls: "screen", role: "status" }, [el("div", { cls: "scan" }), el("h3", { text: "> launching " + ((state.session.answers.businessName) || "your website") }), el("div", {}, LAUNCH_STEPS.map(function(label, n){ return el("div", { cls: "stage" + (n < i ? " done" : n === i ? " run" : "") }, [el("span", { cls: "dot", text: n < i ? "✓" : "" }), el("span", { text: label })]); })), el("div", { cls: "pct", text: Math.min(95, Math.round((i / LAUNCH_STEPS.length) * 100)) + "%" })])]));
+  mountEl(el("div", { cls: "card duo" }, [gen("build", "Building " + (state.session.answers.businessName || "your new website"), LAUNCH_STEPS, i, Math.min(100, Math.round(((i + 1) / LAUNCH_STEPS.length) * 92)))]));
 }
 function launch(template){
   state.error = ""; state.launching = true; state.launchStep = 0; render();
   var timer = setInterval(function(){ if (state.launchStep < LAUNCH_STEPS.length - 1) { state.launchStep++; if (state.launching) launchLoader(); } }, template ? 350 : 1400);
   api({ action: "launch", t: t(), template: template || undefined }).then(function(r){
     clearInterval(timer); state.launchStep = LAUNCH_STEPS.length; launchLoader();
-    setTimeout(function(){ state.launching = false; setSession(r.session); render(); }, 450);
+    setTimeout(function(){ state.launching = false; setSession(r.session); ding(true); render(); }, 450);
   }).catch(function(e){ clearInterval(timer); state.launching = false; fail(e); });
 }
 function requote(){ api({ action: "quote", t: t(), services: state.picked, manager: state.manager }).then(function(r){ state.quote = r.quote; render(); }).catch(fail); }

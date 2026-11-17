@@ -835,8 +835,16 @@ export async function launchSitePreview(session: SessionRow, template = ""): Pro
   }
   const existing = (session.recommended || {}).site as Row | undefined;
   const copy = template && existing?.copy !== undefined ? existing.copy : await aiSiteCopy(session.owner_id, session.answers, profile);
-  const built = E.buildPreviewSite({ answers: session.answers, profile, images: photos, copy, template });
+  const built = E.buildPreviewSite({ answers: session.answers, profile, images: photos, copy, template: template || String(session.answers.template || "") });
   const site = { ...built, copy, aiPolished: Boolean(copy), at: nowIso() };
   const approvals = [...(session.approvals || []), { what: `Launched website preview (${built.template} template)`, at: nowIso() }].slice(-20);
   return updateSession(session, { recommended: { ...(session.recommended || {}), site }, approvals });
+}
+
+/** Live mini-preview for the template picker: built on the fly from the session's answers and site, no AI, not stored. */
+export async function draftSitePreview(session: SessionRow, template: string) {
+  const { profile } = await getProfile(session.owner_id, session.domain || `session-${session.id}`);
+  const photos = parse<string[]>((profile as Row)._images?.value, []);
+  const existing = (session.recommended || {}).site as Row | undefined;
+  return E.buildPreviewSite({ answers: session.answers, profile, images: photos, copy: existing?.copy || null, template });
 }

@@ -51,7 +51,7 @@ async function view(ctx: Ctx, session: SessionRow) {
   const paid = session.payment_status === "paid";
   return {
     token: await tokenFor(ctx, session),
-    route: session.entry_route, step: session.step, steps: E.stepsFor(session.entry_route, session.answers).map((step) => ({ key: step.key, title: step.title, questions: step.questions || [], extract: Boolean(step.extract), contact: Boolean(step.contact), result: step.result || null })),
+    route: session.entry_route, step: session.step, steps: E.stepsFor(session.entry_route, session.answers).map((step) => ({ key: step.key, title: step.title, questions: step.questions || [], extract: Boolean(step.extract), contact: Boolean(step.contact), result: step.result || null, ui: step.ui || null })),
     answers: session.answers, profile: publicProfile(profile), unconfirmed: E.unconfirmedFields(profile).filter((item) => (E.QUESTIONS as Row)[item.field]),
     files: await listFiles(session), auditId: session.audit_id, auditStatus: audit?.status || null, unlocked: Boolean(session.unlocked), consent: Boolean(session.consent_contact),
     recommended: session.recommended || {}, paymentStatus: session.payment_status, bookingStatus: session.booking_status, quote: session.quote || {},
