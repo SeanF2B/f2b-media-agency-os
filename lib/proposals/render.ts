@@ -5,7 +5,7 @@
 // With editable=true every text block is contenteditable and images are click-to-swap; edits are posted
 // to the parent window (the live editor). Pure function — runs in the browser and on the Worker.
 
-import type { ProposalBrand, ProposalDeck, Slide } from "./deck";
+import { businessArea, businessServices, defaultAds, defaultKeywords, type ProposalBrand, type ProposalDeck, type Slide } from "./deck";
 
 export type RenderOptions = {
   editable?: boolean;
@@ -37,23 +37,69 @@ export function renderProposalHtml(deck: ProposalDeck, brand: ProposalBrand, opt
     const value = path.split(".").reduce<any>((node, key) => (node == null ? node : node[key]), slide.data);
     return `<${tag}${cls ? ` class="${cls}"` : ""}${edit ? ` data-e="${attr(slide.id)}|${attr(path)}" contenteditable="plaintext-only" spellcheck="true"` : ""}>${esc(value)}</${tag}>`;
   };
-  /** Swappable picture. key = brand field ("brand.screenshotDesktop") or slide field ("images.0"). */
-  const pic = (slide: Slide, key: string, fallback: string, cls = "shot", alt = "") => {
-    const own = key.startsWith("brand.") ? (brand as any)[key.slice(6)] : key.split(".").reduce<any>((node, k) => (node == null ? node : node[k]), slide.data);
-    const src = img(own) || img(fallback);
-    const data = edit ? ` data-img="${attr(slide.id)}|${attr(key)}" title="Click to change image"` : "";
-    return src ? `<img class="${cls}" src="${attr(src)}" alt="${attr(alt)}" loading="lazy"${data}>` : `<div class="${cls} ph"${data}><span>${edit ? "Click to add image" : esc(brand.businessName)}</span></div>`;
-  };
-  const desktopShot = brand.screenshotDesktop || brand.images[0] || "";
-  const mobileShot = brand.screenshotMobile || brand.screenshotDesktop || brand.images[0] || "";
-  const imageAt = (index: number) => brand.images[index] || brand.images[0] || desktopShot;
   const logo = img(brand.logo);
   const agencyLogo = opts.agencyLogo || "";
+  const name = brand.businessName || "Your business";
+  const domain = (brand.website || "").replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "") || "yourwebsite.ie";
+  const services = businessServices(brand);
+  const area = businessArea(brand);
+  const keywordsFallback = defaultKeywords(brand);
+  const tc = (text: string) => text.replace(/\b\w/g, (c) => c.toUpperCase());
+  const photos = brand.images.map((src) => img(src)).filter(Boolean);
+  const photoAt = (index: number) => photos.length ? photos[index % photos.length] : "";
+  const valueAt = (slide: Slide, key: string) => key.startsWith("brand.") ? (brand as any)[key.slice(6)] : key.split(".").reduce<any>((node, k) => (node == null ? node : node[k]), slide.data);
+  const slotAttr = (slide: Slide, key: string) => edit ? ` data-img="${attr(slide.id)}|${attr(key)}"` : "";
+  const logoMark = (cls = "") => logo ? `<img class="lg ${cls}" src="${attr(logo)}" alt="${attr(name)}" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><b class="lg-t ${cls}" hidden>${esc(name)}</b>` : `<b class="lg-t ${cls}">${esc(name)}</b>`;
+  /** Clean branded tile (their colour + logo) shown when there's no real photo, or behind one that fails to load. */
+  const tile = () => `<span class="tile">${logoMark("on-tile")}</span>`;
+  /** A photo slot: a real photo if we have one, otherwise their brand tile. Never a broken or stock image. "none" = deleted. */
+  const photo = (slide: Slide, key: string, fallback: string, cls = "") => {
+    const own = valueAt(slide, key);
+    const src = own === "none" ? "" : img(own) || img(fallback);
+    return `<div class="slot ${cls}"${slotAttr(slide, key)}>${tile()}${src ? `<img src="${attr(src)}" alt="" loading="lazy" onerror="this.remove()">` : ""}</div>`;
+  };
+  /** Their website: the real screenshot when captured, otherwise a clean mock built from their logo, colours, photos and services. */
+  const siteMock = (kind: "d" | "m", hero: string, headline?: string) => {
+    const head = headline || (services.length ? `${tc(services.slice(0, 2).join(" & "))}${area ? ` in ${area}` : ""}` : name);
+    const blurb = String(brand.description || "").split(/(?<=[.!])\s/)[0].slice(0, 120);
+    const media = `<div class="s-media">${tile()}${hero ? `<img src="${attr(hero)}" alt="" loading="lazy" onerror="this.remove()">` : ""}</div>`;
+    const copy = `<div class="s-copy">${area ? `<small>${esc(area)}</small>` : ""}<h6>${esc(head)}</h6>${blurb ? `<p>${esc(blurb)}</p>` : ""}<span class="s-btns"><b class="s-btn">Get a free quote</b>${kind === "d" ? `<b class="s-ghost">Call us</b>` : ""}</span></div>`;
+    return `<div class="site ${kind}"><div class="s-nav">${logoMark()}${kind === "d" ? `<span class="s-links">${(services.length ? services.slice(0, 3).map(tc) : ["Services", "About"]).concat("Contact").map((item) => `<i>${esc(item)}</i>`).join("")}</span><b class="s-btn sm">Get a quote</b>` : `<span class="s-burger"><i></i><i></i><i></i></span>`}</div>
+      <div class="s-hero">${kind === "d" ? copy + media : media + copy}</div>
+      ${kind === "d" ? `<div class="s-cards">${(services.length ? services : ["Our services", "Why choose us", "Get in touch"]).slice(0, 3).map((item) => `<span><i></i>${esc(tc(item))}</span>`).join("")}</div>` : ""}</div>`;
+  };
+  /** A dedicated service landing page (like the Red Island examples): photo hero + headline + quote form. */
+  const landingMock = (kind: "d" | "m", hero: string, service: string) => {
+    const head = `${tc(service)}${area ? ` in ${area}` : ""}`;
+    const form = `<div class="lp-form"><b>Request a free quote</b><span class="lp-f">Name</span><span class="lp-f">Phone</span><span class="lp-f">Email</span><span class="lp-f tall">What do you need help with?</span><span class="s-btn">Get my free quote →</span></div>`;
+    return `<div class="site lp ${kind}"><div class="s-nav">${logoMark()}${kind === "d" ? `<span class="s-links"><i>Call us today</i></span><b class="s-btn sm">Get a quote</b>` : `<span class="s-burger"><i></i><i></i><i></i></span>`}</div>
+      <div class="lp-hero"><div class="lp-photo">${tile()}${hero ? `<img src="${attr(hero)}" alt="" loading="lazy" onerror="this.remove()">` : ""}<div class="lp-copy"><small>${esc(tc(service))}${area ? ` · ${esc(area)}` : ""}</small><h6>${esc(head)}</h6><p>${esc(`Fast, friendly ${service.toLowerCase()} from ${name}. Free quotes, no obligation.`)}</p>${kind === "m" ? `<span class="s-btn">Get my free quote →</span>` : ""}</div></div>${kind === "d" ? form : ""}</div>
+      ${kind === "d" ? `<div class="lp-trust">${["Free quote", "Local team", "Fast response"].map((item) => `<span>${icon("check")}${item}</span>`).join("")}</div>` : form}</div>`;
+  };
+  const landing = (slide: Slide, key: "images.0" | "images.1", kind: "d" | "m", service: string, heroIndex = 0) => {
+    const own = valueAt(slide, key);
+    const hero = own === "none" ? "" : img(own) || photoAt(heroIndex);
+    return `<div class="slot site-slot"${slotAttr(slide, key)}>${landingMock(kind, hero, service)}</div>`;
+  };
+  const site = (slide: Slide, key: "brand.screenshotDesktop" | "brand.screenshotMobile", kind: "d" | "m", heroIndex = 0) => {
+    const shot = img(valueAt(slide, key));
+    return `<div class="slot site-slot"${slotAttr(slide, key)}>${siteMock(kind, photoAt(heroIndex))}${shot ? `<img class="shotimg" src="${attr(shot)}" alt="${attr(name)} website" loading="lazy" onerror="this.remove()">` : ""}</div>`;
+  };
+  // Back-compat name used by slides below.
+  const pic = (slide: Slide, key: string, fallback: string, cls = "") => key === "brand.screenshotDesktop" ? site(slide, key, "d") : key === "brand.screenshotMobile" ? site(slide, key, "m") : photo(slide, key, fallback, cls);
+  const imageAt = (index: number) => photoAt(index);
+  const desktopShot = "", mobileShot = "";
+  /** A service page on their site (examples slide): their nav + logo, the service as the headline, a real photo. */
+  const pageSlot = (slide: Slide, index: number, headline: string) => {
+    const own = valueAt(slide, `images.${index}`);
+    const hero = own === "none" ? "" : img(own) || photoAt(index);
+    return `<div class="slot site-slot"${slotAttr(slide, `images.${index}`)}>${siteMock("d", hero, headline)}</div>`;
+  };
 
   const desktop = (inner: string, cls = "") => `<div class="mac ${cls}"><div class="mac-screen">${inner}</div><div class="mac-chin"></div><div class="mac-neck"></div><div class="mac-foot"></div></div>`;
   const phone = (inner: string, cls = "") => `<div class="phone ${cls}"><div class="phone-screen">${inner}</div><i class="notch"></i></div>`;
   const swoosh = (pos: string) => `<svg class="swoosh ${pos}" viewBox="0 0 120 400" aria-hidden="true"><path d="M95 0 C 40 120, 90 260, 18 400" fill="none" stroke="${accent}" stroke-width="26" stroke-linecap="round"/></svg>`;
-  const icon = (name: string) => {
+  const icon = (iconName: string) => {
     const paths: Record<string, string> = {
       search: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l5 5"/>',
       target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/>',
@@ -71,30 +117,78 @@ export function renderProposalHtml(deck: ProposalDeck, brand: ProposalBrand, opt
       clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
       plus: '<path d="M12 5v14M5 12h14"/>',
       star: '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" fill="currentColor"/>',
+      globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/>',
+      like: '<path d="M7 11v9H4v-9zM7 11l4-8c1.5 0 2.5 1 2.5 2.5V9h5a2 2 0 0 1 2 2.3l-1.2 6.8A2 2 0 0 1 17.3 20H7"/>',
+      comment: '<path d="M4 18l1.5-4A8 8 0 1 1 9 19z"/>',
+      share: '<path d="M14 5l7 7-7 7M21 12H9a6 6 0 0 0-6 6"/>',
     };
-    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.spark}</svg>`;
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[iconName] || paths.spark}</svg>`;
   };
   const visualIcon: Record<string, string> = { search: "search", maps: "pin", seo: "chart", ai: "spark", site: "monitor", landing: "cursor", social: "social", retarget: "repeat", email: "mail", whatsapp: "chat", dashboard: "gear" };
   const serviceVisual = (key: string) => ({ "google-ads": "search", seo: "seo", geo: "ai", aeo: "ai", gbp: "maps", website: "site", landing: "landing", "meta-ads": "social", retargeting: "retarget", social: "social", email: "email", whatsapp: "whatsapp", crm: "dashboard" } as Record<string, string>)[key] || "site";
   const card = (slide: Slide, iconName: string, titlePath: string, bodyPath: string) => `<div class="icard a"><span class="icard-ico">${icon(iconName)}</span>${t(slide, titlePath, "b")}${t(slide, bodyPath, "p")}</div>`;
+  const browser = (inner: string) => `<div class="browser"><div class="browser-bar"><i></i><i></i><i></i><span>${esc(domain)}</span></div><div class="browser-body">${inner}</div></div>`;
 
-  const searchScreen = (term: string) => `<div class="serp"><div class="serp-glow"></div><div class="serp-brand"><span>${icon("search")}</span>Search</div><div class="serp-box"><div class="serp-q">${icon("search")}<b>${esc(term || "your service near me")}</b></div>${[0, 1, 2, 3, 4, 5].map((index) => `<div class="serp-row" style="--d:${index}">${icon("search")}<span>${esc(term || "your service")} ${["", "cost", "near me", "reviews", "best", "quote"][index]}</span></div>`).join("")}</div></div>`;
-  const browser = (inner: string) => `<div class="browser"><div class="browser-bar"><i></i><i></i><i></i><span>${esc((brand.website || "").replace(/^https?:\/\//, "").replace(/\/$/, "") || "yourwebsite.ie")}</span></div>${inner}</div>`;
+  /** Google results page for one of THEIR keywords, with their own sponsored ad on top. */
+  const searchScreen = (slide: Slide) => {
+    const d = slide.data;
+    const keywords = (Array.isArray(d.keywords) && d.keywords.filter(Boolean).length ? d.keywords : keywordsFallback).slice(0, 6);
+    const kwField = Array.isArray(d.keywords) && d.keywords.length;
+    const kw = (index: number) => kwField ? t(slide, `keywords.${index}`) : esc(keywords[index] || "");
+    return `<div class="serp"><div class="serp-glow"></div><div class="serp-box">
+      <div class="serp-q">${icon("search")}<b>${kw(0)}</b></div>
+      <div class="gad a d2"><small class="gad-sp">Sponsored</small><div class="gad-top"><i>${logoMark()}</i><span><b>${esc(name)}</b><small>https://${esc(domain)}</small></span></div>
+        ${d.adHeadline !== undefined ? t(slide, "adHeadline", "b", "gad-h") : `<b class="gad-h">${esc(`${name} | ${tc(services[0] || "Local Experts")}`)}</b>`}
+        ${d.adDescription !== undefined ? t(slide, "adDescription", "p") : `<p>${esc(String(brand.description || "").slice(0, 150))}</p>`}
+        <div class="gad-links">${(services.length ? services : ["Free Quote", "Contact Us", "Reviews"]).slice(0, 3).map((item) => `<span>${esc(tc(item))}</span>`).join("")}</div></div>
+      <div class="serp-also">People also search for</div>
+      ${keywords.slice(1, 5).map((_: string, index: number) => `<div class="serp-row" style="--d:${index}">${icon("search")}<span>${kw(index + 1)}</span></div>`).join("")}
+    </div></div>`;
+  };
+  /** A realistic Facebook / Instagram feed ad in their branding, promoting one of their services with an offer. */
+  const adPost = (slide: Slide, index: number) => {
+    const ads = Array.isArray(slide.data.ads) && slide.data.ads.length ? slide.data.ads : defaultAds(brand);
+    const own = Array.isArray(slide.data.ads) && slide.data.ads.length;
+    const field = (key: string, tag: string, cls: string) => own ? t(slide, `ads.${index}.${key}`, tag, cls) : `<${tag} class="${cls}">${esc(ads[index]?.[key] || "")}</${tag}>`;
+    return `<div class="ad"><div class="ad-top"><i class="ad-av">${logoMark()}</i><span><b>${esc(name)}</b><small>Sponsored · ${icon("globe")}</small></span><em>···</em></div>
+      ${field("primaryText", "p", "ad-copy")}
+      <div class="ad-media">${photo(slide, `images.${index}`, photoAt(index))}${field("offer", "span", "ad-offer")}</div>
+      <div class="ad-cta"><span><small>${esc(domain.toUpperCase())}</small>${field("headline", "b", "ad-h")}</span>${field("cta", "em", "ad-btn")}</div>
+      <div class="ad-react"><span class="ad-r"><i class="r1">${icon("like")}</i><i class="r2">♥</i></span><span>${icon("like")} Like</span><span>${icon("comment")} Comment</span><span>${icon("share")} Share</span></div></div>`;
+  };
 
   const serviceGraphic = (slide: Slide) => {
     const visual = serviceVisual(String(slide.data.serviceKey || ""));
-    const term = String(slide.data.searchTerm || "");
     switch (visual) {
-      case "search": return desktop(searchScreen(term), "big a d2");
-      case "maps": return `<div class="mapwrap a d2"><div class="map">${[18, 42, 66, 30, 78, 55].map((x, index) => `<i class="pin${index === 2 ? " me" : ""}" style="left:${x}%;top:${[30, 62, 38, 22, 55, 75][index]}%">${icon("pin")}</i>`).join("")}</div><div class="listing">${logo ? `<img src="${attr(logo)}" alt="">` : ""}<b>${esc(brand.businessName)}</b><span class="stars">${icon("star").repeat(5)}<em>5.0</em></span><small>${esc((brand.areas || "").split(/[,\n]/)[0] || "Open now")} · Call · Directions · Website</small></div></div>`;
-      case "seo": return `<div class="duo a d2">${desktop(browser(pic(slide, "brand.screenshotDesktop", desktopShot)), "big")}${phone(pic(slide, "brand.screenshotMobile", mobileShot), "front")}<div class="rank">${[38, 52, 64, 78, 92].map((h, index) => `<i style="height:${h}%;--d:${index}"></i>`).join("")}<span>Organic traffic</span></div></div>`;
-      case "ai": return `<div class="aiq a d2"><div class="aiq-ask">${icon("chat")}<span>Who's the best ${esc((brand.services.split(/[,\n]/)[0] || "company").trim().toLowerCase())} in ${esc((brand.areas.split(/[,\n]/)[0] || "my area").trim())}?</span></div><div class="aiq-ans"><span class="aiq-ico">${icon("spark")}</span><p>Based on reviews, expertise and local presence, <b>${esc(brand.businessName)}</b> is a strong choice. They're known for ${esc((brand.description || "quality work and great service").split(/[.!]/)[0].toLowerCase().slice(0, 120))}.</p><div class="aiq-src"><i></i><i></i><i></i></div></div></div>`;
-      case "social": case "retarget": return `<div class="feed a d2">${[0, 1, 2].map((index) => `${index ? `<span class="arrow">→</span>` : ""}${phone(`<div class="post"><div class="post-top"><i>${logo ? `<img src="${attr(logo)}" alt="">` : ""}</i><b>${esc(brand.businessName)}</b></div>${pic(slide, `images.${index}`, imageAt(index), "post-img")}<div class="post-act"><i>♡</i><i>◌</i><i>➤</i></div><div class="post-lines"><i></i><i></i></div></div>`, "sm")}`).join("")}</div>`;
-      case "email": return `<div class="duo a d2">${phone(`<div class="mail">${logo ? `<img class="mail-logo" src="${attr(logo)}" alt="">` : `<b>${esc(brand.businessName)}</b>`}<h4>${esc(slide.data.cardTitle || "Your latest news")}</h4>${pic(slide, "images.0", imageAt(0), "mail-img")}<p></p><p></p><span class="mail-btn">Book a consultation</span></div>`, "solo")}</div>`;
-      case "whatsapp": return `<div class="feed a d2">${phone(`<div class="formui"><b>Tell us about your project</b><i></i><i></i><i></i><i class="tall"></i><span>Request a consultation →</span></div>`, "sm")}<span class="arrow">→</span>${phone(`<div class="chatui"><div class="chat-top">${esc(brand.businessName)}</div><p class="in">Hi! Thanks for your enquiry — when suits you for a quick call?</p><p class="out">Tomorrow afternoon would be perfect</p><p class="in">Great — you're booked in for 2pm ✓</p></div>`, "sm")}</div>`;
-      case "dashboard": return dashboardGraphic(slide);
-      default: return `<div class="duo a d2">${desktop(browser(pic(slide, "brand.screenshotDesktop", desktopShot)), "big")}${phone(pic(slide, "brand.screenshotMobile", mobileShot), "front")}</div>`;
+      case "search": return desktop(searchScreen(slide), "big a d2");
+      case "maps": return `<div class="mapwrap a d2"><div class="map"><svg class="map-svg" viewBox="0 0 400 260" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="400" height="260" fill="#eef1f4"/><path d="M290 0 C 300 70 360 90 400 110 L400 0Z" fill="#cfe3f7"/><rect x="40" y="150" width="90" height="60" rx="14" fill="#d7ecd9"/><rect x="250" y="170" width="70" height="50" rx="12" fill="#d7ecd9"/><g stroke="#fff" stroke-linecap="round" fill="none"><path d="M-10 120 C 100 100 200 140 410 90" stroke-width="12"/><path d="M150 -10 C 160 80 140 180 175 270" stroke-width="10"/><path d="M-10 40 L 410 60" stroke-width="5"/><path d="M-10 200 L 410 230" stroke-width="5"/><path d="M60 -10 L 90 270" stroke-width="5"/><path d="M240 -10 L 230 270" stroke-width="5"/><path d="M320 -10 L 350 270" stroke-width="5"/></g><g stroke="#f8d77a" stroke-linecap="round" fill="none"><path d="M-10 120 C 100 100 200 140 410 90" stroke-width="3"/></g></svg>${[18, 42, 66, 30, 78, 55].map((x, index) => `<i class="pin${index === 2 ? " me" : ""}" style="left:${x}%;top:${[30, 62, 38, 22, 55, 75][index]}%">${icon("pin")}</i>`).join("")}</div><div class="listing"><span class="listing-top"><i class="ad-av">${logoMark()}</i><b>${esc(name)}</b></span><small>${esc(tc(services[0] || "Local business"))}${area ? ` · ${esc(area)}` : ""}</small><span class="listing-btns"><em>Call</em><em>Directions</em><em>Website</em></span></div></div>`;
+      case "ai": return `<div class="aiq a d2"><div class="aiq-ask">${icon("chat")}<span>Who's the best for ${esc((services[0] || "this service").toLowerCase())}${area ? ` in ${esc(area)}` : " near me"}?</span></div><div class="aiq-ans"><span class="aiq-ico">${icon("spark")}</span><p><b>${esc(name)}</b> is a strong option${area ? ` in ${esc(area)}` : ""}. ${esc(String(brand.description || "They're a well-reviewed local business.").split(/(?<=[.!])\s/)[0].slice(0, 140))}</p><div class="aiq-src"><span>${logoMark()}</span><span>${esc(domain)}</span></div></div></div>`;
+      case "social": case "retarget": return `<div class="feed a d2">${[0, 1, 2].map((index) => `${index ? `<span class="arrow">→</span>` : ""}${phone(adPost(slide, index), "sm")}`).join("")}</div>`;
+      case "email": return `<div class="duo a d2">${phone(`<div class="mail"><div class="mail-head">${logoMark()}</div><h4>${esc(slide.data.cardTitle || "Your latest news")}</h4>${photo(slide, "images.0", photoAt(0), "mail-img")}<p></p><p></p><span class="mail-btn">Book a consultation</span><div class="mail-cards">${[1, 2].map((index) => `<span>${photo(slide, `images.${index}`, photoAt(index))}<b>${esc(tc(services[index - 1] || (index === 1 ? "Latest work" : "Customer stories")))}</b></span>`).join("")}</div></div>`, "solo")}</div>`;
+      case "whatsapp": return `<div class="feed a d2">${phone(`<div class="formui"><div class="mail-head">${logoMark()}</div><b>Tell us about your project</b><i></i><i></i><i></i><i class="tall"></i><span>Request a quote →</span></div>`, "sm")}<span class="arrow">→</span>${phone(`<div class="chatui"><div class="chat-top"><i class="ad-av">${logoMark()}</i>${esc(name)}</div><p class="in">Hi! Thanks for your enquiry — when suits you for a quick call?</p><p class="out">Tomorrow afternoon would be perfect</p><p class="in">Great — you're booked in for 2pm ✓</p></div>`, "sm")}</div>`;
+      case "dashboard": return crmGraphic();
+      case "landing": return `<div class="duo a d2">${desktop(browser(landing(slide, "images.0", "d", services[0] || "Our services", 0)), "big")}${phone(landing(slide, "images.1", "m", services[1] || services[0] || "Our services", 1), "front")}</div>`;
+      case "seo": return `<div class="duo a d2">${desktop(browser(`<div class="slot site-slot"${slotAttr(slide, "images.0")}>${siteMock("d", (valueAt(slide, "images.0") === "none" ? "" : img(valueAt(slide, "images.0")) || photoAt(2)), `${tc(services[1] || services[0] || name)}${area ? ` in ${area}` : ""}`)}</div>`), "big")}${phone(site(slide, "brand.screenshotMobile", "m", 1), "front")}<div class="rank">${[38, 52, 64, 78, 92].map((h, index) => `<i style="height:${h}%;--d:${index}"></i>`).join("")}<span>Organic traffic</span></div></div>`;
+      default: return `<div class="duo a d2">${desktop(browser(site(slide, "brand.screenshotDesktop", "d")), "big")}${phone(site(slide, "brand.screenshotMobile", "m", 1), "front")}</div>`;
     }
+  };
+  const crmGraphic = () => {
+    const svc = (i: number) => tc(services[i % Math.max(services.length, 1)] || ["New enquiry", "Quote request", "Consultation"][i % 3]);
+    const cols: Array<[string, Array<[string, string, string]>]> = [
+      ["New lead", [["Sarah M.", svc(0), "€850"], ["Tom K.", svc(1), "€1,200"], ["Aoife R.", svc(2), "€640"]]],
+      ["Contacted", [["James B.", svc(1), "€2,400"], ["Niamh O.", svc(0), "€950"]]],
+      ["Quote sent", [["Mark D.", svc(2), "€3,100"], ["Lisa F.", svc(0), "€1,750"]]],
+      ["Won", [["Ciara H.", svc(1), "€4,200"]]],
+    ];
+    return `<div class="crmwrap a d2">${desktop(`<div class="crm"><div class="crm-top"><span class="crm-logo">${logoMark()}</span><span class="crm-nav"><i class="on">Dashboard</i><i>Leads</i><i>Scheduling</i><i>Reports</i></span><span class="crm-me"></span></div>
+      <div class="crm-kpis">${[["New leads", "24"], ["Pipeline", "€18,450"], ["Booked", "9"], ["Won this month", "€7,200"]].map(([k, v]) => `<span><small>${k}</small><b>${v}</b></span>`).join("")}</div>
+      <div class="crm-pipe">${cols.map(([title, cards]) => `<div class="crm-col"><small>${title}<em>${cards.length}</em></small>${cards.map(([who, what, val]) => `<span class="crm-card"><b>${who}</b><i>${esc(what)}</i><em>${val}</em></span>`).join("")}</div>`).join("")}</div></div>`, "crm-mac")}
+      ${phone(`<div class="bot"><div class="bot-top"><i class="ad-av">${logoMark()}</i><span><b>${esc(name)}</b><small><i></i>AI assistant · online</small></span></div>
+        <p class="in">Hi, do you do ${esc((services[0] || "your services").toLowerCase())}${area ? ` in ${esc(area)}` : ""}?</p>
+        <p class="out">Yes, we do! ${area ? `We cover all of ${esc(area)}. ` : ""}Would you like a free quote? I have Thursday 10am or Friday 2pm.</p>
+        <p class="in">Thursday 10am please</p>
+        <p class="out">Booked ✓ You'll get a text confirmation shortly.</p>
+        <span class="bot-booked">${icon("check")} Appointment booked · added to CRM</span></div>`, "bot-phone")}</div>`;
   };
   const dashboardGraphic = (slide: Slide) => `<div class="dash a d2">
     <div class="dash-tile">${desktop(`<div class="kpi"><small>Leads</small><strong class="count" data-to="${attr(String(slide.data.leadCount || "75").replace(/\D/g, "") || "75")}">${esc(slide.data.leadCount || "75")}</strong><div class="spark">${[30, 45, 38, 60, 52, 74, 88].map((h) => `<i style="height:${h}%"></i>`).join("")}</div></div>`)}<span class="pill">${esc((slide.data.labels || [])[0] || "Lead Count")}</span></div>
@@ -125,7 +219,7 @@ export function renderProposalHtml(deck: ProposalDeck, brand: ProposalBrand, opt
       }
       case "examples": return `<section class="slide examples" id="s-${attr(slide.id)}"><div class="in">${t(slide, "heading", "h2", "title a")}
         <div class="ex"><div class="ex-panel a">${card(slide, "search", "cardTitle", "cardBody")}</div>
-        <div class="ex-grid">${[0, 1, 2].map((i) => `<div class="ex-item a" style="--d:${i + 1}">${desktop(browser(pic(slide, `images.${i}`, imageAt(i))))}${t(slide, `labels.${i}`, "span", "pill")}</div>`).join("")}</div></div>${n}</div></section>`;
+        <div class="ex-grid">${[0, 1, 2].map((i) => `<div class="ex-item a" style="--d:${i + 1}">${desktop(browser(pageSlot(slide, i, `${(d.labels || [])[i] || tc(services[i] || name)}${area ? ` in ${area}` : ""}`)))}${t(slide, `labels.${i}`, "span", "pill")}</div>`).join("")}</div></div>${n}</div></section>`;
       case "cycle": {
         const stages = (d.stages || []).slice(0, 6);
         const count = Math.max(stages.length, 1), r = 150, c = 2 * Math.PI * r, gap = 14, seg = c / count - gap;
@@ -137,7 +231,7 @@ export function renderProposalHtml(deck: ProposalDeck, brand: ProposalBrand, opt
         </div>${n}</div></section>`;
       }
       case "dashboard": return `<section class="slide dashboard" id="s-${attr(slide.id)}"><div class="in">${t(slide, "heading", "h2", "title a")}
-        <div class="svc"><div class="svc-panel a">${card(slide, "gear", "cardTitle", "cardBody")}</div><div class="svc-visual">${dashboardGraphic(slide)}</div></div>${n}</div></section>`;
+        <div class="svc"><div class="svc-panel a">${card(slide, "gear", "cardTitle", "cardBody")}<ul class="ticks">${(d.bullets || []).map((_: string, i: number) => `<li class="a" style="--d:${i + 2}">${icon("check")}${t(slide, `bullets.${i}`)}</li>`).join("")}</ul></div><div class="svc-visual">${crmGraphic()}</div></div>${n}</div></section>`;
       case "implementation": return `<section class="slide implementation" id="s-${attr(slide.id)}"><div class="in">${swoosh("tl")}${t(slide, "heading", "h2", "title up a")}
         <div class="phases">${(d.phases || []).map((_: unknown, i: number) => `<div class="phase a" style="--d:${i}"><span class="phase-n">${i + 1}</span><div>${t(slide, `phases.${i}.title`, "b")}${t(slide, `phases.${i}.text`, "p")}</div></div>`).join("")}</div>${swoosh("br")}${n}</div></section>`;
       case "timeline": return `<section class="slide timeline" id="s-${attr(slide.id)}"><div class="in">${swoosh("tl")}<div class="tl-head a"><h2 class="title up">${t(slide, "heading")}</h2><span class="tl-clock">${icon("clock")}</span></div>
@@ -160,6 +254,8 @@ export function renderProposalHtml(deck: ProposalDeck, brand: ProposalBrand, opt
     }
   };
 
+  const brandColour = (brand.colours || []).find((c) => { const [r, g, b] = [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16)); const max = Math.max(r, g, b), min = Math.min(r, g, b); return max - min > 40 && max < 245 && !/^#25d366$/i.test(c); }) || accent;
+  const brandInk = (() => { const [r, g, b] = [1, 3, 5].map((i) => parseInt(brandColour.slice(i, i + 2), 16) / 255); return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.62 ? "#111" : "#fff"; })();
   const visible = deck.slides.filter((slide) => !slide.hidden || edit);
   const body = visible.map((slide, index) => slideHtml(slide, index).replace('<section class="slide', `<section${slide.hidden ? ' data-hidden="1"' : ""} class="slide`)).join("\n");
   const css = CSS.replace(/(-?)(\d+(?:\.\d+)?)u\b/g, "calc($1$2*var(--u))").replace(/var\(--accent\)/g, accent);
@@ -167,7 +263,12 @@ export function renderProposalHtml(deck: ProposalDeck, brand: ProposalBrand, opt
 window.addEventListener("beforeprint",function(){document.querySelectorAll(".slide").forEach(function(s){s.classList.add("on")})});
 ${opts.focusSlide ? `var f=document.getElementById(${JSON.stringify(`s-${opts.focusSlide}`)});if(f){f.scrollIntoView({block:"start"});f.classList.add("on")}` : ""}
 ${edit ? `document.addEventListener("input",function(e){var el=e.target.closest("[data-e]");if(!el)return;var p=el.dataset.e.split("|");parent.postMessage({type:"f2b-proposal-edit",slide:p[0],path:p[1],value:el.innerText},"*")});
-document.addEventListener("click",function(e){var im=e.target.closest("[data-img]");if(im){e.preventDefault();var p=im.dataset.img.split("|");parent.postMessage({type:"f2b-proposal-image",slide:p[0],key:p[1]},"*");return}var s=e.target.closest(".slide");if(s)parent.postMessage({type:"f2b-proposal-select",slide:s.id.slice(2)},"*")});
+document.querySelectorAll("[data-img]").forEach(function(el){if(el.tagName==="IMG")return;var t=document.createElement("span");t.className="img-tools";t.innerHTML='<b data-act="replace">Replace</b><b data-act="delete" title="Remove image">×</b><em>Drop image here</em>';el.appendChild(t)});
+function slotOf(e){return e.target.closest&&e.target.closest("[data-img]")}
+document.addEventListener("dragover",function(e){var s=slotOf(e);if(s){e.preventDefault();s.classList.add("drop")}});
+document.addEventListener("dragleave",function(e){var s=slotOf(e);if(s)s.classList.remove("drop")});
+document.addEventListener("drop",function(e){var s=slotOf(e);if(!s)return;e.preventDefault();s.classList.remove("drop");var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];var p=s.dataset.img.split("|");if(f&&/^image[/]/.test(f.type)){s.classList.add("busy");parent.postMessage({type:"f2b-proposal-drop",slide:p[0],key:p[1],file:f},"*")}else{var u=e.dataTransfer.getData("text/uri-list")||e.dataTransfer.getData("text/plain");if(/^https:[/][/]/.test(u))parent.postMessage({type:"f2b-proposal-set-image",slide:p[0],key:p[1],src:u.trim()},"*")}});
+document.addEventListener("click",function(e){var act=e.target.closest("[data-act]");if(act){e.preventDefault();e.stopPropagation();var sl=act.closest("[data-img]").dataset.img.split("|");parent.postMessage({type:act.dataset.act==="delete"?"f2b-proposal-image-delete":"f2b-proposal-image",slide:sl[0],key:sl[1]},"*");return}var im=e.target.closest("[data-img]");if(im){e.preventDefault();var p=im.dataset.img.split("|");parent.postMessage({type:"f2b-proposal-image",slide:p[0],key:p[1]},"*");return}var s=e.target.closest(".slide");if(s)parent.postMessage({type:"f2b-proposal-select",slide:s.id.slice(2)},"*")});
 document.addEventListener("keydown",function(e){if(e.key==="Enter"&&!e.shiftKey&&e.target.closest("[data-e]")&&!/^P$/.test(e.target.tagName)){e.preventDefault();e.target.blur()}});
 window.addEventListener("message",function(e){if(e.data&&e.data.type==="f2b-proposal-scroll"){var s=document.getElementById("s-"+e.data.slide);if(s)s.scrollIntoView({behavior:"smooth",block:"start"})}});
 var st;window.addEventListener("scroll",function(){clearTimeout(st);st=setTimeout(function(){var best=null,bd=1e9;document.querySelectorAll(".slide").forEach(function(s){var d=Math.abs(s.getBoundingClientRect().top);if(d<bd){bd=d;best=s}});if(best)parent.postMessage({type:"f2b-proposal-visible",slide:best.id.slice(2)},"*")},150)});` : ""}
@@ -175,7 +276,7 @@ var st;window.addEventListener("scroll",function(){clearTimeout(st);st=setTimeou
   return `<!doctype html><html lang="en-IE"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
 <title>${esc(opts.title || `${brand.businessName} · Proposal · F2B Media`)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<style>${css}</style></head><body class="${edit ? "editing" : ""}">${body}
+<style>${css}</style></head><body class="${edit ? "editing" : ""}" style="--brand:${brandColour};--brand-ink:${brandInk}">${body}
 ${opts.printButton ? `<button class="print-btn no-print" onclick="print()">Download PDF</button>` : ""}
 <script>${script}</script></body></html>`;
 }
@@ -212,7 +313,7 @@ h1,h2,b{font-weight:800}
 .browser-bar{display:flex;align-items:center;gap:8u;padding:10u 14u;background:#f1f3f6;border-bottom:1px solid #e3e6eb;flex:none}
 .browser-bar i{width:11u;height:11u;border-radius:50%;background:#d6dae1}.browser-bar i:first-child{background:#ff5f57}.browser-bar i:nth-child(2){background:#febc2e}.browser-bar i:nth-child(3){background:#28c840}
 .browser-bar span{margin-left:12u;font-size:13u;color:#6b7280;background:#fff;border-radius:999px;padding:3u 14u;flex:1;max-width:60%}
-.browser .shot,.browser .ph{flex:1;min-height:0}
+.browser-body{flex:1;min-height:0;position:relative;overflow:hidden}
 /* white icon card on black panel */
 .icard{background:#fff;border-radius:34u;padding:70u 34u 34u;text-align:center;position:relative;box-shadow:0 20u 50u rgba(0,0,0,.25)}
 .icard-ico{position:absolute;top:-46u;left:50%;transform:translateX(-50%);width:92u;height:92u;border-radius:50%;background:#fff;display:grid;place-items:center;color:var(--accent);box-shadow:0 8u 24u rgba(0,0,0,.18)}
@@ -263,10 +364,10 @@ h1,h2,b{font-weight:800}
 .ticks svg{flex:none;width:24u;height:24u;color:#fff;background:var(--accent);border-radius:50%;padding:4u}
 .svc-visual{position:relative;display:grid;place-items:center;padding-left:40u}
 .big{width:100%}
-.serp{position:absolute;inset:0;background:radial-gradient(90% 90% at 20% 0%,#2563eb,#0a1f5c 55%,#030a1f);display:flex;flex-direction:column;align-items:center;padding-top:40u;overflow:hidden}
+.serp{position:absolute;inset:0;background:radial-gradient(90% 90% at 20% 0%,#2563eb,#0a1f5c 55%,#030a1f);display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden}
 .serp-glow{position:absolute;inset:auto -10% -40% -10%;height:70%;background:radial-gradient(closest-side,rgba(96,165,250,.55),transparent);filter:blur(10u)}
 .serp-brand{display:flex;align-items:center;gap:12u;color:#fff;font-size:56u;font-weight:700;margin-bottom:26u;letter-spacing:-.02em}.serp-brand span{width:60u;height:60u;border-radius:50%;background:#fff;color:var(--accent);display:grid;place-items:center}.serp-brand svg{width:34u;height:34u}
-.serp-box{position:relative;width:76%;background:#fff;border-radius:22u;padding:8u 0 14u;box-shadow:0 20u 50u rgba(0,0,0,.35)}
+.serp-box{position:relative;width:86%;background:#fff;border-radius:22u;padding:8u 0 14u;box-shadow:0 20u 50u rgba(0,0,0,.35)}
 .serp-q{display:flex;align-items:center;gap:12u;padding:12u 22u;border-bottom:1px solid #eef0f3;font-size:20u}.serp-q svg,.serp-row svg{width:20u;height:20u;color:#9aa3b2;flex:none}
 .serp-row{display:flex;align-items:center;gap:12u;padding:9u 22u;font-size:18u;color:#374151;opacity:0;transform:translateX(-14u);transition:.45s ease calc(var(--d)*.12s + .5s)}
 .on .serp-row{opacity:1;transform:none}.serp-row:nth-child(3){background:#f3f6fb}
@@ -376,6 +477,134 @@ h1,h2,b{font-weight:800}
 .editing [data-e]{outline:1.5px dashed transparent;outline-offset:3px;border-radius:4px;cursor:text;transition:outline-color .15s}
 .editing [data-e]:hover{outline-color:rgba(20,99,255,.6)}.editing [data-e]:focus{outline:2px solid var(--accent);background:rgba(20,99,255,.06)}
 .editing [data-img]{cursor:pointer}.editing [data-img]:hover{outline:3px solid var(--accent);outline-offset:-3px}
+/* brand slots: real photo, or a clean tile in THEIR colour with their logo — never broken/stock images */
+.slot{position:relative;overflow:hidden;display:block;background:#eef1f5}
+.slot>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;z-index:1}
+.site-slot{position:absolute;inset:0}.site-slot>img.shotimg{object-position:top;z-index:3}
+.tile{position:absolute;inset:0;display:grid;place-items:center;background:radial-gradient(120% 120% at 20% 10%,color-mix(in srgb,var(--brand) 78%,#fff),var(--brand) 45%,color-mix(in srgb,var(--brand) 60%,#000))}
+.tile .lg{max-width:58%;max-height:38%;object-fit:contain;background:#fff;padding:5%;border-radius:10%;box-shadow:0 10px 30px rgba(0,0,0,.18)}
+.tile .lg-t{color:var(--brand-ink);font-size:clamp(10px,2.4cqw,40px);text-align:center;padding:0 10%}
+.lg{display:block}.lg-t{font-weight:800;line-height:1.1}
+/* their website (mock built from logo, colours, photos and services; replaced by the live screenshot when captured) */
+.site{position:absolute;inset:0;container-type:inline-size;display:flex;flex-direction:column;background:#fff;color:#111;overflow:hidden;font-family:inherit}
+.s-nav{display:flex;align-items:center;gap:2.4cqw;padding:1.4cqw 3cqw;border-bottom:1px solid #eef0f3;flex:none}
+.s-nav .lg{height:4cqw;max-width:20cqw;object-fit:contain}.s-nav .lg-t{font-size:2.2cqw;color:var(--brand)}
+.s-links{display:flex;gap:2.2cqw;margin-left:auto;font-size:1.35cqw;font-weight:600;color:#3f4652;white-space:nowrap}.s-links i{font-style:normal}
+.s-btn{display:inline-block;background:var(--brand);color:var(--brand-ink);font-size:1.5cqw;font-weight:700;padding:1cqw 2cqw;border-radius:99px;white-space:nowrap}
+.s-btn.sm{font-size:1.25cqw;padding:.8cqw 1.5cqw}
+.s-ghost{display:inline-block;border:.25cqw solid var(--brand);color:var(--brand);font-size:1.5cqw;font-weight:700;padding:.8cqw 1.8cqw;border-radius:99px}
+.s-hero{flex:1;min-height:0;display:grid;grid-template-columns:1.05fr 1fr;gap:3cqw;padding:3cqw;align-items:center;background:linear-gradient(180deg,color-mix(in srgb,var(--brand) 9%,#fff),#fff)}
+.s-copy small{color:var(--brand);font-weight:800;font-size:1.3cqw;text-transform:uppercase;letter-spacing:.1em}
+.s-copy h6{font-size:4cqw;line-height:1.08;margin:.8cqw 0 1.2cqw;font-weight:800;letter-spacing:-.01em}
+.s-copy p{font-size:1.5cqw;color:#4b5563;line-height:1.5;margin-bottom:2cqw}
+.s-btns{display:flex;gap:1.2cqw;flex-wrap:wrap}
+.s-media{position:relative;height:100%;min-height:18cqw;border-radius:1.6cqw;overflow:hidden;box-shadow:0 2cqw 4cqw rgba(0,0,0,.12)}
+.s-media>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1}
+.s-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:1.6cqw;padding:0 3cqw 2.2cqw;flex:none}
+.s-cards span{display:flex;align-items:center;gap:1cqw;border:1px solid #eceef2;border-radius:1.2cqw;padding:1.3cqw 1.5cqw;font-size:1.35cqw;font-weight:700;box-shadow:0 .6cqw 1.6cqw rgba(0,0,0,.05)}
+.s-cards i{width:2.2cqw;height:2.2cqw;border-radius:30%;background:color-mix(in srgb,var(--brand) 18%,#fff);border:.3cqw solid var(--brand);flex:none}
+.site.m .s-nav{padding:11cqw 5cqw 3cqw;gap:3cqw}.site.m .s-nav .lg{height:9cqw;max-width:45cqw}.site.m .s-nav .lg-t{font-size:5cqw}
+.s-burger{margin-left:auto;display:grid;gap:1.4cqw}.s-burger i{width:7cqw;height:.9cqw;border-radius:1cqw;background:#111;display:block}
+.site.m .s-hero{grid-template-columns:1fr;grid-template-rows:42% auto;gap:4cqw;padding:4cqw 5cqw;align-items:start}
+.site.m .s-media{min-height:0;border-radius:4cqw}
+.site.m .s-copy small{font-size:3.2cqw}.site.m .s-copy h6{font-size:8.4cqw;margin:1.5cqw 0 2.5cqw}.site.m .s-copy p{font-size:3.6cqw;margin-bottom:4cqw}
+.site.m .s-btn{font-size:4cqw;padding:3cqw 5cqw;width:100%;text-align:center}
+/* Google results: their sponsored ad on their own keywords */
+.serp-q b{font-weight:600}
+.gad{padding:14u 22u 12u;border-bottom:1px solid #eef0f3}
+.gad-sp{font-size:12u;font-weight:800;color:#202124}
+.gad-top{display:flex;align-items:center;gap:10u;margin:6u 0 4u}.gad-top i{width:30u;height:30u;border-radius:50%;background:#fff;box-shadow:0 0 0 1px #e5e7eb;display:grid;place-items:center;overflow:hidden}.gad-top i .lg{width:78%;height:78%;object-fit:contain}.gad-top i .lg-t{font-size:8u}
+.gad-top span{display:grid}.gad-top b{font-size:14u;font-weight:600}.gad-top small{font-size:12u;color:#4d5156}
+.gad-h{display:block;color:#1a0dab;font-size:21u;font-weight:500;line-height:1.3;margin-bottom:3u}
+.gad p{font-size:14u;line-height:1.5;color:#4d5156}
+.gad-links{display:flex;gap:18u;margin-top:6u}.gad-links span{color:#1a0dab;font-size:14u}
+.serp-also{font-size:13u;font-weight:700;color:#202124;padding:10u 22u 2u}
+/* Meta / Instagram feed ad in their branding */
+.ad{height:100%;display:flex;flex-direction:column;background:#fff;padding-top:44u;color:#050505}
+.ad-top{display:flex;gap:7u;align-items:center;padding:0 9u 6u}
+.ad-av{width:28u;height:28u;border-radius:50%;background:#fff;box-shadow:0 0 0 1px #e4e6eb;display:grid;place-items:center;overflow:hidden;flex:none;font-style:normal}
+.ad-av .lg{width:82%;height:82%;object-fit:contain}.ad-av .lg-t{font-size:7u;text-align:center}
+.ad-top span{display:grid;min-width:0}.ad-top b{font-size:11.5u;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ad-top small{font-size:9u;color:#65676b;display:flex;gap:3u;align-items:center}.ad-top small svg{width:9u;height:9u}
+.ad-top em{margin-left:auto;font-style:normal;color:#65676b;font-weight:800}
+.ad-copy{font-size:10.5u;line-height:1.38;padding:0 9u 7u}
+.ad-media{position:relative;height:178u;flex:none}.ad-media>.slot{position:absolute;inset:0}
+.ad-offer{position:absolute;left:8u;bottom:8u;z-index:4;background:var(--brand);color:var(--brand-ink);font-weight:800;font-size:10.5u;padding:5u 10u;border-radius:99px;box-shadow:0 4u 12u rgba(0,0,0,.25)}
+.ad-cta{display:flex;align-items:center;gap:8u;padding:8u 9u;background:#f0f2f5}
+.ad-cta span{flex:1;min-width:0;display:grid}.ad-cta small{font-size:8u;color:#65676b;letter-spacing:.02em}.ad-h{font-size:11u;line-height:1.25}
+.ad-btn{font-style:normal;background:var(--brand);color:var(--brand-ink);font-weight:800;font-size:9.5u;padding:7u 10u;border-radius:6u;white-space:nowrap}
+.ad-react{display:flex;justify-content:space-between;align-items:center;padding:7u 9u;font-size:9u;font-weight:600;color:#65676b}
+.ad-react span{display:flex;align-items:center;gap:3u}.ad-react svg{width:10u;height:10u}
+.ad-r i{width:15u;height:15u;border-radius:50%;display:grid;place-items:center;color:#fff;font-style:normal;font-size:8u;box-shadow:0 0 0 2u #fff}.ad-r i svg{width:8u;height:8u}.ad-r .r1{background:#1877f2}.ad-r .r2{background:#f33e58;margin-left:-4u}
+/* maps listing, AI answer, email, chat — all carry their logo */
+.listing-top{display:flex;align-items:center;gap:10u}.listing-top .ad-av{width:46u;height:46u}
+.listing-btns{display:flex;gap:8u;margin-top:6u}.listing-btns em{font-style:normal;font-size:13u;font-weight:700;color:var(--brand);border:1.5u solid color-mix(in srgb,var(--brand) 40%,#fff);border-radius:99px;padding:5u 12u}
+.aiq-src{align-items:center}.aiq-src span{display:flex;align-items:center;gap:8u;background:#f1f4f9;border-radius:10u;padding:6u 10u;font-size:13u;color:#4b5563}.aiq-src .lg{height:22u;max-width:90u;object-fit:contain}
+.mail-head{display:flex;justify-content:center;padding:4u 0 6u}.mail-head .lg{height:34u;max-width:70%;object-fit:contain}.mail-head .lg-t{font-size:16u;color:var(--brand)}
+.mail .slot.mail-img{height:170u;width:100%;border-radius:12u;flex:none}.mail-btn,.formui span{background:var(--brand)!important;color:var(--brand-ink)!important}
+.chat-top{display:flex;align-items:center;gap:8u}.chat-top .ad-av{width:26u;height:26u}
+/* editor: replace / delete / drag-and-drop on every image */
+.img-tools{position:absolute;inset:0;z-index:6;display:flex;align-items:flex-start;justify-content:flex-end;gap:6px;padding:8px;opacity:0;transition:opacity .15s;pointer-events:none}
+[data-img]:hover>.img-tools{opacity:1}.img-tools b{pointer-events:auto;font:700 12px Poppins,system-ui;background:#fff;color:#111;padding:5px 10px;border-radius:99px;box-shadow:0 4px 14px rgba(0,0,0,.25);cursor:pointer}
+.img-tools b[data-act=delete]{background:#e11d48;color:#fff;width:26px;height:26px;padding:0;display:grid;place-items:center;font-size:16px}
+.img-tools em{display:none}
+[data-img].drop>.img-tools{opacity:1;background:rgba(20,99,255,.55);outline:3px dashed #fff;outline-offset:-10px;align-items:center;justify-content:center}
+[data-img].drop>.img-tools b{display:none}[data-img].drop>.img-tools em{display:block;font:800 16px Poppins,system-ui;color:#fff;font-style:normal}
+[data-img].busy::after{content:"";position:absolute;z-index:7;left:50%;top:50%;width:34px;height:34px;margin:-17px;border-radius:50%;border:4px solid rgba(255,255,255,.5);border-top-color:#fff;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media print{.img-tools{display:none}}
+.cover-panel .client-logo{background:#fff;padding:16u 22u;border-radius:18u;max-height:84u;max-width:300u;box-sizing:content-box;box-shadow:0 10u 30u rgba(0,0,0,.25)}
+.close .client-logo{background:#fff;padding:16u 22u;border-radius:18u;max-height:80u;box-sizing:content-box}
+.map{background:#eef1f4}.map:before{display:none}.map-svg{position:absolute;inset:0;width:100%;height:100%}
+.feed{gap:12u}.phone.sm{width:292u;border-radius:56u}
+.ad{padding-top:52u}.ad-top{padding:0 12u 8u;gap:9u}.ad-av{width:34u;height:34u}.ad-top b{font-size:14u}.ad-top small{font-size:11u}.ad-top small svg{width:11u;height:11u}
+.ad-copy{font-size:12.5u;padding:0 12u 9u}.ad-media{flex:1;height:auto;min-height:200u}.ad-offer{font-size:12.5u;padding:6u 12u;left:10u;bottom:10u}
+.ad-cta{padding:10u 12u}.ad-cta small{font-size:9.5u}.ad-h{font-size:13u}.ad-btn{font-size:11.5u;padding:8u 12u}
+.ad-react{font-size:10.5u;padding:9u 12u}.ad-react svg{width:12u;height:12u}.ad-r i{width:18u;height:18u}
+.listing .ad-av .lg{max-height:none;max-width:none}
+.mail-cards{display:grid;grid-template-columns:1fr 1fr;gap:10u;width:100%;margin-top:6u}.mail-cards span{display:grid;gap:5u;text-align:left}.mail-cards .slot{height:86u;border-radius:10u}.mail-cards b{font-size:11u}
+/* our CRM with their logo + pipeline, and the AI conversation bot */
+.crmwrap{position:relative;width:100%;padding-right:150u}
+.crm-mac{width:100%}
+.crm{position:absolute;inset:0;container-type:inline-size;background:#f4f6fa;display:flex;flex-direction:column;color:#111}
+.crm-top{display:flex;align-items:center;gap:2.4cqw;padding:1.4cqw 2.4cqw;background:#fff;border-bottom:1px solid #e6e9ef}
+.crm-logo .lg{height:3.6cqw;max-width:16cqw;object-fit:contain}.crm-logo .lg-t{font-size:2cqw;color:var(--brand)}
+.crm-nav{display:flex;gap:.8cqw}.crm-nav i{font-style:normal;font-size:1.35cqw;font-weight:700;color:#5b6475;padding:.7cqw 1.4cqw;border-radius:99px}.crm-nav i.on{background:var(--accent);color:#fff}
+.crm-me{margin-left:auto;width:3.4cqw;height:3.4cqw;border-radius:50%;background:linear-gradient(135deg,#c7d2fe,#93c5fd)}
+.crm-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:1.4cqw;padding:1.8cqw 2.4cqw 0}
+.crm-kpis span{background:#fff;border-radius:1.2cqw;padding:1.3cqw 1.6cqw;box-shadow:0 .4cqw 1.2cqw rgba(15,23,42,.06);display:grid;gap:.3cqw}
+.crm-kpis small{font-size:1.15cqw;color:#6b7280;font-weight:600}.crm-kpis b{font-size:2.6cqw}
+.crm-pipe{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,1fr);gap:1.2cqw;padding:1.6cqw 2.4cqw 2cqw}
+.crm-col{background:#eaedf3;border-radius:1.2cqw;padding:1cqw;display:flex;flex-direction:column;gap:.8cqw;overflow:hidden}
+.crm-col small{display:flex;justify-content:space-between;font-size:1.2cqw;font-weight:800;color:#374151;padding:.2cqw .3cqw}.crm-col small em{font-style:normal;background:#fff;border-radius:99px;padding:0 .8cqw;color:#6b7280}
+.crm-card{background:#fff;border-radius:.9cqw;padding:.9cqw 1cqw;display:grid;gap:.2cqw;border-left:.45cqw solid var(--brand);box-shadow:0 .3cqw .8cqw rgba(15,23,42,.06)}
+.crm-card b{font-size:1.25cqw}.crm-card i{font-style:normal;font-size:1.05cqw;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.crm-card em{font-style:normal;font-size:1.15cqw;font-weight:800;color:#15803d}
+.bot-phone{position:absolute;right:0;bottom:30u;width:250u}
+.bot{height:100%;background:#f5f7fb;display:flex;flex-direction:column;gap:8u;padding:0 10u}
+.bot-top{display:flex;align-items:center;gap:8u;margin:0 -10u 4u;padding:48u 12u 10u;background:#fff;border-bottom:1px solid #e6e9ef}
+.bot-top span{display:grid}.bot-top b{font-size:12.5u}.bot-top small{font-size:9.5u;color:#16a34a;display:flex;align-items:center;gap:4u}.bot-top small i{width:7u;height:7u;border-radius:50%;background:#22c55e}
+.bot p{max-width:86%;font-size:11u;line-height:1.4;padding:8u 10u;border-radius:14u;opacity:0;transform:translateY(8u);transition:.45s ease}
+.bot p.in{background:#fff;align-self:flex-start;border-bottom-left-radius:4u;box-shadow:0 2u 6u rgba(0,0,0,.05)}
+.bot p.out{background:var(--accent);color:#fff;align-self:flex-end;border-bottom-right-radius:4u}
+.on .bot p{opacity:1;transform:none}.on .bot p:nth-of-type(2){transition-delay:.6s}.on .bot p:nth-of-type(3){transition-delay:1.2s}.on .bot p:nth-of-type(4){transition-delay:1.8s}
+.bot-booked{margin-top:auto;margin-bottom:22u;display:flex;align-items:center;gap:6u;justify-content:center;background:#dcfce7;color:#15803d;font-size:10.5u;font-weight:800;padding:8u;border-radius:12u}.bot-booked svg{width:13u;height:13u}
+@media print{.bot p{opacity:1!important;transform:none!important}}
+/* service landing page (Red Island style) */
+.lp-hero{flex:1;min-height:0;display:grid;grid-template-columns:1.55fr 1fr;gap:2.4cqw;padding:2.4cqw 3cqw}
+.lp-photo{position:relative;border-radius:1.6cqw;overflow:hidden}
+.lp-photo>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1}
+.lp-copy{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;justify-content:flex-end;padding:3cqw;color:#fff;background:linear-gradient(180deg,rgba(0,0,0,0) 20%,rgba(0,0,0,.72))}
+.lp-copy small{font-size:1.3cqw;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#fff;opacity:.9}
+.lp-copy h6{font-size:4.4cqw;line-height:1.05;font-weight:800;margin:.6cqw 0 1cqw}
+.lp-copy p{font-size:1.5cqw;line-height:1.5;opacity:.92;max-width:90%}
+.lp-form{background:#fff;border-radius:1.6cqw;padding:2.2cqw;box-shadow:0 1.4cqw 3.6cqw rgba(15,23,42,.14);display:flex;flex-direction:column;gap:1cqw;border-top:.6cqw solid var(--brand)}
+.lp-form b{font-size:2cqw;margin-bottom:.4cqw}
+.lp-f{display:block;border:1px solid #e3e6ec;border-radius:.8cqw;padding:1.1cqw 1.2cqw;font-size:1.25cqw;color:#9aa1ad}.lp-f.tall{height:7cqw}
+.lp-form .s-btn{text-align:center;margin-top:auto}
+.lp-trust{display:flex;justify-content:center;gap:4cqw;padding:0 3cqw 2cqw;font-size:1.4cqw;font-weight:700;color:#374151}
+.lp-trust span{display:flex;align-items:center;gap:.8cqw}.lp-trust svg{width:1.8cqw;height:1.8cqw;color:var(--brand)}
+.site.lp.m .lp-hero{grid-template-columns:1fr;padding:3cqw 4cqw;flex:none;height:46%}
+.site.lp.m .lp-copy{padding:5cqw}.site.lp.m .lp-copy small{font-size:3cqw}.site.lp.m .lp-copy h6{font-size:8cqw}.site.lp.m .lp-copy p{font-size:3.4cqw}.site.lp.m .lp-copy .s-btn{display:none}
+.site.lp.m .lp-form{margin:0 4cqw 4cqw;padding:4.5cqw;gap:2.4cqw;border-radius:4cqw;flex:1}.site.lp.m .lp-form b{font-size:5cqw}.site.lp.m .lp-f{font-size:3.4cqw;padding:3cqw;border-radius:2cqw}.site.lp.m .lp-f.tall{height:14cqw}
 .print-btn{position:fixed;top:16px;right:16px;padding:12px 20px;border:0;border-radius:12px;background:var(--accent);color:#fff;font:700 15px Poppins,system-ui;cursor:pointer;z-index:9;box-shadow:0 10px 30px rgba(20,99,255,.4)}
 @page{size:297mm 215.3mm;margin:0}
 @media print{html,body{background:#fff;padding:0;display:block}.slide{width:297mm;border-radius:0;box-shadow:none;page-break-after:always;break-after:page}.slide[data-hidden]{display:none}.no-print{display:none}.a,.notif,.serp-row,.rank i,.seg,.node,.chatui p{opacity:1!important;transform:none!important;transition:none!important}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
