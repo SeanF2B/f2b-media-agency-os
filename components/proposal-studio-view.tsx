@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./proposal-studio.css";
 import { ReportGeneratingAnimation } from "./report-generating-animation";
+import { MailIcon, SendDocumentEmail, type DocumentEmailTarget } from "./send-document-email";
 import { SERVICE_CATALOGUE, type CatalogueService } from "@/lib/proposals/catalogue";
 import { SLIDE_KINDS, blankSlide, renumberPhases, type ProposalBrand, type ProposalDeck, type ProposalInputs, type ProposalSource, type ProposalUpload, type SelectedService, type Slide, type SlideKind } from "@/lib/proposals/deck";
 import { renderProposalHtml } from "@/lib/proposals/render";
@@ -348,6 +349,7 @@ function Editor({ proposal, change, flush, setProposal, onUpload, uploadOne, onR
   const [picker, setPicker] = useState<{ slide: string; key: string } | null>(null);
   const [rewrite, setRewrite] = useState(""); const [rewriting, setRewriting] = useState(false); const [rewriteError, setRewriteError] = useState("");
   const [sharing, setSharing] = useState(false); const [copied, setCopied] = useState(false);
+  const [emailTarget, setEmailTarget] = useState<DocumentEmailTarget | null>(null);
   const frame = useRef<HTMLIFrameElement>(null);
   const deckRef = useRef(deck); deckRef.current = deck;
   const brandRef = useRef(proposal.brand); brandRef.current = proposal.brand;
@@ -412,12 +414,14 @@ function Editor({ proposal, change, flush, setProposal, onUpload, uploadOne, onR
   const images = [...new Set([proposal.brand.screenshotDesktop, proposal.brand.screenshotMobile, proposal.brand.logo, ...proposal.brand.images].filter(Boolean))];
 
   return <div className="ps-editor">
+    <SendDocumentEmail target={emailTarget} onClose={() => setEmailTarget(null)} onSent={() => { void fetch(`/api/proposals?id=${encodeURIComponent(proposal.id)}`, { cache: "no-store" }).then((response) => response.ok ? response.json() : null).then((payload: { proposal?: Proposal } | null) => { if (payload?.proposal) setProposal(payload.proposal); }).catch(() => undefined); }} />
     <div className="ps-toolbar">
       <span className="ps-hint">Click any text on a slide to edit it · click an image to swap it</span>
       <label className="ps-accent" title="Accent colour">Accent<input type="color" value={deck.accent} onChange={(event) => setDeck({ ...deck, accent: event.target.value })} /></label>
       <button type="button" className="secondary-button" onClick={onRegenerate}><SparkIcon /> Regenerate</button>
       <button type="button" className="secondary-button" onClick={() => void openWindow(false)}>Full screen</button>
       <button type="button" className="secondary-button" title="Includes a clickable Approve & pay button" onClick={() => void openWindow(true)}>Download PDF</button>
+      <button type="button" className="secondary-button ps-email" onClick={async () => { await flush().catch(() => undefined); setEmailTarget({ kind: "proposal", id: proposal.id }); }}><MailIcon /> Email to client</button>
       {shareUrl ? <span className="ps-share"><input readOnly value={shareUrl} onFocus={(event) => event.currentTarget.select()} aria-label="Share link" data-no-ai /><button type="button" className="primary-button" onClick={async () => { try { await navigator.clipboard.writeText(shareUrl); setCopied(true); window.setTimeout(() => setCopied(false), 1800); } catch { /* clipboard blocked */ } }}>{copied ? "Copied" : "Copy link"}</button><button type="button" className="text-button" disabled={sharing} onClick={() => void toggleShare(false)}>Turn off</button>{proposal.viewCount > 0 && <small>{proposal.viewCount} view{proposal.viewCount === 1 ? "" : "s"}</small>}</span>
         : <button type="button" className="primary-button" disabled={sharing} onClick={() => void toggleShare(true)}>{sharing ? "Creating link…" : "Share link"}</button>}
     </div>

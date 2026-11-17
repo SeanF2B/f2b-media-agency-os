@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ReportGeneratingAnimation } from "./report-generating-animation";
 import { KeywordReportBuilder, type KeywordPrepare } from "./keyword-report-builder";
+import { MailIcon, SendDocumentEmail, type DocumentEmailTarget } from "./send-document-email";
 
 type ReportType = "ads" | "seo" | "audit" | "audit-ads" | "audit-website" | "keywords";
 export type ReportsMode = "reports" | "audits" | "keywords";
@@ -69,6 +70,7 @@ export function ClientReportsView({ clientId, clientName, mode = "reports" }: { 
   const setTheme = (next: "dark" | "light") => { setThemeState(next); try { window.localStorage.setItem("f2b-report-theme", next); } catch { /* storage unavailable */ } };
   const themed = useCallback((content: string) => content.replace(/<body(?: class="[^"]*")?>/g, (tag: string, offset: number) => offset > content.indexOf("</head>") ? `<body class="${theme}">` : tag), [theme]);
   const prepareRef = useRef<KeywordPrepare | null>(null);
+  const [emailTarget, setEmailTarget] = useState<DocumentEmailTarget | null>(null);
   useEffect(() => { setGroups([]); }, [clientId]);
   const frame = useRef<HTMLIFrameElement>(null);
   const range = useMemo(() => rangeFor(preset, from, to), [preset, from, to]);
@@ -107,15 +109,23 @@ export function ClientReportsView({ clientId, clientName, mode = "reports" }: { 
   const openTab = (raw = html) => { const content = themed(raw); const win = window.open("", "_blank"); if (!win) { setError("Allow pop-ups for this site to open the report."); return; } win.document.open(); win.document.write(content.replace("</body>", `<button onclick="print()" style="position:fixed;top:14px;right:14px;padding:10px 16px;border:0;border-radius:10px;background:#1f6feb;color:#fff;font:600 14px system-ui;cursor:pointer;z-index:9" class="no-print">Download PDF</button><style>@media print{.no-print{display:none}}</style></body>`)); win.document.close(); };
   const autoSaveRef = useRef<(() => void) | null>(null);
   autoSaveRef.current = () => { const picked = [...groups].sort().join(","); if (!history.some((item) => item.type === type && item.periodStart === range.start && item.periodEnd === range.end && (mode !== "keywords" || (item.summary?.groupIds || []).join(",") === picked))) void save(true); };
-  const save = async (auto = false) => {
+  const save = async (auto = false): Promise<string> => {
     setSaving(true); setError("");
     try {
       const response = await fetch("/api/client-reports", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId, type, start: range.start, end: range.end, ...(mode === "keywords" ? { groups } : {}) }) });
-      const payload = await response.json() as { error?: string; reports?: Saved[] };
+      const payload = await response.json() as { error?: string; reports?: Saved[]; id?: string };
       if (!response.ok) throw new Error(payload.error || "The report could not be saved.");
       setHistory((payload.reports || []).filter((item) => cfg.types.includes(item.type))); setNotice(auto ? "Saved to this client's Reports folder." : "Saved to this client's report history.");
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "The report could not be saved."); }
+      return payload.id || "";
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "The report could not be saved."); return ""; }
     finally { setSaving(false); }
+  };
+  // Email the report on screen: reuse its saved copy (same type, period and keyword groups) or save it first.
+  const prepareEmail = async (): Promise<DocumentEmailTarget | null> => {
+    const picked = [...groups].sort().join(",");
+    const existing = history.find((item) => item.type === type && item.periodStart === range.start && item.periodEnd === range.end && (mode !== "keywords" || (item.summary?.groupIds || []).join(",") === picked));
+    const id = existing?.id || await save(true);
+    return id ? { kind: "report", clientId, archiveId: id, theme } : null;
   };
   const openSaved = async (item: Saved) => {
     try { const response = await fetch(`/api/client-reports?clientId=${encodeURIComponent(clientId)}&archiveId=${encodeURIComponent(item.id)}`, { cache: "no-store" }); if (!response.ok) throw new Error("That saved report could not be opened."); openTab(await response.text()); }
@@ -151,6 +161,7 @@ export function ClientReportsView({ clientId, clientName, mode = "reports" }: { 
           <button type="button" className="secondary-button" onClick={() => openTab()}>Open full screen</button>
           <button type="button" className="secondary-button" disabled={saving} onClick={() => void save()}>{saving ? "Saving…" : "Save to history"}</button>
           <span className="crv-theme" role="radiogroup" aria-label="Report colours">{(["dark", "light"] as const).map((value) => <button key={value} type="button" role="radio" aria-checked={theme === value} className={theme === value ? "on" : ""} onClick={() => setTheme(value)}>{value === "dark" ? "Dark" : "Light"}</button>)}</span>
+          <button type="button" className="secondary-button crv-email" onClick={() => setEmailTarget({ kind: "report", clientId, archiveId: "", theme })}><MailIcon /> Email to client</button>
           <button type="button" className="primary-button" onClick={download}>Download PDF</button>
         </div>
         <iframe ref={frame} className="crv-frame" title={`${clientName} ${META[type].name} preview`} srcDoc={themed(html)} sandbox="allow-same-origin allow-modals allow-popups" />
@@ -159,8 +170,9 @@ export function ClientReportsView({ clientId, clientName, mode = "reports" }: { 
       <div className="crv-history">
         <h3>{cfg.savedTitle}</h3>
         <p className="crv-sub">{cfg.savedSub}</p>
-        {history.length ? <ul>{history.map((item) => <li key={item.id}><TypeMark type={item.type} /><span><b>{item.type === "keywords" && item.summary?.groups?.length ? `${item.summary.groups.join(", ")}` : `${META[item.type]?.short || item.type} · ${fmtDate(item.periodStart)} – ${fmtDate(item.periodEnd)}`}</b><small>{item.kind === "monthly" ? "Monthly (automatic)" : "Saved manually"} · {fmtDate(item.createdAt)}{item.summary?.missing?.length ? ` · missing: ${item.summary.missing.join(", ")}` : ""}</small></span><button type="button" className="secondary-button" onClick={() => void openSaved(item)}>Open</button></li>)}</ul> : <p className="muted">{cfg.empty} for {clientName} yet.</p>}
+        {history.length ? <ul>{history.map((item) => <li key={item.id}><TypeMark type={item.type} /><span><b>{item.type === "keywords" && item.summary?.groups?.length ? `${item.summary.groups.join(", ")}` : `${META[item.type]?.short || item.type} · ${fmtDate(item.periodStart)} – ${fmtDate(item.periodEnd)}`}</b><small>{item.kind === "monthly" ? "Monthly (automatic)" : "Saved manually"} · {fmtDate(item.createdAt)}{item.summary?.missing?.length ? ` · missing: ${item.summary.missing.join(", ")}` : ""}</small></span><button type="button" className="secondary-button crv-email" title="Email this to the client" aria-label="Email this to the client" onClick={() => setEmailTarget({ kind: "report", clientId, archiveId: item.id, theme })}><MailIcon /></button><button type="button" className="secondary-button" onClick={() => void openSaved(item)}>Open</button></li>)}</ul> : <p className="muted">{cfg.empty} for {clientName} yet.</p>}
       </div>
+      <SendDocumentEmail target={emailTarget} prepare={emailTarget?.kind === "report" && !emailTarget.archiveId ? prepareEmail : undefined} onClose={() => setEmailTarget(null)} />
     </section>
   );
 }

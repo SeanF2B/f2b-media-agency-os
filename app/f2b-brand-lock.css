@@ -106,3 +106,7 @@ html body .app-shell.dark-mode .ai-approval-recommendations .ai-recommendation-c
 html body .app-shell.dark-mode .ai-approval-recommendations .ai-recommendation-controls>.recommendation-reject:hover:not(:disabled) { border-color:#c45a5a !important; background:#3d2627 !important; }
 html body .app-shell .ai-approval-recommendations .ai-recommendation-controls>details>summary svg,
 html body .app-shell .ai-approval-recommendations .ai-recommendation-controls>details>summary>span[aria-hidden="true"] { font-size:15px !important; line-height:1 !important; }
+
+/* Email to client buttons (Reports / Audits / Keywords / Proposals) */
+html body .app-shell .crv-email,html body .app-shell .ps-email { display:inline-flex; align-items:center; justify-content:center; gap:6px; }
+html body .app-shell .crv-history li .crv-email { width:38px; min-width:38px; padding:0; }
