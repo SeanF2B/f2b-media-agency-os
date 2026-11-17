@@ -1,7 +1,8 @@
 import { env } from "cloudflare:workers";
 import { authorizeAdminOrSubAccount, respond } from "@/lib/settings-auth";
 import { aiCredentialStorageReady } from "@/lib/ai-credentials";
-import { addMessage, botReply, ensureTables, getClientBot, sanitizeBot, saveClientBot, BLANK_BOT, loadSettings, saveSettings, sendTwilio, twilioCredentials, type NumberConfig } from "@/lib/conversations/core";
+import { addMessage, botReply, e164, ensureTables, getClientBot, listTwilioTemplates, sanitizeBot, saveClientBot, BLANK_BOT, loadSettings, saveSettings, sendTwilio, twilioCredentials, upsertThread, type NumberConfig } from "@/lib/conversations/core";
+import { renderTemplate, windowState } from "@/lib/conversations/whatsapp";
 
 export const dynamic = "force-dynamic";
 
@@ -21,14 +22,16 @@ export async function GET(request: Request) {
       const id = url.searchParams.get("id") || "";
       const thread = await env.DB!.prepare("SELECT * FROM conv_threads WHERE id=?1 AND owner_id=?2").bind(id, auth.ownerId).first();
       if (!thread || (allowed && !allowed.includes(String((thread as any).client_id || "")))) return respond({ error: "That conversation could not be found." }, 404);
-      const messages = (await env.DB!.prepare("SELECT id, direction, sender, body, error, created_at FROM conv_messages WHERE thread_id=?1 ORDER BY created_at ASC LIMIT 300").bind(id).all()).results || [];
+      const messages = (await env.DB!.prepare("SELECT id, direction, sender, body, error, status, created_at FROM conv_messages WHERE thread_id=?1 ORDER BY created_at ASC LIMIT 300").bind(id).all()).results || [];
       await env.DB!.prepare("UPDATE conv_threads SET unread=0 WHERE id=?1").bind(id).run();
       return respond({ thread: { ...thread, unread: 0 }, messages });
     }
     const where = scope === "agency" ? "owner_id=?1" : "owner_id=?1 AND client_id=?2";
     const stmt = env.DB!.prepare(`SELECT * FROM conv_threads WHERE ${where} ORDER BY last_at DESC LIMIT 200`);
     const threads = (await (scope === "agency" ? stmt.bind(auth.ownerId) : stmt.bind(auth.ownerId, scope)).all()).results || [];
-    return respond({ threads, configured: settings.hasToken && Boolean(settings.accountSid) && settings.numbers.length > 0, botEnabled: settings.botEnabled, emailFrom: String(env.TASK_NOTIFICATION_FROM || "") });
+    // WhatsApp numbers this person may start chats from (for the "New chat" button), limited to their own sub-accounts.
+    const waNumbers = settings.numbers.filter((n) => n.channel === "whatsapp" && (!allowed || allowed.includes(n.clientId)) && (scope === "agency" || n.clientId === scope)).map((n) => ({ number: n.number, clientId: n.clientId, label: n.label }));
+    return respond({ threads, waNumbers, configured: settings.hasToken && Boolean(settings.accountSid) && settings.numbers.length > 0, botEnabled: settings.botEnabled, emailFrom: String(env.TASK_NOTIFICATION_FROM || "") });
   } catch (e) { console.error("conversations GET", e); return respond({ error: "Could not load conversations." }, 503); }
 }
 
@@ -58,6 +61,24 @@ export async function POST(request: Request) {
       const r = await botReply(auth.ownerId, { settings, config: { number: "", channel: "whatsapp", clientId, label: String(b.clientName || ""), info: "" } as NumberConfig, clientName: String(b.clientName || ""), channel: "whatsapp", history, forceTest: true });
       return r ? respond({ reply: r.text, handoff: r.handoff }) : respond({ error: "The AI couldn't reply. Check the AI key in Settings → APIs." }, 502);
     }
+    const statusCallback = `${new URL(request.url).origin}/api/marketing-public/twilio/status`;
+    if (action === "start") {
+      // New WhatsApp chat with someone who hasn't written in yet: one thread per customer per WhatsApp number.
+      const clientId = String(b.clientId ?? "").slice(0, 100);
+      if (allowed && !allowed.includes(clientId)) return respond({ error: "You can't start chats for that client." }, 403);
+      const phone = e164(String(b.phone || ""));
+      if (!/^\+\d{7,15}$/.test(phone)) return respond({ error: "Enter the customer's number in international format, like +353871234567." }, 400);
+      const { settings } = await loadSettings(auth.ownerId);
+      const from = settings.numbers.find((n) => n.channel === "whatsapp" && n.clientId === clientId && (!b.from || n.number === e164(String(b.from))));
+      if (!from) return respond({ error: "This account has no WhatsApp number yet. Add one in Conversation settings." }, 400);
+      const thread = await upsertThread(auth.ownerId, { channel: "whatsapp", ourNumber: from.number, contact: phone, contactName: String(b.name || "").trim(), clientId });
+      return respond({ id: thread.id });
+    }
+    if (action === "templates") {
+      const creds = await twilioCredentials(auth.ownerId);
+      if (!creds) return respond({ error: "Add your Twilio details in Conversation settings first." }, 400);
+      return respond({ templates: await listTwilioTemplates(creds) });
+    }
     const id = String(b.id || "");
     const thread = id ? await env.DB!.prepare("SELECT * FROM conv_threads WHERE id=?1 AND owner_id=?2").bind(id, auth.ownerId).first<any>() : null;
     if (!thread || (allowed && !allowed.includes(String(thread.client_id || "")))) return respond({ error: "That conversation could not be found." }, 404);
@@ -81,11 +102,29 @@ export async function POST(request: Request) {
     if (action === "send") {
       const text = String(b.body || "").trim().slice(0, 1500);
       if (!text) return respond({ error: "Type a message first." }, 400);
+      if (thread.channel === "whatsapp" && !windowState(thread.last_in_at).open) return respond({ error: "The 24-hour WhatsApp window is closed. Send an approved template to restart the chat.", code: "window_closed" }, 409);
       const creds = await twilioCredentials(auth.ownerId);
       if (!creds) return respond({ error: "Add your Twilio details in Conversation settings first." }, 400);
       let sid = "", error = "";
-      try { sid = await sendTwilio(creds, { from: thread.our_number, to: thread.contact, body: text, channel: thread.channel }); } catch (e) { error = e instanceof Error ? e.message : "Could not send."; }
+      try { sid = await sendTwilio(creds, { from: thread.our_number, to: thread.contact, body: text, channel: thread.channel, statusCallback }); } catch (e) { error = e instanceof Error ? e.message : "Could not send."; }
       const m = await addMessage(auth.ownerId, id, { direction: "out", sender: "staff", body: text, sid, error });
+      await env.DB!.prepare("UPDATE conv_threads SET bot_on=0, status=CASE WHEN status='closed' THEN 'open' ELSE status END WHERE id=?1").bind(id).run();
+      if (error) return respond({ error, messageId: m.id }, 502);
+      return respond({ ok: true, messageId: m.id });
+    }
+    if (action === "send-template") {
+      if (thread.channel !== "whatsapp") return respond({ error: "Templates are only for WhatsApp chats." }, 400);
+      const contentSid = String(b.contentSid || "");
+      if (!/^HX[0-9a-f]{32}$/i.test(contentSid)) return respond({ error: "Pick a template first." }, 400);
+      const creds = await twilioCredentials(auth.ownerId);
+      if (!creds) return respond({ error: "Add your Twilio details in Conversation settings first." }, 400);
+      const vars: Record<string, string> = {};
+      if (b.variables && typeof b.variables === "object") for (const [k, v] of Object.entries(b.variables as Record<string, unknown>)) if (/^[A-Za-z0-9_]{1,20}$/.test(k)) vars[k] = String(v ?? "").trim().slice(0, 500);
+      for (const [k, v] of Object.entries(vars)) if (!v) return respond({ error: `Fill in {{${k}}} before sending.` }, 400);
+      const preview = `📋 ${String(b.name || "Template").slice(0, 80)}\n${renderTemplate(String(b.body || ""), vars)}`.trim();
+      let sid = "", error = "";
+      try { sid = await sendTwilio(creds, { from: thread.our_number, to: thread.contact, channel: "whatsapp", contentSid, contentVariables: vars, statusCallback }); } catch (e) { error = e instanceof Error ? e.message : "Could not send."; }
+      const m = await addMessage(auth.ownerId, id, { direction: "out", sender: "staff", body: preview, sid, error });
       await env.DB!.prepare("UPDATE conv_threads SET bot_on=0, status=CASE WHEN status='closed' THEN 'open' ELSE status END WHERE id=?1").bind(id).run();
       if (error) return respond({ error, messageId: m.id }, 502);
       return respond({ ok: true, messageId: m.id });

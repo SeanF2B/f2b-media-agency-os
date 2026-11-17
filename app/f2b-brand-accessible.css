@@ -9672,3 +9672,26 @@ html body.f2b-dark .f2b-on-light:is(input, textarea, #f2b-white-text-override)::
   .onb-admin-actions { margin-left:0; }
 }
 html.f2b-dark .onb-admin, .dark-mode .onb-admin { background:#0f172a; color:#f8fafc; }
+
+/* WhatsApp: 24-hour window chip, delivery ticks, template composer, new chat */
+.cv-window{display:inline-flex;align-items:center;gap:4px;margin-top:3px;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;line-height:1.5;width:max-content;max-width:100%}
+.cv-window.open{background:#e3f6ea;color:#14663a}
+.cv-window.closed{background:#fff3dc;color:#7a4b00}
+.dark-mode .cv-window.open{background:#123d27;color:#bff0d2}
+.dark-mode .cv-window.closed{background:#4a3410;color:#ffe2b0}
+.cv-ticks{display:inline-block;margin-right:5px;font-size:11px;font-weight:800;letter-spacing:-2px;color:#7c8b94}
+.cv-ticks.read{color:#1d9bf0}
+.cv-ticks.failed{letter-spacing:0;color:#d93025}
+.cv-ticks.pending{letter-spacing:0;font-size:10px}
+.cv-template{display:grid!important;gap:10px;padding:12px!important;border-top:1px solid rgba(127,138,160,.22)}
+.cv-template label{display:grid;gap:4px;font-size:12px;font-weight:700}
+.cv-template select,.cv-template input{width:100%;padding:9px 11px;border:1px solid #d6dee3;border-radius:9px;background:#fff;color:#22272b;font:inherit;font-size:14px}
+.cv-template-vars{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.cv-template-preview{padding:10px 13px;border-radius:14px 14px 4px 14px;background:var(--brand-primary,#3b82f6);color:#fff;font-size:14px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;justify-self:end;max-width:min(520px,100%)}
+.cv-template > div:last-of-type{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.dark-mode .cv-template select,.dark-mode .cv-template input{background:var(--dark-panel,#202a31);border-color:var(--dark-border,#3c4850);color:var(--dark-text,#edf3f6)}
+.cv-dialog-sm{max-width:440px!important}
+.cv-dialog-sm label{display:grid;gap:4px;margin-bottom:10px;font-size:12px;font-weight:700}
+.cv-dialog-sm input,.cv-dialog-sm select{width:100%;padding:10px 12px;border:1px solid #d6dee3;border-radius:9px;font:inherit;font-size:16px}
+.dark-mode .cv-dialog-sm input,.dark-mode .cv-dialog-sm select{background:var(--dark-panel,#202a31);border-color:var(--dark-border,#3c4850);color:var(--dark-text,#edf3f6)}
+@media (max-width:720px){.cv-template select,.cv-template input{font-size:16px}.cv-template-vars{grid-template-columns:1fr}}

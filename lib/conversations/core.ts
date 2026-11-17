@@ -10,7 +10,9 @@ export type ConvSettings = { accountSid: string; tokenLast4: string; hasToken: b
 
 const DEFAULT_HANDOFF = "Thanks, I'm passing this to the team. Someone will get back to you shortly.";
 
+let tablesReady = false;
 export async function ensureTables() {
+  if (tablesReady) return;
   const db = env.DB!;
   await db.prepare(`CREATE TABLE IF NOT EXISTS conv_settings (owner_id TEXT PRIMARY KEY, account_sid TEXT NOT NULL DEFAULT '', enc_token TEXT NOT NULL DEFAULT '', token_iv TEXT NOT NULL DEFAULT '', token_last4 TEXT NOT NULL DEFAULT '', numbers TEXT NOT NULL DEFAULT '[]', bot_enabled INTEGER NOT NULL DEFAULT 1, bot_name TEXT NOT NULL DEFAULT '', business_info TEXT NOT NULL DEFAULT '', bot_rules TEXT NOT NULL DEFAULT '', handoff_message TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT '')`).run();
   await db.prepare(`CREATE TABLE IF NOT EXISTS conv_threads (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, client_id TEXT NOT NULL DEFAULT '', channel TEXT NOT NULL, our_number TEXT NOT NULL, contact TEXT NOT NULL, contact_name TEXT NOT NULL DEFAULT '', bot_on INTEGER NOT NULL DEFAULT 1, status TEXT NOT NULL DEFAULT 'open', unread INTEGER NOT NULL DEFAULT 0, last_at TEXT NOT NULL, last_preview TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, UNIQUE(owner_id, our_number, contact, channel))`).run();
@@ -18,6 +20,12 @@ export async function ensureTables() {
   await db.prepare(`CREATE INDEX IF NOT EXISTS conv_messages_thread ON conv_messages (thread_id, created_at)`).run();
   await db.prepare(`CREATE INDEX IF NOT EXISTS conv_threads_owner ON conv_threads (owner_id, last_at)`).run();
   await db.prepare(`CREATE TABLE IF NOT EXISTS conv_client_bots (owner_id TEXT NOT NULL, client_id TEXT NOT NULL, data TEXT NOT NULL DEFAULT '{}', updated_at TEXT NOT NULL, PRIMARY KEY (owner_id, client_id))`).run();
+  // WhatsApp: when the customer last wrote (24-hour window) and each outbound message's delivery state (sent / delivered / read / failed).
+  const added = await db.prepare(`ALTER TABLE conv_threads ADD COLUMN last_in_at TEXT NOT NULL DEFAULT ''`).run().then(() => true, () => false);
+  if (added) await db.prepare(`UPDATE conv_threads SET last_in_at = COALESCE((SELECT MAX(created_at) FROM conv_messages m WHERE m.thread_id = conv_threads.id AND m.direction = 'in' AND m.body NOT LIKE '[[voice:%'), '')`).run().catch(() => undefined);
+  await db.prepare(`ALTER TABLE conv_messages ADD COLUMN status TEXT NOT NULL DEFAULT ''`).run().catch(() => undefined);
+  await db.prepare(`CREATE INDEX IF NOT EXISTS conv_messages_sid ON conv_messages (twilio_sid)`).run();
+  tablesReady = true;
 }
 
 /** What a client's AI bot knows: trained per client from its card (Clients → Train AI bot). */
@@ -92,12 +100,30 @@ export async function verifyTwilio(token: string, urls: string[], params: Record
   for (const u of urls) { const expect = await twilioSignature(token, u, params); if (expect.length === signature.length && expect === signature) return true; }
   return false;
 }
-export async function sendTwilio(creds: { sid: string; token: string }, p: { from: string; to: string; body: string; channel: Channel }) {
+export type TwilioSend = { from: string; to: string; channel: Channel; body?: string; contentSid?: string; contentVariables?: Record<string, string>; mediaUrl?: string; statusCallback?: string };
+export async function sendTwilio(creds: { sid: string; token: string }, p: TwilioSend) {
   const prefix = p.channel === "whatsapp" ? "whatsapp:" : "";
-  const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${creds.sid}/Messages.json`, { method: "POST", headers: { Authorization: "Basic " + btoa(`${creds.sid}:${creds.token}`), "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ From: prefix + p.from, To: prefix + p.to, Body: p.body.slice(0, 1500) }) });
-  const j = await res.json().catch(() => ({})) as { sid?: string; message?: string };
-  if (!res.ok) throw new Error(j.message || `Twilio refused the message (HTTP ${res.status}).`);
+  const form = new URLSearchParams({ From: prefix + p.from, To: prefix + p.to });
+  if (p.contentSid) { form.set("ContentSid", p.contentSid); if (p.contentVariables && Object.keys(p.contentVariables).length) form.set("ContentVariables", JSON.stringify(p.contentVariables)); }
+  else form.set("Body", String(p.body || "").slice(0, 1500));
+  if (p.mediaUrl && !p.contentSid) form.set("MediaUrl", p.mediaUrl);
+  if (p.statusCallback) form.set("StatusCallback", p.statusCallback);
+  const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${creds.sid}/Messages.json`, { method: "POST", headers: { Authorization: "Basic " + btoa(`${creds.sid}:${creds.token}`), "Content-Type": "application/x-www-form-urlencoded" }, body: form });
+  const j = await res.json().catch(() => ({})) as { sid?: string; message?: string; code?: number };
+  if (!res.ok) {
+    // 63016 = outside the 24-hour window: say it in plain English.
+    if (j.code === 63016) throw new Error("The 24-hour WhatsApp window has closed. Send an approved template to restart the chat.");
+    throw new Error(j.message || `Twilio refused the message (HTTP ${res.status}).`);
+  }
   return String(j.sid || "");
+}
+
+/** Approved WhatsApp templates on this Twilio account (Content API). */
+export async function listTwilioTemplates(creds: { sid: string; token: string }) {
+  const { parseApprovedTemplates } = await import("./whatsapp");
+  const res = await fetch("https://content.twilio.com/v1/ContentAndApprovals?PageSize=200", { headers: { Authorization: "Basic " + btoa(`${creds.sid}:${creds.token}`) }, signal: AbortSignal.timeout(12_000) });
+  if (!res.ok) throw new Error(`Twilio wouldn't list your templates (HTTP ${res.status}).`);
+  return parseApprovedTemplates(await res.json());
 }
 
 /* ---------------- threads / messages ---------------- */
@@ -110,10 +136,14 @@ export async function upsertThread(ownerId: string, p: { channel: Channel; ourNu
   await db.prepare("INSERT INTO conv_threads (id, owner_id, client_id, channel, our_number, contact, contact_name, bot_on, status, unread, last_at, last_preview, created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,1,'open',0,?8,'',?8)").bind(id, ownerId, p.clientId, p.channel, p.ourNumber, p.contact, (p.contactName || "").slice(0, 80), now).run();
   return db.prepare("SELECT * FROM conv_threads WHERE id=?1").bind(id).first<any>();
 }
-export async function addMessage(ownerId: string, threadId: string, m: { direction: "in" | "out"; sender: "customer" | "bot" | "staff"; body: string; sid?: string; error?: string }) {
+export async function addMessage(ownerId: string, threadId: string, m: { direction: "in" | "out"; sender: "customer" | "bot" | "staff"; body: string; sid?: string; error?: string; status?: string }) {
+  await ensureTables();
   const db = env.DB!, now = new Date().toISOString(), id = crypto.randomUUID();
-  await db.prepare("INSERT INTO conv_messages (id, thread_id, owner_id, direction, sender, body, twilio_sid, error, created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)").bind(id, threadId, ownerId, m.direction, m.sender, m.body.slice(0, 4000), m.sid || "", (m.error || "").slice(0, 300), now).run();
-  await db.prepare(`UPDATE conv_threads SET last_at=?2, last_preview=?3, unread = unread + ?4 WHERE id=?1`).bind(threadId, now, m.body.slice(0, 120), m.direction === "in" ? 1 : 0).run();
+  const status = m.status ?? (m.direction === "out" ? (m.error ? "failed" : m.sid ? "sent" : "") : "");
+  await db.prepare("INSERT INTO conv_messages (id, thread_id, owner_id, direction, sender, body, twilio_sid, error, status, created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)").bind(id, threadId, ownerId, m.direction, m.sender, m.body.slice(0, 4000), m.sid || "", (m.error || "").slice(0, 300), status, now).run();
+  // A phone-call voice note doesn't open WhatsApp's 24-hour window; only a real customer message does.
+  if (m.direction === "in" && !/^\[\[voice:/.test(m.body)) await db.prepare(`UPDATE conv_threads SET last_at=?2, last_preview=?3, unread = unread + 1, last_in_at=?2 WHERE id=?1`).bind(threadId, now, m.body.slice(0, 120)).run();
+  else await db.prepare(`UPDATE conv_threads SET last_at=?2, last_preview=?3, unread = unread + ?4 WHERE id=?1`).bind(threadId, now, m.body.slice(0, 120), m.direction === "in" ? 1 : 0).run();
   return { id, created_at: now };
 }
 
