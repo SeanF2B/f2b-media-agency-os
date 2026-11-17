@@ -590,3 +590,17 @@ html body .app-shell.dark-mode .sch-dash-panel-tools .sch-seg button.on{backgrou
 .app-shell.dark-mode .sch-tl .sch-tl-track{background:#1b2227}
 .app-shell.dark-mode .sch-tl .sch-tl-free{background:#26313a;box-shadow:inset 0 0 0 1px #2f3a41}
 @media(max-width:760px){.sch-tl .sch-tl-row{grid-template-columns:1fr auto}.sch-tl .sch-tl-track{grid-column:1/-1;order:3}}
+
+/* Dashboard month view fits the screen: rows share the available height, cells never push the page taller */
+.sch-dash-month{height:clamp(300px,calc(100dvh - 330px),860px);grid-template-rows:auto repeat(var(--weeks,6),minmax(0,1fr))}
+.sch-dash-month .sch-month-cell{min-height:0;overflow:hidden}
+.sch-dash-month .sch-month-chips{flex:1;min-height:0;display:flex;flex-direction:column;gap:3px;overflow:hidden}
+.sch-dash-month .sch-month-chip{flex:none}
+.sch-dash-month .sch-month-more{flex:none}
+@media(max-width:760px){
+  .sch-dash-month{height:clamp(280px,calc(100dvh - 260px),560px);gap:3px}
+  .sch-dash-month .sch-month-cell{padding:3px;border-radius:8px}
+  .sch-dash-month .sch-month-chip{padding:1px 3px;font-size:9.5px}
+  .sch-dash-month .sch-month-chip b{font-size:9px}
+  .sch-dash-month .sch-month-more{font-size:9px}
+}
