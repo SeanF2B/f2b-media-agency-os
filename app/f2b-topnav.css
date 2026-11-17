@@ -3230,3 +3230,7 @@ html body .app-shell .dh > section.panel.sch-earn { margin-top: 0; }
   html body .app-shell .dh-date-inline .tn-date svg { flex: none; margin: 0 !important; position: static !important; }
   html body .app-shell .dh-date-inline .tn-date select { height: 100% !important; border: 0 !important; background-color: transparent !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; font-size: 16px !important; font-weight: 700; color: inherit; outline: none; }
 }
+@media (max-width: 860px) {
+  /* Books: same one-row period picker as the Dashboard, under the tabs */
+  html body .app-shell .page-content:has(> .book-tabs) > .dh-date-inline { order: 3; }
+}
