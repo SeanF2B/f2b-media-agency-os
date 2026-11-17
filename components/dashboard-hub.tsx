@@ -1,7 +1,7 @@
 "use client";
 import { useSampleData } from "@/hooks/use-sample-data";
 import { useEffect, useMemo, useState, type ReactNode, lazy, Suspense } from "react";
-import { BarChart3, BookOpen, CalendarCheck, CalendarPlus, CheckCircle2, ClipboardList, ListChecks, Workflow, Image as ImageIcon, Mail, MessageSquare, MousePointerClick, Phone, Plus, Sparkles, TrendingUp, UserPlus, Users } from "lucide-react";
+import { BarChart3, BookOpen, CalendarCheck, CalendarPlus, CheckCircle2, ClipboardList, Workflow, Image as ImageIcon, Mail, MessageSquare, MousePointerClick, Phone, Sparkles, TrendingUp, UserPlus, Users } from "lucide-react";
 import { BrandIcon } from "./brand-icon";
 
 // ROAS and close rate, graded only when there's enough data to judge fairly.
@@ -214,9 +214,7 @@ export function DashboardHub({ salesStats = null, activityPanel = null, scopeCli
     finally { setApptBusy(""); }
   };
   const actions: Array<{ label: string; hint: string; icon: ReactNode; run: () => void; tint: string }> = [
-    { label: "Open tasks", hint: "Board, approvals & history", icon: <ListChecks size={18} />, run: () => onNavigate("Tasks"), tint: "blue" },
     ...(!scopeClientId ? [{ label: "Operations", hint: "Tasks, ads, SEO, websites", icon: <Workflow size={18} />, run: () => onNavigate("Operations"), tint: "violet" }] : []),
-    { label: "New task", hint: "Add work for the team", icon: <Plus size={18} />, run: onAddTask, tint: "blue" },
     { label: "View leads", hint: "Pipeline & contacts", icon: <Users size={18} />, run: () => onNavigate("CRM"), tint: "violet" },
     { label: "Conversations", hint: "Texts, WhatsApp, email", icon: <MessageSquare size={18} />, run: () => onNavigate("Conversations"), tint: "teal" },
     ...(showAppts ? [{ label: "New appointment", hint: "Book a call or visit", icon: <CalendarPlus size={18} />, run: () => onNavigate("Scheduling"), tint: "amber" }] : []),
