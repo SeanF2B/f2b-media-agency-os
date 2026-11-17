@@ -2995,3 +2995,21 @@ html body .app-shell .dh-msrc { display: none; }
   html body .app-shell .dh-detail { overflow-x: auto; }
   html body .app-shell .dh-detail :is(.dh-rank-drop-head, .dh-detail-head) { flex-wrap: wrap; gap: 6px; }
 }
+/* Conversation header: Book · Bot · Close as one tidy set (same height, radius and type) */
+html body .cv-chat-actions { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
+html body .cv-chat-actions > button, html body .cv-chat-actions > .cv-switch { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 36px; min-height: 36px; padding: 0 14px !important; border-radius: 10px !important; font-size: 13px !important; font-weight: 700; line-height: 1; white-space: nowrap; box-shadow: none; transition: transform .15s, box-shadow .15s, border-color .15s, background .15s; }
+html body .cv-chat-actions > button:hover, html body .cv-chat-actions > .cv-switch:hover { transform: translateY(-1px); border-color: var(--brand-secondary, var(--brand-primary, #0b78b0)); }
+html body .cv-chat-actions > .secondary-button { background: #fff; border: 1px solid #d5dbe1; color: #0f172a; }
+html body .cv-chat-actions > .cv-switch { position: relative; background: #fff; border: 1px solid #d5dbe1; color: #0f172a; cursor: pointer; }
+html body .cv-chat-actions > .cv-switch input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+html body .cv-chat-actions > .cv-switch > span { display: inline-flex; align-items: center; gap: 6px; }
+html body .cv-chat-actions > .cv-switch > span svg { width: 16px; height: 16px; }
+html body .cv-switch-track { position: relative; width: 28px; height: 16px; border-radius: 99px; background: #cfd6dc; flex: none; transition: background .15s; }
+html body .cv-switch-track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .15s; }
+html body .cv-chat-actions > .cv-switch.on { background: color-mix(in srgb, var(--brand-primary, #0b78b0) 8%, #fff); border-color: color-mix(in srgb, var(--brand-primary, #0b78b0) 45%, transparent); }
+html body .cv-chat-actions > .cv-switch.on .cv-switch-track { background: var(--brand-primary, #0b78b0); }
+html body .cv-chat-actions > .cv-switch.on .cv-switch-track::after { transform: translateX(12px); }
+html body .cv-chat-actions > .cv-switch:focus-within { outline: 2px solid color-mix(in srgb, var(--brand-primary, #0b78b0) 45%, transparent); outline-offset: 2px; }
+html body .app-shell.dark-mode .cv-chat-actions > .secondary-button, html body .app-shell.dark-mode .cv-chat-actions > .cv-switch { background: #27272a; border-color: #3f3f46; color: #fff; }
+html body .app-shell.dark-mode .cv-chat-actions > .cv-switch.on { background: color-mix(in srgb, var(--brand-primary, #0b78b0) 22%, #27272a); }
+@media (max-width: 640px) { html body .cv-chat-actions > button, html body .cv-chat-actions > .cv-switch { padding: 0 10px !important; } }
