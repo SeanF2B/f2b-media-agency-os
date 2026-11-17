@@ -4,6 +4,7 @@ import { useSampleData } from "@/hooks/use-sample-data";
 import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ImagePlus, Sparkles, CalendarDays, ChevronLeft, ChevronRight, Clock, Copy, Link2, MapPin, Plus, RefreshCw, Settings2, Trash2, UserRound, Users, Video, Phone, Building2, LayoutDashboard, ClipboardList, CalendarRange, CalendarClock, History, CircleX } from "lucide-react";
+import { useAppointmentUpdates } from "@/components/appointment-updates";
 import "./scheduling.css";
 import { ReportGeneratingAnimation, currencySymbolFor } from "./report-generating-animation";
 import { computePayslip, maskPps, normalisePps, validPps, DEFAULT_PERSON, EMPTY_YTD, type PayrollEmployer, type PayrollPerson } from "@/lib/scheduling/payroll";
@@ -69,6 +70,8 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
   const [PX_PER_MIN, setPpm] = useState(PX_DEFAULT);
   const [realData, setData] = useState<Data | null>(null);
   const [sample] = useSampleData();
+  // Same "Appointment updates" card as the Dashboard (mark finished appointments)
+  const appt = useAppointmentUpdates({ scopeClientId, sample, enabled: true });
   const [sampleMoves, setSampleMoves] = useState<Record<string, string>>({});
   const site = useSiteSample(scopeClientId, sample);
   const sampleClientName = realData?.clients.find((c) => c.id === scopeClientId)?.name || "";
@@ -180,6 +183,7 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
         <label className="sch-select"><CalendarDays size={14} /><select aria-label="Filter by booking calendar" value={calFilter} onChange={(e) => setCalFilter(e.target.value)}><option value="">All calendars</option>{data.calendars.map((c) => <option key={c.id} value={c.id}>{data.scope === null && c.clientId ? `${clientName(c.clientId)} · ` : ""}{c.name}</option>)}</select></label>
       </div>}
     </div>
+    {tab === "dashboard" && <><section className="dh-approvals sch-appt-updates" aria-label="Appointment updates">{appt.card()}</section>{appt.list}</>}
     {tab === "dashboard" && <div className="iv-stats sch-stats-under"><div><small>Next 7 days</small><b>{stats.upcoming}</b></div><div><small>Booked this month</small><b>{stats.month}</b></div><div><small>Show-up rate</small><b>{stats.showRate === null ? "—" : `${stats.showRate}%`}</b></div><div className={stats.noShow ? "bad" : ""}><small>No-shows</small><b>{stats.noShow}</b></div>
       <div className="sch-perstaff"><small>This month by person</small>{stats.perStaff.length ? stats.perStaff.map(({ s, n }) => <span key={s.id}><Avatar person={s} size={20} /> {s.name.split(" ")[0]} <b>{n}</b></span>) : <span className="iv-small">No bookings yet</span>}</div></div>}
 

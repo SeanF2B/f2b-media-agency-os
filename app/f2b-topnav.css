@@ -3333,3 +3333,6 @@ html body .app-shell .finance-panel > .panel-heading::after { content: ""; posit
 }
 /* Period pickers (Dashboard, Books): one arrow at the right — beats the generic label+icon select rules in light and dark */
 html body .app-shell.app-shell label.tn-date.tn-date > select, html body .app-shell.dark-mode.dark-mode label.tn-date.tn-date > select { background-repeat: no-repeat !important; background-position: right 4px center !important; background-size: 12px 12px !important; background-color: transparent !important; padding-right: 22px !important; }
+/* Scheduling dashboard: the Appointment updates card, full width above the stats */
+html body .app-shell .dh-approvals.sch-appt-updates { display: grid !important; grid-template-columns: minmax(0, 1fr) !important; margin: 0 0 12px !important; }
+html body .app-shell .sch .dh-appt-list { margin: 0 0 12px; }
