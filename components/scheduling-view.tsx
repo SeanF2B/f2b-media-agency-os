@@ -105,7 +105,7 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
   const [editCal, setEditCal] = useState<Partial<Calendar> | null>(null);
   const [editAvail, setEditAvail] = useState<Staff | null>(null);
   const [editProfile, setEditProfile] = useState<Staff | null>(null);
-  const [listMode, setListMode] = useState<"upcoming" | "past" | "cancelled">("upcoming");
+  const [listMode, setListMode] = useState<"upcoming" | "past" | "showed" | "no_show" | "cancelled">("upcoming");
   const dragRef = useRef<{ id: string; grabMin: number } | null>(null);
   const [sel, setSel] = useState<{ day: string; a: number; b: number; moved: boolean } | null>(null); // drag on empty time to create
   const [dropHint, setDropHint] = useState<{ day: string; min: number } | null>(null);
@@ -272,13 +272,13 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
     </div>}
 
     {tab === "appointments" && <div className="iv-card">
-      <div className="iv-filters">{(["upcoming", "past", "cancelled"] as const).map((m) => <button key={m} type="button" className={listMode === m ? "on" : ""} onClick={() => setListMode(m)}>{m === "upcoming" ? "Upcoming" : m === "past" ? "Past" : "Cancelled"}</button>)}</div>
-      {(() => { const now = Date.now(); const rows = visible.filter((b) => listMode === "cancelled" ? b.status === "cancelled" : listMode === "upcoming" ? b.status !== "cancelled" && Date.parse(b.end) >= now : b.status !== "cancelled" && Date.parse(b.end) < now).sort((a, b) => listMode === "upcoming" ? a.start.localeCompare(b.start) : b.start.localeCompare(a.start));
+      <div className="iv-filters">{(["upcoming", "past", "showed", "no_show", "cancelled"] as const).map((m) => <button key={m} type="button" className={listMode === m ? "on" : ""} onClick={() => setListMode(m)}>{m === "upcoming" ? "Upcoming" : m === "past" ? "Past" : m === "showed" ? "Showed" : m === "no_show" ? "No-shows" : "Cancelled"}</button>)}</div>
+      {(() => { const now = Date.now(); const rows = visible.filter((b) => listMode === "cancelled" ? b.status === "cancelled" : listMode === "showed" ? b.status === "completed" : listMode === "no_show" ? b.status === "no_show" : listMode === "upcoming" ? b.status !== "cancelled" && Date.parse(b.end) >= now : b.status !== "cancelled" && Date.parse(b.end) < now).sort((a, b) => listMode === "upcoming" ? a.start.localeCompare(b.start) : b.start.localeCompare(a.start));
         return rows.length ? <div className="sch-list">{rows.map((b) => { const cal = calById.get(b.calendarId); return <button key={b.id} type="button" className="sch-row" onClick={() => setDetail(b)}>
           <span className="sch-dot" style={{ background: cal?.color }} /><span className="sch-when"><b>{new Date(b.start).toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short" })}</b><small>{time(b.start)}–{time(b.end)}</small></span>
           <span className="sch-what"><b>{b.name}</b><small>{cal?.name || "Deleted calendar"}{data.scope === null ? ` · ${clientName(b.clientId)}` : ""}{b.channel ? ` · ${b.channel}` : ""}</small></span>
           <span className="sch-who">{b.staffIds.map((id) => <Avatar key={id} person={staffById.get(id) || { name: "?" }} size={24} />)}</span>
-          <span className={`iv-pill sch-status ${b.status}`}>{STATUS_LABEL[b.status]}</span></button>; })}</div> : <div className="iv-empty">No {listMode} appointments in this range.</div>; })()}
+          <span className={`iv-pill sch-status ${b.status}`}>{STATUS_LABEL[b.status]}</span></button>; })}</div> : <div className="iv-empty">No {listMode === "showed" ? "showed" : listMode === "no_show" ? "no-show" : listMode} appointments in this range.</div>; })()}
     </div>}
 
     {tab === "calendars" && <div className="sch-cal-grid">
