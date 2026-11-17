@@ -102,6 +102,15 @@ export function darkReadyLogo(src: string): Promise<string> {
     const ctx = canvas.getContext("2d", { willReadFrequently: true }); if (!ctx) return stripped;
     ctx.drawImage(img, 0, 0);
     const data = ctx.getImageData(0, 0, w, h); const px = data.data;
+    // Logos that already have light artwork (white line art, light wordmarks) are made for dark backgrounds:
+    // lifting their dark detail would turn it into grey noise, so leave them exactly as they are.
+    let seenOpaque = 0, light = 0;
+    for (let i = 0; i < px.length; i += 4) {
+      if (px[i + 3] < 24) continue; seenOpaque++;
+      const r = px[i], g = px[i + 1], b = px[i + 2];
+      if (Math.max(r, g, b) - Math.min(r, g, b) < 60 && 0.2126 * r + 0.7152 * g + 0.0722 * b > 185) light++;
+    }
+    if (!seenOpaque || light / seenOpaque > 0.06) return stripped;
     let opaque = 0, changed = 0;
     for (let i = 0; i < px.length; i += 4) {
       if (px[i + 3] < 24) continue; opaque++;
