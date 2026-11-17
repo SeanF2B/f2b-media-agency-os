@@ -2,7 +2,7 @@
 // Leads → Outreach. Four compact tabs: Overview · Campaigns · Inbox · Infrastructure.
 // Every animation reflects real backend state (polling while jobs run); nothing is simulated.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BookOpen, CalendarClock, Check, ChevronRight, Copy, Inbox, LayoutDashboard, Mail, Pause, Play, Plus, Rocket, Send, Server, Settings2, Sparkles, Upload, Wand2, X } from "lucide-react";
+import { BookOpen, CalendarClock, Cog, Check, ChevronRight, Copy, Inbox, LayoutDashboard, Mail, Pause, Play, Plus, Rocket, Send, Settings2, Sparkles, Upload, Wand2, X } from "lucide-react";
 import { lintEmail } from "@/lib/outreach/copy-engine.mjs";
 import { ago, LABELS, money, num, outreachAction, outreachGet, pct, type Campaign, type OutreachState, type Step, type Variant } from "./outreach-api";
 import { FlameMeter, HealthPill, InfrastructurePanel, PlaybookDrawer, SettingsDrawer } from "./outreach-infrastructure";
@@ -10,7 +10,7 @@ import "./outreach.css";
 
 type Tab = "overview" | "campaigns" | "inbox" | "infrastructure";
 type LeadList = { id: string; name: string; count: number };
-const TABS: Array<[Tab, string, typeof LayoutDashboard]> = [["overview", "Overview", LayoutDashboard], ["campaigns", "Campaigns", Rocket], ["inbox", "Inbox", Inbox], ["infrastructure", "Infrastructure", Server]];
+const TABS: Array<[Tab, string, typeof LayoutDashboard]> = [["overview", "Overview", LayoutDashboard], ["campaigns", "Campaigns", Rocket], ["inbox", "Inbox", Inbox]];
 
 export function OutreachView({ clients = [], leadLists = [] }: { clients?: Array<{ id: string; name: string }>; leadLists?: LeadList[] }) {
   const initial = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams();
@@ -49,6 +49,7 @@ export function OutreachView({ clients = [], leadLists = [] }: { clients?: Array
       </div>}
       <div className="ox-bar-actions">
         <button type="button" className="ox-icon" onClick={() => setDrawer("playbook")} title="AI Playbook" aria-label="AI Playbook"><BookOpen size={17} /></button>
+        <button type="button" className={`ox-icon ox-infra-cog ${tab === "infrastructure" ? "on" : ""}`} onClick={() => setTab(tab === "infrastructure" ? "overview" : "infrastructure")} title="Infrastructure — mailboxes, domains & Microsoft 365" aria-label="Infrastructure" aria-pressed={tab === "infrastructure"}><Cog size={17} /></button>
         <button type="button" className="ox-icon" onClick={() => setDrawer("settings")} title="Outreach settings" aria-label="Outreach settings"><Settings2 size={17} /></button>
       </div>
     </div>

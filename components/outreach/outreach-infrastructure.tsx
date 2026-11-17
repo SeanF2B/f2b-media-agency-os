@@ -49,7 +49,6 @@ function Connections({ state, act }: { state: OutreachState; act: Act }) {
   const find = (provider: string) => state.connections.find((connection) => connection.provider === provider);
   const items = [
     { key: "microsoft", label: "Microsoft 365", connection: find("microsoft") },
-    { key: "google", label: "Google Workspace", connection: find("google") },
     { key: "telegram", label: "Telegram alerts", connection: find("telegram") },
     { key: "instantly", label: "Instantly warm-up", connection: find("instantly") },
   ];
@@ -297,13 +296,36 @@ function Domains({ state, act }: { state: OutreachState; act: Act }) {
   </div>;
 }
 
+
+/** Microsoft 365 connection — inline wherever it's needed, so setting up inboxes never sends you hunting through Settings. */
+function MicrosoftConnect({ state, act, compact = false }: { state: OutreachState; act: Act; compact?: boolean }) {
+  const connection = state.connections.find((item) => item.provider === "microsoft");
+  const connected = connection?.status === "ok";
+  const [ms, setMs] = useState({ tenantId: String(connection?.config?.tenantId || ""), clientId: String(connection?.config?.clientId || ""), clientSecret: "" });
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState("");
+  const [open, setOpen] = useState(!connected);
+  const ready = ms.tenantId.trim().length > 2 && /^[0-9a-f-]{36}$/i.test(ms.clientId.trim()) && ms.clientSecret.trim().length >= 10;
+  if (connected && !open) return <div className={compact ? "ox-ms-ok" : "ox-panel ox-ms-ok"}><CheckCircle2 size={16} /> <b>Microsoft 365 connected</b><span className="ox-muted">Tenant {String(connection?.config?.tenantId || "")}</span><button type="button" className="ox-link" onClick={() => setOpen(true)}>Change</button></div>;
+  return <div className={compact ? "ox-ms" : "ox-panel ox-ms"}>
+    {!compact && <header className="ox-ms-head"><span className="ox-ms-logo" aria-hidden="true"><i /><i /><i /><i /></span><div><h3>Connect Microsoft 365</h3><p className="ox-muted">One-time setup. After this, Outreach creates the domains and inboxes for you.</p></div></header>}
+    {(problem || (connection?.status && connection.status !== "ok" && connection.lastError)) && <p className="ox-warn-text"><AlertTriangle size={14} /> {problem || connection?.lastError}</p>}
+    <ol className="ox-ms-steps">
+      <li><a href="https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/CreateApplicationBlade/quickStartType~/null/isMSAApp~/false" target="_blank" rel="noreferrer">Register an app in Microsoft Entra</a> — name it “F2B Outreach”, single tenant, no redirect URL.</li>
+      <li>API permissions → Microsoft Graph → <b>Application</b>: User.ReadWrite.All, Domain.ReadWrite.All, Organization.Read.All, Mail.Send, Mail.Read → <b>Grant admin consent</b>.</li>
+      <li>Certificates &amp; secrets → New client secret (24 months). Paste the three values below.</li>
+    </ol>
+    <div className="ox-grid3"><label className="ox-field">Directory (tenant) ID<input value={ms.tenantId} onChange={(event) => setMs({ ...ms, tenantId: event.target.value.trim() })} placeholder="xxxxxxxx-xxxx-…" /></label><label className="ox-field">Application (client) ID<input value={ms.clientId} onChange={(event) => setMs({ ...ms, clientId: event.target.value.trim() })} placeholder="xxxxxxxx-xxxx-…" /></label><label className="ox-field">Client secret value<input type="password" value={ms.clientSecret} onChange={(event) => setMs({ ...ms, clientSecret: event.target.value.trim() })} placeholder="Secret value (not the ID)" /></label></div>
+    <div className="ox-row"><button type="button" className="primary-button" disabled={!ready || busy} onClick={async () => { setBusy(true); setProblem(""); const result = await act<{ ok: boolean; error?: string }>("connect-microsoft", ms); setBusy(false); if (result?.ok) setOpen(false); else if (result?.error) setProblem(result.error); }}>{busy ? <Loader2 className="ox-spin" size={15} /> : <ShieldCheck size={15} />} Connect &amp; verify</button>{connected && <button type="button" className="ox-link" onClick={() => setOpen(false)}>Cancel</button>}</div>
+  </div>;
+}
 // ============================ provisioning ============================
 type Offer = { domain: string; available: boolean; currency: string; registrationCents: number; renewalCents: number; reason: string };
 type Identity = { firstName: string; lastName: string; local: string };
 
 function Provisioning({ state, act, reload }: { state: OutreachState; act: Act; reload: () => Promise<void> }) {
   const [mode, setMode] = useState<"new" | "existing">("new");
-  const [host, setHost] = useState<"microsoft" | "google">(state.connections.find((connection) => connection.provider === "google" && connection.status === "ok") && !state.connections.find((connection) => connection.provider === "microsoft" && connection.status === "ok") ? "google" : "microsoft");
+  const host = "microsoft" as const;
   const [business, setBusiness] = useState("");
   const [offers, setOffers] = useState<Offer[]>([]);
   const [picked, setPicked] = useState<Record<string, Offer & { buy: boolean }>>({});
@@ -321,8 +343,7 @@ function Provisioning({ state, act, reload }: { state: OutreachState; act: Act; 
   return <div className="ox-stack">
     {state.jobs.filter((job) => job.status === "running" || job.progress.failed).map((job) => <JobTimeline key={job.id} job={job} act={act} />)}
     <div className="ox-seg" role="group">{([["new", "New domains & mailboxes"], ["existing", "Connect an existing mailbox"]] as const).map(([key, label]) => <button key={key} type="button" className={mode === key ? "on" : ""} onClick={() => setMode(key)}>{label}</button>)}</div>
-    <div className="ox-seg" role="group" aria-label="Mail host">{(["microsoft", "google"] as const).map((key) => <button key={key} type="button" className={host === key ? "on" : ""} onClick={() => setHost(key)}>{key === "microsoft" ? "Microsoft 365" : "Google Workspace"}{state.connections.some((connection) => connection.provider === key && connection.status === "ok") ? " ✓" : ""}</button>)}</div>
-    {!hostConnected && <p className="ox-warn-text"><AlertTriangle size={14} /> Connect {host === "microsoft" ? "Microsoft 365" : "Google Workspace"} in Settings (⚙︎ top right) first.</p>}
+    {!hostConnected && <MicrosoftConnect state={state} act={act} />}
     {mode === "existing" ? <div className="ox-panel"><h3>Try the whole workflow with one mailbox</h3><p className="ox-muted">Uses a mailbox that already exists in your connected account. Then click its flame: Outreach fixes the domain's email DNS and starts warm-up as soon as it passes.</p>
       <div className="ox-grid2"><label className="ox-field">Mailbox email<input value={existing.email} onChange={(event) => setExisting({ ...existing, email: event.target.value })} placeholder="you@yourdomain.com" /></label><label className="ox-field">Sender name<input value={existing.displayName} onChange={(event) => setExisting({ ...existing, displayName: event.target.value })} placeholder="Sean Kelly" /></label></div>
       <button type="button" className="primary-button" disabled={!hostConnected || !existing.email} onClick={() => void act("connect-existing-mailbox", { host, ...existing, targetDaily: 10 }, "Mailbox connected — authentication checked")}>Connect mailbox</button>
@@ -341,7 +362,7 @@ function Provisioning({ state, act, reload }: { state: OutreachState; act: Act; 
       <div className="ox-panel"><h3>3 · Review costs & approve</h3>
         <button type="button" className="secondary-button" disabled={!hostConnected || busy === "review"} onClick={async () => { setBusy("review"); const result = await act<any>("provision-plan", order()); setBusy(""); setReview(result); }}>{busy === "review" ? "Checking…" : "Review"}</button>
         {review && <div className="ox-review">
-          <ul><li><b>{review.plan.domains}</b> domains · <b>{review.plan.mailboxes}</b> mailboxes · {review.plan.steps.length} automated steps</li><li>Upfront: <b>{money(review.costs.upfrontCents, review.costs.currency)}</b> (domain registrations)</li><li>Monthly: <b>{money(review.costs.monthlyCents, review.costs.currency)}</b> ({money(review.costs.mailboxMonthlyCents)} mailboxes + domain renewals ÷ 12)</li>{host === "microsoft" && review.seats?.length > 0 && <li>Free Exchange seats: <b>{review.seats.reduce((total: number, seat: any) => total + seat.free, 0)}</b> (buy more in the Microsoft admin centre; the setup waits for them)</li>}<li>One guided step per domain: DKIM (no API from {host === "microsoft" ? "Microsoft" : "Google"}).</li></ul>
+          <ul><li><b>{review.plan.domains}</b> domains · <b>{review.plan.mailboxes}</b> mailboxes · {review.plan.steps.length} automated steps</li><li>Upfront: <b>{money(review.costs.upfrontCents, review.costs.currency)}</b> (domain registrations)</li><li>Monthly: <b>{money(review.costs.monthlyCents, review.costs.currency)}</b> ({money(review.costs.mailboxMonthlyCents)} mailboxes + domain renewals ÷ 12)</li>{host === "microsoft" && review.seats?.length > 0 && <li>Free Exchange seats: <b>{review.seats.reduce((total: number, seat: any) => total + seat.free, 0)}</b> (buy more in the Microsoft admin centre; the setup waits for them)</li>}<li>One guided step per domain: DKIM (Microsoft has no API for it).</li></ul>
           {review.buying.length > 0 && <label className="ox-check ox-approve"><input type="checkbox" checked={approve} onChange={(event) => setApprove(event.target.checked)} /> I approve buying {review.buying.length} domain{review.buying.length === 1 ? "" : "s"}: {review.buying.join(", ")}</label>}
           {review.buying.length > 0 && !review.purchasesEnabled && <p className="ox-warn-text"><Lock size={13} /> Purchasing is switched off on the server, so the setup will pause at "Buy domain" and nothing will be charged.</p>}
           <button type="button" className="primary-button ox-launch" disabled={busy === "start" || (review.buying.length > 0 && !approve)} onClick={async () => { setBusy("start"); const result = await act("provision-start", { ...order(), approvePurchase: approve }, "Setup started"); setBusy(""); if (result) { setReview(null); setPicked({}); setOffers([]); await reload(); } }}>Start automatic setup</button>
@@ -384,8 +405,6 @@ function Placement({ state, act }: { state: OutreachState; act: Act }) {
 export function SettingsDrawer({ state, act, onClose }: { state: OutreachState; act: Act; onClose: () => void }) {
   const s = state.settings;
   const [form, setForm] = useState({ cooldownDays: s.cooldownDays, bookingUrl: s.bookingUrl, ms: s.seatPriceCents.microsoft ?? "", google: s.seatPriceCents.google ?? "", workers: s.workersPlanCents ?? "", defaultTargetDaily: s.defaultTargetDaily, dmarcReportEmail: s.dmarcReportEmail, senderAddress: s.senderAddress, appUrl: s.appUrl });
-  const [ms, setMs] = useState({ tenantId: "", clientId: "", clientSecret: "" });
-  const [google, setGoogle] = useState({ adminEmail: "", serviceAccountJson: "" });
   const telegram = state.connections.find((connection) => connection.provider === "telegram");
   const [tg, setTg] = useState({ chatId: String(telegram?.config?.chatId || ""), botToken: "" });
   const [suppress, setSuppress] = useState("");
@@ -403,16 +422,10 @@ export function SettingsDrawer({ state, act, onClose }: { state: OutreachState; 
       <label className="ox-field">App address (for unsubscribe and alert links)<input value={form.appUrl} onChange={(event) => setForm({ ...form, appUrl: event.target.value })} /></label>
     </section>
     <section><h3>Real costs</h3>
-      <div className="ox-grid2"><label className="ox-field">Microsoft seat (cents/mo)<input type="number" value={form.ms} onChange={(event) => setForm({ ...form, ms: event.target.value as never })} /></label><label className="ox-field">Google seat (cents/mo)<input type="number" value={form.google} onChange={(event) => setForm({ ...form, google: event.target.value as never })} /></label><label className="ox-field">Workers plan (cents/mo)<input type="number" value={form.workers} onChange={(event) => setForm({ ...form, workers: event.target.value as never })} /></label></div>
-      <button type="button" className="primary-button" onClick={() => void act("save-settings", { cooldownDays: form.cooldownDays, bookingUrl: form.bookingUrl, defaultTargetDaily: form.defaultTargetDaily, senderAddress: form.senderAddress, dmarcReportEmail: form.dmarcReportEmail, appUrl: form.appUrl, seatPriceCents: { microsoft: form.ms, google: form.google }, workersPlanCents: form.workers }, "Settings saved")}>Save</button>
+      <div className="ox-grid2"><label className="ox-field">Microsoft seat (cents/mo)<input type="number" value={form.ms} onChange={(event) => setForm({ ...form, ms: event.target.value as never })} /></label><label className="ox-field">Workers plan (cents/mo)<input type="number" value={form.workers} onChange={(event) => setForm({ ...form, workers: event.target.value as never })} /></label></div>
+      <button type="button" className="primary-button" onClick={() => void act("save-settings", { cooldownDays: form.cooldownDays, bookingUrl: form.bookingUrl, defaultTargetDaily: form.defaultTargetDaily, senderAddress: form.senderAddress, dmarcReportEmail: form.dmarcReportEmail, appUrl: form.appUrl, seatPriceCents: { microsoft: form.ms, google: s.seatPriceCents.google ?? null }, workersPlanCents: form.workers }, "Settings saved")}>Save</button>
     </section>
-    <section><h3>Microsoft 365</h3><p className="ox-muted">An Entra app with User.ReadWrite.All, Domain.ReadWrite.All, Organization.Read.All, Mail.Send and Mail.Read (application permissions, admin consent).</p>
-      <input placeholder="Tenant ID" value={ms.tenantId} onChange={(event) => setMs({ ...ms, tenantId: event.target.value })} /><input placeholder="Application (client) ID" value={ms.clientId} onChange={(event) => setMs({ ...ms, clientId: event.target.value })} /><input type="password" placeholder="Client secret" value={ms.clientSecret} onChange={(event) => setMs({ ...ms, clientSecret: event.target.value })} />
-      <button type="button" className="secondary-button" onClick={() => void act("connect-microsoft", ms, "Microsoft checked")}>Connect & verify</button></section>
-    <section><h3>Google Workspace</h3><p className="ox-muted">Service account with domain-wide delegation (directory, site verification, gmail.send, gmail.readonly).</p>
-      <input placeholder="Super-admin email" value={google.adminEmail} onChange={(event) => setGoogle({ ...google, adminEmail: event.target.value })} />
-      <label className="secondary-button"><input type="file" accept=".json,application/json" hidden onChange={async (event) => { const file = event.target.files?.[0]; if (file) setGoogle({ ...google, serviceAccountJson: await file.text() }); }} />{google.serviceAccountJson ? "Key loaded ✓" : "Upload JSON key"}</label>
-      <button type="button" className="secondary-button" disabled={!google.serviceAccountJson} onClick={() => void act("connect-google", google, "Google checked")}>Connect & verify</button></section>
+    <section><h3>Microsoft 365</h3><MicrosoftConnect state={state} act={act} compact /></section>
     <section><h3>Instantly warm-up</h3><p className="ox-muted">{instantly?.status === "ok" ? "Connected. Clicking a flame warms that mailbox on Instantly's network; campaigns still send from Agency OS and unlock after 14 days." : "Optional. Uses Instantly only for warm-up (its network of real inboxes). Create an API key in Instantly → Settings → Integrations with the accounts:all scope."}</p>
       {instantly?.status !== "ok" && <input type="password" placeholder="Instantly API key" value={instantlyKey} onChange={(event) => setInstantlyKey(event.target.value)} />}
       <label className="ox-field">Instantly plan (cents/mo, for the cost report)<input type="number" min={0} value={instantlyPrice} onChange={(event) => setInstantlyPrice(event.target.value)} /></label>

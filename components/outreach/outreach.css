@@ -336,3 +336,20 @@
 .ox-bar-filters select:hover,.ox-bar-filters input:hover{transform:translateY(-1px);border-color:var(--secondary,#0b7bb8)}
 .ox-bar-filters select{padding-right:28px}
 .app-shell.dark-mode .ox-bar-filters select,.app-shell.dark-mode .ox-bar-filters input{background:#202024;border-color:#45464c;color:#f4f5f7}
+
+/* Infrastructure as a cog on the right + inline Microsoft 365 connect */
+.ox-icon.ox-infra-cog.on { background: var(--ox-p); border-color: var(--ox-p); color: #fff; box-shadow: 0 4px 14px color-mix(in srgb, var(--ox-p) 35%, transparent); }
+.ox-icon.ox-infra-cog svg { transition: transform .5s ease; }
+.ox-icon.ox-infra-cog:hover svg, .ox-icon.ox-infra-cog.on svg { transform: rotate(60deg); }
+.ox-grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.ox-ms { gap: 12px; }
+.ox-ms-head { display: flex; gap: 12px; align-items: center; }
+.ox-ms-head h3 { margin: 0; }
+.ox-ms-head p { margin: 2px 0 0; }
+.ox-ms-logo { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; width: 26px; height: 26px; flex: none; }
+.ox-ms-logo i:nth-child(1) { background: #f25022; } .ox-ms-logo i:nth-child(2) { background: #7fba00; } .ox-ms-logo i:nth-child(3) { background: #00a4ef; } .ox-ms-logo i:nth-child(4) { background: #ffb900; }
+.ox-ms-steps { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 13px; line-height: 1.45; }
+.ox-ms-steps a { color: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.ox-ms-ok { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ox-ms-ok svg { color: #22c55e; }
+@media (max-width: 900px) { .ox-grid3 { grid-template-columns: 1fr; } }
