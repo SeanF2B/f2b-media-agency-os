@@ -245,6 +245,17 @@ export function renderProposalHtml(deck: ProposalDeck, brand: ProposalBrand, opt
         <div class="tl">${(d.steps || []).map((_: unknown, i: number) => `<div class="tl-step ${i % 2 ? "down" : "up"}" style="--d:${i}"><div class="tl-cap a" style="--d:${i + 1}">${t(slide, `steps.${i}.caption`, "p")}</div><i class="tl-dot"></i><div class="chev a" style="--d:${i}">${t(slide, `steps.${i}.month`, "b")}</div></div>`).join("")}</div>${swoosh("br")}${n}</div></section>`;
       case "expect": return `<section class="slide expect" id="s-${attr(slide.id)}"><div class="in">${swoosh("tl")}${t(slide, "heading", "h2", "title center a")}
         <div class="exp">${(d.paragraphs || []).map((_: string, i: number) => `${t(slide, `paragraphs.${i}`, "p", "a")}`).join("")}</div>${swoosh("br")}${n}</div></section>`;
+      case "aiteam": {
+        const cols = (d.columns || []).slice(0, 3);
+        const svcName = (services[0] || "your service").toLowerCase();
+        const shots = [
+          `<div class="ait-screen tg"><div class="tg-top"><i>${icon("spark")}</i><span><b>F2B Briefing Bot</b><small>bot</small></span></div><div class="tg-body"><p class="in"><b>Good morning ☀️</b><br>Yesterday for ${esc(name)}:<br>• 6 new enquiries<br>• 3 appointments booked<br>• €84 ad spend<br><br>Today: call back Sarah about ${esc(svcName)}.</p><p class="out">How did Google Ads do this week?</p><p class="in">32 enquiries this week, up 18% on last week 📈</p></div></div>`,
+          `<div class="ait-screen crmai"><div class="crmai-top">${logoMark()}<span>AI Assistant</span></div><div class="crmai-body"><p class="out">Who needs a call back today?</p><p class="in"><i>${icon("spark")}</i><span>3 leads are waiting:<br><b>Sarah M.</b> · ${esc(tc(services[0] || "Enquiry"))}<br><b>Tom K.</b> · ${esc(tc(services[1] || services[0] || "Quote"))}<br><b>Aoife R.</b> · ${esc(tc(services[2] || services[0] || "Booking"))}<br><u>Draft follow-up texts?</u></span></p></div><div class="crmai-input">Ask your AI anything…</div></div>`,
+          `<div class="ait-screen learn"><div class="learn-past"><span>"How much is a callout?"</span><span>"Do you cover ${esc(area || "my area")}?"</span><span>"Can you come Saturday?"</span></div><div class="learn-brain"><i>${icon("spark")}</i><small>Learns from your past conversations</small></div><div class="learn-reply"><span class="ad-av">${logoMark()}</span><p>Yes, we cover ${esc(area || "your area")}! I can book you in for tomorrow morning — shall I?</p></div></div>`,
+        ];
+        return `<section class="slide aiteam" id="s-${attr(slide.id)}"><div class="in">${t(slide, "heading", "h2", "title a")}${t(slide, "intro", "p", "lead a")}
+        <div class="ait">${cols.map((_: unknown, i: number) => `<div class="ait-col a" style="--d:${i + 1}">${shots[i] || ""}${t(slide, `columns.${i}.title`, "b", "ait-t")}${t(slide, `columns.${i}.body`, "p", "ait-p")}<ul class="ticks dark">${((cols[i] || {}).bullets || []).map((__: string, k: number) => `<li>${icon("check")}${t(slide, `columns.${i}.bullets.${k}`)}</li>`).join("")}</ul></div>`).join("")}</div>${n}</div></section>`;
+      }
       case "investment": return `<section class="slide investment" id="s-${attr(slide.id)}"><div class="in">
         <div class="inv-phone a">${phone(pic(slide, "brand.screenshotMobile", mobileShot), "solo")}</div>
         <div class="inv a d1">${t(slide, "heading", "h2", "title up")}<div class="inv-bar">${t(slide, "packageName")}</div>
@@ -295,7 +306,7 @@ html{background:#0d0f14}
 body{font-family:Poppins,"Segoe UI",system-ui,-apple-system,sans-serif;color:#0b0d12;-webkit-font-smoothing:antialiased;padding:24px 0;display:grid;gap:24px;justify-items:center}
 .slide{width:min(1200px,calc(100vw - 32px));aspect-ratio:1600/1160;container-type:inline-size;background:#fff;border-radius:14px;overflow:hidden;position:relative;box-shadow:0 30px 80px rgba(0,0,0,.35)}
 .slide[data-hidden]{opacity:.35;outline:3px dashed #f59e0b}
-.in{--u:calc(100cqw/1600);position:absolute;inset:0;padding:80u 90u}
+.slide>.in{--u:calc(100cqw/1600);position:absolute;inset:0;padding:80u 90u}
 .num{position:absolute;right:46u;bottom:34u;font-size:18u;font-weight:600;color:#9aa3b2;letter-spacing:.08em}
 h1,h2,b{font-weight:800}
 .title{font-size:56u;line-height:1.08;letter-spacing:-.01em;text-align:center;margin-bottom:44u}
@@ -327,7 +338,7 @@ h1,h2,b{font-weight:800}
 .icard-ico svg{width:46u;height:46u}
 .icard b{display:block;font-size:24u;margin-bottom:12u}.icard p{font-size:18u;line-height:1.55;color:#374151}
 /* cover */
-.cover .in{padding:0}
+.cover>.in{padding:0}
 .cover-panel{position:absolute;left:0;top:90u;width:690u;height:900u;background:#2b2d33;border-radius:0 60u 60u 0;padding:110u 80u;color:#fff}
 .client-logo{max-height:90u;max-width:260u;object-fit:contain;margin-bottom:40u;display:block}
 .eyebrow{color:var(--accent);font-size:40u;font-weight:600;letter-spacing:.02em;text-transform:uppercase;margin-bottom:18u;filter:brightness(1.35)}
@@ -342,7 +353,7 @@ h1,h2,b{font-weight:800}
 .agency.sm{position:static;height:34u;margin-top:18u;float:right}
 .copy{position:absolute;left:30u;bottom:16u;font-size:13u;color:#6b7280}
 /* goal */
-.goal .in{padding:0}
+.goal>.in{padding:0}
 .goal-panel{position:absolute;left:0;top:0;bottom:0;width:820u;background:#2b2d33;border-radius:0 70u 70u 0;padding:170u 110u;color:#fff}
 .goal-ico{display:grid;place-items:center;width:150u;height:150u;border-radius:50%;background:radial-gradient(circle,#fff 30%,#ffe3e3 31%,#ffe3e3 48%,#fff 49%,#fff 60%,#ffd1d1 61%);color:#e53935;margin-bottom:40u}
 .goal-ico svg{width:80u;height:80u;stroke-width:2.4}
@@ -451,7 +462,7 @@ h1,h2,b{font-weight:800}
 .expect .title{font-size:72u;max-width:1000u;margin:40u auto 60u}
 .exp{max-width:1080u;margin:0 auto;display:grid;gap:30u;text-align:center}.exp p{font-size:26u;line-height:1.6;color:#1f2937}
 /* investment */
-.investment .in{display:grid;grid-template-columns:500u 1fr;gap:70u;align-items:center}
+.investment>.in{display:grid;grid-template-columns:500u 1fr;gap:70u;align-items:center}
 .inv-phone{border-right:3u solid #111;padding-right:40u;height:100%;display:grid;place-items:center}
 .inv .title{text-align:center;margin-bottom:20u}
 .inv-bar{background:var(--accent);color:#fff;font-weight:600;font-size:30u;padding:16u 26u;text-transform:uppercase;letter-spacing:.02em}
@@ -634,6 +645,28 @@ h1,h2,b{font-weight:800}
 .hand-ok{flex:none;width:30u;height:30u;border-radius:50%;background:#16a34a;color:#fff;display:grid;place-items:center}.hand-ok svg{width:18u;height:18u}
 .hand-badge{justify-self:center;display:flex;align-items:center;gap:10u;background:#0b0d12;color:#fff;font-weight:700;font-size:18u;padding:14u 26u;border-radius:999px}.hand-badge svg{width:22u;height:22u;color:#4ade80}
 @media print{.hand-tile{opacity:1!important;transform:none!important}}
+/* your AI team */
+.aiteam{background:#f3f5f9}
+.aiteam .title{margin-bottom:20u}.aiteam .lead{margin:0 auto 30u}
+.ait{display:grid;grid-template-columns:repeat(3,1fr);gap:26u}
+.ait-col{background:#fff;border-radius:26u;padding:20u 22u 24u;box-shadow:0 16u 40u rgba(15,23,42,.08);display:flex;flex-direction:column;gap:10u}
+.ait-t{font-size:23u;margin-top:6u}.ait-p{font-size:16u;line-height:1.5;color:#4b5563}
+.ticks.dark li{color:#1f2937;font-size:15.5u}
+.ait-screen{height:330u;border-radius:18u;overflow:hidden;display:flex;flex-direction:column;font-size:12.5u;line-height:1.4}
+.tg{background:#dfe8ef}.tg-top{display:flex;align-items:center;gap:10u;padding:12u 14u;background:#2aabee;color:#fff}.tg-top i{width:34u;height:34u;border-radius:50%;background:#fff;color:#2aabee;display:grid;place-items:center}.tg-top i svg{width:20u;height:20u}.tg-top span{display:grid}.tg-top b{font-size:14u}.tg-top small{font-size:11u;opacity:.85}
+.tg-body,.crmai-body{flex:1;padding:12u;display:flex;flex-direction:column;gap:8u;overflow:hidden}
+.tg-body p,.crmai-body p{max-width:88%;padding:9u 11u;border-radius:14u}
+.tg-body p.in{background:#fff;align-self:flex-start;border-bottom-left-radius:4u}.tg-body p.out{background:#effdde;align-self:flex-end;border-bottom-right-radius:4u}
+.crmai{background:#f7f8fb;border:1px solid #e6e9ef}.crmai-top{display:flex;align-items:center;gap:10u;padding:12u 14u;background:#fff;border-bottom:1px solid #e6e9ef;font-weight:800;font-size:14u}.crmai-top .lg{height:24u;max-width:90u;object-fit:contain}.crmai-top span{margin-left:auto;color:var(--accent)}
+.crmai-body p.out{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:4u}
+.crmai-body p.in{align-self:flex-start;background:#fff;display:flex;gap:8u;box-shadow:0 2u 8u rgba(0,0,0,.05);border-bottom-left-radius:4u}.crmai-body p.in i{flex:none;width:24u;height:24u;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center}.crmai-body p.in i svg{width:14u;height:14u}.crmai-body u{color:var(--accent);text-decoration:none;font-weight:700}
+.crmai-input{margin:0 12u 12u;padding:10u 14u;border-radius:99px;background:#fff;border:1px solid #e3e6ec;color:#9aa1ad}
+.learn{background:linear-gradient(160deg,#eef3ff,#fff);padding:14u;gap:10u;justify-content:space-between}
+.learn-past{display:grid;gap:6u}.learn-past span{background:#fff;border-radius:12u;padding:7u 10u;font-size:12u;color:#4b5563;box-shadow:0 2u 6u rgba(0,0,0,.05);justify-self:start}
+.learn-past span:nth-child(2){justify-self:center}.learn-past span:nth-child(3){justify-self:end}
+.learn-brain{display:flex;align-items:center;gap:10u;justify-content:center}.learn-brain i{width:46u;height:46u;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;box-shadow:0 0 0 8u rgba(20,99,255,.15);animation:pulse 2s ease-in-out infinite}.learn-brain i svg{width:26u;height:26u}.learn-brain small{font-size:12u;font-weight:700;color:var(--accent)}
+@keyframes pulse{50%{box-shadow:0 0 0 14u rgba(20,99,255,.08)}}
+.learn-reply{display:flex;gap:8u;align-items:flex-end}.learn-reply p{background:var(--accent);color:#fff;border-radius:14u;border-bottom-left-radius:4u;padding:9u 11u;font-size:12.5u}.learn-reply .ad-av{width:30u;height:30u}
 .print-btn{position:fixed;top:16px;right:16px;padding:12px 20px;border:0;border-radius:12px;background:var(--accent);color:#fff;font:700 15px Poppins,system-ui;cursor:pointer;z-index:9;box-shadow:0 10px 30px rgba(20,99,255,.4)}
 @page{size:297mm 215.3mm;margin:0}
 @media print{html,body{background:#fff;padding:0;display:block}.slide{width:297mm;border-radius:0;box-shadow:none;page-break-after:always;break-after:page}.slide[data-hidden]{display:none}.no-print{display:none}.a,.notif,.serp-row,.rank i,.seg,.node,.chatui p{opacity:1!important;transform:none!important;transition:none!important}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
