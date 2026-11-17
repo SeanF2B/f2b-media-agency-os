@@ -2846,3 +2846,7 @@ html body .crm-detail-foot .crm-detail-book:hover { border-color: var(--brand-se
 html body .app-shell.dark-mode .crm-detail-foot, html body.f2b-dark .crm-detail-foot { border-top-color: #3a393d; }
 html body .app-shell.dark-mode .crm-detail-foot .crm-detail-book, html body.f2b-dark .crm-detail-foot .crm-detail-book { background: #27272a; color: #fff; border-color: #3f3f46; }
 @media (max-width: 700px) { html body .crm-detail-foot button { flex: 1; justify-content: center; padding: 0 10px; } }
+@media (max-width: 860px) {
+  html body .app-shell .sch.is-phone .sch-m-views[role="tablist"] { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)) !important; overflow: visible !important; }
+  html body .app-shell .sch.is-phone .sch-m-views[role="tablist"] > button { flex: none !important; width: 100% !important; text-align: center; }
+}
