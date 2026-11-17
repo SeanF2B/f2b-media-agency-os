@@ -5,7 +5,7 @@ import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from "re
 import { readFocusClient, setFocusClient, useFocusClient } from "@/lib/focus-client";
 import { BrandIcon } from "./brand-icon";
 import { ConnectionDots } from "./connection-dots";
-import { Briefcase, FileText, Globe, Check, Link2, Mail, MapPin, Megaphone, MessageCircle, Star, Search, type LucideIcon } from "lucide-react";
+import { Briefcase, CircleCheck, FileText, Globe, Check, Link2, Mail, MapPin, Megaphone, MessageCircle, Star, Search, type LucideIcon } from "lucide-react";
 import { AiVisibilityPanel } from "./ai-visibility-panel";
 import { RankTrackingPanel } from "./rank-tracking-panel";
 import { SiteFormsPanel } from "./site-forms-panel";
@@ -54,8 +54,8 @@ function SiteTemplatesPanel({ clients, onEdit }: { clients: OpsClient[]; onEdit:
 type SiteRow = { clientId: string; backend: string; previewUrl: string; repo: string; branch: string; updatedAt: string };
 // Where everything lives: Clients · Google Ads (Setup · Manage · Performance) · SEO (Setup · Research ·
 // Performance) · Sites (Overview · Forms · Email) · Reports. Google Maps listing lives in the client profile.
-const OPS_TABS: Array<[OperationsTab, string, LucideIcon]> = [["clients", "Clients", Briefcase], ["sites", "Sites", Globe], ["seo", "SEO", Search], ["ads", "Google Ads", Megaphone], ["reports", "Reports", FileText]];
-export type OperationsTab = "overview" | "clients" | "ads" | "seo" | "sites" | "reports" | "onboarding";
+const OPS_TABS: Array<[OperationsTab, string, LucideIcon]> = [["clients", "Clients", Briefcase], ["tasks", "Tasks", CircleCheck], ["sites", "Sites", Globe], ["seo", "SEO", Search], ["ads", "Google Ads", Megaphone], ["reports", "Reports", FileText]];
+export type OperationsTab = "overview" | "clients" | "tasks" | "ads" | "seo" | "sites" | "reports" | "onboarding";
 type SeoMode = "setup" | "keywords" | "competitors" | "backlinks" | "pages" | "overview" | "ranks" | "audit" | "ai";
 const SEO_MAIN: Array<{ key: string; label: string; views: Array<[SeoMode, string]> }> = [
   { key: "setup", label: "Setup", views: [["setup", "Setup"]] },
@@ -103,7 +103,7 @@ function wpAdminUrl(siteUrl: string) {
   try { const url = new URL(/^https?:\/\//i.test(siteUrl) ? siteUrl : `https://${siteUrl}`); return `${url.origin}${url.pathname.replace(/\/+$/, "").replace(/\/wp-admin$/, "")}/wp-admin/`; } catch { return siteUrl; }
 }
 
-export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab, onOpenPage, onOpenWebsite, onOpenDns, onStartOnboarding, onboarding, onCreateGbpTask, onCreateCommunityTask, renderTool, automations, onStartReviews, onEditClient, onPickClient }: { clientsView?: ReactNode; onPickClient?: (clientId: string) => void; 
+export function OperationsView({ tasksView, clientsView, clients, tasks, tab: rawTab, onTab, onOpenPage, onOpenWebsite, onOpenDns, onStartOnboarding, onboarding, onCreateGbpTask, onCreateCommunityTask, renderTool, automations, onStartReviews, onEditClient, onPickClient }: { tasksView?: ReactNode; clientsView?: ReactNode; onPickClient?: (clientId: string) => void; 
   onStartReviews?: (clientId: string) => string; onEditClient?: (clientId: string) => void;
   clients: OpsClient[]; tasks: OpsTask[]; tab: string; onTab: (tab: OperationsTab) => void;
   onOpenPage: (page: string, clientId?: string) => void; onOpenWebsite: (client: OpsClient) => void; onOpenDns: () => void;
@@ -166,7 +166,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
 
   const selected = active.find((client) => client.id === toolClientId) || active[0];
   // The top-bar client picker drives every Operations tool; when it's on "All clients", show the client being used there.
-  const needsClient = tab !== "clients" && tab !== "onboarding";
+  const needsClient = tab !== "clients" && tab !== "tasks" && tab !== "onboarding";
   // Email also works for the agency's own contacts when the agency is picked in the top bar.
   const agencyClient = clients.find((client) => /^agency$/i.test(client.name.trim()));
   const emailClient = agencyClient && toolClientId === agencyClient.id ? { ...agencyClient, id: "", name: "F2B Media (agency)" } : selected;
@@ -178,15 +178,15 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
     <div className="page-heading ops-heading"><div><p className="eyebrow">Agency</p><h1>Operations</h1></div>
     </div>
     <div className="ops-tabs" role="tablist" aria-label="Operations sections">
-      {OPS_TABS.filter(([key]) => (key !== "clients" || clientsView) && (!["seo", "ads", "reports"].includes(key) || renderTool)).map(([key, label, Icon]) => { const on = tab === key || (key === "clients" && tab === "onboarding"); return <button type="button" role="tab" key={key} aria-selected={on} className={on ? "active" : ""} onClick={() => { if (key === "clients") setWorkroom(false); onTab(key); }}><Icon size={16} strokeWidth={1.9} aria-hidden="true" className="ops-tab-icon" />{label}</button>; })}
+      {OPS_TABS.filter(([key]) => (key !== "clients" || clientsView) && (key !== "tasks" || tasksView) && (!["seo", "ads", "reports"].includes(key) || renderTool)).map(([key, label, Icon]) => { const on = tab === key || (key === "clients" && tab === "onboarding"); return <button type="button" role="tab" key={key} aria-selected={on} className={on ? "active" : ""} onClick={() => { if (key === "clients") setWorkroom(false); onTab(key); }}><Icon size={16} strokeWidth={1.9} aria-hidden="true" className="ops-tab-icon" />{label}</button>; })}
     </div>
 
     {tab === "clients" && <p className="ops-more">Also: {[["Meta Ads", "Meta Ads"], ["Proposals", "Proposals"]].map(([page, label], index) => <span key={page}>{index ? " · " : ""}<button type="button" className="text-button" onClick={() => { if (page === "Proposals") { setReportMode("proposals"); onTab("reports"); } else onOpenPage(page); }}>{label}</button></span>)}</p>}
     {tab === "clients" && <>
       <div className="ops-summary">
         <div><b>{active.length}</b><span>Active clients</span></div>
-        <button type="button" onClick={() => onOpenPage("Tasks")}><b>{rows.reduce((sum, row) => sum + row.openTasks, 0)}</b><span>Open tasks</span></button>
-        <button type="button" onClick={() => onOpenPage("Tasks")}><b>{totalApprovals}</b><span>Waiting for review</span></button>
+        <button type="button" onClick={() => tasksView ? onTab("tasks") : onOpenPage("Tasks")}><b>{rows.reduce((sum, row) => sum + row.openTasks, 0)}</b><span>Open tasks</span></button>
+        <button type="button" onClick={() => tasksView ? onTab("tasks") : onOpenPage("Tasks")}><b>{totalApprovals}</b><span>Waiting for review</span></button>
         <div className={issues ? "warn" : ""}><b>{issues}</b><span>Missing connections</span></div>
       </div>
       {clientsView ? clientsView : <>
@@ -195,8 +195,8 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
         <button type="button" className="ops-card-head" onClick={open} title={`Open ${client.name}`}>{client.logo ? <img src={client.logo} alt="" /> : <i style={{ background: client.color || "#d9dee3" }}>{client.name.slice(0, 1)}</i>}<span><b>{client.name}</b><small>{services.length ? services.join(" · ") : "No services yet"}</small></span><em className={isActiveClient(client) ? "on" : ""}>{isActiveClient(client) ? "Active" : "Inactive"}</em></button>
         <div className="ops-card-conn"><small>Integrations</small><ConnectionDots client={client} hasSite={Boolean(siteFor(client.id))} onOpen={(page) => onOpenPage(page, client.id)} /></div>
         <div className="ops-card-stats">
-          <button type="button" onClick={() => onOpenPage("Tasks")}><b>{openTasks}</b><small>Open tasks</small></button>
-          <button type="button" className={approvals ? "warn" : ""} onClick={() => onOpenPage("Tasks")}><b>{approvals}</b><small>To review</small></button>
+          <button type="button" onClick={() => tasksView ? onTab("tasks") : onOpenPage("Tasks")}><b>{openTasks}</b><small>Open tasks</small></button>
+          <button type="button" className={approvals ? "warn" : ""} onClick={() => tasksView ? onTab("tasks") : onOpenPage("Tasks")}><b>{approvals}</b><small>To review</small></button>
           <div><b>{(client.services || []).length}</b><small>Services</small></div>
         </div>
         <div className="ops-card-actions">{clientsView && onPickClient && <button type="button" className="primary-button" onClick={open}>Open client</button>}{onStartOnboarding && <button type="button" className="secondary-button" onClick={() => onStartOnboarding(client.id)}>Onboard</button>}<select aria-label={`Open a tool for ${client.name}`} value="" onChange={(event) => { const value = event.target.value; if (value === "website") onOpenWebsite(client); else if (value.startsWith("tab:")) { setToolClientId(client.id); onTab(value.slice(4) as OperationsTab); } else if (value === "profile") onEditClient?.(client.id); else if (value) onOpenPage(value, client.id); }}><option value="">Tools…</option><option value="website">Website builder</option><option value="tab:ads">Google Ads</option><option value="tab:seo">SEO &amp; AI</option><option value="tab:email">Email</option><option value="tab:reports">Reports</option><option value="Meta Ads">Meta Ads</option>{onEditClient && <option value="profile">Edit profile</option>}</select></div>
@@ -243,6 +243,7 @@ export function OperationsView({ clientsView, clients, tasks, tab: rawTab, onTab
     {tab === "sites" && sitesTab === "media" && renderTool && <div className="ops-embed" key={`media-${selected?.id || "all"}`}>{renderTool("media", selected?.id || "")}</div>}
     {tab === "sites" && sitesTab === "domains" && <div className="ops-embed ops-domains"><Suspense fallback={<div className="page-loading" role="status" aria-label="Loading domains…"><i /></div>}><DomainsDnsView /></Suspense></div>}
     {tab === "sites" && sitesTab === "email" && emailClient && <Suspense fallback={<div className="page-loading" role="status" aria-label="Loading email…"><i /></div>}><EmailMarketingView key={emailStart} initialMode={emailStart} clientId={emailClient.id} clientName={emailClient.name} clientLogo={emailClient.logo} clientColor={emailClient.color} /></Suspense>}
+    {tab === "tasks" && tasksView}
     {tab === "sites" && sitesTab === "automations" && automations && <div className="ops-embed ops-automations">{automations}</div>}
 
 

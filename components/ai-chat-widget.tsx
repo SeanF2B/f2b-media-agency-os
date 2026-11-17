@@ -38,7 +38,7 @@ const PAGE_HELP: Record<string, string[]> = {
 };
 const TOURS: Record<string, TourStep[]> = {
   CRM: [
-    { selector: ".tn-nav", title: "Your sections", text: "Everything lives up here: Dashboard, Leads, Tasks, Operations and Bookkeeping. Press A / D or the arrow keys to hop between them." },
+    { selector: ".tn-nav", title: "Your sections", text: "Everything lives up here: Dashboard, Leads, Operations (with Tasks inside) and Books. Press A / D or the arrow keys to hop between them." },
     { selector: ".crm-tabs", title: "Leads tabs", text: "Pipeline is your deal board. Contacts holds everyone you’ve spoken to, Conversations has texts, WhatsApp and emails, and Clients and Lead Factory are here too." },
     { selector: ".crm-toolbar", title: "Filter & add", text: "Search, filter by client, and add a new opportunity or contact from here." },
     { selector: ".crm-kanban", title: "The pipeline", text: "Each column is a stage. Drag cards across as deals move forward. Drag a column’s header to reorder stages." },

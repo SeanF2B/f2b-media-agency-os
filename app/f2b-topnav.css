@@ -3031,3 +3031,25 @@ html body .app-shell .crecent-open { display: grid; width: 100%; padding: 0; bor
 html body .app-shell .crecent-card > .rep-actions { position: absolute; top: 8px; right: 8px; opacity: 0; transition: opacity .15s ease; }
 html body .app-shell .crecent-card:hover > .rep-actions, html body .app-shell .crecent-card:focus-within > .rep-actions { opacity: 1; }
 @media (hover: none) { html body .app-shell .crecent-card > .rep-actions { opacity: 1; } }
+
+/* Task table: Stage column with ‹ › step buttons, editable Frequency column */
+html body .app-shell .tt-c-stage { width: 178px; }
+html body .app-shell .tt-c-repeat { width: 132px; }
+html body .app-shell .tt-stage { display: flex; align-items: center; gap: 4px; }
+html body .app-shell .tt-stage .tt-pill { flex: 1 1 auto; min-width: 0 !important; }
+html body .app-shell .tt-stage-step { flex: 0 0 24px; width: 24px; height: 28px; padding: 0 !important; border: 0 !important; border-radius: 7px !important; background: rgba(127,138,160,.14) !important; color: inherit; font-size: 16px; font-weight: 700; line-height: 1; cursor: pointer; }
+html body .app-shell .tt-stage-step:disabled { opacity: .3; cursor: default; transform: none !important; }
+html body .app-shell .tt-freq-cell { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+html body .app-shell .tt-freq { appearance: none; -webkit-appearance: none; height: 28px; padding: 0 10px !important; border: 0 !important; border-radius: 99px !important; font: inherit; font-size: 12px; font-weight: 700; background: rgba(127,138,160,.14) !important; color: inherit; cursor: pointer; }
+html body .app-shell .tt-freq.on { background: rgba(140,108,242,.14) !important; color: #6d4fd8; }
+body.f2b-dark .app-shell .tt-freq.on, .app-shell.dark-mode .tt-freq.on { color: #c3b2ff; }
+html body .app-shell .tt-freq option { color: #1f2a33; background: #fff; }
+html body .app-shell .tt-repeat.off { background: rgba(127,138,160,.14); color: inherit; }
+html body .app-shell .tt-mobile-freq { display: none; }
+@media (max-width: 860px) {
+  html body .app-shell .tt-mobile-freq { display: inline-block; margin: 6px 0 0 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: rgba(127,138,160,.14); }
+  html body .app-shell .tt-mobile-freq.on { background: rgba(140,108,242,.14); color: #6d4fd8; }
+}
+/* Tasks inside Operations: the Operations heading already names the page */
+html body .app-shell .ops-tasks { margin-top: 6px; }
+html body .app-shell .ops-tasks .task-page-heading h1, html body .app-shell .ops-tasks .task-page-heading .eyebrow { display: none; }
