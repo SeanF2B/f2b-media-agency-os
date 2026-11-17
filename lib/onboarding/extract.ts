@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { readLandingPage } from "@/lib/landing-page-reader";
 import { aiConfigured, aiEndpoint, aiHeaders, aiModel, resolveAiProvider } from "@/lib/ai-provider";
+import { extractBasicsFromHtml } from "./engine.mjs";
 
 // Business information extraction shared by the internal wizard ("✨ Fill from website") and the public funnel.
 // Reads the public website (home + a few key pages) or uploaded document text and has the AI fill the onboarding
@@ -45,7 +46,7 @@ export function outputText(payload: any) {
 }
 
 export const EXTRACT_FIELDS = ["company", "contact", "email", "phone", "description", "serviceAreas", "idealCustomers", "services", "primaryColour", "secondaryColour", "websitePages"] as const;
-export type Extracted = Record<(typeof EXTRACT_FIELDS)[number], string> & { logo: string; pagesRead: number; sourceText: string; html: string; url: string };
+export type Extracted = Record<(typeof EXTRACT_FIELDS)[number], string> & { logo: string; pagesRead: number; sourceText: string; html: string; url: string; aiUsed: boolean; aiError?: string; industry?: string };
 
 async function aiFill(ownerId: string, instructions: string, input: Record<string, unknown>) {
   const provider = await resolveAiProvider(env, ownerId);
@@ -85,8 +86,23 @@ export async function extractFromWebsite(ownerId: string, website: string, name 
   const withTimeout = <T,>(work: Promise<T>, ms: number) => Promise.race([work, new Promise<null>((resolve) => setTimeout(() => resolve(null), ms))]);
   const pages = await Promise.all([url.toString(), ...found.links.slice(0, 3)].map((page) => withTimeout(readLandingPage(page).catch(() => null), 8_000)));
   const text = pages.filter((page) => page?.status === "connected").map((page) => `PAGE ${page!.url}\nTITLE ${page!.title || ""}\n${page!.description || ""}\n${(page!.text || "").slice(0, 3500)}`).join("\n\n").slice(0, 12_000);
-  const parsed = await aiFill(ownerId, WEBSITE_INSTRUCTIONS, { business: String(name || "").slice(0, 120), website: url.toString(), phonesOnSite: found.phones, emailsOnSite: found.emails, structuredData: found.jsonLd, themeColor: found.themeColor, frequentColours: found.topColours, pages: text });
-  return { ...clean(parsed, found), logo: found.logo && /^https:\/\//.test(found.logo) ? found.logo : "", pagesRead: pages.filter((page) => page?.status === "connected").length, sourceText: `${text}\n${found.jsonLd}`.slice(0, 16_000), html, url: url.toString() };
+  const logo = found.logo && /^https:\/\//.test(found.logo) ? found.logo : "";
+  const pagesRead = pages.filter((page) => page?.status === "connected").length;
+  const sourceText = `${text}\n${found.jsonLd}`.slice(0, 16_000);
+  try {
+    const parsed = await aiFill(ownerId, WEBSITE_INSTRUCTIONS, { business: String(name || "").slice(0, 120), website: url.toString(), phonesOnSite: found.phones, emailsOnSite: found.emails, structuredData: found.jsonLd, themeColor: found.themeColor, frequentColours: found.topColours, pages: text });
+    return { ...clean(parsed, found), logo, pagesRead, sourceText, html, url: url.toString(), aiUsed: true };
+  } catch (error) {
+    // AI unavailable (no credit, timeout, provider down): still read what the site states, straight from its HTML.
+    const basic = extractBasicsFromHtml(html, url.toString());
+    const colours = found.topColours.filter((colour) => !/^#(?:[0-2][0-9a-f]){3}$|^#(?:[d-f][0-9a-f]){3}$/i.test(colour));
+    const primary = /^#[0-9a-f]{6}$/i.test(found.themeColor) ? found.themeColor.toLowerCase() : colours[0] || "";
+    return {
+      company: basic.company, contact: "", email: basic.email || found.emails[0] || "", phone: basic.phone || found.phones[0] || "", description: basic.description, serviceAreas: basic.serviceAreas,
+      idealCustomers: "", services: basic.services, primaryColour: primary, secondaryColour: colours.find((colour) => colour !== primary) || "", websitePages: "",
+      industry: basic.industry, logo, pagesRead, sourceText, html, url: url.toString(), aiUsed: false, aiError: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 /** Extracts onboarding fields from uploaded document text (brochures, PDFs, site files, brand guidelines). */

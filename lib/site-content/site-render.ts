@@ -5,7 +5,7 @@ const esc = (v: any) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp
 const arr = (v: any) => (Array.isArray(v) ? v : []);
 const paras = (t: any) => String(t ?? "").split(/\n{2,}/).map((x) => `<p>${esc(x).replace(/\n/g, "<br>")}</p>`).join("");
 
-export type RenderCtx = { clientId: string; base: string; theme: { primary: string; secondary: string; font: string; radius: number; name: string }; pages: Array<{ slug: string; title: string; url: string }>; phone: string; current: string };
+export type RenderCtx = { clientId: string; base: string; theme: { primary: string; secondary: string; font: string; radius: number; name: string; logo?: string }; pages: Array<{ slug: string; title: string; url: string }>; phone: string; current: string };
 
 const img = (ctx: RenderCtx, p: any) => { const s = String(p || ""); if (!s) return ""; if (/^https:\/\//.test(s)) return s; return `${ctx.base}?c=${encodeURIComponent(ctx.clientId)}&img=${encodeURIComponent(s)}`; };
 const href = (ctx: RenderCtx, link: any) => {
@@ -84,8 +84,8 @@ export function renderPage(page: any, ctx: RenderCtx): string {
 .split{display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:center}.split.rev img{order:2}.split img{border-radius:var(--r)}@media(max-width:760px){.split{grid-template-columns:1fr}.split.rev img{order:0}.hero{padding:64px 0}}
 .gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-top:18px}.gal img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:var(--r)}details{background:#fff;border:1px solid #e3e8ee;border-radius:var(--r);padding:14px 18px;margin:10px 0}summary{font-weight:700;cursor:pointer}figure{margin:0}figcaption{color:#4d5b6a;font-size:14px;margin-top:6px}
 .cta{background:var(--s);color:#fff;text-align:center;padding:64px 0}.cta p{max-width:560px;margin:0 auto 6px;opacity:.95}.form{display:grid;gap:10px;margin-top:14px}.form input,.form textarea{font:inherit;padding:12px 14px;border:1px solid #cfd8e2;border-radius:var(--r);width:100%}.hp{position:absolute;left:-9999px}
-footer.site{background:#10161d;color:#b9c4d0;padding:28px 0;font-size:14px;text-align:center}
-${luxCss}</style></head><body><header class="top"><div class="wrap"><b>${esc(t.name || "")}</b><nav>${nav}</nav>${ctx.phone ? `<a class="call" href="tel:${esc(ctx.phone.replace(/[^+\d]/g, ""))}">${esc(ctx.phone)}</a>` : ""}</div></header>
+header.top img.logo{max-height:44px;max-width:180px;width:auto;object-fit:contain;background:#fff;border-radius:6px;padding:4px 6px}footer.site{background:#10161d;color:#b9c4d0;padding:28px 0;font-size:14px;text-align:center}
+${luxCss}</style></head><body><header class="top"><div class="wrap">${t.logo && /^https:\/\//.test(t.logo) ? `<img class="logo" src="${esc(t.logo)}" alt="${esc(t.name || "")}">` : `<b>${esc(t.name || "")}</b>`}<nav>${nav}</nav>${ctx.phone ? `<a class="call" href="tel:${esc(ctx.phone.replace(/[^+\d]/g, ""))}">${esc(ctx.phone)}</a>` : ""}</div></header>
 ${body}
 <footer class="site"><div class="wrap">© ${new Date().getFullYear()} ${esc(t.name || "")}</div></footer><script>document.querySelectorAll('input[name="page"]').forEach(function(i){if(!i.value)i.value=location.href})</script></body></html>`;
 }

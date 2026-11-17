@@ -84,4 +84,11 @@ export function validateUpload(name: string, declaredType: string, bytes: Uint8A
 export function zipEntries(bytes: Uint8Array | ArrayBuffer, options?: { maxEntries?: number; maxBytes?: number }): { ok: true; entries: Array<{ name: string; size: number }>; total: number } | { ok: false; error: string };
 export function htmlToText(html: string): string;
 export function pdfText(bytes: Uint8Array | ArrayBuffer, inflate: (data: Uint8Array) => Uint8Array, maxChars?: number): string;
+export function extractBasicsFromHtml(html: string, url?: string): { company: string; description: string; phone: string; email: string; serviceAreas: string; services: string; address: string; industry: string; url: string };
+export function friendlyAiError(message: unknown, audience?: "customer" | "agency"): string;
+export function siteImages(html: string, baseUrl: string, max?: number): string[];
+export const SITE_TEMPLATES: Record<string, { label: string; font: string; radius: number; blurb: string }>;
+export function pickTemplate(industry?: string, description?: string): string;
+export type PreviewSite = { template: string; templates: Array<{ key: string; label: string; blurb: string }>; theme: { primary: string; secondary: string; font: string; radius: number; name: string; logo: string; phone: string }; page: { slug: string; title: string; url: string; seo: { title: string; description: string }; blocks: Array<{ type: string; props: Record<string, unknown> }> }; photos: number };
+export function buildPreviewSite(input?: { answers?: Answers; profile?: BusinessProfile | Record<string, unknown>; images?: string[]; copy?: Record<string, any> | null; template?: string }): PreviewSite;
 export const TURNSTILE_VERIFY_URL: string;

@@ -3,6 +3,8 @@ import { getChatGPTUser } from "../../chatgpt-auth";
 import { getGoogleAdsAccountWebsite } from "@/lib/google-ads-direct";
 import { ExtractError, extractFromWebsite } from "@/lib/onboarding/extract";
 import { cacheExtractedProfile } from "@/lib/onboarding/server";
+import { friendlyAiError } from "@/lib/onboarding/engine.mjs";
+const E = { friendlyAiError };
 
 // Operations → Onboarding → "Fill from website": reads the client's public website (home + a few key pages)
 // and has the AI pre-fill the questionnaire. Returns suggestions only; the person reviews before saving.
@@ -40,8 +42,8 @@ export async function POST(request: Request) {
     const found = await extractFromWebsite(auth.ownerId, String(body.url || ""), String(body.name || ""));
     // Cache for reuse by audits, website generation, ads and SEO. Never blocks the reply.
     await cacheExtractedProfile(auth.ownerId, found.url, found).catch(() => undefined);
-    const { sourceText: _sourceText, html: _html, url: _url, ...fields } = found;
-    return respond(fields);
+    const { sourceText: _sourceText, html: _html, url: _url, aiError, aiUsed, ...fields } = found;
+    return respond({ ...fields, ...(aiUsed ? {} : { note: `AI was unavailable, so only the basics the site states were read. ${E.friendlyAiError(aiError, "agency")}` }) });
   } catch (error) {
     if (error instanceof ExtractError) return respond({ error: error.message }, error.status);
     return respond({ error: "Couldn’t fill from the website. Try again." }, 502);

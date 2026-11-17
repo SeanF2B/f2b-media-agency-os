@@ -12,7 +12,7 @@ export async function renderStartPage(request: Request, token = "") {
   const ancestors = ["'self'", ...embedHosts.flatMap((host) => [`https://${host}`, `https://*.${host}`])].join(" ");
   const csp = [
     "default-src 'none'", `script-src 'nonce-${nonce}' https://challenges.cloudflare.com`, "style-src 'unsafe-inline'", "img-src 'self' https: data:", "font-src 'self'",
-    "connect-src 'self'", "frame-src https://challenges.cloudflare.com", `frame-ancestors ${ancestors}`, "base-uri 'none'", "form-action 'self'",
+    "connect-src 'self'", "frame-src 'self' https://challenges.cloudflare.com", `frame-ancestors ${ancestors}`, "base-uri 'none'", "form-action 'self'",
   ].join("; ");
   const safeToken = String(token || "").replace(/[^\w.-]/g, "").slice(0, 1500);
   const html = PAGE.replace(/__NONCE__/g, nonce).replace("__TOKEN__", safeToken);
@@ -37,7 +37,7 @@ body.embed{background:transparent;min-height:0}
 .brand i{width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,var(--brand),var(--brand2));display:grid;place-items:center;color:#fff;font-style:normal;font-size:15px;box-shadow:0 6px 18px rgba(20,99,255,.35)}
 .save{font-size:12px;color:var(--muted)}
 .bar{height:6px;border-radius:99px;background:#e6eaf2;overflow:hidden;margin-bottom:18px}.bar b{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--brand),var(--brand2));border-radius:99px;transition:width .5s cubic-bezier(.2,.8,.2,1)}
-.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:22px;box-shadow:0 12px 40px rgba(15,23,42,.06);animation:in .35s cubic-bezier(.2,.8,.2,1)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:22px;box-shadow:0 12px 40px rgba(15,23,42,.06)}.card.anim{animation:in .35s cubic-bezier(.2,.8,.2,1)}
 @keyframes in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 h1{font-size:clamp(26px,6vw,36px);line-height:1.15;letter-spacing:-.02em;margin:0 0 8px}h2{font-size:22px;letter-spacing:-.01em;margin:0 0 6px}h3{font-size:16px;margin:0 0 4px}
 p.lead{color:var(--muted);margin:0 0 18px;font-size:17px}
@@ -105,6 +105,19 @@ textarea{min-height:96px;resize:vertical}
 .actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin:12px 0}
 .adprev{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:8px 0;background:#fff;font-family:arial,sans-serif}.adprev .sp{font-size:12px;color:#202124}.adprev .t{color:#1a0dab;font-size:18px;line-height:1.3}.adprev .d{color:#4d5156;font-size:14px}
 .siteprev{border-radius:14px;overflow:hidden;border:1px solid var(--line)}.siteprev .hero{padding:26px 18px;color:#fff}.siteprev .hero h3{font-size:22px;color:#fff}.siteprev .sec{padding:12px 18px;border-top:1px solid var(--line)}
+.launch{display:grid;place-items:center;text-align:center;gap:10px;padding:26px 16px;border-radius:18px;background:linear-gradient(135deg,#0b1220,#1b2a4a);color:#e6edff;margin:14px 0;position:relative;overflow:hidden}
+.launch:before{content:"";position:absolute;inset:-40%;background:conic-gradient(from 0deg,transparent,rgba(124,58,237,.35),transparent 30%);animation:spin 6s linear infinite}
+.launch>*{position:relative}.launch h3{color:#fff;font-size:20px}.launch p{margin:0;color:#c7d2fe;font-size:14px;max-width:420px}
+.launch .btn{font-size:18px;padding:16px 26px;margin-top:6px}
+.chiprow{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.device{margin:14px auto 8px;border-radius:16px;background:#0b1220;padding:10px 10px 14px;box-shadow:0 20px 50px rgba(15,23,42,.25);transition:max-width .35s}
+.device.laptop{max-width:100%}.device.phone{max-width:330px;border-radius:34px;padding:14px 10px 18px}
+.device .dots{display:flex;gap:5px;margin:0 0 8px 4px}.device .dots i{width:8px;height:8px;border-radius:50%;background:#334155}
+.device iframe{display:block;width:100%;border:0;border-radius:8px;background:#fff;height:520px}.device.phone iframe{height:600px;border-radius:22px}
+.seg{display:inline-flex;border:1.5px solid var(--line);border-radius:99px;padding:3px;gap:2px}.seg button{border:0;background:transparent;border-radius:99px;padding:6px 12px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;color:var(--muted)}.seg button.on{background:var(--ink);color:#fff}
+.bar2{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.pkg{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:14px;border-radius:14px;background:#f8fafc;margin:12px 0}.pkg b{font-size:18px}
+body.wide .wrap{max-width:1080px}body.wide .device.laptop iframe{height:640px}
 .muted{color:var(--muted)}.small{font-size:13px}.center{text-align:center}.hide{display:none!important}
 .foot{text-align:center;color:var(--muted);font-size:12px;margin-top:18px}
 #ts{margin:14px 0 0;min-height:0}
@@ -159,12 +172,19 @@ new ResizeObserver(resize).observe(document.body);
 function setSession(s){ state.session = s; if (s && s.token) store(s.token); progress(); }
 function fail(e){ state.busy = false; state.error = e && e.message || "Something went wrong."; render(); }
 function q(key){ return state.config.questions[key] || { label: key, kind: "text" }; }
+function mountEl(node){ var key = "s:" + (state.session ? state.session.step + ":" + state.session.paymentStatus : "welcome"); if (state.shown !== key) node.classList.add("anim"); state.shown = key; app.replaceChildren(node); resize(); }
+// Mounts a screen. Only a new screen slides in; updates to the same screen (taps, AI chips) never move it.
+function mount(screenKey, kids){
+  var card = el("div", { cls: "card" + (state.shown !== screenKey ? " anim" : "") }, kids);
+  state.shown = screenKey;
+  app.replaceChildren(card); resize();
+}
 function step(){ var s = state.session; return s && (s.steps.find(function(x){ return x.key === s.step; }) || s.steps[0]); }
 
 // ---------- boot ----------
 fetch(API + "?config=1", { credentials: "same-origin" }).then(function(r){ return r.json(); }).then(function(cfg){
   state.config = cfg;
-  if (!cfg.enabled) { app.replaceChildren(el("div", { cls: "card" }, [el("h2", { text: "We're updating online onboarding" }), el("p", { cls: "lead", text: "Please get in touch and we'll help you directly." })])); return; }
+  if (!cfg.enabled) { mountEl(el("div", { cls: "card" }, [el("h2", { text: "We're updating online onboarding" }), el("p", { cls: "lead", text: "Please get in touch and we'll help you directly." })])); return; }
   var token = LINK || stored();
   if (token) return api({ action: "start", link: token, query: location.search.slice(1), referrer: document.referrer, embedHost: embedHost() }).then(function(r){
     setSession(r.session);
@@ -174,7 +194,7 @@ fetch(API + "?config=1", { credentials: "same-origin" }).then(function(r){ retur
     render();
   }).catch(function(){ store(""); LINK = ""; welcome(); });
   welcome();
-}).catch(function(){ app.replaceChildren(el("div", { cls: "card" }, [el("p", { text: "We couldn't load this page. Please refresh." })])); });
+}).catch(function(){ mountEl(el("div", { cls: "card" }, [el("p", { text: "We couldn't load this page. Please refresh." })])); });
 function embedHost(){ try { return embed && document.referrer ? new URL(document.referrer).hostname : ""; } catch (e) { return ""; } }
 
 function welcome(){
@@ -184,7 +204,7 @@ function welcome(){
   var routes = state.config.routes.map(function(r){
     return el("button", { cls: "route", type: "button", on: { click: function(){ begin(r.key); } } }, [el("span", { cls: "ic", text: icons[r.key] || "✨" }), el("span", {}, [el("b", { text: r.title }), el("span", { text: r.blurb })]), el("span", { cls: "go", text: "→" })]);
   });
-  var card = el("div", { cls: "card" }, [
+  var card = el("div", { cls: "card" + (state.shown !== "welcome" ? " anim" : "") }, [
     el("div", { cls: "assistant" }, [el("span", { cls: "av" }), el("div", { cls: "msg", text: "Hi! I'm your F2B marketing assistant. I'll work alongside you to understand your business and show you exactly where more customers can come from." })]),
     el("h1", { text: "How can we help today?" }),
     el("p", { cls: "lead", text: "Pick a starting point. It takes about 3 minutes and you can change direction any time." }),
@@ -192,7 +212,7 @@ function welcome(){
     el("div", { id: "ts" }),
     state.error ? el("div", { cls: "err", text: state.error }) : null,
   ]);
-  app.replaceChildren(card);
+  state.shown = "welcome"; app.replaceChildren(card);
   turnstile();
   if (pre && state.config.routes.some(function(r){ return r.key === pre; }) && !state.config.turnstileSiteKey) begin(pre);
 }
@@ -217,6 +237,7 @@ function render(){
   progress(); resize();
   if (s.paymentStatus === "paid") return paidScreen();
   var st = step();
+  if (st.result !== "plan") document.body.classList.remove("wide");
   if (st.result === "audit") return auditScreen();
   if (st.result === "plan") return planScreen();
   questionScreen(st);
@@ -237,7 +258,7 @@ function questionScreen(st){
     idx > 0 ? el("button", { cls: "link", type: "button", text: "← Back", on: { click: function(){ go(s.steps[idx - 1].key); } } }) : el("span"),
     el("button", { cls: "btn", type: "button", id: "next", text: st.contact ? "Continue" : "Next →", on: { click: function(){ next(st); } } }),
   ]));
-  app.replaceChildren(el("div", { cls: "card" }, kids));
+  mount("q:" + st.key, kids);
 }
 function val(key){ var a = state.session.answers[key]; return Array.isArray(a) ? a : (a || ""); }
 function fromTag(key){
@@ -258,7 +279,8 @@ function question(key){
         var a = state.session.answers;
         if (spec.kind === "multi") { var list = Array.isArray(a[key]) ? a[key].slice() : []; var i = list.indexOf(o); if (i >= 0) list.splice(i, 1); else list.push(o); a[key] = list; }
         else a[key] = o;
-        render();
+        // Update the buttons in place: no re-render, so nothing jumps.
+        Array.prototype.forEach.call(wrap.children, function(btn){ var picked = spec.kind === "multi" ? a[key].indexOf(btn.textContent) >= 0 : a[key] === btn.textContent; btn.classList.toggle("on", picked); btn.setAttribute("aria-pressed", picked ? "true" : "false"); });
       } } }));
     });
     box.appendChild(wrap); return box;
@@ -302,7 +324,7 @@ function sourcesBlock(){
   var read = el("button", { cls: "btn", type: "button", text: s.profile && s.profile.businessName ? "Re-read website" : "Read my website", on: { click: function(){
     if (!site.value.trim()) { state.error = "Enter your website address first."; return render(); }
     read.disabled = true; read.textContent = "Reading your site…"; state.error = "";
-    api({ action: "extract", t: t(), website: site.value }).then(function(r){ setSession(r.session); state.notice = r.filled ? ("I found " + r.filled + " details on your website. Check them as you go.") : "I read your site — fill in anything I missed."; render(); }).catch(fail);
+    api({ action: "extract", t: t(), website: site.value }).then(function(r){ setSession(r.session); state.notice = r.aiUsed === false ? (r.filled ? "I read the basics from your website (" + r.filled + " details). Fill in anything I missed — I'll suggest more when AI is back." : "I couldn't find much on your website — just type the details in.") : r.filled ? ("I found " + r.filled + " details on your website. Check them as you go.") : "I read your site — fill in anything I missed."; render(); }).catch(fail);
   } } });
   kids.push(el("div", { cls: "q" }, [el("label", { cls: "l", for: "f_website", text: q("website").label }), site, el("div", { cls: "aibar" }, [read])]));
   if (state.notice) kids.push(el("div", { cls: "ok", text: state.notice }));
@@ -356,16 +378,16 @@ function next(st){
 function auditScreen(){
   var s = state.session;
   if (!state.audit || state.audit.id !== s.auditId) {
-    app.replaceChildren(el("div", { cls: "card" }, [loader({ progress: 0, stages: state.config.auditStages.map(function(x){ return { label: x.label }; }) })]));
+    mountEl(el("div", { cls: "card" }, [loader({ progress: 0, stages: state.config.auditStages.map(function(x){ return { label: x.label }; }) })]));
     api({ action: "audit_start", t: t() }).then(function(r){ state.audit = r.audit; setSession(Object.assign(s, { auditId: r.audit.id })); pump(); }).catch(function(e){ state.error = e.message; auditFailed(); });
     return;
   }
-  if (state.audit.status !== "done") { app.replaceChildren(el("div", { cls: "card" }, [loader(state.audit)])); return; }
+  if (state.audit.status !== "done") { mountEl(el("div", { cls: "card" }, [loader(state.audit)])); return; }
   report();
 }
 function pump(){
   if (!state.audit || state.audit.status === "done" || state.audit.status === "failed") { if (state.audit && state.audit.status === "failed") return auditFailed(); return render(); }
-  app.replaceChildren(el("div", { cls: "card" }, [loader(state.audit)])); resize();
+  mountEl(el("div", { cls: "card" }, [loader(state.audit)])); resize();
   api({ action: "audit_step", t: t() }).then(function(r){ state.audit = r.audit; setTimeout(pump, r.audit.status === "done" ? 0 : 400); }).catch(function(e){ state.error = e.message; setTimeout(pump, 2500); });
 }
 function loader(a){
@@ -375,7 +397,7 @@ function loader(a){
     el("div", { cls: "screen", role: "status" }, [el("div", { cls: "scan" }), el("h3", { text: "> auditing " + ((state.session && state.session.answers.website) || "your business").replace(/^https?:\/\//, "") }), el("div", {}, stages), el("div", { cls: "pct", text: (a.progress || 0) + "%" })]),
   ]);
 }
-function auditFailed(){ app.replaceChildren(el("div", { cls: "card" }, [el("h2", { text: "We couldn't finish the audit" }), el("div", { cls: "err", text: state.error || "The website didn't respond." }), el("div", { cls: "nav" }, [el("button", { cls: "link", type: "button", text: "← Change website", on: { click: function(){ state.audit = null; go("source"); } } }), el("button", { cls: "btn", type: "button", text: "See recommendations", on: { click: function(){ go("contact"); } } })])])); }
+function auditFailed(){ mountEl(el("div", { cls: "card" }, [el("h2", { text: "We couldn't finish the audit" }), el("div", { cls: "err", text: state.error || "The website didn't respond." }), el("div", { cls: "nav" }, [el("button", { cls: "link", type: "button", text: "← Change website", on: { click: function(){ state.audit = null; go("source"); } } }), el("button", { cls: "btn", type: "button", text: "See recommendations", on: { click: function(){ go("contact"); } } })])])); }
 function ring(v, label){
   var r = 26, c = 2 * Math.PI * r, pct = v == null ? 0 : Math.max(0, Math.min(100, v)), col = v == null ? "#cbd5e1" : pct >= 80 ? "#16a34a" : pct >= 50 ? "#d97706" : "#dc2626";
   var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg"); svg.setAttribute("viewBox", "0 0 64 64");
@@ -399,7 +421,7 @@ function report(){
     if (a.local && a.local.competitors && a.local.competitors.length) kids.push(el("div", { cls: "finding" }, [el("h3", { text: "Who's winning on Google Maps for “" + a.local.keyword + "”" }), el("p", { cls: "small", text: a.local.competitors.slice(0, 5).map(function(c){ return "#" + c.rank + " " + c.name + (c.reviewCount != null ? " (" + c.reviewCount + " reviews)" : ""); }).join(" · ") }), basisTag("verified")]));
     kids.push(el("div", { cls: "nav" }, [el("span"), el("button", { cls: "btn", type: "button", text: "See my recommendations →", on: { click: function(){ go("plan"); } } })]));
   }
-  app.replaceChildren(el("div", { cls: "card" }, kids));
+  mountEl(el("div", { cls: "card" }, kids));
 }
 function unlockForm(n){
   var a = state.session.answers;
@@ -415,37 +437,62 @@ function unlockForm(n){
   return el("div", { cls: "card", style: "max-width:420px;width:100%" }, [el("h3", { text: n + " more finding" + (n === 1 ? "" : "s") + " + your recommendations" }), el("p", { cls: "small muted", text: "Free. We'll email you a copy too." }), el("div", { cls: "sources" }, [name, email, phone]), el("label", { cls: "consent" }, [consent, el("span", { text: state.config.consentText })]), err, btn]);
 }
 
-// ---------- plan, offer, previews, checkout ----------
+// ---------- plan: one Launch button → their new website → get started ----------
 function planScreen(){
   var s = state.session;
-  if (!state.rec) { app.replaceChildren(el("div", { cls: "card" }, [el("p", { cls: "muted", text: "Putting your recommendations together…" })])); api({ action: "recommend", t: t() }).then(function(r){ state.rec = r.recommendation; state.quote = r.quote; state.picked = r.quote.services.slice(); render(); }).catch(fail); return; }
-  var r = state.rec, kids = [], cfg = state.config, cur = cfg.pricing.currency;
-  kids.push(el("div", { cls: "assistant" }, [el("span", { cls: "av" }), el("div", { cls: "msg", text: s.paymentStatus === "checkout_started" ? "Welcome back! Your checkout wasn't completed — you can pick up right where you left off." : r.headline || "Here's what I'd recommend." })]));
-  kids.push(el("h2", { text: "Your personalised recommendations" }));
-  if (r.opportunities && r.opportunities.length) kids.push(el("div", { cls: "finding" }, [el("h3", { text: "Biggest opportunities" }), el("p", { cls: "small", text: r.opportunities.join(" · ") })]));
-  var svcs = el("div", { cls: "services" });
-  var all = Object.keys(cfg.pricing.services);
-  var ordered = (r.services || []).map(function(x){ return x.service; }).filter(function(k){ return all.indexOf(k) >= 0; });
-  all.forEach(function(k){ if (ordered.indexOf(k) < 0) ordered.push(k); });
-  ordered.forEach(function(k){
-    var p = cfg.pricing.services[k], recd = (r.services || []).find(function(x){ return x.service === k; }), on = state.picked.indexOf(k) >= 0;
-    var box = el("input", { type: "checkbox" }); box.checked = on;
-    svcs.appendChild(el("label", { cls: "svc" + (on ? " on" : "") }, [box, el("span", {}, [el("b", { text: p.label }), recd ? el("span", { cls: "tag ai", text: "Recommended" }) : null, el("small", { text: recd && recd.reason || "" })]), el("span", { cls: "price" }, [el("span", { text: money(p.monthly * 100, cur) }), el("small", { text: "/mo" }), p.setupFee ? el("small", { text: " + " + money(p.setupFee * 100, cur) + " setup" }) : null])]));
-    box.addEventListener("change", function(){ var i = state.picked.indexOf(k); if (i >= 0) state.picked.splice(i, 1); else state.picked.push(k); requote(); });
+  if (!state.rec) { mountEl(el("div", { cls: "card" }, [el("p", { cls: "muted", text: "Putting your recommendations together…" })])); api({ action: "recommend", t: t() }).then(function(r){ state.rec = r.recommendation; state.quote = r.quote; state.picked = r.quote.services.slice(); render(); }).catch(fail); return; }
+  if (state.launching) return launchLoader();
+  var r = state.rec, cfg = state.config, cur = cfg.pricing.currency, site = s.site, kids = [];
+  kids.push(el("div", { cls: "assistant" }, [el("span", { cls: "av" }), el("div", { cls: "msg", text: site ? "Here's your new website, built from our templates with your logo, colours and photos. Try another style, then get started when you're ready." : (r.headline || "Here's what I'd recommend.") + " Hit Launch and I'll build your new website right now." })]));
+  kids.push(el("h2", { text: site ? "Your new website" : "Your plan" }));
+  kids.push(el("div", { cls: "chiprow" }, (r.services || []).slice(0, 4).map(function(x){ return el("span", { cls: "tag ai", text: x.service }); })));
+  if (!site) {
+    kids.push(el("div", { cls: "launch" }, [el("h3", { text: "See your new website" }), el("p", { text: "We'll build it from our proven templates using your logo, brand colours and photos from your current site." }), el("button", { cls: "btn", type: "button", text: "🚀 Launch", on: { click: function(){ launch(""); } } })]));
+  } else {
+    var view = state.device || "laptop";
+    kids.push(el("div", { cls: "bar2" }, [
+      el("div", { cls: "seg", role: "tablist", "aria-label": "Preview size" }, [["laptop", "💻 Desktop"], ["phone", "📱 Phone"]].map(function(d){ return el("button", { type: "button", cls: view === d[0] ? "on" : "", text: d[1], on: { click: function(){ state.device = d[0]; var dev = document.querySelector(".device"); if (dev) { dev.className = "device " + d[0]; } Array.prototype.forEach.call(document.querySelectorAll(".seg button"), function(b){ b.classList.toggle("on", b.textContent === d[1]); }); } } }); })),
+      el("a", { cls: "mini", href: site.previewUrl, target: "_blank", rel: "noopener", text: "Open full screen ↗" }),
+    ]));
+    kids.push(el("div", { cls: "device " + view }, [el("div", { cls: "dots" }, [el("i"), el("i"), el("i")]), el("iframe", { src: site.previewUrl, title: "Your new website preview", loading: "lazy" })]));
+    kids.push(el("div", { cls: "chiprow", role: "group", "aria-label": "Template" }, (site.templates || []).map(function(tp){ return el("button", { type: "button", cls: "opt" + (tp.key === site.template ? " on" : ""), title: tp.blurb, text: tp.label, on: { click: function(){ if (tp.key !== site.template) launch(tp.key); } } }); })));
+    if (!site.hasLogo || !site.photos) kids.push(el("p", { cls: "small muted", text: !site.hasLogo && !site.photos ? "We couldn't find a logo or photos on your current site, so this uses your name and colours. Your real photos go in when we build it." : !site.photos ? "No photos found on your current site yet. We'll add your real project photos when we build it." : "We couldn't find your logo on your site. Send it over and we'll add it." }));
+    var qt = state.quote || { monthly: 0, oneOff: 0, adSpendNote: "" };
+    kids.push(el("div", { cls: "pkg" }, [el("span", {}, [el("div", { cls: "small muted", text: (state.picked.join(" + ") || "Your package") }), el("b", { text: money(qt.monthly, cur) + "/mo" }), qt.oneOff ? el("span", { cls: "small muted", text: " + " + money(qt.oneOff, cur) + " setup" }) : null]), el("button", { cls: "mini", type: "button", text: state.editPkg ? "Done" : "Change", on: { click: function(){ state.editPkg = !state.editPkg; render(); } } })]));
+    if (state.editPkg) kids.push(packageEditor());
+    if (qt.adSpendNote) kids.push(el("p", { cls: "small muted", text: qt.adSpendNote }));
+    if (state.error) kids.push(el("div", { cls: "err", text: state.error }));
+    if (state.notice) kids.push(el("div", { cls: "ok", text: state.notice }));
+    if (cfg.checkout !== "off") kids.push(el("button", { cls: "btn block", type: "button", id: "pay", text: "Get started" + (cfg.checkout === "test" ? " (test mode)" : ""), disabled: !state.picked.length || null, on: { click: checkout } }));
+    kids.push(el("button", { cls: cfg.checkout !== "off" ? "link block" : "btn block", type: "button", text: "Book a free strategy call", style: "width:100%", on: { click: function(){ offer("call"); } } }));
+  }
+  if (!site && state.error) kids.push(el("div", { cls: "err", text: state.error }));
+  document.body.classList.toggle("wide", !!site && !embed);
+  mountEl(el("div", { cls: "card" }, kids));
+}
+function packageEditor(){
+  var cfg = state.config, cur = cfg.pricing.currency, r = state.rec, box = el("div", { cls: "services" });
+  Object.keys(cfg.pricing.services).forEach(function(k){
+    var p = cfg.pricing.services[k], on = state.picked.indexOf(k) >= 0, recd = (r.services || []).some(function(x){ return x.service === k; });
+    var c = el("input", { type: "checkbox" }); c.checked = on;
+    c.addEventListener("change", function(){ var i = state.picked.indexOf(k); if (i >= 0) state.picked.splice(i, 1); else state.picked.push(k); requote(); });
+    box.appendChild(el("label", { cls: "svc" + (on ? " on" : "") }, [c, el("span", {}, [el("b", { text: p.label }), recd ? el("span", { cls: "tag ai", text: "Recommended" }) : null]), el("span", { cls: "price" }, [el("span", { text: money(p.monthly * 100, cur) }), el("small", { text: "/mo" })])]));
   });
-  kids.push(svcs);
-  if (cfg.pricing.manager) { var mb = el("input", { type: "checkbox" }); mb.checked = state.manager; mb.addEventListener("change", function(){ state.manager = mb.checked; requote(); }); kids.push(el("label", { cls: "svc" + (state.manager ? " on" : "") }, [mb, el("span", {}, [el("b", { text: cfg.pricing.manager.label }), el("small", { text: "A named marketing expert who manages your account and meets you monthly." })]), el("span", { cls: "price" }, [el("span", { text: money(cfg.pricing.manager.monthly * 100, cur) }), el("small", { text: "/mo" })])])); }
-  var qt = state.quote || { monthly: 0, oneOff: 0, adSpendNote: "", discountPercent: 0 };
-  kids.push(el("div", { cls: "total" }, [el("span", {}, [el("div", { cls: "small muted", text: "Monthly" + (qt.discountPercent ? " (incl. " + qt.discountPercent + "% bundle saving)" : "") }), el("b", { text: money(qt.monthly, cur) + "/mo" })]), el("span", { cls: "center" }, [el("div", { cls: "small muted", text: "One-off setup" }), el("b", { text: money(qt.oneOff, cur) })])]));
-  if (qt.adSpendNote) kids.push(el("p", { cls: "small muted", text: qt.adSpendNote }));
-  if (state.error) kids.push(el("div", { cls: "err", text: state.error }));
-  var acts = el("div", { cls: "actions" });
-  cfg.offerActions.forEach(function(o){ acts.appendChild(el("button", { cls: "btn ghost", type: "button", text: o.label, on: { click: function(){ offer(o.key); } } })); });
-  kids.push(acts);
-  if (state.preview) kids.push(previewBlock());
-  if (cfg.checkout !== "off") kids.push(el("button", { cls: "btn block", type: "button", id: "pay", text: (cfg.checkout === "test" ? "Get started (test mode) — " : "Get started — ") + money(qt.oneOff + qt.monthly, cur) + " today", disabled: !state.picked.length || null, on: { click: checkout } }));
-  if (cfg.checkout === "test") kids.push(el("p", { cls: "small muted center", text: "Test mode: no real payment is taken." }));
-  app.replaceChildren(el("div", { cls: "card" }, kids));
+  if (cfg.pricing.manager) { var m = el("input", { type: "checkbox" }); m.checked = state.manager; m.addEventListener("change", function(){ state.manager = m.checked; requote(); }); box.appendChild(el("label", { cls: "svc" + (state.manager ? " on" : "") }, [m, el("span", {}, [el("b", { text: cfg.pricing.manager.label })]), el("span", { cls: "price" }, [el("span", { text: money(cfg.pricing.manager.monthly * 100, cur) }), el("small", { text: "/mo" })])])); }
+  return box;
+}
+var LAUNCH_STEPS = ["Pulling your logo and brand colours", "Choosing the best template for your business", "Adding photos from your website", "Writing your pages", "Building your new website"];
+function launchLoader(){
+  var i = state.launchStep || 0;
+  mountEl(el("div", { cls: "card" }, [el("div", { cls: "screen", role: "status" }, [el("div", { cls: "scan" }), el("h3", { text: "> launching " + ((state.session.answers.businessName) || "your website") }), el("div", {}, LAUNCH_STEPS.map(function(label, n){ return el("div", { cls: "stage" + (n < i ? " done" : n === i ? " run" : "") }, [el("span", { cls: "dot", text: n < i ? "✓" : "" }), el("span", { text: label })]); })), el("div", { cls: "pct", text: Math.min(95, Math.round((i / LAUNCH_STEPS.length) * 100)) + "%" })])]));
+}
+function launch(template){
+  state.error = ""; state.launching = true; state.launchStep = 0; render();
+  var timer = setInterval(function(){ if (state.launchStep < LAUNCH_STEPS.length - 1) { state.launchStep++; if (state.launching) launchLoader(); } }, template ? 350 : 1400);
+  api({ action: "launch", t: t(), template: template || undefined }).then(function(r){
+    clearInterval(timer); state.launchStep = LAUNCH_STEPS.length; launchLoader();
+    setTimeout(function(){ state.launching = false; setSession(r.session); render(); }, 450);
+  }).catch(function(e){ clearInterval(timer); state.launching = false; fail(e); });
 }
 function requote(){ api({ action: "quote", t: t(), services: state.picked, manager: state.manager }).then(function(r){ state.quote = r.quote; render(); }).catch(fail); }
 function offer(key){
@@ -494,7 +541,7 @@ function paidScreen(){
     kids.push(el("a", { cls: "btn block", href: s.connectUrl, target: embed ? "_blank" : null, rel: "noopener", text: "Connect my accounts →" }));
     if (!embed && !state.redirected) { state.redirected = true; setTimeout(function(){ location.href = s.connectUrl; }, 3500); }
   } else kids.push(el("p", { cls: "lead", text: "We're setting up your account now. You'll get an email with the next steps in a few minutes." }));
-  app.replaceChildren(el("div", { cls: "card" }, kids));
+  mountEl(el("div", { cls: "card" }, kids));
   if (!s.connectUrl && !state.polling) { state.polling = true; setTimeout(function(){ state.polling = false; api({ action: "resume", t: t() }).then(function(r){ setSession(r.session); render(); }).catch(function(){}); }, 4000); }
 }
 })();
