@@ -1,7 +1,7 @@
 export type RouteKey = "grow" | "audit" | "guidance" | "internal";
 export type QuestionKind = "text" | "textarea" | "choice" | "multi" | "url" | "email" | "tel";
 export type Question = { label: string; kind: QuestionKind; factual?: boolean; required?: boolean; ai?: boolean; chips?: boolean; list?: boolean; placeholder?: string; options?: string[] };
-export type Step = { key: string; title: string; questions?: string[]; extract?: boolean; contact?: boolean; result?: "plan" | "audit"; when?: Record<string, string> };
+export type Step = { key: string; title: string; questions?: string[]; extract?: boolean; contact?: boolean; result?: "plan" | "audit"; when?: Record<string, string>; ui?: "website" | "confirm" | "template" | "tiles" };
 export type Answers = Record<string, string | string[]>;
 export type ProfileFact = { value: string; source: string; confirmed: boolean };
 export type BusinessProfile = Record<string, ProfileFact>;
