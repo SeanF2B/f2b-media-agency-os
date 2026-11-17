@@ -5,7 +5,7 @@
 // With editable=true every text block is contenteditable and images are click-to-swap; edits are posted
 // to the parent window (the live editor). Pure function — runs in the browser and on the Worker.
 
-import { businessArea, businessServices, defaultAds, defaultKeywords, type ProposalBrand, type ProposalDeck, type Slide } from "./deck";
+import { businessArea, businessServices, defaultAds, defaultKeywords, renumberPhases, type ProposalBrand, type ProposalDeck, type Slide } from "./deck";
 
 export type RenderOptions = {
   editable?: boolean;
@@ -24,6 +24,7 @@ const esc = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, (c) => (
 const attr = esc;
 
 export function renderProposalHtml(deck: ProposalDeck, brand: ProposalBrand, opts: RenderOptions = {}) {
+  deck = renumberPhases(deck);
   const edit = Boolean(opts.editable);
   const accent = /^#[0-9a-f]{6}$/i.test(deck.accent) ? deck.accent : "#1463ff";
   const img = (src: string | undefined) => {
@@ -168,7 +169,7 @@ export function renderProposalHtml(deck: ProposalDeck, brand: ProposalBrand, opt
       case "whatsapp": return `<div class="feed a d2">${phone(`<div class="formui"><div class="mail-head">${logoMark()}</div><b>Tell us about your project</b><i></i><i></i><i></i><i class="tall"></i><span>Request a quote →</span></div>`, "sm")}<span class="arrow">→</span>${phone(`<div class="chatui"><div class="chat-top"><i class="ad-av">${logoMark()}</i>${esc(name)}</div><p class="in">Hi! Thanks for your enquiry — when suits you for a quick call?</p><p class="out">Tomorrow afternoon would be perfect</p><p class="in">Great — you're booked in for 2pm ✓</p></div>`, "sm")}</div>`;
       case "dashboard": return crmGraphic();
       case "landing": return `<div class="duo a d2">${desktop(browser(landing(slide, "images.0", "d", services[0] || "Our services", 0)), "big")}${phone(landing(slide, "images.1", "m", services[1] || services[0] || "Our services", 1), "front")}</div>`;
-      case "seo": return `<div class="duo a d2">${desktop(browser(`<div class="slot site-slot"${slotAttr(slide, "images.0")}>${siteMock("d", (valueAt(slide, "images.0") === "none" ? "" : img(valueAt(slide, "images.0")) || photoAt(2)), `${tc(services[1] || services[0] || name)}${area ? ` in ${area}` : ""}`)}</div>`), "big")}${phone(site(slide, "brand.screenshotMobile", "m", 1), "front")}<div class="rank">${[38, 52, 64, 78, 92].map((h, index) => `<i style="height:${h}%;--d:${index}"></i>`).join("")}<span>Organic traffic</span></div></div>`;
+      case "seo": return `<div class="duo a d2">${desktop(browser(`<div class="slot site-slot"${slotAttr(slide, "images.0")}>${siteMock("d", (valueAt(slide, "images.0") === "none" ? "" : img(valueAt(slide, "images.0")) || photoAt(2)), `${tc(services[1] || services[0] || name)}${area ? ` in ${area}` : ""}`)}</div>`), "big")}${phone(site(slide, "brand.screenshotMobile", "m", 1), "front")}</div>`;
       default: return `<div class="duo a d2">${desktop(browser(site(slide, "brand.screenshotDesktop", "d")), "big")}${phone(site(slide, "brand.screenshotMobile", "m", 1), "front")}</div>`;
     }
   };
@@ -329,7 +330,7 @@ h1,h2,b{font-weight:800}
 .cover .sub{margin-top:30u;font-size:24u;color:#c7cbd4;font-weight:500}
 .gears{position:absolute;left:80u;bottom:90u;display:flex;color:var(--accent);filter:brightness(1.3)}
 .gears svg{width:80u;height:80u;stroke-width:2.6}.gears svg+svg{width:52u;height:52u;margin:-16u 0 0 -8u}
-.cover-mac{position:absolute;left:600u;top:200u;width:1100u}
+.cover-mac{position:absolute;left:740u;top:230u;width:800u}
 .agency{position:absolute;right:60u;top:46u;height:46u;object-fit:contain}
 .agency-t{position:absolute;right:60u;top:46u;color:var(--accent);font-size:28u;letter-spacing:.1em}
 .agency.sm{position:static;height:34u;margin-top:18u;float:right}
@@ -371,7 +372,7 @@ h1,h2,b{font-weight:800}
 .serp-q{display:flex;align-items:center;gap:12u;padding:12u 22u;border-bottom:1px solid #eef0f3;font-size:20u}.serp-q svg,.serp-row svg{width:20u;height:20u;color:#9aa3b2;flex:none}
 .serp-row{display:flex;align-items:center;gap:12u;padding:9u 22u;font-size:18u;color:#374151;opacity:0;transform:translateX(-14u);transition:.45s ease calc(var(--d)*.12s + .5s)}
 .on .serp-row{opacity:1;transform:none}.serp-row:nth-child(3){background:#f3f6fb}
-.duo{position:relative;width:100%;padding-right:110u}.duo .phone.front{position:absolute;right:0;bottom:-10u;width:180u}
+.duo{position:relative;width:100%;display:flex;align-items:center;gap:34u}.duo>.mac{flex:1;min-width:0}.duo .phone.front{position:relative;flex:none;width:200u}
 .duo .phone.solo,.inv-phone .phone{width:340u;margin:auto}
 .rank{position:absolute;left:-30u;bottom:120u;width:230u;height:170u;background:#fff;border-radius:20u;box-shadow:0 20u 40u rgba(0,0,0,.2);padding:20u 20u 40u;display:flex;align-items:flex-end;gap:10u}
 .rank i{flex:1;background:linear-gradient(var(--accent),#7fb0ff);border-radius:6u 6u 2u 2u;transform-origin:bottom;transform:scaleY(0);transition:.7s cubic-bezier(.2,.8,.2,1) calc(var(--d)*.1s + .6s)}
@@ -555,7 +556,7 @@ h1,h2,b{font-weight:800}
 .cover-panel .client-logo{background:#fff;padding:16u 22u;border-radius:18u;max-height:84u;max-width:300u;box-sizing:content-box;box-shadow:0 10u 30u rgba(0,0,0,.25)}
 .close .client-logo{background:#fff;padding:16u 22u;border-radius:18u;max-height:80u;box-sizing:content-box}
 .map{background:#eef1f4}.map:before{display:none}.map-svg{position:absolute;inset:0;width:100%;height:100%}
-.feed{gap:12u}.phone.sm{width:292u;border-radius:56u}
+.feed{gap:10u;max-width:100%}.phone.sm{width:262u;border-radius:52u}
 .ad{padding-top:52u}.ad-top{padding:0 12u 8u;gap:9u}.ad-av{width:34u;height:34u}.ad-top b{font-size:14u}.ad-top small{font-size:11u}.ad-top small svg{width:11u;height:11u}
 .ad-copy{font-size:12.5u;padding:0 12u 9u}.ad-media{flex:1;height:auto;min-height:200u}.ad-offer{font-size:12.5u;padding:6u 12u;left:10u;bottom:10u}
 .ad-cta{padding:10u 12u}.ad-cta small{font-size:9.5u}.ad-h{font-size:13u}.ad-btn{font-size:11.5u;padding:8u 12u}
@@ -563,7 +564,7 @@ h1,h2,b{font-weight:800}
 .listing .ad-av .lg{max-height:none;max-width:none}
 .mail-cards{display:grid;grid-template-columns:1fr 1fr;gap:10u;width:100%;margin-top:6u}.mail-cards span{display:grid;gap:5u;text-align:left}.mail-cards .slot{height:86u;border-radius:10u}.mail-cards b{font-size:11u}
 /* our CRM with their logo + pipeline, and the AI conversation bot */
-.crmwrap{position:relative;width:100%;padding-right:150u}
+.crmwrap{position:relative;width:100%;display:flex;align-items:center;gap:30u}.crmwrap>.mac{flex:1;min-width:0}
 .crm-mac{width:100%}
 .crm{position:absolute;inset:0;container-type:inline-size;background:#f4f6fa;display:flex;flex-direction:column;color:#111}
 .crm-top{display:flex;align-items:center;gap:2.4cqw;padding:1.4cqw 2.4cqw;background:#fff;border-bottom:1px solid #e6e9ef}
@@ -578,7 +579,7 @@ h1,h2,b{font-weight:800}
 .crm-col small{display:flex;justify-content:space-between;font-size:1.2cqw;font-weight:800;color:#374151;padding:.2cqw .3cqw}.crm-col small em{font-style:normal;background:#fff;border-radius:99px;padding:0 .8cqw;color:#6b7280}
 .crm-card{background:#fff;border-radius:.9cqw;padding:.9cqw 1cqw;display:grid;gap:.2cqw;border-left:.45cqw solid var(--brand);box-shadow:0 .3cqw .8cqw rgba(15,23,42,.06)}
 .crm-card b{font-size:1.25cqw}.crm-card i{font-style:normal;font-size:1.05cqw;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.crm-card em{font-style:normal;font-size:1.15cqw;font-weight:800;color:#15803d}
-.bot-phone{position:absolute;right:0;bottom:30u;width:250u}
+.bot-phone{position:relative;flex:none;width:230u}
 .bot{height:100%;background:#f5f7fb;display:flex;flex-direction:column;gap:8u;padding:0 10u}
 .bot-top{display:flex;align-items:center;gap:8u;margin:0 -10u 4u;padding:48u 12u 10u;background:#fff;border-bottom:1px solid #e6e9ef}
 .bot-top span{display:grid}.bot-top b{font-size:12.5u}.bot-top small{font-size:9.5u;color:#16a34a;display:flex;align-items:center;gap:4u}.bot-top small i{width:7u;height:7u;border-radius:50%;background:#22c55e}
