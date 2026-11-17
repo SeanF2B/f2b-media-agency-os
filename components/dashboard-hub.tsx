@@ -148,6 +148,8 @@ export function DashboardHub({ salesStats = null, activityPanel = null, scopeCli
   }, [clientId, periodStart, periodEnd]);
 
   const bots = useMemo(() => new Set(staff.filter((s) => s.isBot).map((s) => s.id)), [staff]);
+  // All accounts selected: Marketing is per client, so it waits for a client pick (never shows a random one).
+  const marketingPicked = Boolean(scopeClientId) || sample || clients.some((c) => c.id === focusClientId);
   const inScope = (t: HubTask) => !scopeClientId || t.clientId === scopeClientId;
   const upcoming = useMemo(() => tasks.filter((t) => inScope(t) && !/^done$/i.test(t.status) && (showAi || !bots.has(t.assigneeId))).sort((a, b) => (a.dueAt || a.due || "9999").localeCompare(b.dueAt || b.due || "9999")).slice(0, 6), [tasks, showAi, bots, scopeClientId]); // eslint-disable-line react-hooks/exhaustive-deps
   const completed = useMemo(() => tasks.filter((t) => inScope(t) && /^done$/i.test(t.status) && t.completedAt).sort((a, b) => (b.completedAt || "").localeCompare(a.completedAt || "")).slice(0, 6), [tasks, scopeClientId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -268,9 +270,9 @@ export function DashboardHub({ salesStats = null, activityPanel = null, scopeCli
     {valuePanel}
     <section className="panel dh-panel" aria-label="Website and marketing results">
       <div className="dh-head"><div><p className="eyebrow">📈 {periodLabel.toUpperCase()}</p><h2>Marketing</h2></div>
-        {!scopeClientId && <span className="dh-client-note">{clients.find((c) => c.id === clientId)?.logo && <img src={clients.find((c) => c.id === clientId)?.logo} alt="" />}{clients.find((c) => c.id === clientId)?.name}{!focusClientId && <small> · change client in the top bar</small>}</span>}
+        {!scopeClientId && marketingPicked && <span className="dh-client-note">{clients.find((c) => c.id === clientId)?.name}</span>}
       </div>
-      {loading && !m ? <><p className="dh-muted">Loading results…</p></> : !m ? <></> : <>
+      {!marketingPicked ? <p className="dh-muted">Marketing results are per client — pick a client in the top bar to see theirs.</p> : loading && !m ? <><p className="dh-muted">Loading results…</p></> : !m ? <></> : <>
         {(() => { const sp = m.split; const v = (x: number | null | undefined) => x == null ? "—" : num(x);
           const Row = ({ icon, label, value, good }: { icon: ReactNode; label: string; value: string; good?: boolean }) => <div className={`dh-split-row ${good ? "good" : ""}`}><span className="dh-split-ico">{icon}</span><span>{label}</span><b>{value}</b></div>;
           return <><div className="dh-msrc" role="tablist" aria-label="Marketing source">{([["organic", "Organic"], ["ads", "Google Ads"], ["meta", "Meta"]] as const).map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={mSrc === k} className={mSrc === k ? "on" : ""} onClick={() => { setMSrc(k); setDetail(""); }}>{l}</button>)}</div>
