@@ -3336,3 +3336,16 @@ html body .app-shell.app-shell label.tn-date.tn-date > select, html body .app-sh
 /* Scheduling dashboard: the Appointment updates card, full width above the stats */
 html body .app-shell .dh-approvals.sch-appt-updates { display: grid !important; grid-template-columns: minmax(0, 1fr) !important; margin: 0 0 12px !important; }
 html body .app-shell .sch .dh-appt-list { margin: 0 0 12px; }
+/* Phones: tighter page tops (Leads and others) — small gap under the bar, compact header, tabs and search */
+@media (max-width: 860px) {
+  html body.topnav-layout .app-shell .page-content.page-content, html body .app-shell.topnav-layout .page-content.page-content { padding-top: 10px !important; }
+  html body .app-shell .crm-heading { margin: 0 0 8px !important; align-items: center !important; }
+  html body .app-shell .crm-heading h1 { font-size: 22px !important; margin: 0 !important; line-height: 1.15 !important; }
+  html body .app-shell .crm-heading .eyebrow, html body .app-shell .crm-heading p:not(.eyebrow) { display: none !important; }
+  html body .app-shell .crm-heading .primary-button { height: 34px !important; padding: 0 12px !important; border-radius: 10px !important; font-size: 12.5px !important; }
+  html body .app-shell .page-content .crm-tabs.crm-tabs { margin: 0 0 8px !important; padding: 3px !important; border-radius: 14px !important; }
+  html body .app-shell .page-content .crm-tabs.crm-tabs > * { height: 44px !important; border-radius: 11px !important; gap: 2px !important; }
+  html body .app-shell .page-content .crm-tabs.crm-tabs > * svg { width: 16px !important; height: 16px !important; }
+  html body .app-shell .page-content :is(.crm-toolbar, .crm-search-bar, .contacts-toolbar) { padding: 6px !important; margin-bottom: 8px !important; border-radius: 12px !important; }
+  html body .app-shell .page-content :is(.crm-toolbar, .crm-search-bar, .contacts-toolbar) input[type="search"], html body .app-shell .page-content :is(.crm-toolbar, .crm-search-bar, .contacts-toolbar) input:not([type]) { height: 38px !important; }
+}
