@@ -18,6 +18,9 @@ const json = (data: unknown, status = 200) => Response.json(data, { status, head
 const fail = (error: string, status = 400) => json({ error }, status);
 const str = (v: unknown, n = 200) => (typeof v === "string" ? v.trim().slice(0, n) : "");
 
+/** A sub-account's own team member (older profiles may only carry a "Sub-account …" role). */
+const isClientOwn = (s: { staffType?: string; role?: string }) => s.staffType === "subaccount" || (!s.staffType && /^Sub-account/.test(s.role || ""));
+
 async function context(request: Request) {
   const user = await getChatGPTUser();
   if (!user) return { response: fail("Sign in to use Scheduling.", 401) };
@@ -30,10 +33,12 @@ async function context(request: Request) {
   if (admin) {
     const scope = requested && ws.clients.some((c) => c.id === requested) ? requested : null; // null = agency view (everything)
     // Inside a client's account, show that client's own team (people with access to it); agency view shows everyone.
-    const clientTeam = scope ? ws.staffRaw.filter((s) => (s.clientAccessIds || []).includes(scope)).map(({ id, name, email, role, avatar }) => ({ id, name, email, role, avatar })) : [];
+    // Inside a client sub-account only that client's own people are bookable/listed — never the agency team,
+    // even when agency staff have access to the account and even when the client has no team set up yet.
+    const clientTeam = scope ? ws.staffRaw.filter((s) => isClientOwn(s) && (s.clientAccessIds || []).includes(scope)).map(({ id, name, email, role, avatar }) => ({ id, name, email, role, avatar })) : [];
     // The sub-account's own people (not agency staff who merely have access) — sample data uses only these.
-    const ownTeamIds = scope ? ws.staffRaw.filter((s) => s.staffType === "subaccount" && (s.clientAccessIds || []).includes(scope)).map((s) => s.id) : [];
-    return { user, ws, me, admin, canManage: true, ownOnly: false, scope, ownTeamIds, staff: clientTeam.length ? clientTeam : ws.staff };
+    const ownTeamIds = scope ? ws.staffRaw.filter((s) => isClientOwn(s) && (s.clientAccessIds || []).includes(scope)).map((s) => s.id) : [];
+    return { user, ws, me, admin, canManage: true, ownOnly: false, scope, ownTeamIds, staff: scope ? clientTeam : ws.staff };
   }
   // Everyone else goes by their Scheduling permissions (Team → permissions).
   const perms = me ? getMemberPermissions(me as never, ws.ownerId) : null;
@@ -42,7 +47,7 @@ async function context(request: Request) {
   const allowed = [...(isSubAccount ? [] : [""]), ...(me.clientAccessIds || []).filter((id) => ws.clients.some((c) => c.id === id))];
   if (!allowed.length) return { response: fail("You don't have access to any accounts in Scheduling.", 403) };
   const scope = requested !== null && allowed.includes(requested) ? requested : allowed[0];
-  const staff = ws.staffRaw.filter((s) => s.id === me.id || (scope ? (s.clientAccessIds || []).includes(scope) : s.staffType !== "subaccount")).map(({ id, name, email, role, avatar }) => ({ id, name, email, role, avatar }));
+  const staff = ws.staffRaw.filter((s) => s.id === me.id || (scope ? isClientOwn(s) && (s.clientAccessIds || []).includes(scope) : s.staffType !== "subaccount")).map(({ id, name, email, role, avatar }) => ({ id, name, email, role, avatar }));
   return { user, ws, me, admin: false, canManage: Boolean(perms.manageScheduling), ownOnly: !perms.allAppointments, scope, staff };
 }
 type Ctx = Exclude<Awaited<ReturnType<typeof context>>, { response: Response }>;
