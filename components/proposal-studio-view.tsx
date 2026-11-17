@@ -9,7 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./proposal-studio.css";
 import { ReportGeneratingAnimation } from "./report-generating-animation";
 import { SERVICE_CATALOGUE, type CatalogueService } from "@/lib/proposals/catalogue";
-import { SLIDE_KINDS, blankSlide, type ProposalBrand, type ProposalDeck, type ProposalInputs, type ProposalSource, type ProposalUpload, type SelectedService, type Slide, type SlideKind } from "@/lib/proposals/deck";
+import { SLIDE_KINDS, blankSlide, renumberPhases, type ProposalBrand, type ProposalDeck, type ProposalInputs, type ProposalSource, type ProposalUpload, type SelectedService, type Slide, type SlideKind } from "@/lib/proposals/deck";
 import { renderProposalHtml } from "@/lib/proposals/render";
 
 type StudioClient = { id: string; name: string; logo?: string; status?: string };
@@ -353,7 +353,7 @@ function Editor({ proposal, change, flush, setProposal, onUpload, uploadOne, onR
   const brandRef = useRef(proposal.brand); brandRef.current = proposal.brand;
   const selected = deck.slides.find((slide) => slide.id === selectedId) || deck.slides[0];
   const rerender = () => setRenderKey((key) => key + 1);
-  const setDeck = (next: ProposalDeck, redraw = true) => { change({ deck: next }); if (redraw) rerender(); };
+  const setDeck = (next: ProposalDeck, redraw = true) => { change({ deck: renumberPhases(next) }); if (redraw) rerender(); };
   const updateSlide = (slideId: string, data: Record<string, any>, redraw = true) => setDeck({ ...deckRef.current, slides: deckRef.current.slides.map((slide) => slide.id === slideId ? { ...slide, data } : slide) }, redraw);
 
   // The preview only re-renders on structural/inspector changes; typing inside the slides updates state silently.
