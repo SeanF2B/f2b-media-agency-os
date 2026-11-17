@@ -2952,3 +2952,25 @@ html body .app-shell .tn-side-foot { display: none; }
   html body .app-shell .page-content .crm-workspace { gap: 8px !important; }
   html body .app-shell .page-content .crm-toolbar { margin-bottom: 8px !important; }
 }
+
+/* Dashboard: appointment updates list */
+html body .app-shell .dh-appt-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 4px 0 10px; }
+html body .app-shell .dh-appt-stats span { padding: 8px; border-radius: 10px; background: rgba(127,138,160,.08); font-size: 11.5px; text-align: center; line-height: 1.2; }
+html body .app-shell .dh-appt-stats b { display: block; font-size: 17px; }
+html body .app-shell .dh-appt-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 12px; background: rgba(127,138,160,.1); margin-bottom: 8px; }
+html body .app-shell .dh-appt-tabs button { height: 34px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-size: 12.5px; font-weight: 700; color: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html body .app-shell .dh-appt-tabs button i { font-style: normal; opacity: .6; margin-left: 2px; }
+html body .app-shell .dh-appt-tabs button.on { background: #fff; color: #1f2a33; box-shadow: 0 1px 4px rgba(15,23,42,.12); }
+html body.f2b-dark .app-shell .dh-appt-tabs button.on { background: #2a333a; color: #fff; }
+html body .app-shell .dh-appt-row.completed .dh-appr-dot { background: #22a55b; } html body .app-shell .dh-appt-row.no_show .dh-appr-dot { background: #d92d20; } html body .app-shell .dh-appt-row.cancelled .dh-appr-dot { background: #98a2b3; } html body .app-shell .dh-appt-row.booked .dh-appr-dot { background: #e0a100; }
+html body .app-shell .dh-appt-badge { font-size: 11.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: #eef2f5; color: #1f2a33; }
+html body .app-shell .dh-appt-badge.completed { background: #e3f4ea; color: #1d6a3e; } html body .app-shell .dh-appt-badge.no_show { background: #fde9e4; color: #8a3f2c; }
+html body .app-shell .dh-appt-err { color: #b42318; font-size: 12.5px; margin: 4px 0 8px; }
+html body .app-shell .dh-appt-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+html body .app-shell .dh-appt-foot small { opacity: .6; font-size: 11.5px; }
+@media (max-width: 860px) {
+  html body .app-shell .dh-appt-row { flex-wrap: wrap; }
+  html body .app-shell .dh-appt-row .dh-appr-acts { width: 100%; display: grid !important; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  html body .app-shell .dh-appt-row .dh-appr-acts > * { height: 36px; }
+  html body .app-shell .dh-appt-row .dh-appr-acts:has(.dh-appt-badge) { display: flex !important; width: auto; }
+}

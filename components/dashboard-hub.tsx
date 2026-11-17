@@ -113,7 +113,16 @@ export function DashboardHub({ salesStats = null, activityPanel = null, scopeCli
   const [loading, setLoading] = useState(false);
   const [apprOpen, setApprOpen] = useState<"" | "ai" | "human">("");
   // Appointments that have finished but nobody has marked (attended / no-show / cancelled) yet.
-  const [apptUpdates, setApptUpdates] = useState<{ n: number; oldestHours: number } | null>(null);
+  type ApptRow = { id: string; name: string; start: string; end: string; status: "booked" | "cancelled" | "completed" | "no_show"; staffIds: string[]; calendarId: string; phone?: string };
+  const [apptRows, setApptRows] = useState<ApptRow[] | null>(null);
+  const [apptMeta, setApptMeta] = useState<{ staff: Map<string, string>; calendars: Map<string, string> }>({ staff: new Map(), calendars: new Map() });
+  const [apptOpen, setApptOpen] = useState(false);
+  const [apptTab, setApptTab] = useState<"todo" | "completed" | "no_show" | "cancelled">("todo");
+  const [apptBusy, setApptBusy] = useState("");
+  const [apptErr, setApptErr] = useState("");
+  const apptCutoff = Date.now() - 15 * 60_000;
+  const apptTodo = (apptRows || []).filter((b) => b.status === "booked" && Date.parse(b.end) < apptCutoff).sort((a, b) => a.start.localeCompare(b.start));
+  const apptUpdates = apptRows ? { n: apptTodo.length, oldestHours: apptTodo.length ? Math.round((Date.now() - Date.parse(apptTodo[0].end)) / 3_600_000) : 0 } : null;
   const [rankOpen, setRankOpen] = useState<"" | "google" | "chatgpt">("");
   // Drop-down under the Organic / Google Ads cards: landing pages (URLs) and keywords.
   const [detail, setDetail] = useState<DetailKey>("");
@@ -165,21 +174,42 @@ export function DashboardHub({ salesStats = null, activityPanel = null, scopeCli
 
   const showAppts = !scopeClientId || clients.find((c) => c.id === scopeClientId)?.appointmentBased !== false;
   useEffect(() => {
-    if (!showAppts) { setApptUpdates(null); return; }
-    if (sample) { setApptUpdates({ n: 3, oldestHours: 30 }); return; }
+    if (!showAppts) { setApptRows(null); return; }
+    if (sample) { // demo: three to mark plus some history; marking only changes this screen
+      const h = (hoursAgo: number, len = 1) => { const e = new Date(Date.now() - hoursAgo * 3_600_000); const st = new Date(e.getTime() - len * 3_600_000); return { start: st.toISOString(), end: e.toISOString() }; };
+      setApptRows([
+        { id: "s1", name: "Mary Burke", ...h(3), status: "booked", staffIds: [], calendarId: "" },
+        { id: "s2", name: "John Doyle", ...h(26), status: "booked", staffIds: [], calendarId: "" },
+        { id: "s3", name: "Sinéad Kelly", ...h(30), status: "booked", staffIds: [], calendarId: "" },
+        { id: "s4", name: "Tom Walsh", ...h(50), status: "completed", staffIds: [], calendarId: "" },
+        { id: "s5", name: "Aoife Ryan", ...h(75), status: "completed", staffIds: [], calendarId: "" },
+        { id: "s6", name: "Ciarán Byrne", ...h(98), status: "no_show", staffIds: [], calendarId: "" },
+        { id: "s7", name: "Niamh Walsh", ...h(140), status: "cancelled", staffIds: [], calendarId: "" },
+      ]);
+      return;
+    }
     let live = true;
     const from = new Date(Date.now() - 30 * 86_400_000).toISOString(), to = new Date().toISOString();
     fetch(`/api/scheduling?clientId=${encodeURIComponent(scopeClientId || "agency")}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { cache: "no-store" })
       .then((r) => r.ok ? r.json() : null)
-      .then((j: { bookings?: Array<{ status: string; end: string }> } | null) => {
+      .then((j: { bookings?: ApptRow[]; staff?: Array<{ id: string; name: string }>; calendars?: Array<{ id: string; name: string }> } | null) => {
         if (!live || !j) return;
-        const cutoff = Date.now() - 15 * 60_000;
-        const pending = (j.bookings || []).filter((b) => b.status === "booked" && Date.parse(b.end) < cutoff);
-        const oldest = pending.reduce((min, b) => Math.min(min, Date.parse(b.end)), Date.now());
-        setApptUpdates({ n: pending.length, oldestHours: pending.length ? Math.round((Date.now() - oldest) / 3_600_000) : 0 });
+        setApptRows((j.bookings || []).filter((b) => Date.parse(b.start) <= Date.now()));
+        setApptMeta({ staff: new Map((j.staff || []).map((x) => [x.id, x.name])), calendars: new Map((j.calendars || []).map((x) => [x.id, x.name])) });
       }).catch(() => {});
     return () => { live = false; };
   }, [showAppts, sample, scopeClientId]);
+  const markAppt = async (id: string, status: "completed" | "no_show" | "cancelled") => {
+    setApptErr(""); setApptBusy(id);
+    try {
+      if (!sample) {
+        const r = await fetch(`/api/scheduling?clientId=${encodeURIComponent(scopeClientId || "agency")}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "updateBooking", id, status, notify: false }) });
+        if (!r.ok) { const j = await r.json().catch(() => ({})) as { error?: string }; throw new Error(j.error || "Couldn’t update that appointment."); }
+      }
+      setApptRows((rows) => (rows || []).map((b) => b.id === id ? { ...b, status } : b));
+    } catch (e) { setApptErr(e instanceof Error ? e.message : "Couldn’t update that appointment."); }
+    finally { setApptBusy(""); }
+  };
   const actions: Array<{ label: string; hint: string; icon: ReactNode; run: () => void; tint: string }> = [
     { label: "Open tasks", hint: "Board, approvals & history", icon: <ListChecks size={18} />, run: () => onNavigate("Tasks"), tint: "blue" },
     ...(!scopeClientId ? [{ label: "Operations", hint: "Ads, SEO, websites, email", icon: <Compass size={18} />, run: () => onNavigate("Operations"), tint: "violet" }] : []),
@@ -196,11 +226,11 @@ export function DashboardHub({ salesStats = null, activityPanel = null, scopeCli
     <section className="dh-actions" aria-label="Quick actions">{actions.map((a) => <button type="button" key={a.label} className={`dh-action ${a.tint}`} onClick={a.run}><span className="dh-action-icon">{a.icon}</span><span><b>{a.label}</b><small>{a.hint}</small></span></button>)}</section>
 
     <section className="dh-approvals" aria-label="Pending approvals">
-      {[{ key: "ai" as const, label: "AI approvals", n: aiPending, mine: aiMine.length, icon: <Sparkles size={18} />, hint: "Changes the AI wants you to approve" }, { key: "human" as const, label: "Team approvals", n: humanPending, mine: humanMine.length, icon: <Users size={18} />, hint: "Work your team submitted for review" }].map((a) => { const t = tone(a.mine); return <button type="button" key={a.key} className={`dh-approval ${t} ${apprOpen === a.key ? "open" : ""}`} aria-expanded={apprOpen === a.key} onClick={() => setApprOpen(apprOpen === a.key ? "" : a.key)}><span className="dh-approval-icon">{a.icon}</span><span className="dh-approval-text"><b>{a.label}</b><small>{t === "overload" ? `${a.mine} waiting on you — catch up` : a.mine ? `${a.mine} waiting on you` : a.n ? `${a.n} with others · nothing for you` : "All done"}</small></span><span className="dh-approval-n">{a.mine || (a.n ? a.n : "✓")}</span></button>; })}
+      {[{ key: "ai" as const, label: "AI approvals", n: aiPending, mine: aiMine.length, icon: <Sparkles size={18} />, hint: "Changes the AI wants you to approve" }, { key: "human" as const, label: "Team approvals", n: humanPending, mine: humanMine.length, icon: <Users size={18} />, hint: "Work your team submitted for review" }].map((a) => { const t = tone(a.mine); return <button type="button" key={a.key} className={`dh-approval ${t} ${apprOpen === a.key ? "open" : ""}`} aria-expanded={apprOpen === a.key} onClick={() => { setApprOpen(apprOpen === a.key ? "" : a.key); setApptOpen(false); }}><span className="dh-approval-icon">{a.icon}</span><span className="dh-approval-text"><b>{a.label}</b><small>{t === "overload" ? `${a.mine} waiting on you — catch up` : a.mine ? `${a.mine} waiting on you` : a.n ? `${a.n} with others · nothing for you` : "All done"}</small></span><span className="dh-approval-n">{a.mine || (a.n ? a.n : "✓")}</span></button>; })}
       {showAppts && apptUpdates && (() => {
         // amber as they build up, red when there are 5+ or one has waited over 2 days
         const t = !apptUpdates.n ? "clear" : apptUpdates.n >= 5 || apptUpdates.oldestHours >= 48 ? "overload" : "waiting";
-        return <button type="button" className={`dh-approval dh-appt-updates ${t}`} onClick={() => { try { sessionStorage.removeItem("f2b-sched-catchup"); } catch { /* ignore */ } onNavigate("Scheduling"); }} title="Mark finished appointments as attended, no-show or cancelled">
+        return <button type="button" className={`dh-approval dh-appt-updates ${t} ${apptOpen ? "open" : ""}`} aria-expanded={apptOpen} onClick={() => { setApptOpen(!apptOpen); setApprOpen(""); setApptTab("todo"); }} title="Mark finished appointments as showed, no-show or cancelled">
           <span className="dh-approval-icon"><CalendarCheck size={18} /></span>
           <span className="dh-approval-text"><b>Appointment updates</b><small>{!apptUpdates.n ? "All appointments marked" : t === "overload" ? `${apptUpdates.n} to mark — ${apptUpdates.oldestHours >= 48 ? `oldest ${Math.floor(apptUpdates.oldestHours / 24)} days ago` : "catch up"}` : `${apptUpdates.n} finished, not marked yet`}</small></span>
           <span className="dh-approval-n">{apptUpdates.n || "✓"}</span></button>;
@@ -212,6 +242,27 @@ export function DashboardHub({ salesStats = null, activityPanel = null, scopeCli
         <span className="dh-appr-acts">{apprOpen === "human" && onReviewTask && mine && <><button type="button" className="dh-appr-ok" onClick={() => onReviewTask(t.id, "approve")}>Approve</button><button type="button" className="dh-appr-no" onClick={() => onReviewTask(t.id, "request_changes")}>Changes</button></>}{onOpenTask && <button type="button" className="dh-appr-open" onClick={() => onOpenTask(t.id)}>Open</button>}</span></div>; })
         : <p className="dh-muted">Nothing waiting. 🎉</p>}
     </section>; })()}
+    {apptOpen && apptRows && (() => {
+      const lists = { todo: apptTodo, completed: apptRows.filter((b) => b.status === "completed"), no_show: apptRows.filter((b) => b.status === "no_show"), cancelled: apptRows.filter((b) => b.status === "cancelled") };
+      const rows = apptTab === "todo" ? lists.todo : [...lists[apptTab]].sort((a, b) => b.start.localeCompare(a.start));
+      const done = lists.completed.length + lists.no_show.length;
+      const when = (iso: string) => new Date(iso).toLocaleString("en-IE", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+      const who = (b: ApptRow) => [b.staffIds.map((id) => apptMeta.staff.get(id)).filter(Boolean).join(", "), apptMeta.calendars.get(b.calendarId)].filter(Boolean).join(" · ");
+      return <section className="dh-appr-list dh-appt-list" aria-label="Appointment updates">
+        <div className="dh-appr-list-head"><b>Appointments · last 30 days</b><button type="button" className="text-button" onClick={() => setApptOpen(false)}>Close</button></div>
+        <div className="dh-appt-stats"><span><b>{done ? Math.round((lists.completed.length / done) * 100) : 0}%</b> show-up rate</span><span><b>{lists.completed.length}</b> showed</span><span><b>{lists.no_show.length}</b> no-shows</span><span><b>{lists.cancelled.length}</b> cancelled</span></div>
+        <div className="dh-appt-tabs" role="tablist">{([["todo", "To mark"], ["completed", "Showed"], ["no_show", "No-shows"], ["cancelled", "Cancelled"]] as const).map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={apptTab === k} className={apptTab === k ? "on" : ""} onClick={() => setApptTab(k)}>{l} <i>{lists[k].length}</i></button>)}</div>
+        {apptErr && <p className="dh-appt-err" role="alert">{apptErr}</p>}
+        {rows.length ? rows.slice(0, 40).map((b) => <div key={b.id} className={`dh-appr-item dh-appt-row ${b.status}`}><span className="dh-appr-dot" /><span className="dh-appr-main"><b>{b.name || "Appointment"}</b><small>{when(b.start)}{who(b) ? ` · ${who(b)}` : ""}</small></span>
+          <span className="dh-appr-acts">{b.status === "booked" ? <>
+            <button type="button" className="dh-appr-ok" disabled={apptBusy === b.id} onClick={() => void markAppt(b.id, "completed")}>Showed</button>
+            <button type="button" className="dh-appr-no" disabled={apptBusy === b.id} onClick={() => void markAppt(b.id, "no_show")}>No-show</button>
+            <button type="button" className="dh-appr-open" disabled={apptBusy === b.id} onClick={() => void markAppt(b.id, "cancelled")}>Cancelled</button>
+          </> : <span className={`dh-appt-badge ${b.status}`}>{b.status === "completed" ? "Showed" : b.status === "no_show" ? "No-show" : "Cancelled"}</span>}</span></div>)
+          : <p className="dh-muted">{apptTab === "todo" ? "Everything’s marked. Nice one." : "None in the last 30 days."}</p>}
+        <div className="dh-appt-foot"><button type="button" className="text-button" onClick={() => onNavigate("Scheduling")}>Open Scheduling →</button>{sample && <small>Sample data — marking here doesn’t save.</small>}</div>
+      </section>;
+    })()}
     {showAppts && <Suspense fallback={null}><AppointmentsDashboard key={scopeClientId || "agency"} scopeClientId={scopeClientId} sample={sample} clientName={clients.find((c) => c.id === scopeClientId)?.name || ""} periodStart={periodStart} periodEnd={periodEnd} periodLabel={periodLabel} onOpen={() => onNavigate("Scheduling")} /></Suspense>}
     {valuePanel}
     <section className="panel dh-panel" aria-label="Website and marketing results">
