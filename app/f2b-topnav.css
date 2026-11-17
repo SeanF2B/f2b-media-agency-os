@@ -3013,3 +3013,7 @@ html body .cv-chat-actions > .cv-switch:focus-within { outline: 2px solid color-
 html body .app-shell.dark-mode .cv-chat-actions > .secondary-button, html body .app-shell.dark-mode .cv-chat-actions > .cv-switch { background: #27272a; border-color: #3f3f46; color: #fff; }
 html body .app-shell.dark-mode .cv-chat-actions > .cv-switch.on { background: color-mix(in srgb, var(--brand-primary, #0b78b0) 22%, #27272a); }
 @media (max-width: 640px) { html body .cv-chat-actions > button, html body .cv-chat-actions > .cv-switch { padding: 0 10px !important; } }
+/* Lead pop-up: Schedule appointment at the top */
+html body .crm-detail-quick { flex: none; padding: 10px 18px 0; }
+html body .crm-detail-quick .crm-detail-book { width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 42px; border-radius: 12px; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; background: var(--brand-primary, #0b78b0); color: #fff; border: 1px solid transparent; transition: transform .15s, box-shadow .15s; }
+html body .crm-detail-quick .crm-detail-book:hover { transform: translateY(-1px); box-shadow: 0 6px 16px color-mix(in srgb, var(--brand-secondary, var(--brand-primary, #0b78b0)) 25%, transparent); }
