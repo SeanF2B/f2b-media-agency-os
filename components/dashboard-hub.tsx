@@ -126,6 +126,7 @@ export function DashboardHub({ salesStats = null, activityPanel = null, scopeCli
   const [rankOpen, setRankOpen] = useState<"" | "google" | "chatgpt">("");
   // Drop-down under the Organic / Google Ads cards: landing pages (URLs) and keywords.
   const [detail, setDetail] = useState<DetailKey>("");
+  const [mSrc, setMSrc] = useState<"organic" | "ads" | "meta">("organic"); // phones: one marketing source at a time
   const [sample] = useSampleData();
   // Won deals from the CRM (sample figures when Sample is on).
   const sales: SalesStats | null = sample ? { leads: 47, won: 12, wonValue: 18400, adsLeads: 19, adsWon: 5, adsWonValue: 7600, periodLabel: "sample" } : salesStats;
@@ -272,7 +273,8 @@ export function DashboardHub({ salesStats = null, activityPanel = null, scopeCli
       {loading && !m ? <><p className="dh-muted">Loading results…</p></> : !m ? <></> : <>
         {(() => { const sp = m.split; const v = (x: number | null | undefined) => x == null ? "—" : num(x);
           const Row = ({ icon, label, value, good }: { icon: ReactNode; label: string; value: string; good?: boolean }) => <div className={`dh-split-row ${good ? "good" : ""}`}><span className="dh-split-ico">{icon}</span><span>{label}</span><b>{value}</b></div>;
-          return <div className="dh-split">
+          return <><div className="dh-msrc" role="tablist" aria-label="Marketing source">{([["organic", "Organic"], ["ads", "Google Ads"], ["meta", "Meta"]] as const).map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={mSrc === k} className={mSrc === k ? "on" : ""} onClick={() => { setMSrc(k); setDetail(""); }}>{l}</button>)}</div>
+          <div className={`dh-split m-src-${mSrc}`}>
             <div className="dh-split-col"><div className="dh-split-head"><BrandIcon id="google" size={20} fallback={null} /><b>Organic</b><small>Google search & Maps (free)</small></div>
               {(() => { const g = m.gsc && !m.gsc.error ? m.gsc : null; const clicks = g ? g.clicks : sp?.organic.clicks; return <>
                 <Row icon={<MousePointerClick size={15} />} label={clicks != null ? "Google search clicks" : "Website visits"} value={v(clicks ?? sp?.organic.visits)} good={(clicks ?? sp?.organic.visits ?? 0) > 0} />
@@ -311,7 +313,7 @@ export function DashboardHub({ salesStats = null, activityPanel = null, scopeCli
             <div className="dh-split-total"><UserPlus size={16} /><span>All leads · 30 days</span><b>{v(m.leads?.value)}</b>{sp?.otherLeads ? <small>{sp.otherLeads} from other or unknown sources</small> : null}
               {sales && (() => { const r = closeGrade(sales.won, sales.leads); return <span className={`dh-close dh-grade-${r.grade}`} title={`${sales.won} won of ${sales.leads} leads (${sales.periodLabel})`}><span>Close rate</span><b>{r.value}</b>{r.grade === "low" && <GradeTip tip={r.tip} />}</span>; })()}
             </div>
-          </div>; })()}
+          </div></>; })()}
         {detail && (() => {
           const d: { gsc: Gsc | null; ads: AdsDetail | null } = sample ? sampleDetail(m) : { gsc: m.gsc && !m.gsc.error ? m.gsc : null, ads: m.adsDetail || null };
           const camp = (m.googleCampaigns || []).find((x) => x.id === gCamp);
