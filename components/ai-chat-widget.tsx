@@ -3,7 +3,7 @@
 // greets new users, pops up notifications (approvals, new leads, unread messages), runs page tours, and turns
 // typed or spoken requests into pre-filled forms (nothing is saved without your OK).
 import { useEffect, useRef, useState, type ReactNode, type PointerEvent as RPointerEvent, type CSSProperties } from "react";
-import { Mic, MicOff, Send, X, Compass, Sparkles, LifeBuoy, EyeOff } from "lucide-react";
+import { Mic, MicOff, Send, X, Compass, Sparkles, LifeBuoy, EyeOff, Bell, BellOff } from "lucide-react";
 
 export type AiCommand = { action: string; reply: string; fields: Record<string, string> };
 type Suggestion = { title: string; clientId: string; priority: string; service: string; why: string; source?: string };
@@ -81,6 +81,9 @@ export function AiChatWidget({ userName = "", page, pageName, clientId, avatar, 
   const [employee, setEmployee] = useState(() => { try { return localStorage.getItem("f2b-ai-employee") || ""; } catch { return ""; } });
   const [pickerOpen, setPickerOpen] = useState(false);
   const [listening, setListening] = useState(false);
+  // Notifications switch (bell in the chat header, or "Mute" on a nudge): off = no pop-ups at all. Remembered per device.
+  const [alertsOff, setAlertsOffState] = useState(() => { try { return window.localStorage.getItem("f2b-ai-alerts-off") === "1"; } catch { return false; } });
+  const setAlertsOff = (off: boolean) => { setAlertsOffState(off); if (off) setToast(null); try { window.localStorage.setItem("f2b-ai-alerts-off", off ? "1" : "0"); } catch { /* ignore */ } };
   const [toast, setToast] = useState<{ text: string; action?: { label: string; run: () => void } } | null>(null);
   // Nudges are a small bubble that tidies itself away after a few seconds (the tour waits for you).
   useEffect(() => { if (!toast || /tour/i.test(toast.text)) return; const timer = window.setTimeout(() => setToast(null), 7000); return () => window.clearTimeout(timer); }, [toast]);
@@ -131,7 +134,7 @@ export function AiChatWidget({ userName = "", page, pageName, clientId, avatar, 
     if (seen) return;
     const timer = window.setTimeout(() => {
       try { window.localStorage.setItem("f2b-ai-intro", "1"); } catch { /* ignore */ }
-      setToast({ text: "Hey boss 👋 I’m your AI assistant. Quick tour?", action: { label: "Show me", run: () => startTour("CRM") } });
+      setToast({ text: "Hi 👋 I’m your AI assistant. Quick tour?", action: { label: "Show me", run: () => startTour("CRM") } });
     }, 2500);
     return () => window.clearTimeout(timer);
   }, [enabled]);
@@ -153,8 +156,9 @@ export function AiChatWidget({ userName = "", page, pageName, clientId, avatar, 
   };
   useEffect(() => {
     setToast((current) => current && !/tour/i.test(current.text) ? null : current);
+    // Page greetings ("Hey …, need me for …?") are switched off — only real notifications pop up.
     const lines = PAGE_NUDGE[page];
-    if (!enabled || !lines) return;
+    if (!enabled || !lines || true) return;
     // Different line each time, at most once every 3 minutes per page.
     let last = 0; try { last = Number(window.sessionStorage.getItem(`f2b-ai-nudge-${page}`) || 0); } catch { /* ignore */ }
     if (Date.now() - last < 3 * 60_000) return;
@@ -173,7 +177,7 @@ export function AiChatWidget({ userName = "", page, pageName, clientId, avatar, 
   }, [page, enabled]); // eslint-disable-line react-hooks/exhaustive-deps
   // Notifications: what's waiting (approvals, new leads, unread messages). Checked on load and every 10 minutes.
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || alertsOff) return;
     let stop = false; let lastKey = "";
     const check = async () => {
       const response = await fetch(`/api/task-suggestions${clientId ? `?clientId=${encodeURIComponent(clientId)}` : ""}`, { cache: "no-store" }).catch(() => null);
@@ -195,7 +199,7 @@ export function AiChatWidget({ userName = "", page, pageName, clientId, avatar, 
     void check();
     const timer = window.setInterval(() => void check(), 10 * 60_000);
     return () => { stop = true; window.clearInterval(timer); };
-  }, [enabled, clientId]);
+  }, [enabled, clientId, alertsOff]);
 
   // When the page changes, the open chat says where we are.
   useEffect(() => { if (open) { setMessages([]); window.setTimeout(() => openChat(true), 0); } }, [page]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -315,9 +319,9 @@ export function AiChatWidget({ userName = "", page, pageName, clientId, avatar, 
         <div className="ai-tour-actions"><button type="button" className="text-button" onClick={() => setTour(null)}>Skip tour</button>{tour.index > 0 && <button type="button" className="secondary-button" onClick={() => setTour({ ...tour, index: tour.index - 1 })}>Back</button>}<button type="button" className="primary-button" onClick={() => tour.index < tour.steps.length - 1 ? setTour({ ...tour, index: tour.index + 1 }) : (setTour(null), setToast({ text: "That’s the tour! Ask me anything, any time." }))}>{tour.index < tour.steps.length - 1 ? "Next" : "Finish"}</button></div>
       </div>
     </div>}
-    {toast && !open && <div className="ai-chat-toast" role="status"><button type="button" className="ai-chat-toast-x" aria-label="Dismiss" onClick={() => setToast(null)}><X size={14} /></button><p>{toast.text}</p>{toast.action && <button type="button" className="primary-button" onClick={() => { const run = toast.action!.run; setToast(null); run(); }}>{toast.action.label}</button>}</div>}
+    {toast && !open && <div className="ai-chat-toast" role="status"><button type="button" className="ai-chat-toast-x" aria-label="Dismiss" onClick={() => setToast(null)}><X size={14} /></button><p>{toast.text}</p><button type="button" className="ai-chat-toast-mute" onClick={() => setAlertsOff(true)}>Mute</button>{toast.action && <button type="button" className="primary-button" onClick={() => { const run = toast.action!.run; setToast(null); run(); }}>{toast.action.label}</button>}</div>}
     {open && <section className="ai-chat-panel" aria-label="AI assistant">
-      <header><span className="ai-chat-head-bot">{avatar}</span><div className="ai-emp-wrap"><button type="button" className="ai-emp-trigger" aria-haspopup="listbox" aria-expanded={pickerOpen} onClick={() => setPickerOpen((v) => !v)} title="Choose an AI employee"><b>{current.icon} {current.name}</b><span aria-hidden="true">▾</span></button><small>On {label}</small>{pickerOpen && <div className="ai-emp-menu" role="listbox">{EMPLOYEES.map((item) => <button type="button" role="option" aria-selected={item.id === employee} key={item.id || "assistant"} className={item.id === employee ? "is-on" : ""} onClick={() => void chooseEmployee(item.id)}><span className="ai-emp-ico">{item.icon}</span><span><b>{item.name}</b><small>{item.hint}</small></span></button>)}</div>}</div><button type="button" className="ai-chat-icon" title="Hide assistant" aria-label="Hide assistant" onClick={hideBot}><EyeOff size={16} /></button><button type="button" className="ai-chat-icon" title="Raise a support ticket" aria-label="Raise a support ticket" onClick={openTicket}><LifeBuoy size={17} /></button>{TOURS[page] && <button type="button" className="ai-chat-icon" title={`Tour ${label}`} aria-label={`Tour ${label}`} onClick={() => startTour(page)}><Compass size={17} /></button>}<button type="button" className="ai-chat-icon" aria-label="Close" onClick={() => setOpen(false)}><X size={17} /></button></header>
+      <header><span className="ai-chat-head-bot">{avatar}</span><div className="ai-emp-wrap"><button type="button" className="ai-emp-trigger" aria-haspopup="listbox" aria-expanded={pickerOpen} onClick={() => setPickerOpen((v) => !v)} title="Choose an AI employee"><b>{current.icon} {current.name}</b><span aria-hidden="true">▾</span></button><small>On {label}</small>{pickerOpen && <div className="ai-emp-menu" role="listbox">{EMPLOYEES.map((item) => <button type="button" role="option" aria-selected={item.id === employee} key={item.id || "assistant"} className={item.id === employee ? "is-on" : ""} onClick={() => void chooseEmployee(item.id)}><span className="ai-emp-ico">{item.icon}</span><span><b>{item.name}</b><small>{item.hint}</small></span></button>)}</div>}</div><button type="button" className={`ai-chat-icon${alertsOff ? " is-off" : ""}`} title={alertsOff ? "Notifications off — click to turn on" : "Turn notifications off"} aria-label={alertsOff ? "Turn notifications on" : "Turn notifications off"} aria-pressed={alertsOff} onClick={() => setAlertsOff(!alertsOff)}>{alertsOff ? <BellOff size={16} /> : <Bell size={16} />}</button><button type="button" className="ai-chat-icon" title="Hide assistant" aria-label="Hide assistant" onClick={hideBot}><EyeOff size={16} /></button><button type="button" className="ai-chat-icon" title="Raise a support ticket" aria-label="Raise a support ticket" onClick={openTicket}><LifeBuoy size={17} /></button>{TOURS[page] && <button type="button" className="ai-chat-icon" title={`Tour ${label}`} aria-label={`Tour ${label}`} onClick={() => startTour(page)}><Compass size={17} /></button>}<button type="button" className="ai-chat-icon" aria-label="Close" onClick={() => setOpen(false)}><X size={17} /></button></header>
       <div className="ai-chat-list" ref={listRef}>{messages.map((message, index) => <div key={index} className={`ai-chat-msg ${message.from}`}><p>{message.text}</p>{message.rows && message.rows.length > 0 && <div className="ai-emp-rows">{message.rows.map((row) => <div key={row.label} className={`ai-emp-row ${row.tone || ""}`}><span>{row.label}</span><b>{row.value}</b></div>)}</div>}{message.actions && message.actions.length > 0 && <div className="ai-chat-actions">{message.actions.map((action) => <button type="button" key={action.label} onClick={action.run}>{action.label}</button>)}</div>}</div>)}{busy && <div className="ai-chat-msg bot typing"><p><i /><i /><i /></p></div>}</div>
       {ticket && <form className="ai-chat-ticket" onSubmit={(event) => { event.preventDefault(); void sendTicket(); }}>
         <b><LifeBuoy size={15} /> New support ticket</b>
