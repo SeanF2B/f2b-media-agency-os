@@ -52,3 +52,57 @@ html body .app-shell .sch-dash-free { color: var(--bl-ink) !important; }
 html body .app-shell .sch-earn-totals :is(.earn, .profit) { background: var(--bl-soft) !important; border-color: var(--bl-edge) !important; }
 html body .app-shell .sch-earn-totals :is(.earn, .profit) b,
 html body .app-shell :is(.sch-earn-money.earn b, .sch-earn-cell.earn b, .sch-earn-pay, .sch-earn-note) { color: var(--bl-ink) !important; }
+
+/* ── Recommendation / approval cards: photo previews + tidy action row (17 Nov) ── */
+html body .app-shell .ai-recommendation-photos { display:flex; gap:6px; margin-top:8px; }
+html body .app-shell .ai-recommendation-photo { position:relative; flex:0 0 auto; width:56px; height:42px; padding:0; overflow:hidden; border:1px solid var(--f2b-border,#e3e7ec); border-radius:8px; background:#f0f2f6; cursor:zoom-in; transform:none; box-shadow:none; }
+html body .app-shell .ai-recommendation-photo img { display:block; width:100%; height:100%; object-fit:cover; }
+html body .app-shell .ai-recommendation-photo:hover { border-color:var(--brand-primary,#0a78b0); box-shadow:0 2px 8px rgba(0,0,0,.14); }
+html body .app-shell .ai-recommendation-photo.is-broken { display:none; }
+html body .app-shell .ai-recommendation-photo-more { position:absolute; inset:0; display:grid; place-items:center; background:rgba(0,0,0,.5); color:#fff; font:700 12px/1 system-ui,-apple-system,"Segoe UI",sans-serif; }
+html body .app-shell.dark-mode .ai-recommendation-photo { border-color:#4a4a51; background:#2b2b30; }
+
+html body .app-shell .ai-approval-recommendations .ai-recommendation-controls {
+  display:grid !important;
+  grid-template-columns:36px auto minmax(0,1fr) 36px !important;
+  grid-template-areas:"run run run run" "details feedback . reject" !important;
+  align-items:center !important;
+  gap:8px !important;
+}
+html body .app-shell .ai-approval-recommendations .ai-recommendation-controls:has(>.ai-recommendation-more[open]) { grid-template-areas:"run run run run" "feedback feedback . reject" "details details details details" !important; }
+html body .app-shell .ai-approval-recommendations .ai-recommendation-controls:has(>.ai-recommendation-feedback[open]) { grid-template-areas:"run run run run" "details . . reject" "feedback feedback feedback feedback" !important; }
+html body .app-shell .ai-approval-recommendations .ai-recommendation-controls>.primary-button { min-height:38px !important; height:38px; padding:0 12px !important; border-radius:10px !important; font:650 13.5px/1 system-ui,-apple-system,"Segoe UI",sans-serif !important; display:inline-flex; align-items:center; justify-content:center; gap:6px; }
+html body .app-shell .ai-approval-recommendations .ai-recommendation-controls>details { align-self:start; margin:0 !important; padding:0 !important; border:0 !important; background:none !important; box-shadow:none !important; }
+html body .app-shell .ai-approval-recommendations .ai-recommendation-controls>details>summary,
+html body .app-shell .ai-approval-recommendations .ai-recommendation-controls>.recommendation-reject {
+  box-sizing:border-box !important;
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  gap:5px !important;
+  height:36px !important;
+  min-height:36px !important;
+  margin:0 !important;
+  padding:0 10px !important;
+  border:1px solid var(--f2b-border,#dfe3e8) !important;
+  border-radius:10px !important;
+  background:var(--f2b-panel,#fff) !important;
+  color:var(--f2b-text,#1d1d1f) !important;
+  font:600 13px/1 system-ui,-apple-system,"Segoe UI",sans-serif !important;
+  text-decoration:none !important;
+  box-shadow:none !important;
+  transform:none !important;
+  transition:border-color .15s, background-color .15s, color .15s !important;
+}
+html body .app-shell .ai-approval-recommendations .ai-recommendation-controls>.ai-recommendation-more>summary { width:36px !important; padding:0 !important; }
+html body .app-shell .ai-approval-recommendations .ai-recommendation-controls>.ai-recommendation-feedback>summary { width:auto !important; }
+html body .app-shell .ai-approval-recommendations .ai-recommendation-controls>.recommendation-reject { grid-area:reject; justify-self:end; width:36px !important; min-width:36px !important; padding:0 !important; font-size:15px !important; color:#b23b3b !important; }
+html body .app-shell .ai-approval-recommendations .ai-recommendation-controls>details>summary:hover { border-color:var(--brand-primary,#0a78b0) !important; color:var(--brand-primary,#0a78b0) !important; background:color-mix(in srgb,var(--brand-primary,#0a78b0) 7%,var(--f2b-panel,#fff)) !important; }
+html body .app-shell .ai-approval-recommendations .ai-recommendation-controls>.recommendation-reject:hover:not(:disabled) { border-color:#d16a6a !important; background:#fff1f1 !important; color:#9a2525 !important; }
+html body .app-shell .ai-approval-recommendations .ai-recommendation-controls>details[open]>summary { border-color:var(--brand-primary,#0a78b0) !important; color:var(--brand-primary,#0a78b0) !important; }
+html body .app-shell.dark-mode .ai-approval-recommendations .ai-recommendation-controls>details>summary,
+html body .app-shell.dark-mode .ai-approval-recommendations .ai-recommendation-controls>.recommendation-reject { border-color:#45454c !important; background:#2a2a2f !important; color:#ececf1 !important; }
+html body .app-shell.dark-mode .ai-approval-recommendations .ai-recommendation-controls>.recommendation-reject { color:#ff9c9c !important; }
+html body .app-shell.dark-mode .ai-approval-recommendations .ai-recommendation-controls>.recommendation-reject:hover:not(:disabled) { border-color:#c45a5a !important; background:#3d2627 !important; }
+html body .app-shell .ai-approval-recommendations .ai-recommendation-controls>details>summary svg,
+html body .app-shell .ai-approval-recommendations .ai-recommendation-controls>details>summary>span[aria-hidden="true"] { font-size:15px !important; line-height:1 !important; }
