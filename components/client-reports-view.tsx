@@ -67,7 +67,7 @@ export function ClientReportsView({ clientId, clientName, mode = "reports" }: { 
   // Dark or light report — remembered, applied instantly to the preview, full-screen view, PDF and saved reports.
   const [theme, setThemeState] = useState<"dark" | "light">(() => { try { return window.localStorage.getItem("f2b-report-theme") === "light" ? "light" : "dark"; } catch { return "dark"; } });
   const setTheme = (next: "dark" | "light") => { setThemeState(next); try { window.localStorage.setItem("f2b-report-theme", next); } catch { /* storage unavailable */ } };
-  const themed = useCallback((content: string) => content.replace(/<body(?: class="[^"]*")?>/, `<body class="${theme}">`), [theme]);
+  const themed = useCallback((content: string) => content.replace(/<body(?: class="[^"]*")?>/g, (tag: string, offset: number) => offset > content.indexOf("</head>") ? `<body class="${theme}">` : tag), [theme]);
   const prepareRef = useRef<KeywordPrepare | null>(null);
   useEffect(() => { setGroups([]); }, [clientId]);
   const frame = useRef<HTMLIFrameElement>(null);
