@@ -2744,3 +2744,39 @@ body.f2b-dark .app-shell .dh-link{color:#e7edf1 !important;-webkit-text-fill-col
   html body .app-shell .sch.is-phone .sch-toolbar { width: 100%; max-width: 100%; }
   html body .app-shell .sch.is-phone .sch-filters .sch-select select { min-width: 0; width: 100%; text-overflow: ellipsis; }
 }
+
+/* ===== Phones: clean, no overflow, the work first ===== */
+@media (max-width: 600px) {
+  /* client menu: opens as a full-width panel under the bar (was clipped and scrolled the bar sideways) */
+  html body .app-shell.topnav-layout .tn-left { overflow: visible !important; }
+  html body .app-shell.topnav-layout .tn-bar .client-scope-menu { position: fixed !important; top: 58px !important; left: 8px !important; right: 8px !important; width: auto !important; max-height: min(70vh, 560px) !important; overflow-y: auto !important; z-index: 1400 !important; border-radius: 16px !important; box-shadow: 0 18px 50px rgba(15,23,42,.25) !important; }
+  html body .app-shell.topnav-layout .tn-bar .client-scope-menu .client-scope-search input { font-size: 16px !important; }
+}
+@media (max-width: 860px) {
+  /* tab strips wrap to fit instead of hanging off the edge */
+  html body .app-shell .page-content :is(.crm-tabs, .iv-tabs, .ops-tabs, .settings-tabs, .ai-task-tabs, .book-tabs) { display: grid !important; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)) !important; gap: 4px !important; overflow: visible !important; max-width: 100%; }
+  html body .app-shell .page-content :is(.crm-tabs, .iv-tabs, .ops-tabs, .settings-tabs, .ai-task-tabs, .book-tabs) > * { min-width: 0 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; justify-content: center; padding-inline: 8px !important; font-size: 13px !important; }
+  html body .app-shell .page-content .ops-status-filter { flex-wrap: wrap; overflow: visible !important; max-width: 100%; }
+  /* Dashboard approvals: two cards side by side, nothing off-screen */
+  html body .app-shell .dh-approvals { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; overflow: visible !important; }
+  html body .app-shell .dh-approvals > .dh-approval { min-width: 0 !important; width: auto !important; max-width: 100% !important; margin: 0 !important; padding: 8px !important; gap: 6px !important; }
+  html body .app-shell .dh-approvals .dh-approval-icon { width: 30px !important; height: 30px !important; flex: none; }
+  html body .app-shell .dh-approvals .dh-approval-text { min-width: 0; flex: 1 1 auto; }
+  html body .app-shell .dh-approvals .dh-approval-text b { font-size: 13px !important; line-height: 1.15; }
+  html body .app-shell .dh-approvals .dh-approval-n { width: 28px !important; height: 28px !important; flex: none; font-size: 13px !important; }
+  html body .app-shell .dh-chevrons { overflow: visible !important; }
+  /* Dashboard + Books: big sections open on tap (see MobileCollapse) */
+  html body .app-shell :is(.dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel, .overview-projection-panel):not([data-mopen]) > :not(:first-child) { display: none !important; }
+  html body .app-shell :is(.dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel, .overview-projection-panel) > :first-child { position: relative; padding-right: 30px !important; cursor: pointer; }
+  html body .app-shell :is(.dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel, .overview-projection-panel) > :first-child::after { content: ""; position: absolute; right: 8px; top: 14px; width: 9px; height: 9px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); opacity: .55; transition: transform .2s; }
+  html body .app-shell :is(.dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel, .overview-projection-panel)[data-mopen] > :first-child::after { transform: rotate(-135deg); top: 18px; }
+  html body .app-shell :is(.dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel) { margin-bottom: 8px !important; }
+  html body .app-shell .dh-grid { display: grid !important; grid-template-columns: 1fr !important; gap: 8px !important; }
+  /* Tasks: filters fold into one tap-to-open bar so the list is on screen */
+  html body .app-shell .pipeline-toolbar:not([data-mopen]) > * { display: none !important; }
+  html body .app-shell .pipeline-toolbar { cursor: pointer; padding: 10px 12px !important; min-height: 0 !important; }
+  html body .app-shell .pipeline-toolbar::before { content: "Filters"; display: block; font-size: 13px; font-weight: 700; pointer-events: none; }
+  html body .app-shell .pipeline-toolbar[data-mopen]::before { content: "Filters (tap here to fold)"; margin-bottom: 8px; }
+  /* notices that push the work down */
+  html body .app-shell .page-content :is(.crm-notice, .conv-twilio-note, .iv-note-info) { display: none !important; }
+}
