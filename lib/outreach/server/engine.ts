@@ -314,7 +314,7 @@ async function executeStep(ownerId: string, settings: OutreachSettings, job: Row
       const registrar = createRegistrar({ apiToken: tokenValue || "", accountId: cloudflareAccountId(), purchasesEnabled: purchasesEnabled() });
       const approval = { approvedBy: String(job.approved_by || ""), approvedAt: String(job.approved_at || ""), domains: (input.domains || []).filter((item: Row) => item.buy).map((item: Row) => String(item.domain)) };
       try {
-        const result = await registrar.register(step.domain, { approval });
+        const result = await registrar.register(step.domain, { approval, autoRenew: false });
         await database.prepare("INSERT INTO outreach_domains (id, owner_id, domain, mail_host, registrar, registered_at, annual_cost_cents, currency, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, 'cloudflare', ?5, ?6, ?7, ?5, ?5) ON CONFLICT(owner_id, domain) DO UPDATE SET registrar = 'cloudflare', registered_at = COALESCE(outreach_domains.registered_at, excluded.registered_at)")
           .bind(uuid(), ownerId, step.domain, input.host, nowIso(), (input.domains || []).find((item: Row) => item.domain === step.domain)?.renewalCents ?? null, "USD").run();
         return { ok: true, message: result.alreadyOwned ? "Already owned." : `Registration ${result.status}.` };
