@@ -6,7 +6,7 @@ import { KeywordReportBuilder, type KeywordPrepare } from "./keyword-report-buil
 
 type ReportType = "ads" | "seo" | "audit" | "audit-ads" | "audit-website" | "keywords";
 export type ReportsMode = "reports" | "audits" | "keywords";
-type Saved = { id: string; type: ReportType; periodStart: string; periodEnd: string; kind: string; createdAt: string; summary?: { leads?: number | null; wonRevenue?: number | null; missing?: string[] } };
+type Saved = { id: string; type: ReportType; periodStart: string; periodEnd: string; kind: string; createdAt: string; summary?: { leads?: number | null; wonRevenue?: number | null; missing?: string[]; groups?: string[]; groupIds?: string[]; keywords?: number | null } };
 const PRESETS = [["lastMonth", "Last month"], ["thisMonth", "This month to date"], ["30d", "Last 30 days"], ["90d", "Last 90 days"], ["custom", "Custom range"]] as const;
 type Preset = (typeof PRESETS)[number][0];
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -106,7 +106,7 @@ export function ClientReportsView({ clientId, clientName, mode = "reports" }: { 
   const download = () => { const win = frame.current?.contentWindow; if (!win) return; win.focus(); win.print(); };
   const openTab = (raw = html) => { const content = themed(raw); const win = window.open("", "_blank"); if (!win) { setError("Allow pop-ups for this site to open the report."); return; } win.document.open(); win.document.write(content.replace("</body>", `<button onclick="print()" style="position:fixed;top:14px;right:14px;padding:10px 16px;border:0;border-radius:10px;background:#1f6feb;color:#fff;font:600 14px system-ui;cursor:pointer;z-index:9" class="no-print">Download PDF</button><style>@media print{.no-print{display:none}}</style></body>`)); win.document.close(); };
   const autoSaveRef = useRef<(() => void) | null>(null);
-  autoSaveRef.current = () => { if (!history.some((item) => item.type === type && item.periodStart === range.start && item.periodEnd === range.end)) void save(true); };
+  autoSaveRef.current = () => { const picked = [...groups].sort().join(","); if (!history.some((item) => item.type === type && item.periodStart === range.start && item.periodEnd === range.end && (mode !== "keywords" || (item.summary?.groupIds || []).join(",") === picked))) void save(true); };
   const save = async (auto = false) => {
     setSaving(true); setError("");
     try {
@@ -159,7 +159,7 @@ export function ClientReportsView({ clientId, clientName, mode = "reports" }: { 
       <div className="crv-history">
         <h3>{cfg.savedTitle}</h3>
         <p className="crv-sub">{cfg.savedSub}</p>
-        {history.length ? <ul>{history.map((item) => <li key={item.id}><TypeMark type={item.type} /><span><b>{META[item.type]?.short || item.type} · {fmtDate(item.periodStart)} – {fmtDate(item.periodEnd)}</b><small>{item.kind === "monthly" ? "Monthly (automatic)" : "Saved manually"} · {fmtDate(item.createdAt)}{item.summary?.missing?.length ? ` · missing: ${item.summary.missing.join(", ")}` : ""}</small></span><button type="button" className="secondary-button" onClick={() => void openSaved(item)}>Open</button></li>)}</ul> : <p className="muted">{cfg.empty} for {clientName} yet.</p>}
+        {history.length ? <ul>{history.map((item) => <li key={item.id}><TypeMark type={item.type} /><span><b>{item.type === "keywords" && item.summary?.groups?.length ? `${item.summary.groups.join(", ")}` : `${META[item.type]?.short || item.type} · ${fmtDate(item.periodStart)} – ${fmtDate(item.periodEnd)}`}</b><small>{item.kind === "monthly" ? "Monthly (automatic)" : "Saved manually"} · {fmtDate(item.createdAt)}{item.summary?.missing?.length ? ` · missing: ${item.summary.missing.join(", ")}` : ""}</small></span><button type="button" className="secondary-button" onClick={() => void openSaved(item)}>Open</button></li>)}</ul> : <p className="muted">{cfg.empty} for {clientName} yet.</p>}
       </div>
     </section>
   );

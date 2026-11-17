@@ -2995,3 +2995,18 @@ html body .app-shell .dh-msrc { display: none; }
   html body .app-shell .dh-detail { overflow-x: auto; }
   html body .app-shell .dh-detail :is(.dh-rank-drop-head, .dh-detail-head) { flex-wrap: wrap; gap: 6px; }
 }
+
+/* Client workroom → Recent reports: preview cards (report thumbnail + date period / keyword group). */
+html body .app-shell .crecent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
+html body .app-shell .crecent-card { display: grid; gap: 0; padding: 0; overflow: hidden; text-align: left; border: 1px solid var(--f2b-border, #d9dee3); border-radius: 12px; background: var(--f2b-white, #fff); color: inherit; font: inherit; cursor: pointer; transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease; }
+html body .app-shell .crecent-card:hover { transform: translateY(-2px); border-color: var(--brand-secondary, var(--brand-primary, #0b74b8)); box-shadow: 0 8px 20px rgba(15, 23, 42, .12); }
+html body .app-shell.dark-mode .crecent-card { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.14); }
+html body .app-shell .crecent-thumb { position: relative; display: block; height: 128px; overflow: hidden; background: #0f172a; pointer-events: none; }
+html body .app-shell .crecent-thumb iframe { position: absolute; top: 0; left: 0; width: 900px; height: 520px; border: 0; transform: scale(.26); transform-origin: 0 0; background: #fff; }
+html body .app-shell .crecent-text { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 4px; padding: 10px; text-align: center; color: #fff; background: linear-gradient(135deg, #1e293b, #0f172a); }
+html body .app-shell .crecent-text small { opacity: .75; font-size: 11px; }
+html body .app-shell .crecent-period { position: absolute; left: 8px; bottom: 8px; max-width: calc(100% - 16px); padding: 3px 8px; border-radius: 999px; background: rgba(15, 23, 42, .82); color: #fff; font-size: 11px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html body .app-shell .crecent-meta { display: grid; gap: 3px; padding: 9px 11px 11px; min-width: 0; }
+html body .app-shell .crecent-meta .cfolder-badge { justify-self: start; }
+html body .app-shell .crecent-meta b { font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html body .app-shell .crecent-meta small { font-size: 12px; opacity: .72; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

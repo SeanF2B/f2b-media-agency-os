@@ -26,16 +26,25 @@ export async function saveClientReport(db: D1Database, bucket: Bucket, workspace
   const id = crypto.randomUUID();
   const storageKey = bucket ? `client-reports/${ownerId}/${clientId}/${type}/${period.start}_${period.end}_${kind}_${id}.html` : "";
   if (bucket) await bucket.put(storageKey, html, { httpMetadata: { contentType: "text/html; charset=utf-8", cacheControl: "private, no-store" } });
-  const summary = { leads: report.attribution.data?.current.leads ?? null, qualified: report.attribution.data?.current.qualified ?? null, wonRevenue: report.attribution.data?.current.wonRevenue ?? null, spend: report.ads?.data?.current.spend ?? null, missing: report.missing.map((m) => m.label) };
+  const groupIds = [...new Set((options.keywordGroups || []).map(String))].sort();
+  const kw = report.keywordResearch?.data;
+  const summary = { leads: report.attribution.data?.current.leads ?? null, qualified: report.attribution.data?.current.qualified ?? null, wonRevenue: report.attribution.data?.current.wonRevenue ?? null, spend: report.ads?.data?.current.spend ?? null, missing: report.missing.map((m) => m.label), ...(type === "keywords" ? { groups: (kw?.groups || []).map((g) => g.name).slice(0, 20), groupIds, keywords: kw?.total ?? null } : {}) };
+  // Keyword reports are kept per group selection, so a report for "Roof repairs" never replaces one for "New roofs".
+  if (type === "keywords" && kind === "manual" && groupIds.length) kind = `manual-kw-${await shortHash(groupIds.join(","))}` as typeof kind;
   await db.prepare("INSERT INTO client_report_archive (id, owner_id, client_id, type, period_start, period_end, kind, created_at, storage_key, html, summary_json) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11) ON CONFLICT(owner_id, client_id, type, period_start, period_end, kind) DO UPDATE SET id=excluded.id, created_at=excluded.created_at, storage_key=excluded.storage_key, html=excluded.html, summary_json=excluded.summary_json")
     .bind(id, ownerId, clientId, type, period.start, period.end, kind, report.generatedAt, storageKey, bucket ? null : html, JSON.stringify(summary)).run();
   return { id, report, html };
 }
 
+async function shortHash(value: string) {
+  const digest = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(value));
+  return [...new Uint8Array(digest)].slice(0, 6).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 export async function listClientReports(db: D1Database, ownerId: string, clientId: string) {
   await ensureReportArchive(db);
-  const rows = await db.prepare("SELECT id, type, period_start, period_end, kind, created_at, summary_json FROM client_report_archive WHERE owner_id = ?1 AND client_id = ?2 AND kind IN ('monthly', 'manual') ORDER BY period_end DESC, created_at DESC LIMIT 36").bind(ownerId, clientId).all<{ id: string; type: string; period_start: string; period_end: string; kind: string; created_at: string; summary_json: string }>();
-  return (rows.results || []).map((row) => ({ id: row.id, type: row.type, periodStart: row.period_start, periodEnd: row.period_end, kind: row.kind, createdAt: row.created_at, summary: (() => { try { return JSON.parse(row.summary_json); } catch { return {}; } })() }));
+  const rows = await db.prepare("SELECT id, type, period_start, period_end, kind, created_at, summary_json FROM client_report_archive WHERE owner_id = ?1 AND client_id = ?2 AND (kind IN ('monthly', 'manual') OR kind LIKE 'manual-kw-%') ORDER BY period_end DESC, created_at DESC LIMIT 36").bind(ownerId, clientId).all<{ id: string; type: string; period_start: string; period_end: string; kind: string; created_at: string; summary_json: string }>();
+  return (rows.results || []).map((row) => ({ id: row.id, type: row.type, periodStart: row.period_start, periodEnd: row.period_end, kind: row.kind.startsWith("manual") ? "manual" : row.kind, createdAt: row.created_at, summary: (() => { try { return JSON.parse(row.summary_json); } catch { return {}; } })() }));
 }
 
 export async function readClientReportHtml(db: D1Database, bucket: Bucket, ownerId: string, id: string) {
