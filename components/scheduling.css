@@ -612,3 +612,4 @@ html body .app-shell.dark-mode .sch-dash-panel-tools .sch-seg button.on{backgrou
   .sch .dh-sample-banner{padding:6px 12px;font-size:12px}
 }
 .sch .iv-stats.sch-stats-under{margin:0 0 12px}
+.sch-custom-dur{align-items:center;margin-top:6px}.sch-custom-dur input{width:64px;font-size:16px}.sch-custom-dur span{font-size:12px;opacity:.75}

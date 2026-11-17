@@ -356,7 +356,7 @@ function CalendarEditor({ data, value, busy, onClose, onSave, onDelete }: { data
     <Field label="Description (shown on the booking page)"><textarea rows={2} value={c.description || ""} onChange={(e) => set({ description: e.target.value })} maxLength={1500} placeholder="What happens at this appointment?" /></Field>
     <h3 className="sch-h3">Timing</h3>
     <div className="iv-grid">
-      <Field label="Length (minutes)"><input type="number" min={5} max={600} value={c.durationMin ?? 60} onChange={(e) => set({ durationMin: Number(e.target.value) })} /></Field>
+      <Field label="Length (minutes)"><input type="number" min={5} max={720} value={c.durationMin ?? 60} onChange={(e) => set({ durationMin: Number(e.target.value) })} /></Field>
       <Field label="Buffer before (min)" hint="Prep / travel time blocked before"><input type="number" min={0} max={240} value={c.bufferBefore ?? 0} onChange={(e) => set({ bufferBefore: Number(e.target.value) })} /></Field>
       <Field label="Buffer after (min)" hint="Wrap-up / travel time blocked after"><input type="number" min={0} max={240} value={c.bufferAfter ?? 0} onChange={(e) => set({ bufferAfter: Number(e.target.value) })} /></Field>
       <Field label="Start times every"><select value={c.slotInterval ?? 30} onChange={(e) => set({ slotInterval: Number(e.target.value) })}>{[15, 20, 30, 45, 60, 90, 120].map((n) => <option key={n} value={n}>{n} minutes</option>)}</select></Field>
@@ -453,6 +453,9 @@ function NewAppointment({ data, scope, initial, onClose, onSaved, onCalendarsCha
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [location, setLocation] = useState("");
   const [duration, setDuration] = useState(initial.durationMin || 0); // 0 = the appointment type's own length
+  const DURATION_PRESETS = [15, 20, 30, 45, ...Array.from({ length: 19 }, (_, i) => 60 + i * 30)]; // 15m–45m, then every half hour from 1h to 10h
+  const [customDur, setCustomDur] = useState(() => !!initial.durationMin && ![15, 20, 30, 45].includes(initial.durationMin) && (initial.durationMin < 60 || initial.durationMin > 600 || initial.durationMin % 30 !== 0));
+  const fmtDur = (m: number) => { const h = Math.floor(m / 60), r = m % 60; return h ? `${h} hr${r ? ` ${r} min` : h === 1 ? "" : "s"}` : `${r} min`; };
   const [price, setPrice] = useState("");
   const [images, setImages] = useState<string[]>(() => (initial.images || []).slice(0, 3));
   const [uploading, setUploading] = useState(0);
@@ -523,7 +526,8 @@ function NewAppointment({ data, scope, initial, onClose, onSaved, onCalendarsCha
       : cal ? <><SlotPicker data={data} scope={scope} calendarId={calendarId} staffIds={staffIds} date={date} value={slot} onPick={(s) => setSlot(s.start)} /><button type="button" className="sch-linkbtn" onClick={useAnyTime}>Need a time that isn't listed? Pick any time</button></> : null}
     {cal?.questions.length ? <><h3 className="sch-h3">Details</h3><div className="iv-grid">{cal.questions.map((q) => <Field key={q.id} label={q.label}>{q.type === "select" ? <select value={answers[q.id] || ""} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}><option value="">Choose…</option>{(q.options || []).map((o) => <option key={o}>{o}</option>)}</select> : <input value={answers[q.id] || ""} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })} />}</Field>)}</div></> : null}
     {cal && <><h3 className="sch-h3">Length, price &amp; photos</h3><div className="iv-grid">
-      <Field label="How long?"><select value={duration} onChange={(e) => setDuration(Number(e.target.value))}><option value={0}>Default ({cal.durationMin} min)</option>{[...new Set([15, 30, 45, 60, 90, 120, 180, 240, 300, 360, 480, ...(duration ? [duration] : [])])].sort((a, b) => a - b).filter((m) => m !== cal.durationMin).map((m) => <option key={m} value={m}>{m < 60 ? `${m} min` : `${m / 60 % 1 ? (m / 60).toFixed(1) : m / 60} hour${m === 60 ? "" : "s"}`}</option>)}</select></Field>
+      <Field label="How long?"><select value={customDur ? -1 : duration} onChange={(e) => { const v = Number(e.target.value); if (v === -1) { setCustomDur(true); if (!duration) setDuration(cal.durationMin); } else { setCustomDur(false); setDuration(v); } }}><option value={0}>Default ({fmtDur(cal.durationMin)})</option>{DURATION_PRESETS.filter((m) => m !== cal.durationMin).map((m) => <option key={m} value={m}>{fmtDur(m)}</option>)}<option value={-1}>Custom…</option></select>
+        {customDur && <div className="sch-inline sch-custom-dur"><input type="number" inputMode="numeric" min={0} max={12} aria-label="Hours" value={Math.floor((duration || cal.durationMin) / 60)} onChange={(e) => { const h = Math.max(0, Math.min(12, Math.floor(Number(e.target.value) || 0))); setDuration(Math.max(5, Math.min(720, h * 60 + ((duration || cal.durationMin) % 60)))); }} /><span>hrs</span><input type="number" inputMode="numeric" min={0} max={59} step={5} aria-label="Minutes" value={(duration || cal.durationMin) % 60} onChange={(e) => { const mm = Math.max(0, Math.min(59, Math.floor(Number(e.target.value) || 0))); setDuration(Math.max(5, Math.min(720, Math.floor((duration || cal.durationMin) / 60) * 60 + mm))); }} /><span>mins</span></div>}</Field>
       <Field label={`Price (${cal.currency || "EUR"})`}><input type="number" inputMode="decimal" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} placeholder={cal.price ? String(cal.price) : "Optional"} /></Field>
     </div>
     <div className="sch-appt-photos">{images.map((u) => <span key={u} className="sch-appt-photo"><img src={u} alt="" /><button type="button" aria-label="Remove photo" onClick={() => setImages(images.filter((x) => x !== u))}>×</button></span>)}

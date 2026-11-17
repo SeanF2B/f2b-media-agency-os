@@ -73,7 +73,7 @@ export function sanitizeCalendar(input: Record<string, unknown>, base: Partial<C
     slug: slugify(text(input.slug, 60) || name),
     kind,
     description: text(input.description, 1500),
-    durationMin: clampInt(input.durationMin, 5, 600, 30),
+    durationMin: clampInt(input.durationMin, 5, 720, 30),
     bufferBefore: clampInt(input.bufferBefore, 0, 240, 0),
     bufferAfter: clampInt(input.bufferAfter, 0, 240, 0),
     slotInterval: clampInt(input.slotInterval, 5, 240, 30),
