@@ -38,7 +38,7 @@ export function InfrastructurePanel({ state, act, reload }: { state: OutreachSta
   return <div className="ox-stack">
     <div className="ox-seg ox-subtabs" role="tablist" aria-label="Infrastructure">{([["mailboxes", `Mailboxes (${state.mailboxes.length})`], ["domains", `Domains (${state.domains.length})`], ["setup", running.length ? `Set up · ${running[0].progress.percent}%` : "Add mailboxes"], ["placement", "Placement tests"]] as const).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={section === key} className={section === key ? "on" : ""} onClick={() => setSection(key)}>{label}</button>)}</div>
     <Connections state={state} act={act} />
-    {section === "mailboxes" && <MailboxTable state={state} act={act} />}
+    {section === "mailboxes" && <MailboxTable state={state} act={act} reload={reload} />}
     {section === "domains" && <Domains state={state} act={act} />}
     {section === "setup" && <Provisioning state={state} act={act} reload={reload} />}
     {section === "placement" && <Placement state={state} act={act} />}
@@ -208,8 +208,10 @@ function FlameCell({ mailbox, act, warm }: { mailbox: Mailbox; act: Act; warm: (
   </div>;
 }
 
-function MailboxTable({ state, act }: { state: OutreachState; act: Act }) {
+function MailboxTable({ state, act, reload }: { state: OutreachState; act: Act; reload: () => Promise<void> }) {
   const [editing, setEditing] = useState<Mailbox | null>(null);
+  const [liveFor, setLiveFor] = useState<string | null>(null);
+  const jobFor = (mailbox: Mailbox) => state.jobs.find((job) => job.steps.some((step) => step.email === mailbox.email) && job.status !== "done") || null;
   const [reportFor, setReportFor] = useState<Mailbox | null>(null);
   const [warmResults, setWarmResults] = useState<WarmupResult[] | null>(null);
   const warm = async (ids: string[]) => {
@@ -253,11 +255,11 @@ function MailboxTable({ state, act }: { state: OutreachState; act: Act }) {
             <button type="button" className="ox-mbx-who" onClick={() => setEditing(mailbox)} title="Edit name and photo">
               <SenderAvatar mailbox={mailbox} size={40} />
               <span><b>{mailbox.displayName || mailbox.email}</b><small>{mailbox.email}</small>
-                <span className="ox-mbx-tags">{setting && <span className="ox-chip-mini warn">Setting up</span>}{mailbox.status === "paused" && <span className="ox-chip-mini warn">Paused</span>}{mailbox.tags.map((tag) => <span key={tag} className="ox-chip-mini">{tag}</span>)}{mailbox.campaigns.length > 0 && <span className="ox-chip-mini">{mailbox.campaigns.length} campaign{mailbox.campaigns.length === 1 ? "" : "s"}</span>}</span>
+                <span className="ox-mbx-tags">{setting && !jobFor(mailbox) && <span className="ox-chip-mini warn">Setting up</span>}{mailbox.status === "paused" && <span className="ox-chip-mini warn">Paused</span>}{mailbox.tags.map((tag) => <span key={tag} className="ox-chip-mini">{tag}</span>)}{mailbox.campaigns.length > 0 && <span className="ox-chip-mini">{mailbox.campaigns.length} campaign{mailbox.campaigns.length === 1 ? "" : "s"}</span>}</span>
                 {mailbox.pausedReason && <small className="ox-warn-text">{mailbox.pausedReason}</small>}
               </span>
             </button>
-            <div className="ox-mbx-flame"><FlameCell mailbox={mailbox} act={act} warm={warm} /></div>
+            <div className="ox-mbx-flame">{jobFor(mailbox) ? <SetupPill job={jobFor(mailbox)!} email={mailbox.email} onOpen={() => setLiveFor(mailbox.id)} /> : <FlameCell mailbox={mailbox} act={act} warm={warm} />}</div>
             <button type="button" className="ox-mbx-health" onClick={() => setReportFor(mailbox)} title="Open health report — spam, bounces, replies, DNS"><HealthPill health={mailbox.health} /><small><Activity size={12} /> Report</small></button>
             <div className="ox-mbx-today"><span className="ox-meter" aria-label={`${mailbox.sentToday} of ${mailbox.limitToday} sent today`}><span style={{ width: `${mailbox.limitToday ? Math.min(100, (mailbox.sentToday / mailbox.limitToday) * 100) : 0}%` }} /></span><small>{mailbox.sentToday}/{mailbox.limitToday} today</small></div>
             <div className="ox-mbx-cost"><small>{money(mailbox.monthlyCostCents)}/mo</small></div>
@@ -266,6 +268,7 @@ function MailboxTable({ state, act }: { state: OutreachState; act: Act }) {
         })}
       </section>)}
     </div>
+    {liveFor && (() => { const mailbox = state.mailboxes.find((item) => item.id === liveFor); const job = mailbox && jobFor(mailbox); return mailbox ? <SetupLiveDrawer mailbox={mailbox} job={job} domain={state.domains.find((item) => item.domain === mailbox.domain) || null} act={act} reload={reload} onClose={() => setLiveFor(null)} /> : null; })()}
     {editing && <SenderDrawer mailbox={editing} act={act} onClose={() => setEditing(null)} />}
     {reportFor && <ReportDrawer mailbox={reportFor} onClose={() => setReportFor(null)} />}
     {warmResults && <WarmupResults results={warmResults} act={act} onClose={() => setWarmResults(null)} />}
@@ -397,6 +400,70 @@ function JobTimeline({ job, act }: { job: OutreachState["jobs"][number]; act: Ac
       {(step.status === "failed" || (step.status === "waiting" && step.manual)) && <button type="button" className="ox-link" onClick={() => void act("job-retry", { jobId: job.id, stepKey: step.key }, "Retrying")}>Retry</button>}
     </li>)}</ol></div>)}
   </div>;
+}
+
+
+// ============================ live setup (watch it happen) ============================
+const STEP_NARRATION: Record<string, (domain: string, email?: string) => string> = {
+  purchase: (d) => `Buying ${d}…`, zone: (d) => `Connecting ${d} to Cloudflare…`, "host-domain": (d) => `Adding ${d} to Microsoft 365…`,
+  "host-verify": (d) => `Proving to Microsoft that you own ${d}…`, "mail-dns": (d) => `Writing MX, SPF and DMARC records for ${d}…`,
+  dkim: () => "Waiting for DKIM to be switched on in Microsoft…", propagation: (d) => `Checking the world can see ${d}'s records…`,
+  mailbox: (_d, e) => `Creating ${e}…`, license: (_d, e) => `Giving ${e} a Microsoft licence…`, connect: (_d, e) => `Connecting ${e} to Outreach…`,
+  test: (_d, e) => `Sending a test email from ${e}…`, warmup: (_d, e) => `Starting warm-up for ${e}…`,
+};
+const STEP_HELP: Record<string, { text: string; href: string; label: string }> = {
+  dkim: { text: "Microsoft makes you flip this one switch yourself.", href: "https://security.microsoft.com/dkimv2", label: "Open DKIM settings" },
+  license: { text: "There's no free Microsoft licence. Buy one (or get the held order released) and this carries on by itself.", href: "https://admin.microsoft.com/#/catalog", label: "Buy a licence" },
+};
+
+function SetupPill({ job, email, onOpen }: { job: OutreachState["jobs"][number]; email: string; onOpen: () => void }) {
+  const steps = job.steps.filter((step) => !step.email || step.email === email);
+  const done = steps.filter((step) => step.status === "done").length;
+  const blocked = steps.some((step) => ["failed", "waiting", "retry"].includes(step.status));
+  const pctDone = Math.round((done / Math.max(1, steps.length)) * 100);
+  return <button type="button" className={`ox-setup-pill ${blocked ? "blocked" : ""}`} onClick={onOpen} title="Watch the setup live">
+    <span className="ox-setup-ring" style={{ ["--p" as string]: `${pctDone}` }}><Sparkles size={13} /></span>
+    <span><b>{blocked ? "Needs you" : "Setting up"}</b><small>{done}/{steps.length} steps · watch live</small></span>
+  </button>;
+}
+
+function SetupLiveDrawer({ mailbox, job, domain, act, reload, onClose }: { mailbox: Mailbox; job: OutreachState["jobs"][number] | null; domain: OutreachState["domains"][number] | null; act: Act; reload: () => Promise<void>; onClose: () => void }) {
+  const [check, setCheck] = useState(domain?.check || {});
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    const run = async () => { await reload().catch(() => undefined); try { const result = await outreachAction<{ check: typeof check }>("domain-check", { domain: mailbox.domain }); if (alive) setCheck(result.check); } catch { /* domain may not be added yet */ } if (alive) setTick((value) => value + 1); };
+    void run(); const timer = setInterval(run, 15000);
+    return () => { alive = false; clearInterval(timer); };
+  }, [mailbox.domain]); // eslint-disable-line react-hooks/exhaustive-deps
+  const steps = (job?.steps || []).filter((step) => !step.email || step.email === mailbox.email);
+  const current = steps.find((step) => step.status !== "done") || null;
+  const done = steps.filter((step) => step.status === "done").length;
+  const pctDone = Math.round((done / Math.max(1, steps.length)) * 100);
+  const help = current && STEP_HELP[current.kind];
+  const records: Array<{ key: "mx" | "spf" | "dmarc" | "dkim"; label: string; what: string }> = [
+    { key: "mx", label: "MX", what: "Routes replies into the inbox" }, { key: "spf", label: "SPF", what: "Says Microsoft may send for this domain" },
+    { key: "dkim", label: "DKIM", what: "Signs every email so it can't be faked" }, { key: "dmarc", label: "DMARC", what: "Tells Gmail & Outlook what to do with fakes" },
+  ];
+  return <div className="ox-drawer-backdrop" role="presentation" onClick={onClose}><aside className="ox-drawer ox-live" role="dialog" aria-label={`Setting up ${mailbox.email}`} onClick={(event) => event.stopPropagation()}>
+    <header><h2>Setting up {mailbox.firstName || mailbox.email}</h2><button type="button" className="ox-icon" onClick={onClose} aria-label="Close"><X size={16} /></button></header>
+    <div className="ox-live-hero">
+      <span className={`ox-live-orb ${current ? "busy" : "done"}`}><Sparkles size={18} /></span>
+      <div aria-live="polite"><b key={current?.key || "done"} className="ox-live-say">{current ? (help && ["waiting", "retry", "failed"].includes(current.status) ? help.text : (STEP_NARRATION[current.kind]?.(current.domain, current.email) || current.label)) : "All set — ready to warm up 🔥"}</b>
+        <small>{mailbox.email} · {done} of {steps.length} done · checks again every 15s{tick ? "" : "…"}</small></div>
+      <strong>{pctDone}%</strong>
+    </div>
+    <div className="ox-progress"><span style={{ width: `${pctDone}%` }} className={current ? "live" : ""} /></div>
+    {help && current && ["waiting", "retry", "failed"].includes(current.status) && <a className="primary-button ox-live-cta" href={help.href} target="_blank" rel="noreferrer">{help.label} ↗</a>}
+    <section><h3>DNS records · {mailbox.domain}</h3><ul className="ox-live-records">{records.map((record) => { const value = (check as Record<string, string | undefined>)[record.key]; const ok = value === "pass"; return <li key={record.key} className={ok ? "ok" : value ? "bad" : "wait"}>
+      <span className="ox-tl-icon">{ok ? <CheckCircle2 size={16} /> : value && value !== "missing" ? <XCircle size={16} /> : <Loader2 size={16} className="ox-spin" />}</span>
+      <span><b>{record.label}</b><small>{record.what}</small></span><em>{ok ? "Live" : value === "missing" ? "Adding…" : value ? "Fixing" : "Checking…"}</em></li>; })}</ul></section>
+    <section><h3>Steps</h3><ol className="ox-live-steps">{steps.map((step) => <li key={step.key} className={step.status}>
+      <span className="ox-tl-icon">{step.status === "done" ? <CheckCircle2 size={15} /> : step.status === "failed" ? <XCircle size={15} /> : step === current ? <Loader2 size={15} className="ox-spin" /> : <CircleDashed size={15} />}</span>
+      <span><b>{step.label}</b>{step.message && <small>{step.message}</small>}</span>
+      {(step.status === "failed" || (step.manual && step.status !== "done")) && job && <button type="button" className="ox-link" onClick={() => void act("job-retry", { jobId: job.id, stepKey: step.key }, "Checking again")}>Check again</button>}
+    </li>)}</ol></section>
+  </aside></div>;
 }
 
 // ============================ placement ============================
