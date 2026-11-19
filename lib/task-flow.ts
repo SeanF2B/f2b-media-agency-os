@@ -90,6 +90,8 @@ export type FlowTask = {
   aiMode?: string;
   aiRunState?: string;
   aiRunStartedAt?: string;
+  aiProgressText?: string;
+  aiProgressAt?: string;
   aiRunAt?: string;
   aiRunAttempt?: number;
   aiStartNowRequestedAt?: string;
@@ -113,6 +115,21 @@ const PENDING_STATUSES = new Set(["Blocked", "Pending"]);
 const shortText = (value: unknown, limit: number) => String(value ?? "").replace(/\s+/g, " ").trim().slice(0, limit);
 const newId = () => (globalThis.crypto?.randomUUID?.() || `id-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
 
+/** A run with no sign of life for this long has stopped, whatever its stored state says. */
+export const ABANDONED_RUN_MS = 30 * 60_000;
+
+/** True only while an AI run is genuinely alive (recent start or progress update). */
+export function isLiveRun(task: Pick<FlowTask, "aiRunState" | "aiRunStartedAt" | "aiProgressAt">, now = Date.now()): boolean {
+  if (task.aiRunState !== "running") return false;
+  const lastSign = Math.max(Date.parse(task.aiProgressAt || "") || 0, Date.parse(task.aiRunStartedAt || "") || 0);
+  return lastSign > 0 && now - lastSign < ABANDONED_RUN_MS;
+}
+
+/** A run marked "running" that has gone quiet — it belongs in Pending with its last progress as the reason. */
+export function isAbandonedRun(task: FlowTask, now = Date.now()): boolean {
+  return task.status !== TASK_STATUS.done && task.aiRunState === "running" && !isLiveRun(task, now);
+}
+
 export function isAiTask(task: Pick<FlowTask, "assigneeId" | "aiMode">, botIds?: ReadonlySet<string>): boolean {
   const id = String(task.assigneeId || "");
   if (botIds) return botIds.has(id);
@@ -127,12 +144,13 @@ function withEvent<T extends FlowTask>(task: T, event: Omit<TaskHistoryEvent, "i
  * Where a task shows on the board. Strict: an AI task is only In progress while
  * the AI is acting. Anything that stopped without finishing is Pending.
  */
-export function boardColumn(task: FlowTask, botIds?: ReadonlySet<string>): BoardColumn {
+export function boardColumn(task: FlowTask, botIds?: ReadonlySet<string>, now = Date.now()): BoardColumn {
   if (task.status === TASK_STATUS.done) return "done";
   const ai = isAiTask(task, botIds);
   if (ai) {
     const applyingChange = (task.aiApprovals || []).some((item) => item.status === "applying");
-    if (task.aiRunState === "running" || task.aiStartNowRequestedAt || applyingChange) return "in_progress";
+    if (isLiveRun(task, now) || task.aiStartNowRequestedAt || applyingChange) return "in_progress";
+    if (task.aiRunState === "running") return "pending"; // went quiet — stopped
     if (task.approvalRequest?.status === "awaiting" || PENDING_STATUSES.has(String(task.status))) return "pending";
     if (["failed", "needs_review", "needs_connection", "cancelled"].includes(String(task.aiRunState))) return "pending";
     // An AI task marked In progress with no live run has stopped — it is Pending.

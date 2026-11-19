@@ -240,3 +240,19 @@ test("History: edit and send back to the AI → In progress → Done", async () 
   assert.equal(readTask("t-report").status, "Done");
   assert.equal(emails.length, 3);
 });
+
+test("Runs left 'running' for days (like the ones on the live board) are moved to Pending with a reason and an approval email", async () => {
+  addTask({ id: "t-stuck", title: "GBP post · Roof Replacement · Thu 19 Nov", clientId: "c-pro", assigneeId: BOT, aiMode: "Research", service: "Research", status: "In progress", priority: "Normal", estimate: 1,
+    aiRunState: "running", aiRunStartedAt: minutesAgo(60 * 48), aiProgressText: "Waiting for Sean’s approval (in Approvals): GBP post – Roof Replacement", due: dueDay(minutesAgo(60 * 48)), dueAt: minutesAgo(60 * 48), repeat: "None", occurrence: 1 });
+  addTask({ id: "t-live", title: "Live run", clientId: "c-pro", assigneeId: BOT, aiMode: "Research", status: "In progress", aiRunState: "running", aiRunStartedAt: minutesAgo(2), repeat: "None", occurrence: 1 });
+  assert.equal(flow.boardColumn(readTask("t-stuck"), botIds), "pending", "the board already shows it as Pending");
+  const before = emails.length;
+  await processDueAiTasks(env, new Date());
+  const task = readTask("t-stuck");
+  assert.equal(task.status, "Blocked");
+  assert.match(task.pendingReason, /Waiting for Sean/);
+  assert.equal(task.approvalRequest.status, "awaiting");
+  assert.equal(emails.length, before + 1);
+  assert.equal(readTask("t-live").aiRunState, "running", "a genuinely live run is left alone");
+  assert.equal(flow.boardColumn(readTask("t-live"), botIds), "in_progress");
+});

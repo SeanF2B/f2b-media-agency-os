@@ -21,7 +21,7 @@ test("To do shows the date and frequency", () => {
 
 test("In progress only while the AI is acting", () => {
   const running = startTask(base, { by: "Bot", at: at(0) }, true);
-  assert.equal(boardColumn(running, bot), "in_progress");
+  assert.equal(boardColumn(running, bot, Date.parse(at(1))), "in_progress");
   // Status says In progress but no live run → it has stopped → Pending.
   assert.equal(boardColumn({ ...running, aiRunState: "needs_review" }, bot), "pending");
   assert.equal(boardColumn({ ...base, status: "In progress", aiRunState: "scheduled" }, bot), "pending");
@@ -49,7 +49,7 @@ test("stopping always needs a reason and sends an approval request to Sean", () 
 test("approve → back In progress → AI finishes → straight to Done, never asks again", () => {
   const pending = moveToPending(startTask(base, { by: "Bot", at: at(0) }, true), { by: "Bot", at: at(1), reason: "Post ready to publish", request: "Original caption" }).task;
   const approved = approveTask(pending, { by: "Sean", at: at(2), editedRequest: "Sean's edited caption", ai: true }).task;
-  assert.equal(boardColumn(approved, bot), "in_progress");
+  assert.equal(boardColumn(approved, bot, Date.parse(at(2))), "in_progress");
   assert.equal(approved.approvalRequest.editedRequest, "Sean's edited caption");
   assert.match(approvedRunInstructions(approved), /Sean's edited caption/);
   const resumed = startTask(approved, { by: "Bot", at: at(3) }, true);
@@ -93,4 +93,11 @@ test("History can send a finished task back to the AI with edits (pre-approved)"
   assert.equal(error, "");
   assert.equal(boardColumn(task, bot), "in_progress");
   assert.equal(finishAiRun(startTask(task, { by: "Bot", at: at(3) }, true), { by: "Bot", at: at(4), finished: false, reason: "x" }).column, "done");
+});
+
+test("a run marked running that went quiet is Pending, not In progress", () => {
+  const now = Date.parse("2026-11-19T19:00:00Z");
+  const stuck = { ...base, status: "In progress", aiRunState: "running", aiRunStartedAt: "2026-11-17T13:42:00Z", aiProgressText: "Waiting for Sean’s approval" };
+  assert.equal(boardColumn(stuck, bot, now), "pending");
+  assert.equal(boardColumn({ ...stuck, aiProgressAt: "2026-11-19T18:55:00Z" }, bot, now), "in_progress", "recent progress = genuinely running");
 });

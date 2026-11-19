@@ -2,7 +2,7 @@ import { GOOGLE_ADS_TASK_TEMPLATES, RETIRED_GOOGLE_ADS_TASK_TEMPLATE_IDS, google
 import { logSystemEmail } from "../lib/email-log";
 import { buildGoogleAdsAuditReport } from "../lib/google-ads-audit-report";
 import { aiConfigured, aiEndpoint, aiHeaders, aiModel, resolveAiProvider } from "../lib/ai-provider";
-import { approvalEmail, approvedRunInstructions, finishAiRun, moveToPending, startTask, type TaskApprovalRequest, type TaskHistoryEvent } from "../lib/task-flow";
+import { approvalEmail, approvedRunInstructions, finishAiRun, isAbandonedRun, moveToPending, startTask, type TaskApprovalRequest, type TaskHistoryEvent } from "../lib/task-flow";
 
 type AiMode = "Google Ads" | "Meta Ads" | "SEO" | "Audit" | "Research" | "Setup" | "Sites";
 type TaskAttachment = { id: string; name: string; type: string; size: number; uploadedAt: string; uploadedBy: string; storageKey?: string };
@@ -1951,8 +1951,27 @@ async function sendQueuedApprovalEmails(env: SchedulerEnv) {
   }
 }
 
+/** Runs left "running" with no sign of life (crashed, handed over, waiting on Sean) → Pending with their last status as the reason. */
+async function parkAbandonedRuns(env: SchedulerEnv, now: Date) {
+  if (!env.DB) return;
+  const cutoff = new Date(now.getTime() - 30 * 60_000).toISOString();
+  const rows = await env.DB.prepare(`SELECT json_extract(task.value, '$.id') AS task_id FROM workspace_documents workspace, json_each(workspace.data, '$.tasks') task
+    WHERE workspace.id = 'f2b-agency' AND json_extract(task.value, '$.aiRunState') = 'running' AND json_extract(task.value, '$.status') <> 'Done'
+      AND COALESCE(json_extract(task.value, '$.aiProgressAt'), json_extract(task.value, '$.aiRunStartedAt'), '') < ?1 LIMIT 10`).bind(cutoff).all<{ task_id: string }>();
+  const at = now.toISOString();
+  for (const row of rows.results || []) {
+    await updateSingleTask(env, row.task_id, (task) => {
+      if (!task || !isAbandonedRun(task, now.getTime())) return null;
+      const progress = String(task.aiProgressText || "").trim();
+      const reason = progress ? `Stopped: ${progress}` : "The AI run stopped without finishing.";
+      return moveToPending(task, { at, by: "Scheduler", reason, request: [progress, task.aiFeedback].filter(Boolean).join("\n\n") || task.aiInstructions || task.title, kind: "stopped", aiRunState: "needs_review" }).task;
+    });
+  }
+}
+
 export async function processDueAiTasks(env: SchedulerEnv, scheduledTime = new Date()) {
   if (!env.DB) return;
+  await parkAbandonedRuns(env, scheduledTime);
   await sendQueuedApprovalEmails(env);
   await suppressIndividualTaskEmailsCompact(env, scheduledTime);
   const now = scheduledTime.getTime();
