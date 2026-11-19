@@ -50,8 +50,14 @@ export async function searchWaNumbers(ownerId: string, p: { country: string; con
   const country = /^[A-Z]{2}$/.test(p.country) ? p.country : "IE";
   const q = new URLSearchParams({ SmsEnabled: "true", PageSize: "20" });
   if (p.contains && /^\d{2,10}$/.test(p.contains)) q.set("Contains", p.contains);
-  const j = await twilioApi(c, `/AvailablePhoneNumbers/${country}/${p.type === "Local" ? "Local" : "Mobile"}.json?${q}`);
-  return ((j.available_phone_numbers || []) as any[]).map((n) => ({ number: String(n.phone_number), friendly: String(n.friendly_name || n.phone_number), locality: String(n.locality || n.region || ""), addressRequired: String(n.address_requirements || "none") }));
+  const kind = p.type === "Local" ? "Local" : "Mobile";
+  const j = await twilioApi(c, `/AvailablePhoneNumbers/${country}/${kind}.json?${q}`).catch((e: Error) => {
+    if (/not found/i.test(e.message)) throw new Error(`Twilio doesn't sell ${kind === "Mobile" ? "mobile" : "landline"} numbers in ${country === "IE" ? "Ireland" : country}.${country === "IE" ? " Use the client's own number instead, or a UK mobile." : " Try the other type or another country."}`);
+    throw e;
+  });
+  const list = ((j.available_phone_numbers || []) as any[]).map((n) => ({ number: String(n.phone_number), friendly: String(n.friendly_name || n.phone_number), locality: String(n.locality || n.region || ""), addressRequired: String(n.address_requirements || "none") }));
+  if (!list.length && country === "IE") throw new Error("Twilio has no Irish numbers available right now. Use the client's own number instead, or a UK mobile.");
+  return list;
 }
 export async function buyWaNumber(ownerId: string, number: string, base: string, extra: { addressSid?: string; bundleSid?: string; label?: string }) {
   const c = await creds(ownerId);
