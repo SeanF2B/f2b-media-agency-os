@@ -155,6 +155,7 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
   const aiPending = aiList.length, humanPending = humanList.length;
   const aiMine = aiList.filter((t) => mineFor(t)), humanMine = humanList.filter((t) => mineFor(t, t.reviewApproverId));
   const oldestHours = (list: HubTask[]) => list.reduce((h, t) => { const at = Date.parse(t.approvalRequest?.requestedAt || ""); return at ? Math.max(h, (Date.now() - at) / 3_600_000) : h; }, 0);
+  const OVERLOAD = 5;
   // Same colours as Appointment updates: green when none, yellow when any are waiting, red when overloaded (5+ or waiting 2+ days).
   const tone = (n: number, hours = 0) => n >= OVERLOAD || (n > 0 && hours >= 48) ? "overload" : n > 0 ? "waiting" : "clear";
   const clientOf = (id: string) => clients.find((c) => c.id === id);
