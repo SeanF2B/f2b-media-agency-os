@@ -146,7 +146,8 @@ export function UsageClientPanel({ clientId, currency = "EUR" }: { clientId: str
 }
 
 const CSS = `
-.ubp{display:flex;flex-direction:column;gap:14px}
+.ubp{display:flex;flex-direction:column;gap:14px;padding:22px 24px !important;margin-top:14px}
+@media (max-width:700px){.ubp{padding:16px !important}}
 .ubp .ubp-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
 .ubp .ubp-sub{margin:4px 0 0;font-size:13px;opacity:.7;max-width:760px}
 .ubp .ubp-muted{font-size:12.5px;opacity:.65}

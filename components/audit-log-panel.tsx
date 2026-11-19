@@ -82,7 +82,9 @@ export function AuditLogPanel() {
 }
 
 const CSS = `
-.alp{display:flex;flex-direction:column;gap:12px}
+.alp{display:flex;flex-direction:column;gap:12px;padding:22px 24px !important}
+@media (max-width:700px){.alp{padding:16px !important}}
+.alp .alp-table td,.alp .alp-table th{padding-left:12px;padding-right:12px}
 .alp .alp-sub{margin:4px 0 0;font-size:13px;opacity:.7;max-width:760px}.alp .alp-muted{font-size:12.5px;opacity:.65}
 .alp .alp-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .alp .alp-bar select{padding:7px 10px;border-radius:10px;border:1px solid rgba(127,127,127,.28);background:transparent;color:inherit;font:inherit}
