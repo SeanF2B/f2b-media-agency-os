@@ -242,18 +242,30 @@ function MailboxTable({ state, act }: { state: OutreachState; act: Act }) {
       <button type="button" className="ox-icon" onClick={() => setSelected([])} aria-label="Clear selection"><X size={15} /></button>
       {prompt && <span className="ox-bulk-prompt">{prompt.op === "assign" ? <select autoFocus value={value} onChange={(event) => setValue(event.target.value)} aria-label="Campaign"><option value="">Choose…</option>{state.campaigns.map((campaign) => <option key={campaign.id} value={campaign.id}>{campaign.name}</option>)}</select> : <input autoFocus value={value} onChange={(event) => setValue(event.target.value)} placeholder={prompt.label} aria-label={prompt.label} />}<button type="button" className="primary-button" disabled={!value} onClick={() => void bulk(prompt.op, value)}>Apply</button></span>}
     </div>}
-    <div className="ox-table-wrap"><table className="ox-table ox-mailboxes"><thead><tr><th><input type="checkbox" aria-label="Select all" checked={all} onChange={() => setSelected(all ? [] : rows.map((mailbox) => mailbox.id))} /></th><th>Mailbox</th><th>Warm-up</th><th>Today</th><th>Health</th><th>Report</th><th>Campaigns</th><th>Cost / mo</th></tr></thead>
-      {groups.map(([group, items]) => <tbody key={group}><tr className="ox-group"><td colSpan={8}>{group} <small>{items.length}</small></td></tr>{items.map((mailbox) => <tr key={mailbox.id} className={selected.includes(mailbox.id) ? "sel" : ""}>
-        <td><input type="checkbox" aria-label={`Select ${mailbox.email}`} checked={selected.includes(mailbox.id)} onChange={() => setSelected(selected.includes(mailbox.id) ? selected.filter((id) => id !== mailbox.id) : [...selected, mailbox.id])} /></td>
-        <td><button type="button" className="ox-sender" onClick={() => setEditing(mailbox)} title="Edit sender name and photo"><SenderAvatar mailbox={mailbox} /><span><b>{mailbox.displayName || mailbox.email}</b><small>{mailbox.email}</small></span></button><small>{mailbox.host === "google" ? "Google" : "Microsoft"} · <span className={`ox-status ${mailbox.status}`}>{mailbox.status}</span>{mailbox.tags.map((tag) => <span key={tag} className="ox-tag">{tag}</span>)}</small>{mailbox.pausedReason && <small className="ox-warn-text">{mailbox.pausedReason}</small>}</td>
-        <td><FlameCell mailbox={mailbox} act={act} warm={warm} /></td>
-        <td><span className="ox-meter" aria-label={`${mailbox.sentToday} of ${mailbox.limitToday} sent today`}><span style={{ width: `${mailbox.limitToday ? Math.min(100, (mailbox.sentToday / mailbox.limitToday) * 100) : 0}%` }} /></span><small>{mailbox.sentToday}/{mailbox.limitToday}</small></td>
-        <td><HealthPill health={mailbox.health} /></td>
-        <td><button type="button" className="ox-link" onClick={() => setReportFor(mailbox)}><Activity size={14} /> Report</button></td>
-        <td>{mailbox.campaigns.map((campaign) => campaign.name).join(", ") || <span className="ox-muted">—</span>}</td>
-        <td>{money(mailbox.monthlyCostCents)}</td>
-      </tr>)}</tbody>)}
-    </table></div>
+    <div className="ox-mbx" role="list">
+      <div className="ox-mbx-head" aria-hidden="true"><span><input type="checkbox" aria-label="Select all" checked={all} onChange={() => setSelected(all ? [] : rows.map((mailbox) => mailbox.id))} /></span><span>Sender</span><span>Warm-up</span><span>Health</span><span>Sent today</span><span>Cost</span><span /></div>
+      {groups.map(([group, items]) => <section key={group} className="ox-mbx-group" aria-label={group}>
+        <h4 className="ox-mbx-group-title"><Globe size={13} /> {group}<small>{items.length}</small></h4>
+        {items.map((mailbox) => {
+          const setting = mailbox.status === "setup" && !mailbox.external?.startedAt;
+          return <article key={mailbox.id} role="listitem" className={`ox-mbx-row ${selected.includes(mailbox.id) ? "sel" : ""}`}>
+            <span className="ox-mbx-check"><input type="checkbox" aria-label={`Select ${mailbox.email}`} checked={selected.includes(mailbox.id)} onChange={() => setSelected(selected.includes(mailbox.id) ? selected.filter((id) => id !== mailbox.id) : [...selected, mailbox.id])} /></span>
+            <button type="button" className="ox-mbx-who" onClick={() => setEditing(mailbox)} title="Edit name and photo">
+              <SenderAvatar mailbox={mailbox} size={40} />
+              <span><b>{mailbox.displayName || mailbox.email}</b><small>{mailbox.email}</small>
+                <span className="ox-mbx-tags">{setting && <span className="ox-chip-mini warn">Setting up</span>}{mailbox.status === "paused" && <span className="ox-chip-mini warn">Paused</span>}{mailbox.tags.map((tag) => <span key={tag} className="ox-chip-mini">{tag}</span>)}{mailbox.campaigns.length > 0 && <span className="ox-chip-mini">{mailbox.campaigns.length} campaign{mailbox.campaigns.length === 1 ? "" : "s"}</span>}</span>
+                {mailbox.pausedReason && <small className="ox-warn-text">{mailbox.pausedReason}</small>}
+              </span>
+            </button>
+            <div className="ox-mbx-flame"><FlameCell mailbox={mailbox} act={act} warm={warm} /></div>
+            <button type="button" className="ox-mbx-health" onClick={() => setReportFor(mailbox)} title="Open health report — spam, bounces, replies, DNS"><HealthPill health={mailbox.health} /><small><Activity size={12} /> Report</small></button>
+            <div className="ox-mbx-today"><span className="ox-meter" aria-label={`${mailbox.sentToday} of ${mailbox.limitToday} sent today`}><span style={{ width: `${mailbox.limitToday ? Math.min(100, (mailbox.sentToday / mailbox.limitToday) * 100) : 0}%` }} /></span><small>{mailbox.sentToday}/{mailbox.limitToday} today</small></div>
+            <div className="ox-mbx-cost"><small>{money(mailbox.monthlyCostCents)}/mo</small></div>
+            <button type="button" className="ox-icon ox-mbx-edit" onClick={() => setEditing(mailbox)} aria-label={`Edit ${mailbox.email}`}><Camera size={15} /></button>
+          </article>;
+        })}
+      </section>)}
+    </div>
     {editing && <SenderDrawer mailbox={editing} act={act} onClose={() => setEditing(null)} />}
     {reportFor && <ReportDrawer mailbox={reportFor} onClose={() => setReportFor(null)} />}
     {warmResults && <WarmupResults results={warmResults} act={act} onClose={() => setWarmResults(null)} />}

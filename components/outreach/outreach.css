@@ -353,3 +353,49 @@
 .ox-ms-ok { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .ox-ms-ok svg { color: #22c55e; }
 @media (max-width: 900px) { .ox-grid3 { grid-template-columns: 1fr; } }
+
+/* Mailboxes — clean list that becomes cards on phones */
+.ox-mbx { display: grid; gap: 10px; }
+.ox-mbx-head, .ox-mbx-row { display: grid; grid-template-columns: 28px minmax(220px, 2.2fr) minmax(130px, 1.1fr) minmax(120px, 1fr) minmax(110px, .9fr) 70px 36px; align-items: center; gap: 14px; }
+.ox-mbx-head { padding: 0 16px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ox-muted, #6b7280); }
+.ox-mbx-group { display: grid; gap: 8px; }
+.ox-mbx-group-title { display: flex; align-items: center; gap: 6px; margin: 6px 4px 0; font-size: 13px; font-weight: 700; }
+.ox-mbx-group-title small { margin-left: 2px; padding: 1px 7px; border-radius: 999px; background: color-mix(in srgb, currentColor 10%, transparent); font-weight: 600; }
+.ox-mbx-row { padding: 12px 16px; border-radius: 16px; background: var(--ox-surface, rgba(255,255,255,.85)); border: 1px solid var(--ox-line, rgba(0,0,0,.07)); box-shadow: 0 1px 2px rgba(0,0,0,.04); transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+.ox-mbx-row:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,0,0,.07); border-color: color-mix(in srgb, var(--ox-p) 35%, transparent); }
+.ox-mbx-row.sel { border-color: var(--ox-p); }
+.ox-mbx-who { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 0; border: 0; background: none; text-align: left; color: inherit; cursor: pointer; font: inherit; }
+.ox-mbx-who > span { display: grid; gap: 2px; min-width: 0; }
+.ox-mbx-who b { font-size: 14px; }
+.ox-mbx-who small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ox-muted, #6b7280); }
+.ox-mbx-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.ox-mbx-tags:empty { display: none; }
+.ox-chip-mini { padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; background: color-mix(in srgb, currentColor 8%, transparent); }
+.ox-chip-mini.warn { background: #fef3c7; color: #92400e; }
+.ox-mbx-health { display: grid; justify-items: start; gap: 4px; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; font: inherit; }
+.ox-mbx-health small { display: inline-flex; align-items: center; gap: 4px; color: var(--ox-p); font-weight: 600; }
+.ox-mbx-today { display: grid; gap: 4px; }
+.ox-mbx-today small, .ox-mbx-cost small { color: var(--ox-muted, #6b7280); }
+.ox-mbx-flame .ox-flame-cell { gap: 4px; }
+.ox-mbx-edit { justify-self: end; }
+@media (max-width: 820px) {
+  .ox-mbx-head { display: none; }
+  .ox-mbx-row { grid-template-columns: 24px minmax(0, 1fr) 36px; grid-template-areas: "check who edit" "flame flame flame" "health today cost"; row-gap: 12px; column-gap: 10px; padding: 14px; }
+  .ox-mbx-check { grid-area: check; align-self: start; padding-top: 10px; }
+  .ox-mbx-who { grid-area: who; }
+  .ox-mbx-edit { grid-area: edit; align-self: start; }
+  .ox-mbx-flame { grid-area: flame; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, currentColor 4%, transparent); }
+  .ox-mbx-health { grid-area: health; }
+  .ox-mbx-today { grid-area: today; }
+  .ox-mbx-cost { grid-area: cost; justify-self: end; align-self: end; }
+  .ox-mbx-row:hover { transform: none; }
+}
+@media (max-width: 420px) {
+  .ox-mbx-row { grid-template-areas: "check who edit" "flame flame flame" "health health today" "cost cost cost"; }
+  .ox-mbx-cost { justify-self: start; }
+}
+/* Tidy the status chips + search row on small screens */
+@media (max-width: 820px) {
+  .ox-filters { flex-direction: column; align-items: stretch; }
+  .ox-conn-row, .ox-connections { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
+}
