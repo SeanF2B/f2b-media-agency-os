@@ -7,6 +7,14 @@ import { aiConfigured, aiEndpoint, aiHeaders, aiModel, resolveAiProvider } from 
 export const dynamic = "force-dynamic";
 const respond = (body: Record<string, unknown>, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 
+/** Plain message for provider errors; never shows key ids or account URLs. */
+function aiError(raw?: string) {
+  const m = String(raw || "");
+  if (/credit|afford|max_tokens|quota|insufficient|billing|limit/i.test(m)) return "The AI account (OpenRouter) has run out of credit or hit its monthly key limit. Top up credits or raise the key’s limit at openrouter.ai, then try again.";
+  if (/api key|unauthori[sz]ed|invalid.*key|401/i.test(m)) return "The AI key isn’t valid any more. Update it in Settings → API Keys.";
+  return "The AI provider didn’t respond. Try again.";
+}
+
 function outputText(payload: any) {
   if (typeof payload?.output_text === "string") return payload.output_text;
   for (const item of payload?.output || []) for (const content of item?.content || []) if (content?.type === "output_text" && typeof content.text === "string") return content.text;
@@ -47,7 +55,7 @@ export async function POST(request: Request) {
       signal: AbortSignal.timeout(30_000),
     });
     const payload = await response.json().catch(() => null);
-    if (!response.ok) return respond({ error: payload?.error?.message || "The AI provider didn’t respond. Try again." }, 502);
+    if (!response.ok) return respond({ error: aiError(payload?.error?.message) }, 502);
     const parsed = JSON.parse(outputText(payload) || "{}") as Record<string, string>;
     const slug = String(parsed.slug || "").toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
     return respond({ title: String(parsed.title || "").slice(0, 60), description: String(parsed.description || "").slice(0, 155), slug, ogTitle: String(parsed.ogTitle || "").slice(0, 70), ogDescription: String(parsed.ogDescription || "").slice(0, 200), note: String(parsed.note || "").slice(0, 300), model: aiModel(env, undefined, provider) });
@@ -85,7 +93,7 @@ async function reviewPage(env: any, provider: any, client: { name: string; seoLo
       signal: AbortSignal.timeout(45_000),
     });
     const payload = await response.json().catch(() => null);
-    if (!response.ok) return respond({ error: payload?.error?.message || "The AI provider didn’t respond. Try again." }, 502);
+    if (!response.ok) return respond({ error: aiError(payload?.error?.message) }, 502);
     const parsed = JSON.parse(outputText(payload) || "{}") as { summary?: string; recommendations?: Array<Record<string, string>>; title?: string; description?: string; targetKeyword?: string };
     return respond({
       summary: cut(parsed.summary, 500),
