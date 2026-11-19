@@ -1,0 +1,59 @@
+/* Task flow: Approvals, History and the card schedule strip. Uses the app's theme variables. */
+.tf-panel { display: grid; gap: 14px; margin-top: 12px; }
+.tf-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.tf-panel-head h2 { margin: 0; font-size: 1.15rem; }
+.tf-panel-head p { margin: 4px 0 0; color: var(--muted, #6b7280); font-size: .86rem; }
+.tf-count { min-width: 28px; padding: 3px 10px; border-radius: 999px; background: var(--secondary, #0f6fb4); color: #fff; font-weight: 700; text-align: center; }
+.tf-empty { padding: 28px; border: 1px dashed var(--line, #d7dde4); border-radius: 16px; text-align: center; color: var(--muted, #6b7280); }
+.tf-empty b { color: var(--ink, #111); }
+.tf-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 14px; align-items: start; }
+.tf-card { display: grid; gap: 10px; padding: 14px; border-radius: 16px; background: var(--card, #fff); color: var(--ink, #111); border: 1px solid var(--line, #e3e7ec); box-shadow: 0 6px 18px rgb(15 23 42 / 6%); transition: transform .15s, box-shadow .15s; }
+.tf-card:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgb(15 23 42 / 10%); }
+.tf-card.is-rejected { opacity: .85; }
+.tf-card > header { display: flex; align-items: center; gap: 10px; }
+.tf-title { display: grid; flex: 1; min-width: 0; }
+.tf-title b { font-size: .95rem; line-height: 1.25; }
+.tf-title small, .tf-muted { color: var(--muted, #6b7280); font-size: .78rem; }
+.tf-client { display: inline-grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 9px; overflow: hidden; color: #fff; font-size: .72rem; font-weight: 700; }
+.tf-client.has-logo { background: transparent; border: 1px solid var(--line, #e3e7ec); }
+.tf-client img { width: 100%; height: 100%; object-fit: contain; }
+.tf-reason { margin: 0; padding: 8px 10px; border-radius: 10px; background: rgb(234 179 8 / 12%); font-size: .85rem; }
+.tf-reason span { display: block; font-weight: 700; font-size: .74rem; margin-bottom: 2px; }
+.tf-field { display: grid; gap: 4px; font-size: .8rem; font-weight: 600; }
+.tf-field small { font-weight: 400; color: var(--muted, #6b7280); margin-left: 6px; }
+.tf-field textarea, .tf-field input { width: 100%; padding: 9px 10px; border-radius: 10px; border: 1px solid var(--line, #d7dde4); background: var(--field, #fff); color: var(--ink, #111); font: inherit; font-size: .9rem; font-weight: 400; resize: vertical; }
+.tf-field textarea:hover, .tf-field input:hover, .tf-field textarea:focus, .tf-field input:focus { border-color: var(--secondary, #0f6fb4); outline: none; transform: translateY(-1px); }
+.tf-card footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.tf-actions { display: flex; gap: 8px; margin-left: auto; }
+.tf-actions.is-left { margin-left: 0; }
+.tf-actions button:hover { transform: translateY(-1px); }
+.tf-reject { color: #b42318; }
+.tf-mail { font-size: .75rem; color: var(--muted, #6b7280); }
+.tf-mail.is-sent { color: #15803d; }
+.tf-mail.is-failed { color: #b42318; }
+.tf-link { background: none; border: 0; color: var(--secondary, #0f6fb4); font-weight: 600; cursor: pointer; font-size: .8rem; }
+.tf-outcome { font-size: .74rem; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: rgb(22 163 74 / 12%); color: #15803d; white-space: nowrap; }
+.tf-outcome.is-rejected { background: rgb(220 38 38 / 10%); color: #b42318; }
+.tf-details summary { cursor: pointer; font-size: .8rem; font-weight: 600; }
+.tf-details pre { white-space: pre-wrap; font: inherit; font-size: .84rem; margin: 4px 0 8px; padding: 8px 10px; border-radius: 10px; background: var(--soft, #f4f6f8); }
+.tf-details p { margin: 6px 0 2px; font-size: .84rem; }
+.tf-files { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.tf-files li { display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: 10px; background: var(--soft, #f4f6f8); }
+.tf-file-thumb img { width: 46px; height: 46px; object-fit: cover; border-radius: 8px; display: block; }
+.tf-file-icon { width: 46px; text-align: center; font-size: 1.3rem; }
+.tf-file-name { flex: 1; min-width: 0; display: grid; font-size: .82rem; overflow-wrap: anywhere; }
+.tf-file-name small { color: var(--muted, #6b7280); font-size: .72rem; }
+.tf-icon-btn { padding: 4px 7px; border-radius: 8px; text-decoration: none; }
+.tf-icon-btn:hover { background: var(--card, #fff); transform: translateY(-1px); }
+.tf-timeline { margin: 6px 0 0; padding-left: 18px; font-size: .8rem; display: grid; gap: 3px; }
+.tf-timeline b { text-transform: capitalize; }
+.tf-timeline small { display: block; color: var(--muted, #6b7280); }
+.tf-sendback { display: grid; gap: 8px; }
+.tf-more { justify-self: center; }
+.tf-card-meta { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 2px; font-size: .74rem; font-weight: 600; }
+.tf-card-meta span { padding: 3px 8px; border-radius: 999px; background: var(--soft, #eef2f6); color: var(--ink, #1f2937); }
+.tf-card-meta.is-pending span { background: rgb(234 179 8 / 16%); }
+.tf-card-meta.is-approved span { background: rgb(22 163 74 / 14%); color: #15803d; }
+[data-theme="dark"] .tf-card, .dark .tf-card { background: var(--card, #17181c); color: var(--ink, #f3f4f6); border-color: rgb(255 255 255 / 10%); }
+[data-theme="dark"] .tf-card-meta span, .dark .tf-card-meta span, [data-theme="dark"] .tf-files li, .dark .tf-files li, [data-theme="dark"] .tf-details pre, .dark .tf-details pre { background: rgb(255 255 255 / 7%); color: inherit; }
+@media (max-width: 640px) { .tf-list { grid-template-columns: 1fr; } .tf-actions { width: 100%; } .tf-actions button { flex: 1; } }

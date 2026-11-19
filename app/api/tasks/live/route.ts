@@ -2,6 +2,7 @@ import { getChatGPTUser } from "../../../chatgpt-auth";
 import { env } from "cloudflare:workers";
 import { fullTeamPermissions, getTeamPermissions, type TeamPermissions } from "@/lib/access-permissions";
 import { canViewAiAssignedTask, isAiAssignedTask } from "@/lib/ai-task-access";
+import { moveToPending } from "@/lib/task-flow";
 
 export const dynamic = "force-dynamic";
 
@@ -107,7 +108,8 @@ export async function POST(request: Request) {
     // waiting for review or failed) is cancelled straight away so the runner never picks it up.
     const updatedTask = task.aiRunState === "running"
       ? { ...task, aiCancelRequestedAt: at, aiCancelRequestedBy: by, aiProgressText: "Stopping safely…", aiProgressAt: at }
-      : { ...task, aiRunState: "cancelled", aiCancelRequestedAt: at, aiCancelRequestedBy: by, aiCancelledAt: at, aiCancelledBy: by, aiStartNowRequestedAt: undefined, aiProgressText: "Cancelled", aiProgressAt: at };
+      // Not running yet → straight to Pending with a reason, and an approval request to the owner.
+      : { ...moveToPending(task as never, { at, by, reason: `Cancelled by ${by} — approve to let the AI do it, or reject to close it.`, request: String(task.aiInstructions || task.notes || task.title || ""), kind: "cancelled", aiRunState: "cancelled" }).task as LiveTask, aiCancelledAt: at, aiCancelledBy: by, aiProgressText: "Cancelled", aiProgressAt: at };
     const client = data.clients?.find((item: any) => item.id === task.clientId);
     const event = { id: crypto.randomUUID(), title: "AI task cancellation requested", detail: `${task.title} · ${client?.name || "Client"} · ${task.aiMode || task.service}`, icon: "⏹️", at, actor: actor?.name || user.email, actorAvatar: actor?.avatar || "", staffId: user.userId, clientId: task.clientId, taskId: task.id, service: task.aiMode || task.service, kind: "task", note: `${actor?.name || user.email} asked the AI to stop. It will stop at the next safe checkpoint; a request already sent to an external service cannot be recalled.` };
     const next = { ...data, tasks: data.tasks.map((item: any) => item.id === task.id ? updatedTask : item), activity: [event, ...(data.activity || [])].slice(0, 100) };
