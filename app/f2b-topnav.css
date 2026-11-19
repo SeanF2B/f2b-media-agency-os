@@ -3554,3 +3554,7 @@ html body .wa-open-button { background: var(--f2b-white, #fff) !important; color
 html body .wa-open-button:hover { box-shadow: 0 4px 12px rgba(16,24,40,.08) !important; border-color: var(--brand-secondary, var(--brand-primary, #1479b8)) !important; }
 html body .wa-open-button .brand-icon, html body .wa-open-button .ch-icon-fb { flex: none; }
 html body .app-shell.dark-mode .wa-open-button { background: #2a3238 !important; color: #f1f5f7 !important; border-color: #3c4850 !important; }
+
+/* Settings → Billing: billing details and AI billing as matching padded cards */
+html body .app-shell .settings-billing-card { padding: 22px 24px !important; margin-bottom: 14px; }
+@media (max-width: 700px) { html body .app-shell .settings-billing-card { padding: 16px !important; } }
