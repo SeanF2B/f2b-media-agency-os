@@ -3544,3 +3544,8 @@ html body .app-shell.dark-mode .dh-ov.good, body.f2b-dark .app-shell .dh-ov.good
 html body .app-shell.dark-mode .dh-ov.expense, body.f2b-dark .app-shell .dh-ov.expense { background: rgba(180,35,24,.16); }
 @media (max-width: 1100px) { html body .app-shell .dh-overall-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 600px) { html body .app-shell .dh-overall-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } html body .app-shell .dh-ov b { font-size: 17px; } }
+
+/* Dashboard hints that open the place to fix it ("Run one in Operations → AI visibility →") */
+html body .app-shell .dh-golink { display: inline; border: 0; background: none; padding: 0; margin: 0; font: inherit; font-weight: 700; color: var(--brand-primary, #101828); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+html body .app-shell .dh-golink:hover { opacity: .8; }
+body.f2b-dark .app-shell .dh-golink, html body .app-shell.dark-mode .dh-golink { color: #8ab4f8; }

@@ -154,6 +154,27 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
   const OVERLOAD = 5;
   const tone = (mine: number) => mine >= OVERLOAD ? "overload" : mine > 0 ? "waiting" : "clear";
   const clientOf = (id: string) => clients.find((c) => c.id === id);
+  // "Run one in Operations → AI visibility" etc. become buttons that open that place (with this client picked).
+  const go = (target: string) => { if (target.startsWith("Operations") && clientId && clientId !== "all") { try { localStorage.setItem("f2b-ops-client", clientId); } catch { /* storage off */ } } onNavigate?.(target); };
+  const LINKS: Array<[RegExp, string]> = [
+    [/Operations\s*→\s*AI visibility/, "Operations:ai"], [/Operations\s*→\s*SEO/, "Operations:ranks"], [/Operations\s*→\s*Google Ads/, "Operations:ads"],
+    [/Operations\s*→\s*Reports/, "Operations:reports"], [/Operations\s*→\s*Sites/, "Operations:sites"], [/(?:Operations\s*→\s*)?Launchpad/, "Integrations"],
+    [/Settings\s*→\s*APIs?/, "Settings"], [/[Cc]onnect (?:this client’s |the )?(?:Google )?Business Profile|[Cc]onnect the Facebook Page|[Ll]ink a Google Ads account|[Cc]onnect (?:Google )?Search Console/, "Integrations"],
+  ];
+  const L = (text?: string | null): ReactNode => {
+    if (!text) return text ?? null;
+    const out: ReactNode[] = []; let rest = text; let i = 0;
+    while (rest) {
+      let best: { at: number; len: number; target: string } | null = null;
+      for (const [re, target] of LINKS) { const hit = re.exec(rest); if (hit && (!best || hit.index < best.at)) best = { at: hit.index, len: hit[0].length, target }; }
+      if (!best) { out.push(rest); break; }
+      if (best.at) out.push(rest.slice(0, best.at));
+      const label = rest.slice(best.at, best.at + best.len), target = best.target;
+      out.push(<button key={i++} type="button" className="dh-golink" onClick={(e) => { e.stopPropagation(); go(target); }}>{label} →</button>);
+      rest = rest.slice(best.at + best.len);
+    }
+    return <>{out}</>;
+  };
   const logo = (id: string) => { const c = clientOf(id); return c?.logo ? <img className="dh-logo" src={c.logo} alt="" /> : <span className="dh-logo dh-logo-fallback">{(c?.name || "•").slice(0, 1)}</span>; };
   // Sample keywords / ChatGPT questions follow this account's own services and town (from its website when known).
   const [siteSample, setSiteSample] = useState<{ services: string[]; locations: string[] } | null>(null);
@@ -254,7 +275,7 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
               <Row icon={<Phone size={15} />} label="Calls (Business Profile)" value={v(sp?.organic.calls)} good={(sp?.organic.calls || 0) > 0} />
               <Row icon={<BrandIcon id="business-profile" size={15} fallback={<MousePointerClick size={15} />} />} label="Profile website clicks" value={v(m.profileClicks?.value)} good={(m.profileClicks?.value || 0) > 0} />
               <Row icon={<UserPlus size={15} />} label="Leads" value={v(sp?.organic.leads)} good={(sp?.organic.leads || 0) > 0} />
-              {m.gsc?.error ? <em className="dh-split-note">{m.gsc.error}</em> : !m.gsc && sp?.notes.organic ? <em className="dh-split-note">{sp.notes.organic}</em> : null}
+              {m.gsc?.error ? <em className="dh-split-note">{L(m.gsc.error)}</em> : !m.gsc && sp?.notes.organic ? <em className="dh-split-note">{L(sp.notes.organic)}</em> : null}
               <DetailToggles value={detail} onChange={setDetail} items={[["org-pages", "Web pages"], ["org-trend", "Trending"]]} />
             </div>
             {(() => { const camps = m.googleCampaigns || []; const c = camps.find((x) => x.id === gCamp); const spend = c ? c.spend : m.adSpend?.value; const clicks = c ? c.clicks : sp?.paid.clicks; const conv = c ? c.conversions : sp?.paid.conversions;
@@ -267,7 +288,7 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
                 {!c && <Row icon={<UserPlus size={15} />} label="Leads in CRM" value={v(sp?.paid.leads)} good={(sp?.paid.leads || 0) > 0} />}
                 {!c && sales && (() => { const r = roasGrade(sales.adsWonValue, spend ?? null, sales.adsLeads); return <GradedRow icon={<TrendingUp size={15} />} label="Return on ad spend" value={r.value} grade={r.grade} tip={r.tip} detail={spend ? `${money(sales.adsWonValue, cur)} won from ${money(spend, cur)} spend` : "No spend yet"} />; })()}
                 {!c && sales && (() => { const r = closeGrade(sales.adsWon, sales.adsLeads); return <GradedRow icon={<CheckCircle2 size={15} />} label="Ads close rate" value={r.value} grade={r.grade} tip={r.tip} detail={`${sales.adsWon} won of ${sales.adsLeads} leads`} />; })()}
-                {sp?.notes.paid && <em className="dh-split-note">{sp.notes.paid}</em>}
+                {sp?.notes.paid && <em className="dh-split-note">{L(sp.notes.paid)}</em>}
                 <DetailToggles value={detail} onChange={setDetail} items={[["ads-pages", "Landing pages"], ["ads-kw", "Keywords"], ["ads-assets", "Assets"]]} />
               </div>; })()}
             {(() => { const meta = m.meta; const camps = meta?.campaigns || []; const c = camps.find((x) => x.id === mCamp); const spend = c ? c.spend : meta?.spend; const clicks = c ? c.clicks : meta?.clicks; const leads = c ? c.leads : meta?.leads;
@@ -278,7 +299,7 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
                   <Row icon={<span className="dh-cur">€</span>} label="Avg. CPC" value={clicks ? money2((spend || 0) / clicks, cur) : "—"} />
                   <Row icon={<UserPlus size={15} />} label="Leads" value={v(leads)} good={(leads || 0) > 0} />
                   <Row icon={<CheckCircle2 size={15} />} label="Cost per lead" value={leads ? money2((spend || 0) / leads, cur) : "—"} />
-                </> : <em className="dh-split-note">{m.metaNote || "No Meta Ads account linked to this client."}</em>}
+                </> : <em className="dh-split-note">{L(m.metaNote || "No Meta Ads account linked to this client. Connect it in Launchpad.")}</em>}
               </div>; })()}
           </div></>; })()}
         {detail && (() => {
@@ -294,7 +315,7 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
           const perPage = (parts: Array<[number, string]>) => parts.filter(([n]) => n > 0).map(([n, l]) => `${num(n)} ${l}${n === 1 ? "" : "s"}`).join(" · ");
           const Link = ({ url, path }: { url?: string; path: string }) => url && /^https?:/.test(url) ? <a className="dh-rank-term dh-link" href={url} target="_blank" rel="noreferrer" title={url} onClick={(e) => e.stopPropagation()}>{path}</a> : <span className="dh-rank-term" title={path}>{path}</span>;
           const close = <button type="button" className="text-button" onClick={() => setDetail("")}>Close</button>;
-          const empty = (t: string) => <p className="dh-muted">{t}</p>;
+          const empty = (t: string) => <p className="dh-muted">{L(t)}</p>;
           if (!sample && clientId && clientId !== "all" && (detail === "org-pages" || detail === "org-kw" || detail === "ads-pages" || detail === "ads-assets")) return <PageDrill kind={detail === "org-pages" ? "organic" : detail === "org-kw" ? "keywords" : detail === "ads-pages" ? "ads" : "assets"} clientId={clientId} start={periodStart} end={periodEnd} currency={cur} onClose={() => setDetail("")} />;
           if (detail === "org-pages") { const rows = d.gsc?.pages || []; return <div className="dh-rank-drop dh-detail"><div className="dh-rank-drop-head"><b>Web pages</b><span><small>{rows.length ? "From Search Console · clicks" : ga4.some((g) => g.organicSessions > 0) ? "From Google Analytics · organic visits, calls & leads" : "From Search Console · clicks"}</small>{close}</span></div>
             {rows.length ? rows.map((p) => { const g = ga4By.get(pageKey(p.url)); const extra = g ? perPage([[g.organic.calls, "call"], [g.organic.leads, "lead"]]) : ""; return <div key={p.page} className="dh-rank-row dh-detail-row"><span className={`dh-pos ${p.position == null ? "" : p.position <= 3 ? "top" : p.position <= 10 ? "mid" : "low"}`}>{p.position != null ? `#${p.position}` : "—"}</span><Link url={p.url} path={p.page} /><b>{num(p.clicks)} clicks</b><small>{num(p.impressions)} seen{extra ? ` · ${extra}` : ""}</small></div>; })
@@ -319,8 +340,8 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
     {isAdmin && marketingPicked && m && (() => { const bp = sample ? SAMPLE_GBP : m.businessProfile; const tp = sample ? { status: "ok", rating: 4.8, total: 63 } as typeof m.trustpilot : m.trustpilot; const gR = sample ? { total: 214, averageRating: 4.9 } : gReviews; return <>
       <section className="panel dh-panel dh-sec-reviews" aria-label="Reviews" data-admin=""><div className="dh-head"><div><p className="eyebrow">⭐ {periodLabel.toUpperCase()}</p><h2>Reviews</h2></div></div>
         <div className="dh-reviews">
-            <div className="dh-review"><BrandIcon id="business-profile" size={22} fallback={null} /><span><b>{gR?.averageRating != null ? `${gR.averageRating.toFixed(1)} ★` : "—"}</b><small>{gR?.total != null ? `${num(gR.total)} Google reviews` : "Google reviews · connect Business Profile"}</small></span></div>
-            <div className="dh-review"><BrandIcon id="facebook" size={22} fallback={null} /><span><b>{sample ? "4.7 ★" : "—"}</b><small>{sample ? "88 Facebook reviews" : "Facebook reviews · connect the Facebook Page"}</small></span></div>
+            <div className="dh-review"><BrandIcon id="business-profile" size={22} fallback={null} /><span><b>{gR?.averageRating != null ? `${gR.averageRating.toFixed(1)} ★` : "—"}</b><small>{gR?.total != null ? `${num(gR.total)} Google reviews` : L("Google reviews · connect Business Profile")}</small></span></div>
+            <div className="dh-review"><BrandIcon id="facebook" size={22} fallback={null} /><span><b>{sample ? "4.7 ★" : "—"}</b><small>{sample ? "88 Facebook reviews" : L("Facebook reviews · connect the Facebook Page")}</small></span></div>
             <div className="dh-review"><BrandIcon id="trustpilot" size={22} fallback={null} /><span><b>{tp?.status === "ok" && tp.rating != null ? `${tp.rating.toFixed(1)} ★` : "—"}</b><small>{tp?.status === "ok" ? `${num(tp.total || 0)} Trustpilot reviews` : tp?.status === "not_found" ? "Not on Trustpilot yet" : tp?.status === "no_website" ? "Trustpilot · add the website" : "Trustpilot"}</small></span></div>
           </div>
       </section>
@@ -331,25 +352,25 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
             <Tile icon={<span>🧭</span>} label="Directions" value={bp?.directions != null ? num(bp.directions) : "—"}><Delta now={bp?.directions} before={bp?.previous?.directions} /></Tile>
             <Tile icon={<MousePointerClick size={18} />} label="Website clicks" value={bp?.websiteClicks != null ? num(bp.websiteClicks) : "—"}><Delta now={bp?.websiteClicks} before={bp?.previous?.websiteClicks} /></Tile>
           </div>
-          {!bp && <p className="dh-muted">{m.businessNote || "Connect this client’s Google Business Profile to see views, calls and directions."}</p>}
+          {!bp && <p className="dh-muted">{L(m.businessNote || "Connect this client’s Google Business Profile to see views, calls and directions.")}</p>}
       </section>
     </>; })()}
     {isAdmin && marketingPicked && m && m.scope !== "all" && <section className="panel dh-panel dh-sec-showup" aria-label="Where you show up" data-admin=""><div className="dh-head"><div><p className="eyebrow">🔎 {periodLabel.toUpperCase()}</p><h2>Where you show up</h2></div></div>
         <div className="dh-ranks">
-          <div className={`dh-rank dh-rank-click ${rankOpen === "google" ? "open" : ""}`} role="button" tabIndex={0} aria-expanded={rankOpen === "google"} onClick={() => setRankOpen(rankOpen === "google" ? "" : "google")} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setRankOpen(rankOpen === "google" ? "" : "google"); } }}><span className="dh-rank-chev">{rankOpen === "google" ? "▲" : "▼"} Keywords</span><div className="dh-rank-logos"><BrandIcon id="google" size={24} fallback={<span>G</span>} /><span className="dh-rank-also" title="Chrome and Safari use Google search"><BrandIcon id="chrome" size={14} fallback={null} /><BrandIcon id="safari" size={14} fallback={null} /></span></div><small>Google · Chrome & Safari</small>{m.google ? <><b>{m.google.position != null ? `#${m.google.position}` : "—"}</b><em>avg of {m.google.tracked} keywords · {m.google.top3} in top 3 <Delta now={m.google.position} before={m.google.previous} lowerIsBetter suffix="" /></em></> : m.gsc && !m.gsc.error && m.gsc.position != null ? <><b>#{m.gsc.position}</b><em>avg position across {num(m.gsc.queriesTracked || 0)} searches (Search Console) <Delta now={m.gsc.position} before={m.gsc.previousPosition} lowerIsBetter suffix="" /></em></> : <><b>—</b><em>{m.gsc?.error || m.rankNote || "Not tracked yet"}</em></>}</div>
-          <div className="dh-rank"><div className="dh-rank-logos"><BrandIcon id="bing" size={24} fallback={<span>b</span>} /><span className="dh-rank-also" title="Microsoft Edge uses Bing search"><BrandIcon id="edge" size={14} fallback={null} /></span></div><small>Bing · Microsoft Edge</small><b>—</b><em>{m.bingNote}</em></div>
-          <div className={`dh-rank dh-rank-click ${rankOpen === "chatgpt" ? "open" : ""}`} role="button" tabIndex={0} aria-expanded={rankOpen === "chatgpt"} onClick={() => setRankOpen(rankOpen === "chatgpt" ? "" : "chatgpt")} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setRankOpen(rankOpen === "chatgpt" ? "" : "chatgpt"); } }}><span className="dh-rank-chev">{rankOpen === "chatgpt" ? "▲" : "▼"} Questions</span><div className="dh-rank-logos"><BrandIcon id="chatgpt" size={24} fallback={<Sparkles size={18} />} /></div><small>ChatGPT</small><b>{m.chatgpt ? `${Math.round(m.chatgpt.share)}%` : "—"}</b>{m.chatgpt ? <em>mentioned in {m.chatgpt.mentioned} of {m.chatgpt.prompts} questions <Delta now={m.chatgpt.share} before={m.chatgpt.previous} suffix=" pts" /></em> : <em>{m.aiNote || "No AI check yet"}</em>}</div>
+          <div className={`dh-rank dh-rank-click ${rankOpen === "google" ? "open" : ""}`} role="button" tabIndex={0} aria-expanded={rankOpen === "google"} onClick={() => setRankOpen(rankOpen === "google" ? "" : "google")} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setRankOpen(rankOpen === "google" ? "" : "google"); } }}><span className="dh-rank-chev">{rankOpen === "google" ? "▲" : "▼"} Keywords</span><div className="dh-rank-logos"><BrandIcon id="google" size={24} fallback={<span>G</span>} /><span className="dh-rank-also" title="Chrome and Safari use Google search"><BrandIcon id="chrome" size={14} fallback={null} /><BrandIcon id="safari" size={14} fallback={null} /></span></div><small>Google · Chrome & Safari</small>{m.google ? <><b>{m.google.position != null ? `#${m.google.position}` : "—"}</b><em>avg of {m.google.tracked} keywords · {m.google.top3} in top 3 <Delta now={m.google.position} before={m.google.previous} lowerIsBetter suffix="" /></em></> : m.gsc && !m.gsc.error && m.gsc.position != null ? <><b>#{m.gsc.position}</b><em>avg position across {num(m.gsc.queriesTracked || 0)} searches (Search Console) <Delta now={m.gsc.position} before={m.gsc.previousPosition} lowerIsBetter suffix="" /></em></> : <><b>—</b><em>{L(m.gsc?.error || m.rankNote || "Not tracked yet")}</em></>}</div>
+          <div className="dh-rank"><div className="dh-rank-logos"><BrandIcon id="bing" size={24} fallback={<span>b</span>} /><span className="dh-rank-also" title="Microsoft Edge uses Bing search"><BrandIcon id="edge" size={14} fallback={null} /></span></div><small>Bing · Microsoft Edge</small><b>—</b><em>{L(m.bingNote)}</em></div>
+          <div className={`dh-rank dh-rank-click ${rankOpen === "chatgpt" ? "open" : ""}`} role="button" tabIndex={0} aria-expanded={rankOpen === "chatgpt"} onClick={() => setRankOpen(rankOpen === "chatgpt" ? "" : "chatgpt")} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setRankOpen(rankOpen === "chatgpt" ? "" : "chatgpt"); } }}><span className="dh-rank-chev">{rankOpen === "chatgpt" ? "▲" : "▼"} Questions</span><div className="dh-rank-logos"><BrandIcon id="chatgpt" size={24} fallback={<Sparkles size={18} />} /></div><small>ChatGPT</small><b>{m.chatgpt ? `${Math.round(m.chatgpt.share)}%` : "—"}</b>{m.chatgpt ? <em>mentioned in {m.chatgpt.mentioned} of {m.chatgpt.prompts} questions <Delta now={m.chatgpt.share} before={m.chatgpt.previous} suffix=" pts" /></em> : <em>{L(m.aiNote || "No AI check yet. Run one in Operations → AI visibility.")}</em>}</div>
         </div>
         {rankOpen === "google" && (() => {
           const rows = m.google?.keywords?.length ? m.google.keywords.map((k) => ({ term: k.keyword, pos: k.position, prev: k.previous, extra: k.volume != null ? `${num(k.volume)}/mo` : "" }))
             : (m.gsc?.queries || []).map((q) => ({ term: q.query, pos: q.position, prev: null as number | null, extra: `${num(q.clicks)} clicks` }));
           return <div className="dh-rank-drop"><div className="dh-rank-drop-head"><b>Google keywords</b><small>{m.google?.keywords?.length ? "Daily rank checks" : rows.length ? "From Search Console" : ""}</small></div>
             {rows.length ? rows.map((r) => { const ch = r.pos != null && r.prev != null ? r.prev - r.pos : null; return <div key={r.term} className="dh-rank-row"><span className={`dh-pos ${r.pos == null ? "" : r.pos <= 3 ? "top" : r.pos <= 10 ? "mid" : "low"}`}>{r.pos != null ? `#${Math.round(r.pos * 10) / 10}` : "—"}</span><span className="dh-rank-term">{r.term}</span>{ch ? <b className={ch > 0 ? "good" : "bad"}>{ch > 0 ? "▲" : "▼"} {Math.abs(Math.round(ch * 10) / 10)}</b> : <b className="flat">–</b>}<small>{r.extra}</small></div>; })
-              : <p className="dh-muted">No keywords tracked yet. Add keywords in Operations → SEO to see each position here.</p>}
+              : <p className="dh-muted">{L("No keywords tracked yet. Add keywords in Operations → SEO to see each position here.")}</p>}
           </div>; })()}
         {rankOpen === "chatgpt" && <div className="dh-rank-drop"><div className="dh-rank-drop-head"><b>ChatGPT questions</b><small>Latest answer for each question</small></div>
           {m.chatgpt?.questions?.length ? m.chatgpt.questions.map((q) => <div key={q.prompt} className="dh-rank-row ai"><span className={`dh-pos ${q.mentioned ? "top" : "low"}`}>{q.mentioned ? (q.position ? `#${q.position}` : "✓") : "✗"}</span><span className="dh-rank-term">{q.prompt}</span><b className={q.mentioned ? "good" : "bad"}>{q.mentioned ? "Mentioned" : "Not mentioned"}</b><small>{q.competitors.length ? `Also named: ${q.competitors.join(", ")}` : ""}</small></div>)
-            : <p className="dh-muted">No ChatGPT checks yet. Run one in Operations → AI visibility.</p>}
+            : <p className="dh-muted">{L("No ChatGPT checks yet. Run one in Operations → AI visibility.")}</p>}
         </div>}
     </section>}
 
