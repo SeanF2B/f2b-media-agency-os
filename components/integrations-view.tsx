@@ -1,7 +1,9 @@
 "use client";
 
 import { appAlert, appConfirm, appPrompt } from "./app-dialog";
-import { useEffect, useState, type CSSProperties } from "react";
+import { lazy, Suspense, useEffect, useState, type CSSProperties } from "react";
+import { MessagingLaunchpad } from "./staff-messaging";
+const WhatsAppSetup = lazy(() => import("./whatsapp-setup").then((m) => ({ default: m.WhatsAppSetup })));
 import { BrandIcon } from "./brand-icon";
 import { DataForSeoConnect } from "./dataforseo-connect";
 import type { GooglePropertyMatch } from "@/lib/google-property-match.mjs";
@@ -55,7 +57,8 @@ const integrationIcons: Record<string, string> = {
   dataforseo: "🔍", pagespeed: "⚡", wordpress: "🌐", "marketing-public": "🚀", gohighlevel: "🧩", "landing-hosting": "🪄",
 };
 
-export function IntegrationsView({ onNavigate, onApplyGoogleMatches }: { onNavigate: (page: string) => void; onApplyGoogleMatches?: (matches: GooglePropertyMatch[]) => Promise<boolean> }) {
+export function IntegrationsView({ onNavigate, onApplyGoogleMatches, clients = [] }: { onNavigate: (page: string) => void; onApplyGoogleMatches?: (matches: GooglePropertyMatch[]) => Promise<boolean>; clients?: Array<{ id: string; name: string; logo?: string }> }) {
+  const [waFor, setWaFor] = useState<string | null>(null);
   const [linking, setLinking] = useState(false);
   const [linkMessage, setLinkMessage] = useState("");
   async function autoLinkGoogle() {
@@ -160,6 +163,8 @@ export function IntegrationsView({ onNavigate, onApplyGoogleMatches }: { onNavig
           <div className="lp-action">{item.status === "ready" ? <span className="lp-done" role="img" aria-label="Connected">✓ Connected</span> : item.connectHref ? <a className="lp-button" href={item.connectHref}>Connect</a> : <button className="lp-button" type="button" onClick={() => onNavigate(item.actionPage)}>Set up</button>}
             {item.status !== "ready" && <ShareLink name={item.name} href={item.connectHref ? new URL(item.connectHref, window.location.origin).toString() : `${window.location.origin}/?page=${encodeURIComponent(item.actionPage || "Integrations")}`} />}</div>
         </article>)}</section>
+        <MessagingLaunchpad clients={clients} onOpenWhatsApp={(id) => setWaFor(id)} />
+        {waFor !== null && <Suspense fallback={null}><WhatsAppSetup clients={clients.map((c) => ({ id: c.id, name: c.name }))} initialClientId={waFor} onClose={() => setWaFor(null)} onLive={() => undefined} /></Suspense>}
       </>;
     })()}
   </main>;
