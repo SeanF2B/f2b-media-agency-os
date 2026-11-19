@@ -5,6 +5,9 @@ import { decryptAiCredential, encryptAiCredential } from "@/lib/ai-credentials";
 import { aiEndpoint, aiHeaders, aiModel, resolveAiProvider } from "@/lib/ai-provider";
 
 export type Channel = "sms" | "whatsapp";
+/** Every channel a conversation thread can be on. Messenger / Instagram come from Meta (lib/conversations/meta.ts). */
+export type ThreadChannel = Channel | "messenger" | "instagram";
+export const CHANNEL_LABEL: Record<string, string> = { sms: "SMS", whatsapp: "WhatsApp", messenger: "Facebook Messenger", instagram: "Instagram", email: "Email" };
 export type NumberConfig = { number: string; channel: Channel; clientId: string; label: string; info: string };
 export type ConvSettings = { accountSid: string; tokenLast4: string; hasToken: boolean; numbers: NumberConfig[]; botEnabled: boolean; botName: string; businessInfo: string; botRules: string; handoffMessage: string; updatedAt: string };
 
@@ -127,7 +130,7 @@ export async function listTwilioTemplates(creds: { sid: string; token: string })
 }
 
 /* ---------------- threads / messages ---------------- */
-export async function upsertThread(ownerId: string, p: { channel: Channel; ourNumber: string; contact: string; contactName?: string; clientId: string }) {
+export async function upsertThread(ownerId: string, p: { channel: ThreadChannel; ourNumber: string; contact: string; contactName?: string; clientId: string }) {
   await ensureTables();
   const db = env.DB!, now = new Date().toISOString();
   const existing = await db.prepare("SELECT * FROM conv_threads WHERE owner_id=?1 AND our_number=?2 AND contact=?3 AND channel=?4").bind(ownerId, p.ourNumber, p.contact, p.channel).first<any>();
@@ -150,7 +153,7 @@ export async function addMessage(ownerId: string, threadId: string, m: { directi
 /* ---------------- AI bot ---------------- */
 const outputText = (r: any) => { if (typeof r?.output_text === "string") return r.output_text.trim(); return (r?.output || []).flatMap((i: any) => i.content || []).filter((p: any) => p.type === "output_text" && typeof p.text === "string").map((p: any) => p.text).join("\n").trim(); };
 const HUMAN_RE = /\b(human|real person|speak to (?:someone|a person|somebody)|call me|ring me|agent|manager|complain|complaint|solicitor|lawyer|refund)\b/i;
-export async function botReply(ownerId: string, p: { settings: ConvSettings; config: NumberConfig; clientName: string; channel: Channel; history: Array<{ sender: string; body: string }>; forceTest?: boolean }): Promise<{ text: string; handoff: boolean } | null> {
+export async function botReply(ownerId: string, p: { settings: ConvSettings; config: NumberConfig; clientName: string; channel: ThreadChannel; history: Array<{ sender: string; body: string }>; forceTest?: boolean }): Promise<{ text: string; handoff: boolean } | null> {
   const lastCustomer = [...p.history].reverse().find((m) => m.sender === "customer")?.body || "";
   if (HUMAN_RE.test(lastCustomer)) { const b0 = await getClientBot(ownerId, p.config.clientId || ""); return { text: b0?.handoff || p.settings.handoffMessage || DEFAULT_HANDOFF, handoff: true }; }
   const provider = await resolveAiProvider(env as any, ownerId);
@@ -160,7 +163,7 @@ export async function botReply(ownerId: string, p: { settings: ConvSettings; con
   if (bot && !bot.enabled && !p.forceTest) return null;
   const name = bot?.name || p.settings.botName || `${p.clientName || "the team"}'s assistant`;
   const instructions = [
-    `You are ${name}, replying to customers of ${p.clientName || "the business"} by ${p.channel === "whatsapp" ? "WhatsApp" : "SMS"}.`,
+    `You are ${name}, replying to customers of ${p.clientName || "the business"} by ${CHANNEL_LABEL[p.channel] || "message"}.`,
     "Be warm, brief (1-3 short sentences, under 300 characters), plain text only, no markdown, at most one emoji.",
     bot?.tone ? `Tone of voice: ${bot.tone}.` : "",
     botKnowledge(bot) ? `What you know about ${p.clientName || "the business"} (trained by the owner):\n${botKnowledge(bot)}` : "",
@@ -184,7 +187,8 @@ export async function botReply(ownerId: string, p: { settings: ConvSettings; con
 }
 
 /** First message from a new customer: add them to the CRM pipeline as a new lead (best effort, never blocks the reply). */
-export async function leadToCrm(ownerId: string, t: { clientId: string; channel: Channel; contact: string; name: string; firstMessage: string }) {
+export async function leadToCrm(ownerId: string, t: { clientId: string; channel: ThreadChannel; contact: string; name: string; firstMessage: string }) {
+  const social = t.channel === "messenger" || t.channel === "instagram", label = CHANNEL_LABEL[t.channel] || "Message";
   try {
     const db = env.DB!, now = new Date().toISOString();
     const pipeline = (t.clientId ? await db.prepare("SELECT id FROM crm_pipelines WHERE owner_id=?1 AND archived=0 AND client_id=?2 ORDER BY created_at LIMIT 1").bind(ownerId, t.clientId).first<{ id: string }>().catch(() => null) : null)
@@ -192,12 +196,16 @@ export async function leadToCrm(ownerId: string, t: { clientId: string; channel:
     if (!pipeline) return;
     const stage = await db.prepare("SELECT id FROM crm_pipeline_stages WHERE owner_id=?1 AND pipeline_id=?2 AND category='open' ORDER BY position LIMIT 1").bind(ownerId, pipeline.id).first<{ id: string }>();
     if (!stage) return;
-    let contact = await db.prepare("SELECT id FROM crm_contacts WHERE owner_id=?1 AND phone=?2 AND COALESCE(client_id,'')=?3 LIMIT 1").bind(ownerId, t.contact, t.clientId).first<{ id: string }>();
+    // Messenger / Instagram give a Meta id, not a phone number: kept in the contact's notes, never in the phone field.
+    const metaRef = social ? `${label} id: ${t.contact}` : "";
+    let contact = social
+      ? await db.prepare("SELECT id FROM crm_contacts WHERE owner_id=?1 AND COALESCE(client_id,'')=?3 AND notes LIKE ?2 LIMIT 1").bind(ownerId, `%${metaRef}%`, t.clientId).first<{ id: string }>()
+      : await db.prepare("SELECT id FROM crm_contacts WHERE owner_id=?1 AND phone=?2 AND COALESCE(client_id,'')=?3 LIMIT 1").bind(ownerId, t.contact, t.clientId).first<{ id: string }>();
     if (!contact) {
-      const id = crypto.randomUUID(), parts = (t.name || t.contact).split(/\s+/);
-      await db.prepare("INSERT INTO crm_contacts (id, owner_id, client_id, first_name, last_name, email, phone, company, source, notes, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,'',?6,'',?7,'',?8,?8)").bind(id, ownerId, t.clientId || null, parts[0] || t.contact, parts.slice(1).join(" "), t.contact, t.channel === "whatsapp" ? "WhatsApp" : "SMS", now).run();
+      const id = crypto.randomUUID(), parts = (t.name || (social ? label + " contact" : t.contact)).split(/\s+/);
+      await db.prepare("INSERT INTO crm_contacts (id, owner_id, client_id, first_name, last_name, email, phone, company, source, notes, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,'',?6,'',?7,?9,?8,?8)").bind(id, ownerId, t.clientId || null, parts[0] || (social ? label + " contact" : t.contact), parts.slice(1).join(" "), social ? "" : t.contact, label === "SMS" ? "SMS" : label, now, metaRef).run();
       contact = { id };
     }
-    await db.prepare("INSERT INTO crm_opportunities (id, owner_id, pipeline_id, stage_id, contact_id, client_id, title, value, currency, source, notes, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,0,'EUR',?8,?9,?10,?10)").bind(crypto.randomUUID(), ownerId, pipeline.id, stage.id, contact.id, t.clientId || null, `${t.channel === "whatsapp" ? "WhatsApp" : "Text"} enquiry · ${t.name || t.contact}`, t.channel === "whatsapp" ? "WhatsApp" : "SMS", t.firstMessage.slice(0, 500), now).run();
+    await db.prepare("INSERT INTO crm_opportunities (id, owner_id, pipeline_id, stage_id, contact_id, client_id, title, value, currency, source, notes, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,0,'EUR',?8,?9,?10,?10)").bind(crypto.randomUUID(), ownerId, pipeline.id, stage.id, contact.id, t.clientId || null, `${t.channel === "sms" ? "Text" : label} enquiry · ${t.name || (social ? label + " contact" : t.contact)}`, label, t.firstMessage.slice(0, 500), now).run();
   } catch (e) { console.error("leadToCrm", e); }
 }

@@ -22,7 +22,7 @@ export async function authorizeAdmin(action = "manage settings"): Promise<{ owne
 }
 
 /** Admins get everything (scope null). Sub-account staff allowed to use `page` get only their own sub-account ids. */
-export async function authorizeAdminOrSubAccount(action: string, page: "CRM" | "Conversations"): Promise<{ ownerId: string; scope: string[] | null; error?: never } | { error: Response; ownerId?: never; scope?: never }> {
+export async function authorizeAdminOrSubAccount(action: string, page: "CRM" | "Conversations"): Promise<{ ownerId: string; scope: string[] | null; staffId?: string; error?: never } | { error: Response; ownerId?: never; scope?: never; staffId?: never }> {
   const admin = await authorizeAdmin(action);
   if (!admin.error) return { ownerId: admin.ownerId, scope: null };
   if (admin.error.status !== 403) return { error: admin.error };
@@ -32,5 +32,5 @@ export async function authorizeAdminOrSubAccount(action: string, page: "CRM" | "
   const profile = user && (workspace.staff || []).find((member: any) => !member?.isBot && (member?.id === user.userId || String(member?.email || "").toLowerCase() === user.email.toLowerCase()));
   const scope = crmClientScope(profile, page).filter((id: string) => (workspace.clients || []).some((client: any) => String(client.id) === id));
   if (!scope.length) return { error: admin.error };
-  return { ownerId: row?.owner_id || workspace.ownerId || "", scope };
+  return { ownerId: row?.owner_id || workspace.ownerId || "", scope, staffId: String(profile?.id || "") };
 }

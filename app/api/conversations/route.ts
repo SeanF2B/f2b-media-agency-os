@@ -3,6 +3,8 @@ import { authorizeAdminOrSubAccount, respond } from "@/lib/settings-auth";
 import { aiCredentialStorageReady } from "@/lib/ai-credentials";
 import { addMessage, botReply, e164, ensureTables, getClientBot, listTwilioTemplates, sanitizeBot, saveClientBot, BLANK_BOT, loadSettings, saveSettings, sendTwilio, twilioCredentials, upsertThread, type NumberConfig } from "@/lib/conversations/core";
 import { renderTemplate, windowState } from "@/lib/conversations/whatsapp";
+import { ensureMetaTables, getStaffMessaging, sendMeta } from "@/lib/conversations/meta";
+import { metaSendMode } from "@/lib/conversations/meta-rules";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +13,7 @@ export async function GET(request: Request) {
   if (auth.error) return auth.error;
   const allowed = auth.scope; // null = admin (everything); otherwise this person's own sub-account ids
   try {
-    await ensureTables();
+    await ensureTables(); await ensureMetaTables();
     const url = new URL(request.url), view = url.searchParams.get("view") || "threads";
     const requested = url.searchParams.get("clientId") || "agency";
     const scope = allowed ? (allowed.includes(requested) ? requested : allowed[0]) : requested;
@@ -28,10 +30,12 @@ export async function GET(request: Request) {
     }
     const where = scope === "agency" ? "owner_id=?1" : "owner_id=?1 AND client_id=?2";
     const stmt = env.DB!.prepare(`SELECT * FROM conv_threads WHERE ${where} ORDER BY last_at DESC LIMIT 200`);
-    const threads = (await (scope === "agency" ? stmt.bind(auth.ownerId) : stmt.bind(auth.ownerId, scope)).all()).results || [];
+    let threads = (await (scope === "agency" ? stmt.bind(auth.ownerId) : stmt.bind(auth.ownerId, scope)).all()).results || [];
+    // Sub-account staff only see the channels switched on for them (Team → Messaging). Admins see everything.
+    if (allowed && auth.staffId) { const mine = (await getStaffMessaging(auth.ownerId, [auth.staffId]))[auth.staffId]; if (mine) threads = threads.filter((t: any) => t.channel === "email" || (mine.channels as Record<string, boolean>)[String(t.channel)] !== false); }
     // WhatsApp numbers this person may start chats from (for the "New chat" button), limited to their own sub-accounts.
     const waNumbers = settings.numbers.filter((n) => n.channel === "whatsapp" && (!allowed || allowed.includes(n.clientId)) && (scope === "agency" || n.clientId === scope)).map((n) => ({ number: n.number, clientId: n.clientId, label: n.label }));
-    return respond({ threads, waNumbers, configured: settings.hasToken && Boolean(settings.accountSid) && settings.numbers.length > 0, botEnabled: settings.botEnabled, emailFrom: String(env.TASK_NOTIFICATION_FROM || "") });
+    return respond({ threads, waNumbers, configured: settings.hasToken && Boolean(settings.accountSid) && settings.numbers.length > 0, botEnabled: settings.botEnabled, emailFrom: String(env.TASK_NOTIFICATION_FROM || ""), me: auth.staffId || "" });
   } catch (e) { console.error("conversations GET", e); return respond({ error: "Could not load conversations." }, 503); }
 }
 
@@ -41,7 +45,7 @@ export async function POST(request: Request) {
   const allowed = auth.scope;
   let b: any; try { b = await request.json(); } catch { return respond({ error: "Send a valid request." }, 400); }
   try {
-    await ensureTables();
+    await ensureTables(); await ensureMetaTables();
     const action = String(b.action || "");
     if (action === "save-settings") {
       if (allowed) return respond({ error: "Only an admin can change Conversation settings." }, 403);
@@ -88,16 +92,39 @@ export async function POST(request: Request) {
       const subject = String(b.subject || "").trim().slice(0, 200) || "Re: your enquiry";
       if (!text) return respond({ error: "Write your email first." }, 400);
       if (!env.RESEND_API_KEY || !env.TASK_NOTIFICATION_FROM) return respond({ error: "Email sending isn't set up on the server yet." }, 503);
-      const replyTo = String(b.replyTo || "").trim();
-      const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#22272b">${text.split(/\n{2,}/).map((p) => `<p style="margin:0 0 14px">${p.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" } as Record<string, string>)[c]).replace(/\n/g, "<br>")}</p>`).join("")}</div>`;
+      // The person replying: their own name, reply-to address and signature (Team → Messaging), sent from the verified system address.
+      const senderId = auth.staffId || String(b.staffId || "").slice(0, 100);
+      const who = senderId ? (await getStaffMessaging(auth.ownerId, [senderId]))[senderId] : undefined;
+      const replyTo = who?.emailReplyTo || String(b.replyTo || "").trim();
+      const fromAddr = (String(env.TASK_NOTIFICATION_FROM).match(/<([^>]+)>/) || [])[1] || String(env.TASK_NOTIFICATION_FROM);
+      const from = who?.emailName ? `${who.emailName.replace(/["<>]/g, "")} <${fromAddr}>` : env.TASK_NOTIFICATION_FROM;
+      const signed = who?.signature ? `${text}\n\n${who.signature}` : text;
+      const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#22272b">${signed.split(/\n{2,}/).map((p) => `<p style="margin:0 0 14px">${p.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" } as Record<string, string>)[c]).replace(/\n/g, "<br>")}</p>`).join("")}</div>`;
       let error = "";
       try {
-        const r = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json", "Idempotency-Key": `conv-email/${id}/${crypto.randomUUID()}` }, body: JSON.stringify({ from: env.TASK_NOTIFICATION_FROM, to: [thread.contact], subject, text, html, ...(/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(replyTo) ? { reply_to: replyTo } : {}) }), signal: AbortSignal.timeout(15_000) });
+        const r = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json", "Idempotency-Key": `conv-email/${id}/${crypto.randomUUID()}` }, body: JSON.stringify({ from, to: [thread.contact], subject, text: signed, html, ...(/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(replyTo) ? { reply_to: replyTo } : {}) }), signal: AbortSignal.timeout(15_000) });
         if (!r.ok) error = `The email service returned HTTP ${r.status}.`;
       } catch (e) { error = e instanceof Error ? e.message : "Could not send."; }
-      const m = await addMessage(auth.ownerId, id, { direction: "out", sender: "staff", body: `Subject: ${subject}\n\n${text}`, error });
+      const m = await addMessage(auth.ownerId, id, { direction: "out", sender: "staff", body: `Subject: ${subject}\n\n${signed}`, error });
       if (error) return respond({ error, messageId: m.id }, 502);
       return respond({ ok: true, messageId: m.id });
+    }
+    if (action === "send" && (thread.channel === "messenger" || thread.channel === "instagram")) {
+      const text = String(b.body || "").trim().slice(0, 1900);
+      if (!text) return respond({ error: "Type a message first." }, 400);
+      const mode = metaSendMode(thread.last_in_at, true);
+      if (!mode.ok) return respond({ error: mode.reason, code: "window_closed" }, 409);
+      let sid = "", error = "";
+      try { sid = await sendMeta(auth.ownerId, { accountId: thread.our_number, contactId: thread.contact, text, tag: mode.tag }); } catch (e) { error = e instanceof Error ? e.message : "Could not send."; }
+      const m = await addMessage(auth.ownerId, id, { direction: "out", sender: "staff", body: text, sid, error });
+      await env.DB!.prepare("UPDATE conv_threads SET bot_on=0, status=CASE WHEN status='closed' THEN 'open' ELSE status END WHERE id=?1").bind(id).run();
+      if (error) return respond({ error, messageId: m.id }, 502);
+      return respond({ ok: true, messageId: m.id });
+    }
+    if (action === "assign") {
+      const to = String(b.staffId || "").slice(0, 100);
+      await env.DB!.prepare("UPDATE conv_threads SET assigned_to=?2 WHERE id=?1").bind(id, to).run();
+      return respond({ ok: true });
     }
     if (action === "send") {
       const text = String(b.body || "").trim().slice(0, 1500);
