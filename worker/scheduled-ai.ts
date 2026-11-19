@@ -1957,13 +1957,14 @@ async function parkAbandonedRuns(env: SchedulerEnv, now: Date) {
   const cutoff = new Date(now.getTime() - 30 * 60_000).toISOString();
   const rows = await env.DB.prepare(`SELECT json_extract(task.value, '$.id') AS task_id FROM workspace_documents workspace, json_each(workspace.data, '$.tasks') task
     WHERE workspace.id = 'f2b-agency' AND json_extract(task.value, '$.aiRunState') = 'running' AND json_extract(task.value, '$.status') <> 'Done'
-      AND (COALESCE(json_extract(task.value, '$.aiProgressAt'), json_extract(task.value, '$.aiRunStartedAt'), '') < ?1
-        OR json_extract(task.value, '$.approvalRequest.status') = 'awaiting') LIMIT 10`).bind(cutoff).all<{ task_id: string }>();
+      AND COALESCE(json_extract(task.value, '$.approvalRequest.status'), '') <> 'awaiting'
+      AND COALESCE(json_extract(task.value, '$.aiProgressAt'), json_extract(task.value, '$.aiRunStartedAt'), '') < ?1 LIMIT 10`).bind(cutoff).all<{ task_id: string }>();
   const at = now.toISOString();
   for (const row of rows.results || []) {
     await updateSingleTask(env, row.task_id, (task) => {
-      // Abandoned, or marked running while still waiting on the owner (another process re-opened it).
-      if (!task || (!isAbandonedRun(task, now.getTime()) && !(task.aiRunState === "running" && task.approvalRequest?.status === "awaiting"))) return null;
+      // Tasks already waiting on the owner are left alone: the board shows them as Pending whatever their stored
+      // run state, and rewriting them would fight the agent API's sweep every minute.
+      if (!task || task.approvalRequest?.status === "awaiting" || !isAbandonedRun(task, now.getTime())) return null;
       const progress = String(task.aiProgressText || "").trim();
       const reason = progress ? `Stopped: ${progress}` : "The AI run stopped without finishing.";
       return moveToPending(task, { at, by: "Scheduler", reason, request: requestTextFromTask(task) || [progress, task.aiFeedback].filter(Boolean).join("\n\n") || task.aiInstructions || task.title, kind: "stopped", aiRunState: "needs_review" }).task;
@@ -1986,6 +1987,7 @@ export async function processDueAiTasks(env: SchedulerEnv, scheduledTime = new D
       AND COALESCE(json_extract(task.value, '$.aiDismissedAt'), '') = ''
       AND COALESCE(json_extract(task.value, '$.aiMode'), '') <> ''
       AND COALESCE(json_extract(task.value, '$.status'), '') <> 'Done'
+      AND COALESCE(json_extract(task.value, '$.approvalRequest.status'), '') <> 'awaiting'
       AND (json_extract(task.value, '$.aiRunState') = 'scheduled'
         OR COALESCE(json_extract(task.value, '$.aiStartNowRequestedAt'), '') <> ''
         OR (json_extract(task.value, '$.aiRunState') = 'running'

@@ -257,13 +257,14 @@ test("Runs left 'running' for days (like the ones on the live board) are moved t
   assert.equal(flow.boardColumn(readTask("t-live"), botIds), "in_progress");
 });
 
-test("If another process re-opens a waiting task as 'running', the scheduler puts it straight back in Pending (no new email)", async () => {
+test("If another process re-opens a waiting task as 'running', it still shows Pending and the scheduler neither re-runs nor rewrites it", async () => {
   const data = readWorkspace(); const t = data.tasks.find((x) => x.id === "t-stuck");
-  writeTask({ ...t, status: "In progress", aiRunState: "running", aiRunStartedAt: new Date().toISOString(), aiProgressAt: new Date().toISOString() });
+  const reopened = { ...t, status: "In progress", aiRunState: "running", aiRunStartedAt: minutesAgo(90), aiProgressAt: minutesAgo(90) };
+  writeTask(reopened);
   assert.equal(flow.boardColumn(readTask("t-stuck"), botIds), "pending");
-  const before = emails.length;
+  const before = emails.length; aiRequests.length = 0;
   await processDueAiTasks(env, new Date());
-  assert.equal(readTask("t-stuck").status, "Blocked");
-  assert.equal(readTask("t-stuck").approvalRequest.id, t.approvalRequest.id);
-  assert.equal(emails.length, before, "same approval request, no second email");
+  assert.equal(aiRequests.length, 0, "never re-run while waiting on Sean");
+  assert.deepEqual(readTask("t-stuck"), reopened, "left untouched — no flip-flopping writes");
+  assert.equal(emails.length, before);
 });
