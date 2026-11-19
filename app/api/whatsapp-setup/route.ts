@@ -30,7 +30,7 @@ export async function POST(request: Request) {
   try {
     if (action === "search-numbers") return respond({ numbers: await searchWaNumbers(auth.ownerId, { country: str(b.country, 2).toUpperCase() || "IE", contains: str(b.contains, 10), type: b.type === "Local" ? "Local" : "Mobile" }) });
     if (action === "buy-number") return respond({ number: await buyWaNumber(auth.ownerId, str(b.number, 20), base, { addressSid: str(b.addressSid, 40), bundleSid: str(b.bundleSid, 40), label: str(b.label, 60) }) });
-    if (action === "register") return respond({ sender: await registerSender(auth.ownerId, { clientId: clientKey(b.clientId), number: str(b.number, 20), wabaId: str(b.wabaId, 30).replace(/\D/g, ""), displayName: str(b.displayName, 60), base }) });
+    if (action === "register") return respond({ sender: await registerSender(auth.ownerId, { clientId: clientKey(b.clientId), number: str(b.number, 20), wabaId: str(b.wabaId, 30).replace(/\D/g, ""), displayName: str(b.displayName, 60), coexist: b.coexist === true, base }) });
     if (action === "verify") return respond({ sender: await verifySender(auth.ownerId, str(b.sid, 60), str(b.code, 10)) });
     if (action === "refresh") return respond({ sender: await refreshSender(auth.ownerId, str(b.sid, 60)) });
     if (action === "remove") { await removeSender(auth.ownerId, str(b.sid, 60)); return respond({ ok: true }); }

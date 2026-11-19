@@ -94,7 +94,7 @@ function senderDetail(j: Record<string, any>) {
   return String(j.properties?.quality_rating ? `Quality: ${j.properties.quality_rating}` : "").slice(0, 400);
 }
 
-export async function registerSender(ownerId: string, p: { clientId: string; number: string; wabaId: string; displayName: string; base: string }) {
+export async function registerSender(ownerId: string, p: { clientId: string; number: string; wabaId: string; displayName: string; coexist?: boolean; base: string }) {
   await ensureTable();
   const c = await creds(ownerId);
   const number = e164(p.number);
@@ -106,7 +106,7 @@ export async function registerSender(ownerId: string, p: { clientId: string; num
   const ownsNumber = (await ownedNumbers(ownerId).catch(() => [])).some((n) => n.number === number);
   const j = await sendersApi(c, "", "POST", {
     sender_id: `whatsapp:${number}`,
-    configuration: { waba_id: p.wabaId, ...(ownsNumber ? {} : { verification_method: "sms" }) },
+    configuration: { waba_id: p.wabaId, ...(ownsNumber || p.coexist ? {} : { verification_method: "sms" }) },
     webhook: { callback_url: urls.inbound, callback_method: "POST", status_callback_url: urls.status, status_callback_method: "POST" },
     profile: { name },
   });

@@ -58,6 +58,8 @@ export function WhatsAppSetup({ clients, initialClientId = "", onClose, onLive }
   const [addressSid, setAddressSid] = useState("");
   const [bundleSid, setBundleSid] = useState("");
   const [existing, setExisting] = useState("");
+  // Coexistence: the client keeps using the WhatsApp Business app on the same number; chats sync into the OS.
+  const [keepApp, setKeepApp] = useState(true);
   const [number, setNumber] = useState("");
   const [wabaId, setWabaId] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -109,12 +111,12 @@ export function WhatsAppSetup({ clients, initialClientId = "", onClose, onLive }
       window.addEventListener("message", onMsg);
       FB.login((response) => {
         window.setTimeout(() => { window.removeEventListener("message", onMsg); if (got) resolve(got); else if (response.authResponse) reject(new Error("Facebook connected but didn't send the WhatsApp account back. Paste the account ID below.")); else reject(new Error("Facebook sign-up wasn't finished.")); }, 600);
-      }, { config_id: es.configId, response_type: "code", override_default_response_type: true, extras: { setup: es.solutionId ? { solutionID: es.solutionId } : {}, featureType: "", sessionInfoVersion: "3" } });
+      }, { config_id: es.configId, response_type: "code", override_default_response_type: true, extras: { setup: es.solutionId ? { solutionID: es.solutionId } : {}, featureType: coexist ? "whatsapp_business_app_onboarding" : "", sessionInfoVersion: "3" } });
     });
     setWabaId(waba); setMsg("Facebook connected ✓"); setStep(3);
   });
   const register = () => run("register", async () => {
-    const r = await api<{ sender: { sid: string; status: string; ownsNumber: boolean } }>({ action: "register", clientId, number, wabaId, displayName });
+    const r = await api<{ sender: { sid: string; status: string; ownsNumber: boolean } }>({ action: "register", clientId, number, wabaId, displayName, coexist });
     setMsg(r.sender.ownsNumber ? "Sent to Meta. Twilio numbers verify themselves; this usually goes live within minutes." : "Sent to Meta. A code is on its way to that number by text. Enter it below.");
     setWizard(false); setStep(1); setNumber(""); setWabaId(""); setResults(null); setOwned(null); setExisting("");
     await load(true);
@@ -122,6 +124,7 @@ export function WhatsAppSetup({ clients, initialClientId = "", onClose, onLive }
   const verify = (s: Sender) => run(`v-${s.sid}`, async () => { await api({ action: "verify", sid: s.sid, code: codes[s.sid] || "" }); setMsg("Code sent to Meta."); await load(true); });
   const remove = (s: Sender) => run(`r-${s.sid}`, async () => { if (!(await appConfirm(`Remove WhatsApp from ${s.number}? Customers won't be able to WhatsApp ${s.displayName} on this number any more.`))) return; await api({ action: "remove", sid: s.sid }); await load(true); });
 
+  const coexist = numberMode === "existing" && keepApp;
   const canStep2 = Boolean(clientId !== "" || clients.length === 0) && /^\+\d{7,15}$/.test(number);
   // Rendered at the app-shell level so the side bar never sits on top of the window.
   const host = typeof document !== "undefined" ? (document.querySelector(".app-shell") || document.body) : null;
@@ -160,19 +163,21 @@ export function WhatsAppSetup({ clients, initialClientId = "", onClose, onLive }
             <div className="cv-2"><label>Country<select value={country} onChange={(e) => { setCountry(e.target.value); setNumber(toE164(existing, e.target.value)); }}>{COUNTRIES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
             <label>Client's phone number<input inputMode="tel" value={existing} placeholder="087 123 4567" onChange={(e) => { setExisting(e.target.value); setNumber(toE164(e.target.value, country)); }} /></label></div>
             {number && <p className="cv-hint">We'll register <b>{number}</b>.</p>}
-            <p className="cv-hint">Meta texts a code to this number to prove it's theirs; you'll type it in here. If it's already on the WhatsApp app, the client must delete that WhatsApp account on the phone first (chat history on the app is lost).</p>
+            <label className="wa-check"><input type="checkbox" checked={keepApp} onChange={(e) => setKeepApp(e.target.checked)} /><span><b>They use the WhatsApp Business app on this number. Keep it</b><small>Recommended. Nothing changes on their phone: same number, same chats, replying from the app stays free and unlimited. Their WhatsApp chats also land in the OS. Needs Continue with Facebook in the next step, with their phone to hand to scan a code.</small></span></label>
+            {!keepApp && <p className="cv-hint">Meta texts a code to this number to prove it's theirs; you'll type it in here. If the number is on the WhatsApp app, the client must delete that WhatsApp account on the phone first (chat history on the app is lost).</p>}
           </>}
           <footer><button type="button" className="secondary-button" onClick={() => senders.length ? setWizard(false) : onClose()}>Cancel</button><button type="button" className="primary-button" disabled={!canStep2} onClick={() => setStep(2)}>Next</button></footer>
         </div>}
 
         {step === 2 && <div className="wa-pane">
-          <p className="wa-lead">Link <b>{clientName(clientId)}</b>'s Facebook business so WhatsApp knows who owns <b>{number}</b>.</p>
+          <p className="wa-lead">{coexist ? <>Link <b>{clientName(clientId)}</b>'s WhatsApp Business app on <b>{number}</b>. In the Facebook pop-up, pick “Connect your existing WhatsApp Business app”, then scan the QR code it shows from the app on their phone (Settings → Linked devices isn't needed, the pop-up guides it).</> : <>Link <b>{clientName(clientId)}</b>'s Facebook business so WhatsApp knows who owns <b>{number}</b>.</>}</p>
           {es?.ready ? <button type="button" className="wa-fb" disabled={busy === "fb"} onClick={() => void connectFacebook()}><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M24 12a12 12 0 1 0-13.9 11.9v-8.4h-3V12h3V9.4c0-3 1.8-4.7 4.5-4.7 1.3 0 2.7.2 2.7.2v3h-1.5c-1.5 0-2 .9-2 1.9V12h3.4l-.5 3.5h-2.9v8.4A12 12 0 0 0 24 12Z" /></svg>{busy === "fb" ? "Waiting for Facebook…" : "Continue with Facebook"}</button>
+            : coexist ? <p className="cv-error wa-note">Keeping the WhatsApp Business app only works through Continue with Facebook, and that isn't switched on yet: your Meta app needs WhatsApp sign-up set up once (settings <code>META_APP_ID</code> and <code>WHATSAPP_ES_CONFIG_ID</code>). Ask Claude to switch it on, then come back to this step.</p>
             : <p className="cv-hint wa-note">One-click Facebook needs your Meta app's WhatsApp sign-up switched on (setting <code>WHATSAPP_ES_CONFIG_ID</code>). Until then, paste the account ID below.</p>}
-          <details className="wa-reg" open={!es?.ready}><summary>{es?.ready ? "Or paste the WhatsApp Business Account ID" : "Paste the WhatsApp Business Account ID"}</summary>
+          {!coexist && <details className="wa-reg" open={!es?.ready}><summary>{es?.ready ? "Or paste the WhatsApp Business Account ID" : "Paste the WhatsApp Business Account ID"}</summary>
             <label>WhatsApp Business Account ID<input inputMode="numeric" value={wabaId} placeholder="e.g. 104996122399160" onChange={(e) => setWabaId(e.target.value.replace(/\D/g, ""))} /></label>
             <p className="cv-hint">Find it in Meta Business Suite → Settings → Accounts → WhatsApp accounts. The account must be shared with your Twilio account.</p>
-          </details>
+          </details>}
           <footer><button type="button" className="secondary-button" onClick={() => setStep(1)}>Back</button><button type="button" className="primary-button" disabled={!/^\d{6,25}$/.test(wabaId)} onClick={() => setStep(3)}>Next</button></footer>
         </div>}
 

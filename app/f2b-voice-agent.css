@@ -152,3 +152,7 @@ html body .wa-summary dt { font-size: 11px; font-weight: 700; opacity: .65; }
 html body .wa-summary dd { margin: 2px 0 0; font-weight: 700; overflow-wrap: anywhere; }
 @media (max-width: 640px) { html body .wa-steps li { font-size: 12px; padding: 6px; } html body .wa-summary { grid-template-columns: 1fr; } html body .wa-row { grid-template-columns: 1fr auto; } }
 html body .wa-modal { z-index: 3000 !important; }
+html body .wa-check { display: flex !important; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: rgba(37,211,102,.08); border: 1px solid rgba(37,211,102,.35); cursor: pointer; }
+html body .wa-check input { margin-top: 3px; accent-color: #25d366; width: 16px; height: 16px; flex: 0 0 auto; }
+html body .wa-check span { display: grid; gap: 3px; font-weight: 400; }
+html body .wa-check small { font-size: 12px; opacity: .8; line-height: 1.4; }
