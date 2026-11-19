@@ -2726,7 +2726,7 @@ ${senderName}`, staffType: member.staffType || (isSubAccountRole(member.role) ? 
   const navActive = (key: string) => page === key || (key === "CRM" && (page === "Clients" || page === "Lead Factory") && canSeeLeadsPage) || (key === "Operations" && marketingPageActive && page !== "Media Library") || (key === "Settings" && page === "Integrations");
   const openTaskCount = viewWorkspace.tasks.filter((t) => t.status !== "Done" && !t.aiDismissedAt).length;
   const navPriority = ["Overview", "Operating World", "Clients", "CRM", "Conversations", "Scheduling", "Tasks", "Operations", "Onboarding", "Invoicing", "Media Library", "CRM Automations", "Lead Factory", "Team", "AI Assistant", "Activity", "Chess", "Bookkeeping"]; // Books sits last (far right)
-  const orderedNav = [...visibleNav].filter((item) => !(activeScopeId && (item.key === "CRM Automations" || item.key === "Tasks")) && (WORLD_IN_SUBACCOUNTS || !activeScopeId || item.key !== "Operating World")).sort((x, y) => (navPriority.indexOf(x.key) + 1 || 99) - (navPriority.indexOf(y.key) + 1 || 99));
+  const orderedNav = [...visibleNav].filter((item) => !(activeScopeId && item.key === "CRM Automations") && (WORLD_IN_SUBACCOUNTS || !activeScopeId || item.key !== "Operating World")).sort((x, y) => (navPriority.indexOf(x.key) + 1 || 99) - (navPriority.indexOf(y.key) + 1 || 99));
   // Agency view: every page on the bar (no More menu). Sub-accounts: first seven, with Bookkeeping and Team always on the bar.
   const settingsNav = viewIsAdmin ? [{ key: "Settings", icon: "⚙️" }] : [];
   const pinnedNav = ["Bookkeeping", "Team"];
