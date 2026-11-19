@@ -3,7 +3,8 @@
  * Task flow screens: the Approvals queue and History, plus the small schedule /
  * approval strip shown on board cards. All rules live in lib/task-flow.ts.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import "./task-flow.css";
 import {
   OWNER_APPROVER_EMAIL, boardColumn, frequencyLabel, historyItems, needsOwnerDecision, requestTextFromTask, scheduleLabel,
@@ -53,7 +54,40 @@ export function TaskFlowCardMeta({ task, botIds }: { task: PanelTask; botIds: Re
   return null;
 }
 
-export function TaskApprovalsPanel({ tasks, clients, staff, canDecide, busyTaskId, onApprove, onReject, onOpenTask }: {
+/** Plain-English, short version of an agent's request/reason (drops "Stopped:", "Waiting for X's approval (in Approvals):" etc.). */
+function tidy(text = "") {
+  return text
+    .replace(/^\s*(stopped|blocked|paused)\s*[:\-–]\s*/i, "")
+    .replace(/^\s*waiting (for|on) [^:(]*?approval\s*(\([^)]*\))?\s*[:\-–]?\s*/i, "")
+    .replace(/^\s*(needs?|awaiting) (your |owner )?(approval|sign-?off)\s*[:\-–]\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+function shorten(text: string, max = 120) {
+  const first = text.split(/(?<=[.!?])\s/)[0] || text;
+  const base = first.length >= 40 ? first : text;
+  return base.length > max ? `${base.slice(0, max - 1).replace(/\s+\S*$/, "")}…` : base;
+}
+function ago(iso?: string) {
+  const t = Date.parse(iso || ""); if (!t) return "";
+  const m = Math.max(1, Math.round((Date.now() - t) / 60000));
+  return m < 60 ? `${m}m ago` : m < 1440 ? `${Math.round(m / 60)}h ago` : m < 10080 ? `${Math.round(m / 1440)}d ago` : new Date(t).toLocaleDateString("en-IE", { day: "numeric", month: "short" });
+}
+const fileKind = (file: FlowAttachment) => file.type.startsWith("image/") ? "image" : /pdf/.test(file.type) ? "PDF" : /html/.test(file.type) ? "Report" : /zip/.test(file.type) || /\.zip$/i.test(file.name) ? "ZIP" : (file.name.split(".").pop() || "File").toUpperCase().slice(0, 4);
+
+function Thumb({ task, client }: { task: PanelTask; client?: FlowClient }) {
+  const files = task.attachments || [];
+  const image = files.find((file) => file.type.startsWith("image/"));
+  const other = files.find((file) => !file.type.startsWith("image/"));
+  return <div className="tfa-thumb">
+    {image ? <img src={fileUrl(task.id, image, true)} alt="" loading="lazy" />
+      : other ? <span className="tfa-doc"><b>{fileKind(other)}</b><small>{other.name}</small></span>
+      : <span className="tfa-blank">{client?.logo ? <img src={client.logo} alt="" /> : <b>{initials(client?.name || "F2B")}</b>}</span>}
+    {files.length > 1 && <span className="tfa-count">+{files.length - 1}</span>}
+  </div>;
+}
+
+export function TaskApprovalsPanel({ tasks, clients, staff, canDecide, busyTaskId, onApprove, onReject, onOpenTask, renderAvatar }: {
   tasks: PanelTask[];
   clients: FlowClient[];
   staff: FlowStaff[];
@@ -62,43 +96,85 @@ export function TaskApprovalsPanel({ tasks, clients, staff, canDecide, busyTaskI
   onApprove: (taskId: string, editedRequest: string, note: string) => void | Promise<unknown>;
   onReject: (taskId: string, note: string) => void | Promise<unknown>;
   onOpenTask?: (taskId: string) => void;
+  renderAvatar?: (staffId: string) => ReactNode;
 }) {
-  const queue = useMemo(() => tasks.filter(needsOwnerDecision).sort((a, b) => (Date.parse(a.approvalRequest?.requestedAt || "") || 0) - (Date.parse(b.approvalRequest?.requestedAt || "") || 0)), [tasks]);
+  const queue = useMemo(() => tasks.filter(needsOwnerDecision).sort((a, b) => (Date.parse(b.approvalRequest?.requestedAt || "") || 0) - (Date.parse(a.approvalRequest?.requestedAt || "") || 0)), [tasks]);
+  const [openId, setOpenId] = useState("");
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
-  if (!queue.length) return <section className="tf-panel tf-empty"><b>Nothing waiting for your approval.</b><p>When an AI or teammate stops and moves a task to Pending, it lands here and an email goes to {OWNER_APPROVER_EMAIL}.</p></section>;
-  return <section className="tf-panel" aria-label="Approvals">
-    <header className="tf-panel-head"><div><h2>Approvals</h2><p>Edit anything before you approve. Approve → back to In progress, the AI finishes it and it goes straight to Done. Reject → Done.</p></div><span className="tf-count">{queue.length}</span></header>
-    <div className="tf-list">{queue.map((task) => {
-      const request = task.approvalRequest!;
-      const client = clients.find((item) => item.id === task.clientId);
-      const assignee = staff.find((item) => item.id === task.assigneeId);
-      // Older requests may only hold a status line; show the agent's actual draft when it posted one.
-      const agentDraft = requestTextFromTask(task);
-      const original = agentDraft && !request.request.includes(agentDraft.slice(0, 60)) ? agentDraft : request.request;
-      const draft = drafts[task.id] ?? original;
-      const busy = busyTaskId === task.id;
-      const adsChanges = (task.aiApprovals || []).filter((item) => item.status === "pending");
-      return <article className="tf-card" key={task.id}>
-        <header><ClientMark client={client} /><div className="tf-title"><b>{task.title}</b><small>{client?.name || "Internal"} · {assignee?.name || "Unassigned"} · asked {when(request.requestedAt)}</small></div>{onOpenTask && <button type="button" className="tf-link" onClick={() => onOpenTask(task.id)}>Open card</button>}</header>
-        <p className="tf-reason"><span>⏳ Why it stopped</span>{request.reason}</p>
-        <label className="tf-field"><span>{assignee?.isBot ? "What the AI is asking for" : "What they are asking for"} <small>Edit freely — your version is what gets done</small></span>
-          <textarea rows={Math.min(14, Math.max(4, draft.split("\n").length + 1))} value={draft} disabled={!canDecide || busy} onChange={(event) => setDrafts((current) => ({ ...current, [task.id]: event.target.value }))} />
-        </label>
-        {(task.attachments || []).length > 0 && <details className="tf-details" open={(task.attachments || []).length <= 3}><summary>Attached files · {(task.attachments || []).length}</summary><Files task={task} /></details>}
-        {adsChanges.length > 0 && <p className="tf-muted">Approving applies {adsChanges.length} proposed account change{adsChanges.length === 1 ? "" : "s"}: {adsChanges.map((item) => item.title).filter(Boolean).join(" · ")}</p>}
-        <label className="tf-field"><span>Note to {assignee?.isBot ? "the AI" : "them"} <small>Optional</small></span>
-          <input value={notes[task.id] || ""} disabled={!canDecide || busy} placeholder="e.g. Use the Salthill job photo" onChange={(event) => setNotes((current) => ({ ...current, [task.id]: event.target.value }))} />
-        </label>
+  const [editing, setEditing] = useState(false);
+  useEffect(() => {
+    if (!openId) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setOpenId(""); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [openId]);
+  if (!queue.length) return <section className="tf-panel tf-empty"><b>Nothing waiting for you.</b><p>When an AI or teammate needs a yes from you, it shows up here.</p></section>;
+
+  const meta = (task: PanelTask) => {
+    const request = task.approvalRequest!;
+    const client = clients.find((item) => item.id === task.clientId);
+    const assignee = staff.find((item) => item.id === task.assigneeId);
+    // Older requests may only hold a status line; prefer the agent's actual draft when it posted one.
+    const agentDraft = requestTextFromTask(task);
+    const original = agentDraft && !request.request.includes(agentDraft.slice(0, 60)) ? agentDraft : request.request;
+    const summary = shorten(tidy(original) || tidy(request.reason) || task.title);
+    const reason = tidy(request.reason);
+    return { request, client, assignee, original, summary, reason };
+  };
+  const open = queue.find((task) => task.id === openId);
+  const host = typeof document !== "undefined" ? (document.querySelector(".app-shell") || document.body) : null;
+
+  const modal = open && (() => {
+    const { request, client, assignee, original, reason } = meta(open);
+    const draft = drafts[open.id] ?? tidy(original);
+    const busy = busyTaskId === open.id;
+    const edited = draft.trim() !== tidy(original).trim();
+    const files = open.attachments || [];
+    const adsChanges = (open.aiApprovals || []).filter((item) => item.status === "pending");
+    const showReason = reason && !tidy(original).toLowerCase().includes(reason.toLowerCase().slice(0, 40)) && reason.toLowerCase() !== open.title.toLowerCase();
+    return <div className="tfa-backdrop" role="dialog" aria-modal="true" aria-label={open.title} onMouseDown={(event) => { if (event.target === event.currentTarget) setOpenId(""); }}>
+      <div className="tfa-modal">
+        <header><ClientMark client={client} /><div className="tf-title"><b>{open.title}</b><small>{client?.name || "F2B Media"} · {assignee?.name || "Unassigned"}{open.service ? ` · ${open.service}` : ""} · {when(request.requestedAt)}</small></div><button type="button" className="tfa-x" aria-label="Close" onClick={() => setOpenId("")}>✕</button></header>
+        {files.length > 0 && <div className="tfa-files">{files.map((file) => file.type.startsWith("image/")
+          ? <a key={file.id} className="tfa-file is-image" href={fileUrl(open.id, file, true)} target="_blank" rel="noreferrer" title={file.name}><img src={fileUrl(open.id, file, true)} alt={file.name} loading="lazy" /></a>
+          : <a key={file.id} className="tfa-file" href={fileUrl(open.id, file, true)} target="_blank" rel="noreferrer" title={`Open ${file.name}`}><b>{fileKind(file)}</b><small>{file.name}</small></a>)}</div>}
+        <section className="tfa-ask">
+          <div className="tfa-label"><span>What needs your OK</span>{canDecide && !editing && <button type="button" className="tf-link" onClick={() => setEditing(true)}>Edit</button>}</div>
+          {editing ? <textarea rows={Math.min(12, Math.max(4, draft.split("\n").length + 1))} value={draft} disabled={!canDecide || busy} onChange={(event) => setDrafts((current) => ({ ...current, [open.id]: event.target.value }))} autoFocus />
+            : <p className="tfa-text">{draft}</p>}
+          {showReason && <p className="tfa-reason">{shorten(reason, 160)}</p>}
+          {adsChanges.length > 0 && <p className="tfa-reason">Approving also applies: {adsChanges.map((item) => item.title).filter(Boolean).join(" · ")}</p>}
+        </section>
+        {canDecide && <input className="tfa-note" value={notes[open.id] || ""} disabled={busy} placeholder={`Note to ${assignee?.isBot ? "the AI" : assignee?.name?.split(" ")[0] || "them"} (optional)`} onChange={(event) => setNotes((current) => ({ ...current, [open.id]: event.target.value }))} />}
         <footer>
-          <small className={`tf-mail is-${request.emailStatus || "queued"}`}>{request.emailStatus === "sent" ? `Emailed ${request.to}` : request.emailStatus === "failed" ? `Email failed: ${request.emailDetail || "unknown error"}` : request.emailStatus === "skipped" ? "Email not configured — waiting here" : `Emailing ${request.to}…`}</small>
+          {onOpenTask ? <button type="button" className="tf-link" onClick={() => { setOpenId(""); onOpenTask(open.id); }}>Open task</button> : <span />}
           {canDecide ? <div className="tf-actions">
-            <button type="button" className="secondary-button tf-reject" disabled={busy} onClick={() => void onReject(task.id, notes[task.id] || "")}>Reject</button>
-            <button type="button" className="primary-button" disabled={busy || !draft.trim()} onClick={() => void onApprove(task.id, draft, notes[task.id] || "")}>{busy ? "Working…" : draft.trim() !== original.trim() ? "Approve with edits" : "Approve"}</button>
+            <button type="button" className="secondary-button tf-reject" disabled={busy} onClick={async () => { await onReject(open.id, notes[open.id] || ""); setOpenId(""); }}>Reject</button>
+            <button type="button" className="primary-button" disabled={busy || !draft.trim()} onClick={async () => { await onApprove(open.id, edited ? draft : original, notes[open.id] || ""); setOpenId(""); }}>{busy ? "Working…" : edited ? "Approve with edits" : "Approve"}</button>
           </div> : <small className="tf-muted">Only the owner can decide.</small>}
         </footer>
-      </article>;
+      </div>
+    </div>;
+  })();
+
+  return <section className="tf-panel tfa" aria-label="Approvals">
+    <div className="tfa-grid">{queue.map((task) => {
+      const { request, client, assignee, summary } = meta(task);
+      return <button type="button" className="tfa-tile" key={task.id} onClick={() => { setOpenId(task.id); setEditing(false); }}>
+        <Thumb task={task} client={client} />
+        <span className="tfa-body">
+          <span className="tfa-head"><ClientMark client={client} /><b>{task.title}</b></span>
+          <span className="tfa-sum">{summary}</span>
+          <span className="tfa-foot">
+            <span className="tfa-agent">{renderAvatar ? renderAvatar(task.assigneeId || "") : null}{assignee?.name || "Unassigned"}</span>
+            {task.service && <span className="tfa-src">{task.service}</span>}
+            <time dateTime={request.requestedAt} title={when(request.requestedAt)}>{ago(request.requestedAt)}</time>
+          </span>
+        </span>
+      </button>;
     })}</div>
+    {modal && host ? createPortal(modal, host) : modal}
   </section>;
 }
 
