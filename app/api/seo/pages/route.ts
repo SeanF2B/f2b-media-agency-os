@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "../../../chatgpt-auth";
 import { autoLinkGoogleProperties } from "@/lib/google-auto-link";
+import { isSubAccountRole } from "@/lib/access-permissions";
 import { hasGoogleSearchConsoleConnection, readGoogleSearchConsoleRows, type GoogleSearchConsoleRow } from "@/lib/google-search-console-direct";
 
 // SEO → Performance → Pages: every known page of a client's site with its target keywords (saved here,
@@ -18,9 +19,12 @@ async function context(request: Request) {
   if (!env.DB) return { error: respond({ error: "The workspace database is unavailable." }, 503) };
   const row = await env.DB.prepare("SELECT owner_id, data FROM workspace_documents WHERE id = ?1").bind("f2b-agency").first<{ owner_id: string; data: string }>();
   if (!row) return { error: respond({ error: "The workspace is unavailable." }, 503) };
-  const data = JSON.parse(row.data) as { ownerId?: string; staff?: Array<{ id?: string; email?: string; isBot?: boolean }>; clients?: Client[] };
-  const member = data.ownerId === user.userId || row.owner_id === user.userId || (data.staff || []).some((item) => !item.isBot && (item.id === user.userId || item.email?.toLowerCase() === user.email.toLowerCase()));
-  if (!member) return { error: respond({ error: "Only workspace members can see SEO pages." }, 403) };
+  const data = JSON.parse(row.data) as { ownerId?: string; staff?: Array<{ id?: string; email?: string; role?: string; staffType?: string; isBot?: boolean }>; clients?: Client[] };
+  const owner = data.ownerId === user.userId || row.owner_id === user.userId;
+  const me = (data.staff || []).find((item) => !item.isBot && (item.id === user.userId || item.email?.toLowerCase() === user.email.toLowerCase()));
+  if (!owner && !me) return { error: respond({ error: "Only workspace members can see SEO pages." }, 403) };
+  // Agency-level staff only: sub-account staff can't read or change page keyword targets.
+  if (!owner && me && (me.staffType === "subaccount" || isSubAccountRole(me.role))) return { error: respond({ error: "Only agency staff can manage SEO pages." }, 403) };
   const url = new URL(request.url);
   const clientId = url.searchParams.get("clientId") || "";
   let client = (data.clients || []).find((c) => c.id === clientId);

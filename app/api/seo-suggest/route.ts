@@ -29,6 +29,7 @@ export async function POST(request: Request) {
   if (!client) return respond({ error: "Choose a client in this workspace." }, 404);
   const provider = await resolveAiProvider(env, row.owner_id);
   if (!aiConfigured(env, provider)) return respond({ error: "Connect an AI provider in Settings → API Keys to use suggestions." }, 503);
+  if ((body as { mode?: string }).mode === "review") return reviewPage(env, provider, client, body as unknown as Record<string, unknown>);
   const page = {
     business: client.name, serviceAreas: (client.seoLocations || []).slice(0, 10), pageName: String(body.pageTitle || "").slice(0, 120), currentUrl: String(body.url || "").slice(0, 120),
     focusKeyword: String(body.focusKeyword || "").slice(0, 80), currentTitle: String(body.title || "").slice(0, 120), currentDescription: String(body.description || "").slice(0, 300),
@@ -52,5 +53,46 @@ export async function POST(request: Request) {
     return respond({ title: String(parsed.title || "").slice(0, 60), description: String(parsed.description || "").slice(0, 155), slug, ogTitle: String(parsed.ogTitle || "").slice(0, 70), ogDescription: String(parsed.ogDescription || "").slice(0, 200), note: String(parsed.note || "").slice(0, 300), model: aiModel(env, undefined, provider) });
   } catch (error) {
     return respond({ error: error instanceof Error && error.name === "TimeoutError" ? "The AI took too long. Try again." : "Couldn’t get suggestions. Try again." }, 502);
+  }
+}
+
+
+// Dashboard → Web pages → page manager → "AI recommendations": reviews one page's real Search Console
+// numbers and live meta tags, returns plain-English actions plus a suggested title/description/keyword.
+// Nothing is saved here; the manager fills its own fields for the user to review.
+async function reviewPage(env: any, provider: any, client: { name: string; seoLocations?: string[] }, body: Record<string, unknown>) {
+  const cut = (v: unknown, n: number) => String(v ?? "").slice(0, n);
+  const list = (v: unknown, n: number) => (Array.isArray(v) ? v : []).slice(0, n);
+  const input = {
+    business: client.name, serviceAreas: (client.seoLocations || []).slice(0, 10), url: cut(body.url, 200),
+    title: cut(body.title, 160), description: cut(body.description, 320), h1: cut(body.h1, 200), targetKeyword: cut(body.targetKeyword, 100), supportingKeywords: cut(body.supportingKeywords, 400),
+    googleLast28Days: { clicks: Number(body.clicks) || 0, impressions: Number(body.impressions) || 0, ctrPercent: body.ctr ?? null, avgPosition: body.position ?? null },
+    searches: list(body.queries, 25), trending: list(body.trending, 10), visits: body.visits ?? null, calls: body.calls ?? null, leads: body.leads ?? null,
+  };
+  const instructions = "You are an SEO specialist for a local service business in Ireland/UK. Review ONE web page using only the data given (Google Search Console searches, positions, impressions, CTR, the live title, meta description and H1). Write in plain UK/Irish English for a business owner, no jargon. Give 3–6 specific, prioritised recommendations: each has a short title, why (citing the actual numbers or searches given — never invent figures), and the exact action. Typical angles: searches with impressions but low CTR → rewrite title/description to match them; searches ranking 8–20 → strengthen content/headings for them; title missing the main search or over 60 chars; description missing or over 155 chars; H1 not matching the page's main search; trending searches to add a section for. Also propose a better SEO title (max 60 characters), meta description (120–155 characters, benefit + call to action) and a target keyword chosen from the real searches where possible. If there is little or no Google data, say so in one recommendation and base the rest on the page's own title/H1. No spammy keyword stuffing.";
+  try {
+    const response = await fetch(aiEndpoint(env, "responses", provider)!, {
+      method: "POST", headers: aiHeaders(env, provider)!,
+      body: JSON.stringify({
+        model: aiModel(env, undefined, provider), instructions, input: JSON.stringify(input),
+        text: { format: { type: "json_schema", name: "page_review", strict: true, schema: { type: "object", additionalProperties: false, required: ["summary", "recommendations", "title", "description", "targetKeyword"], properties: {
+          summary: { type: "string" },
+          recommendations: { type: "array", items: { type: "object", additionalProperties: false, required: ["priority", "title", "why", "action"], properties: { priority: { type: "string", enum: ["high", "medium", "low"] }, title: { type: "string" }, why: { type: "string" }, action: { type: "string" } } } },
+          title: { type: "string" }, description: { type: "string" }, targetKeyword: { type: "string" },
+        } } } },
+        max_output_tokens: 1400, store: false,
+      }),
+      signal: AbortSignal.timeout(45_000),
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) return respond({ error: payload?.error?.message || "The AI provider didn’t respond. Try again." }, 502);
+    const parsed = JSON.parse(outputText(payload) || "{}") as { summary?: string; recommendations?: Array<Record<string, string>>; title?: string; description?: string; targetKeyword?: string };
+    return respond({
+      summary: cut(parsed.summary, 500),
+      recommendations: (parsed.recommendations || []).slice(0, 6).map((r) => ({ priority: ["high", "medium", "low"].includes(r.priority) ? r.priority : "medium", title: cut(r.title, 120), why: cut(r.why, 400), action: cut(r.action, 400) })),
+      title: cut(parsed.title, 60), description: cut(parsed.description, 155), targetKeyword: cut(parsed.targetKeyword, 100),
+    });
+  } catch (error) {
+    return respond({ error: error instanceof Error && error.name === "TimeoutError" ? "The AI took too long. Try again." : "Couldn’t get recommendations. Try again." }, 502);
   }
 }

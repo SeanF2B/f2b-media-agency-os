@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ArrowDownRight, ArrowUpRight, ExternalLink, Minus, PenLine, Search, X } from "lucide-react";
+import { PageManager, type ManagedPage } from "./dashboard-page-manager";
 
 // SEO → Performance → Pages: each page's target keywords next to its real organic Google traffic.
 type Page = { key: string; url: string; title: string; known: boolean; primary: string; supporting: string; suggested: string; targetsUpdatedAt: string; clicks: number | null; impressions: number | null; prevClicks: number | null };
@@ -69,7 +70,7 @@ export function SeoPagesPanel({ clientId, clientName, onOpenWebsite, onConnect }
         <td className="num">{!connected ? <span className="spp-na">Unavailable</span> : !p.clicks && !p.impressions && !p.prevClicks ? <span className="spp-na">No activity</span> : c == null ? "—" : <span className={`spp-delta ${c > 0 ? "up" : c < 0 ? "down" : ""}`}>{c > 0 ? <ArrowUpRight size={13} /> : c < 0 ? <ArrowDownRight size={13} /> : <Minus size={13} />}{c > 0 ? "+" : ""}{num(c)}</span>}</td>
       </tr>; })}</tbody>
     </table></div> : <p className="ops-empty">{(data.pages || []).length ? "No pages match." : `No pages found for ${clientName} yet. Pages appear once the site is built in Websites or Search Console reports traffic.`}</p>)}
-    {open && <PageDetail key={open.key} page={open} clientId={clientId} period={data?.period} connected={connected} statusMessage={data?.message || ""} onClose={() => setOpen(null)} onSaved={(primary, supporting) => { setData((cur) => cur ? { ...cur, pages: cur.pages.map((p) => p.key === open.key ? { ...p, primary, supporting } : p) } : cur); setOpen((cur) => cur ? { ...cur, primary, supporting } : cur); }} onOpenWebsite={onOpenWebsite} onConnect={onConnect} />}
+    {open && <OpsPageManager key={`m-${open.key}`} page={open} clientId={clientId} period={data?.period} onClose={() => setOpen(null)} onTargets={(primary, supporting) => setData((cur) => cur ? { ...cur, pages: cur.pages.map((p) => p.key === open.key ? { ...p, primary, supporting } : p) } : cur)} fallback={<PageDetail key={open.key} page={open} clientId={clientId} period={data?.period} connected={connected} statusMessage={data?.message || ""} onClose={() => setOpen(null)} onSaved={(primary, supporting) => { setData((cur) => cur ? { ...cur, pages: cur.pages.map((p) => p.key === open.key ? { ...p, primary, supporting } : p) } : cur); setOpen((cur) => cur ? { ...cur, primary, supporting } : cur); }} onOpenWebsite={onOpenWebsite} onConnect={onConnect} />} />}
   </div>;
 }
 
@@ -117,4 +118,30 @@ function PageDetail({ page, clientId, period, connected, statusMessage, onClose,
       </section>
     </aside>
   </div>;
+}
+
+// Operations → SEO → Pages: clicking a page opens the full page manager (edit meta tags, keywords, AI
+// recommendations, trending). Agency-level only (Operations and these APIs are agency staff only).
+const pagesCache = new Map<string, ManagedPage[]>();
+const keyOf = (u: string) => { let v = "/"; try { v = decodeURIComponent(new URL(u, "https://x.invalid").pathname || "/"); } catch { v = u || "/"; } v = v.toLowerCase().replace(/\/{2,}/g, "/"); return v.length > 1 && !v.endsWith("/") && !/\.[a-z0-9]+$/i.test(v) ? `${v}/` : v; };
+function OpsPageManager({ page, clientId, period, onClose, onTargets, fallback }: { page: Page; clientId: string; period?: { start: string; end: string }; onClose: () => void; onTargets: (primary: string, supporting: string) => void; fallback: ReactNode }) {
+  const ck = `${clientId}:${period?.start || ""}:${period?.end || ""}`;
+  const [pages, setPages] = useState<ManagedPage[] | null>(pagesCache.get(ck) || null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    if (pagesCache.has(ck)) return;
+    let live = true;
+    const q = new URLSearchParams({ kind: "organic", clientId, ...(period ? { start: period.start, end: period.end } : {}) });
+    fetch(`/api/dashboard-pages?${q}`, { cache: "no-store" }).then(async (r) => { const j = await r.json().catch(() => ({})) as { pages?: ManagedPage[]; error?: string }; if (!r.ok || !j.pages) throw new Error(j.error || "failed"); return j.pages; })
+      .then((list) => { if (!live) return; pagesCache.set(ck, list); setPages(list); }).catch(() => { if (live) setFailed(true); });
+    return () => { live = false; };
+  }, [ck, clientId, period]);
+  const key = keyOf(page.url || page.key);
+  const mp = pages?.find((p) => p.path === key) || (pages ? { path: key, url: page.url, clicks: page.clicks || 0, impressions: page.impressions || 0, position: null, ctr: null, title: page.title === page.key ? "" : page.title, description: "", metaKeywords: "", h1: "", canonical: "", robots: "", httpStatus: null, targetKeyword: page.primary, supportingKeywords: page.supporting, builder: null, queries: [], trending: [], visits: null, allVisits: null, conversions: null, calls: null, leads: null } as ManagedPage : null);
+  if (failed) return <>{fallback}</>;
+  if (!mp) return <div className="pm-overlay" role="status" aria-label="Loading page" style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(16,24,40,.35)", display: "grid", placeItems: "center" }} onClick={onClose}><div className="page-loading"><i /></div></div>;
+  return <PageManager page={mp} clientId={clientId} onClose={onClose} onSaved={(patch) => {
+    setPages((cur) => { const next = (cur || []).map((p) => p.path === mp.path ? { ...p, ...patch } : p); pagesCache.set(ck, next); return next; });
+    if (patch.targetKeyword !== undefined || patch.supportingKeywords !== undefined) onTargets(patch.targetKeyword ?? mp.targetKeyword, patch.supportingKeywords ?? mp.supportingKeywords);
+  }} />;
 }

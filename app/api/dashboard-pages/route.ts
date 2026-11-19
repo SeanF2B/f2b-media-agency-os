@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "../../chatgpt-auth";
-import { fullTeamPermissions, getTeamPermissions, type TeamPermissions } from "@/lib/access-permissions";
+import { fullTeamPermissions, getTeamPermissions, isSubAccountRole, type TeamPermissions } from "@/lib/access-permissions";
 import { loadCachedMarketingData } from "@/lib/marketing-data-history";
 import { hasGoogleSearchConsoleConnection, listGoogleSearchConsoleProperties, readGoogleSearchConsoleRows } from "@/lib/google-search-console-direct";
 import { hasGoogleAnalyticsDirectConnection, readGoogleAnalyticsReport } from "@/lib/google-analytics-direct";
@@ -14,7 +14,7 @@ import { getGoogleAdsAdMetrics, getGoogleAdsKeywordPerformance, getGoogleAdsLand
 // Read-only. Google reads are cached 6h, page meta 24h, so opening the drop-down rarely costs a live call.
 export const dynamic = "force-dynamic";
 const reply = (body: Record<string, unknown>, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
-type Staff = { id: string; email: string; role: string; isBot?: boolean; permissions?: Partial<TeamPermissions>; clientAccessIds?: string[]; limitClientAccess?: boolean };
+type Staff = { id: string; email: string; role: string; staffType?: string; isBot?: boolean; permissions?: Partial<TeamPermissions>; clientAccessIds?: string[]; limitClientAccess?: boolean };
 type Client = { id: string; name: string; website?: string; wordpressSiteUrl?: string; googleAdsAccountId?: string; googleSearchConsoleAccountId?: string; googleAnalyticsAccountId?: string };
 const H6 = 6 * 3600_000;
 
@@ -47,6 +47,8 @@ export async function GET(request: Request) {
   const staff = (workspace.staff || []).find((s) => !s.isBot && (s.id === user.userId || s.email?.toLowerCase() === user.email.toLowerCase()));
   const admin = owner || ["Owner", "Admin"].includes(staff?.role || "");
   if (!admin && !staff) return reply({ error: "You do not have access." }, 403);
+  // Agency-level staff only: sub-account staff never see or edit page SEO data.
+  if (!owner && staff && (staff.staffType === "subaccount" || isSubAccountRole(staff.role))) return reply({ error: "Only agency staff can see page SEO data." }, 403);
   const permissions = owner ? fullTeamPermissions : getTeamPermissions(staff?.role || "Viewer", staff?.permissions);
   if (!admin && !permissions.reports) return reply({ error: "You do not have access to reports." }, 403);
   const url = new URL(request.url);
@@ -108,11 +110,21 @@ export async function GET(request: Request) {
       else gscNote = `${domain} isn’t in the connected Search Console account yet. Add it (or give that Google login access) and its searches will appear here.`;
     }
     let gscRows: Array<{ query: string; page: string; clicks: number; impressions: number; position: number }> = [];
+    let prevRows: Array<{ query: string; page: string; clicks: number; impressions: number; position: number }> = [];
     if (property && gscConnected) {
       const today3 = new Date(Date.now() - 3 * 86_400_000).toISOString().slice(0, 10);
       const gEnd = period.end > today3 ? today3 : period.end;
       const gStart = period.start < gEnd ? period.start : new Date(Date.parse(gEnd) - 28 * 86_400_000).toISOString().slice(0, 10);
-      try { gscRows = await cache("Search Console", JSON.stringify({ report: "dash-gsc", property, a: gStart, b: gEnd }), () => readGoogleSearchConsoleRows(ownerId, property, gStart, gEnd)) as typeof gscRows; }
+      // Previous equal period too, for trending searches per page (same cache key shape as the dashboard).
+      const span = Math.round((Date.parse(gEnd) - Date.parse(gStart)) / 86_400_000) + 1;
+      const pEnd = new Date(Date.parse(gStart) - 86_400_000).toISOString().slice(0, 10), pStart = new Date(Date.parse(pEnd) - (span - 1) * 86_400_000).toISOString().slice(0, 10);
+      try {
+        const [cur, prev] = await Promise.all([
+          cache("Search Console", JSON.stringify({ report: "dash-gsc", property, a: gStart, b: gEnd }), () => readGoogleSearchConsoleRows(ownerId, property, gStart, gEnd)),
+          cache("Search Console", JSON.stringify({ report: "dash-gsc", property, a: pStart, b: pEnd }), () => readGoogleSearchConsoleRows(ownerId, property, pStart, pEnd)).catch(() => []),
+        ]);
+        gscRows = cur as typeof gscRows; prevRows = prev as typeof gscRows;
+      }
       catch (error) { gscNote = error instanceof Error ? error.message : "Search Console couldn’t be read."; }
       if (!gscNote && !gscRows.length) gscNote = "Google hasn’t returned search data for this period yet (new Search Console properties take about a day).";
     } else if (!gscNote) gscNote = !gscConnected ? "Search Console isn’t connected. Connect it in Operations → Launchpad." : origin ? "No Search Console property linked yet." : "Add this client’s website so Search Console can be matched.";
@@ -136,6 +148,9 @@ export async function GET(request: Request) {
       const q = p.queries.get(r.query) || { clicks: 0, impressions: 0, posW: 0 }; q.clicks += r.clicks; q.impressions += r.impressions; q.posW += r.position * r.impressions; p.queries.set(r.query, q);
     }
     for (const k of ga.keys()) if (!pages.has(k) && origin) page(origin + k);
+    // Last period's impressions and position per page + search, to show what's growing.
+    const prevQ = new Map<string, { impressions: number; posW: number }>();
+    for (const r of prevRows) { if (!r.page || !r.query) continue; const k = `${pathKey(r.page)}\u0000${r.query}`; const g = prevQ.get(k) || { impressions: 0, posW: 0 }; g.impressions += r.impressions; g.posW += r.position * r.impressions; prevQ.set(k, g); }
 
     // Saved target keywords (SEO → Pages) and the builder's focus keyword.
     const targets = new Map<string, { primary: string; supporting: string }>();
@@ -188,8 +203,10 @@ export async function GET(request: Request) {
     const list = ordered.map((p) => {
       const g = ga.get(p.path), m = (metas as Record<string, { title: string; description: string; keywords: string; h1: string; canonical: string; robots: string; status: number }>)[p.path], t = targets.get(p.path);
       const queries = [...p.queries.entries()].sort((a, b) => b[1].clicks - a[1].clicks || b[1].impressions - a[1].impressions).slice(0, 100).map(([query, q]) => ({ query, clicks: q.clicks, impressions: q.impressions, position: q.impressions ? Math.round(q.posW / q.impressions * 10) / 10 : null }));
+      const trending = [...p.queries.entries()].map(([query, q]) => { const before = prevQ.get(`${p.path}\u0000${query}`); const pos = q.impressions ? Math.round(q.posW / q.impressions * 10) / 10 : null; const prevPos = before?.impressions ? Math.round(before.posW / before.impressions * 10) / 10 : null; return { query, impressions: q.impressions, previous: before?.impressions || 0, change: q.impressions - (before?.impressions || 0), position: pos, previousPosition: prevPos, isNew: !before }; })
+        .filter((t) => t.change > 0 || (t.position != null && t.previousPosition != null && t.previousPosition - t.position >= 1)).sort((a, b) => b.change - a.change).slice(0, 10);
       return {
-        path: p.path, url: p.url, clicks: p.clicks, impressions: p.impressions, position: p.impressions ? Math.round(p.posW / p.impressions * 10) / 10 : null, ctr: p.impressions ? Math.round(p.clicks / p.impressions * 1000) / 10 : null,
+        path: p.path, url: p.url, trending, clicks: p.clicks, impressions: p.impressions, position: p.impressions ? Math.round(p.posW / p.impressions * 10) / 10 : null, ctr: p.impressions ? Math.round(p.clicks / p.impressions * 1000) / 10 : null,
         title: m?.title || "", description: m?.description || "", metaKeywords: m?.keywords || "", h1: m?.h1 || "", canonical: m?.canonical || "", robots: m?.robots || "", httpStatus: m?.status ?? null,
         targetKeyword: t?.primary || "", supportingKeywords: t?.supporting || "", queries, builder: builder.get(p.path) || null,
         visits: g?.organicSessions ?? null, allVisits: g?.sessions ?? null, conversions: g?.organicKeyEvents ?? null, calls: g?.calls.organic ?? null, leads: g?.leads.organic ?? null, allCalls: g?.calls.all ?? null, allLeads: g?.leads.all ?? null, whatsapp: g?.whatsapp ?? null, emails: g?.emails ?? null,

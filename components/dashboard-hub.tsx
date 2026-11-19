@@ -115,10 +115,6 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(false);
   const [apprOpen, setApprOpen] = useState<"" | "ai" | "human">("");
-  // Collapsible dashboard sections (Reviews, Where you show up); remembered per browser.
-  const [fold, setFold] = useState<Record<string, boolean>>(() => { try { return JSON.parse(localStorage.getItem("f2b-dash-fold") || "{}"); } catch { return {}; } });
-  const toggleFold = (k: string) => setFold((f) => { const n = { ...f, [k]: !f[k] }; try { localStorage.setItem("f2b-dash-fold", JSON.stringify(n)); } catch { /* storage off */ } return n; });
-  const FoldHead = ({ k, title, hint }: { k: string; title: string; hint?: string }) => <button type="button" className={`dh-sub dh-fold ${fold[k] ? "open" : ""}`} aria-expanded={Boolean(fold[k])} onClick={() => toggleFold(k)}><span className="dh-fold-chev">{fold[k] ? "▲" : "▼"}</span>{title}{hint && !fold[k] ? <small>{hint}</small> : null}</button>;
   const [rankOpen, setRankOpen] = useState<"" | "google" | "chatgpt">("");
   // Drop-down under the Organic / Google Ads cards: landing pages (URLs) and keywords.
   const [detail, setDetail] = useState<DetailKey>("");
@@ -278,24 +274,28 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
             {rows.length ? rows.map((k, i) => <div key={`${k.keyword}-${k.matchType}-${i}`} className="dh-rank-row dh-detail-row"><span className={`dh-pos ${k.qualityScore == null ? "" : k.qualityScore >= 7 ? "top" : k.qualityScore >= 5 ? "mid" : "low"}`} title="Quality score">{k.qualityScore != null ? `QS ${k.qualityScore}` : "—"}</span><span className="dh-rank-term">{k.keyword}<em className="dh-match">{k.matchType.toLowerCase()}</em></span><b>{num(k.clicks)} clicks</b><small>{money(k.spend, cur)} · {num(k.conversions)} conv</small></div>) : empty(d.ads?.error || "No keywords with impressions in this period.")}</div>; }
           return null;
         })()}
-        {(() => { const bp = sample ? SAMPLE_GBP : m.businessProfile; const tp = sample ? { status: "ok", rating: 4.8, total: 63 } as typeof m.trustpilot : m.trustpilot; const gR = sample ? { total: 214, averageRating: 4.9 } : gReviews; return <>
-          <FoldHead k="reviews" title="Reviews" hint={[gR?.averageRating != null ? `${gR.averageRating.toFixed(1)} ★` : "", gR?.total != null ? `${num(gR.total)} Google reviews` : "", tp?.status === "ok" && tp.rating != null ? `Trustpilot ${tp.rating.toFixed(1)} ★` : ""].filter(Boolean).join(" · ")} />
-          {fold.reviews && <div className="dh-reviews">
+      </>}
+    </section>}
+    {isAdmin && marketingPicked && m && (() => { const bp = sample ? SAMPLE_GBP : m.businessProfile; const tp = sample ? { status: "ok", rating: 4.8, total: 63 } as typeof m.trustpilot : m.trustpilot; const gR = sample ? { total: 214, averageRating: 4.9 } : gReviews; return <>
+      <section className="panel dh-panel dh-sec-reviews" aria-label="Reviews" data-admin=""><div className="dh-head"><div><p className="eyebrow">⭐ {periodLabel.toUpperCase()}</p><h2>Reviews</h2></div></div>
+        <div className="dh-reviews">
             <div className="dh-review"><BrandIcon id="business-profile" size={22} fallback={null} /><span><b>{gR?.averageRating != null ? `${gR.averageRating.toFixed(1)} ★` : "—"}</b><small>{gR?.total != null ? `${num(gR.total)} Google reviews` : "Google reviews · connect Business Profile"}</small></span></div>
             <div className="dh-review"><BrandIcon id="facebook" size={22} fallback={null} /><span><b>{sample ? "4.7 ★" : "—"}</b><small>{sample ? "88 Facebook reviews" : "Facebook reviews · connect the Facebook Page"}</small></span></div>
             <div className="dh-review"><BrandIcon id="trustpilot" size={22} fallback={null} /><span><b>{tp?.status === "ok" && tp.rating != null ? `${tp.rating.toFixed(1)} ★` : "—"}</b><small>{tp?.status === "ok" ? `${num(tp.total || 0)} Trustpilot reviews` : tp?.status === "not_found" ? "Not on Trustpilot yet" : tp?.status === "no_website" ? "Trustpilot · add the website" : "Trustpilot"}</small></span></div>
-          </div>}
-          <FoldHead k="gbp" title="Google Business Profile" hint={[bp?.views != null ? `${num(bp.views)} views` : "", bp?.calls != null ? `${num(bp.calls)} calls` : "", bp?.websiteClicks != null ? `${num(bp.websiteClicks)} website clicks` : ""].filter(Boolean).join(" · ") || "Not connected"} />
-          {fold.gbp && <><div className="dh-tiles dh-gbp">
+          </div>
+      </section>
+      <section className="panel dh-panel dh-sec-gbp" aria-label="Google Business Profile" data-admin=""><div className="dh-head"><div><p className="eyebrow">📍 {periodLabel.toUpperCase()}</p><h2>Google Business Profile</h2></div></div>
+        <div className="dh-tiles dh-gbp">
             <Tile icon={<BrandIcon id="business-profile" size={20} fallback={null} />} label="Profile views" value={bp?.views != null ? num(bp.views) : "—"}><Delta now={bp?.views} before={bp?.previous?.impressions} /></Tile>
             <Tile icon={<Phone size={18} />} label="Calls" value={bp?.calls != null ? num(bp.calls) : "—"} tone={(bp?.calls || 0) > 0 ? "good" : ""}><Delta now={bp?.calls} before={bp?.previous?.calls} /></Tile>
             <Tile icon={<span>🧭</span>} label="Directions" value={bp?.directions != null ? num(bp.directions) : "—"}><Delta now={bp?.directions} before={bp?.previous?.directions} /></Tile>
             <Tile icon={<MousePointerClick size={18} />} label="Website clicks" value={bp?.websiteClicks != null ? num(bp.websiteClicks) : "—"}><Delta now={bp?.websiteClicks} before={bp?.previous?.websiteClicks} /></Tile>
           </div>
-          {!bp && <p className="dh-muted">{m.businessNote || "Connect this client’s Google Business Profile to see views, calls and directions."}</p>}</>}
-        </>; })()}
-        {m.scope !== "all" && <><FoldHead k="showup" title="Where you show up" hint="Google · Bing · ChatGPT" />
-        {fold.showup && <><div className="dh-ranks">
+          {!bp && <p className="dh-muted">{m.businessNote || "Connect this client’s Google Business Profile to see views, calls and directions."}</p>}
+      </section>
+    </>; })()}
+    {isAdmin && marketingPicked && m && m.scope !== "all" && <section className="panel dh-panel dh-sec-showup" aria-label="Where you show up" data-admin=""><div className="dh-head"><div><p className="eyebrow">🔎 {periodLabel.toUpperCase()}</p><h2>Where you show up</h2></div></div>
+        <div className="dh-ranks">
           <div className={`dh-rank dh-rank-click ${rankOpen === "google" ? "open" : ""}`} role="button" tabIndex={0} aria-expanded={rankOpen === "google"} onClick={() => setRankOpen(rankOpen === "google" ? "" : "google")} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setRankOpen(rankOpen === "google" ? "" : "google"); } }}><span className="dh-rank-chev">{rankOpen === "google" ? "▲" : "▼"} Keywords</span><div className="dh-rank-logos"><BrandIcon id="google" size={24} fallback={<span>G</span>} /><span className="dh-rank-also" title="Chrome and Safari use Google search"><BrandIcon id="chrome" size={14} fallback={null} /><BrandIcon id="safari" size={14} fallback={null} /></span></div><small>Google · Chrome & Safari</small>{m.google ? <><b>{m.google.position != null ? `#${m.google.position}` : "—"}</b><em>avg of {m.google.tracked} keywords · {m.google.top3} in top 3 <Delta now={m.google.position} before={m.google.previous} lowerIsBetter suffix="" /></em></> : m.gsc && !m.gsc.error && m.gsc.position != null ? <><b>#{m.gsc.position}</b><em>avg position across {num(m.gsc.queriesTracked || 0)} searches (Search Console) <Delta now={m.gsc.position} before={m.gsc.previousPosition} lowerIsBetter suffix="" /></em></> : <><b>—</b><em>{m.gsc?.error || m.rankNote || "Not tracked yet"}</em></>}</div>
           <div className="dh-rank"><div className="dh-rank-logos"><BrandIcon id="bing" size={24} fallback={<span>b</span>} /><span className="dh-rank-also" title="Microsoft Edge uses Bing search"><BrandIcon id="edge" size={14} fallback={null} /></span></div><small>Bing · Microsoft Edge</small><b>—</b><em>{m.bingNote}</em></div>
           <div className={`dh-rank dh-rank-click ${rankOpen === "chatgpt" ? "open" : ""}`} role="button" tabIndex={0} aria-expanded={rankOpen === "chatgpt"} onClick={() => setRankOpen(rankOpen === "chatgpt" ? "" : "chatgpt")} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setRankOpen(rankOpen === "chatgpt" ? "" : "chatgpt"); } }}><span className="dh-rank-chev">{rankOpen === "chatgpt" ? "▲" : "▼"} Questions</span><div className="dh-rank-logos"><BrandIcon id="chatgpt" size={24} fallback={<Sparkles size={18} />} /></div><small>ChatGPT</small><b>{m.chatgpt ? `${Math.round(m.chatgpt.share)}%` : "—"}</b>{m.chatgpt ? <em>mentioned in {m.chatgpt.mentioned} of {m.chatgpt.prompts} questions <Delta now={m.chatgpt.share} before={m.chatgpt.previous} suffix=" pts" /></em> : <em>{m.aiNote || "No AI check yet"}</em>}</div>
@@ -311,9 +311,8 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
           {m.chatgpt?.questions?.length ? m.chatgpt.questions.map((q) => <div key={q.prompt} className="dh-rank-row ai"><span className={`dh-pos ${q.mentioned ? "top" : "low"}`}>{q.mentioned ? (q.position ? `#${q.position}` : "✓") : "✗"}</span><span className="dh-rank-term">{q.prompt}</span><b className={q.mentioned ? "good" : "bad"}>{q.mentioned ? "Mentioned" : "Not mentioned"}</b><small>{q.competitors.length ? `Also named: ${q.competitors.join(", ")}` : ""}</small></div>)
             : <p className="dh-muted">No ChatGPT checks yet. Run one in Operations → AI visibility.</p>}
         </div>}
-        </>}</>}
-      </>}
     </section>}
+
 
     {isAdmin && adsPanel && <div className="dh-ads-wrap">{adsPanel}</div>}
     {isAdmin && activityPanel}
