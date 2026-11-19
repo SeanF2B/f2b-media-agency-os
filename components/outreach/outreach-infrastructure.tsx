@@ -79,6 +79,23 @@ function squarePhoto(file: File): Promise<string> {
   });
 }
 
+/** The F2B logo as a square, white-backed profile picture (same size as uploads). */
+function logoPhoto(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      const canvas = document.createElement("canvas"); canvas.width = 256; canvas.height = 256;
+      const context = canvas.getContext("2d"); if (!context) { reject(new Error("This browser can't draw images.")); return; }
+      context.fillStyle = "#ffffff"; context.fillRect(0, 0, 256, 256);
+      const crop = image.width * 0.16; const side = image.width - crop * 2;
+      context.drawImage(image, crop, crop, side, side, 0, 0, 256, 256);
+      resolve(canvas.toDataURL("image/jpeg", 0.9));
+    };
+    image.onerror = () => reject(new Error("Couldn't load the F2B logo."));
+    image.src = "/f2b-app-icon-v5-512.png?v=20261022-3";
+  });
+}
+
 /** Sender name and real photo for one mailbox — pushed to Microsoft 365 / Google so recipients see them. */
 function SenderDrawer({ mailbox, act, onClose }: { mailbox: Mailbox; act: Act; onClose: () => void }) {
   const [firstName, setFirstName] = useState(mailbox.firstName);
@@ -99,10 +116,11 @@ function SenderDrawer({ mailbox, act, onClose }: { mailbox: Mailbox; act: Act; o
     <div className="ox-row"><SenderAvatar mailbox={{ ...mailbox, firstName, lastName, photo: preview }} size={72} />
       <div className="ox-stack" style={{ gap: 6 }}>
         <label className="secondary-button ox-upload"><Camera size={15} /> {preview ? "Replace photo" : "Upload photo"}<input type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) void squarePhoto(file).then(setPhoto).catch((reason) => setError(reason.message)); event.target.value = ""; }} /></label>
+        <button type="button" className="secondary-button ox-upload" onClick={() => void logoPhoto().then(setPhoto).catch((reason) => setError(reason.message))}><img src="/f2b-app-icon-v5-192.png?v=20261022-3" alt="" width={18} height={18} /> Use F2B logo</button>
         {preview && <button type="button" className="ox-link" onClick={() => setPhoto(null)}>Remove photo</button>}
       </div>
     </div>
-    <small className="ox-muted">Use a real photo of the person who handles these replies. It's cropped square and resized here before upload.</small>
+    <small className="ox-muted">Use a real photo of the person who handles these replies, or the F2B logo. Photos are cropped square and resized before upload.</small>
     <div className="ox-grid2">
       <label className="ox-field">First name<input value={firstName} maxLength={40} onChange={(event) => setFirstName(event.target.value)} /></label>
       <label className="ox-field">Last name<input value={lastName} maxLength={40} onChange={(event) => setLastName(event.target.value)} /></label>
