@@ -192,6 +192,8 @@ const worker = {
       }),
       processExpiredMarketingSubmissions(env.DB!, env.BUCKET, new Date(controller.scheduledTime)),
       processMonthlyClientReports(env.DB, env.BUCKET as never, new Date(controller.scheduledTime)),
+      // Content calendar: publish approved posts that are due to Facebook / Instagram / Google Business.
+      import("../lib/content-publish").then(({ processContentPublishing }) => processContentPublishing(new Date(controller.scheduledTime))),
       // AI & SEO-data rebilling: last month's usage → a line on each client's draft invoice (1st–3rd, once).
       import("../lib/usage-billing").then(({ processUsageInvoices }) => processUsageInvoices(new Date(controller.scheduledTime))),
       processOutreach(new Date(controller.scheduledTime)),

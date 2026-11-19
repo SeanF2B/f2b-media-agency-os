@@ -2,8 +2,11 @@
 // Social post planner: a month calendar of posts per client. Write with AI, attach photos from the client's Media Library.
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-type Post = { id: string; clientId: string; postAt: string; platforms: string[]; caption: string; images: string[]; status: "draft" | "scheduled" | "posted"; updatedAt?: string };
-type Media = { id: string; url: string; name: string; kind: string };
+export type Post = { id: string; clientId: string; postAt: string; platforms: string[]; caption: string; images: string[]; status: "draft" | "pending" | "scheduled" | "posted" | "failed" | "rejected"; updatedAt?: string; createdByName?: string; createdBy?: string; authorType?: string; reviewNote?: string; reviewedBy?: string; publish?: Record<string, { ok: boolean; url?: string; error?: string; manual?: boolean; at?: string }> };
+type Media = { id: string; url: string; name: string; kind: string; createdBy?: string };
+export type PlannerFilters = { createdBy?: string; platform?: string; status?: string };
+export const STATUS_LABEL: Record<string, string> = { draft: "Draft", pending: "Awaiting approval", scheduled: "Scheduled", posted: "Posted", failed: "Failed", rejected: "Sent back" };
+const initials = (n = "") => n.replace(/\|.*$/, "").trim().split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase() || "?";
 const PLATFORMS: Array<[string, string, string]> = [["facebook", "Facebook", "#1877f2"], ["instagram", "Instagram", "#e1306c"], ["google", "Google Business", "#34a853"], ["linkedin", "LinkedIn", "#0a66c2"], ["tiktok", "TikTok", "#111"]];
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const hm = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
@@ -15,7 +18,7 @@ async function call<T>(url: string, body?: unknown): Promise<T> {
   return json;
 }
 
-export function SocialPlanner({ clientId, clientName }: { clientId: string; clientName: string }) {
+export function SocialPlanner({ clientId, clientName, filters = {}, canApprove = false, onChanged }: { clientId: string; clientName: string; filters?: PlannerFilters; canApprove?: boolean; onChanged?: () => void }) {
   const [month, setMonth] = useState(() => { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d; });
   const [posts, setPosts] = useState<Post[]>([]);
   const [edit, setEdit] = useState<Post | null>(null);
@@ -25,9 +28,9 @@ export function SocialPlanner({ clientId, clientName }: { clientId: string; clie
 
   const load = useCallback(async () => {
     try { const from = new Date(month); from.setDate(from.getDate() - 7); const to = new Date(month); to.setMonth(to.getMonth() + 1, 7);
-      const r = await call<{ posts: Post[] }>(`/api/social-posts?clientId=${encodeURIComponent(clientId)}&from=${from.toISOString()}&to=${to.toISOString()}`); setPosts(r.posts); setStatus(""); }
+      const r = await call<{ posts: Post[] }>(`/api/social-posts?clientId=${encodeURIComponent(clientId)}&from=${from.toISOString()}&to=${to.toISOString()}`); setPosts(r.posts.filter((x) => (!filters.createdBy || x.createdByName === filters.createdBy) && (!filters.platform || x.platforms.includes(filters.platform)) && (!filters.status || x.status === filters.status))); setStatus(""); }
     catch (e) { setStatus(e instanceof Error ? e.message : "Couldn't load posts."); }
-  }, [clientId, month]);
+  }, [clientId, month, filters.createdBy, filters.platform, filters.status]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { let live = true; call<{ items: Media[] }>(`/api/media-library?scope=${encodeURIComponent(clientId)}&kind=image`).then((r) => { if (live) setMedia(r.items || []); }).catch(() => undefined); return () => { live = false; }; }, [clientId]);
 
@@ -68,15 +71,21 @@ export function SocialPlanner({ clientId, clientName }: { clientId: string; clie
           <span className="sp-date" onClick={() => newPost(d)}>{d.getDate()}</span>
           {list.map((p) => <button key={p.id} type="button" className={`sp-post ${p.status}`} onClick={() => setEdit(p)} title={p.caption}>
             {p.images[0] && <img src={p.images[0]} alt="" loading="lazy" />}
-            <span><em>{hm(p.postAt)} {p.platforms.map((x) => <i key={x} style={{ background: PLATFORMS.find((q) => q[0] === x)?.[2] }} />)}</em><small>{p.caption.split("\n")[0].slice(0, 60) || "Untitled post"}</small></span>
+            <span><em>{hm(p.postAt)} {p.platforms.map((x) => <i key={x} style={{ background: PLATFORMS.find((q) => q[0] === x)?.[2] }} />)}{p.createdByName && <b className="sp-who" title={`By ${p.createdByName}`}>{initials(p.createdByName)}</b>}</em><small>{p.caption.split("\n")[0].slice(0, 60) || "Untitled post"}</small></span>
           </button>)}
         </div>; })}
     </div>
-    {edit && <PostEditor post={edit} clientId={clientId} clientName={clientName} media={media} onMedia={(m) => setMedia((cur) => [m, ...cur])} onClose={() => setEdit(null)} onSaved={async (msg) => { setEdit(null); setStatus(msg); await load(); }} />}
+    {edit && <PostEditor post={edit} clientId={clientId} clientName={clientName} media={media} canApprove={canApprove} onMedia={(m) => setMedia((cur) => [m, ...cur])} onClose={() => setEdit(null)} onSaved={async (msg) => { setEdit(null); setStatus(msg); await load(); onChanged?.(); }} />}
   </section>;
 }
 
-function PostEditor({ post, clientId, clientName, media, onMedia, onClose, onSaved }: { post: Post; clientId: string; clientName: string; media: Media[]; onMedia: (m: Media) => void; onClose: () => void; onSaved: (msg: string) => void }) {
+export function PostEditor({ post, clientId, clientName, media, onMedia, onClose, onSaved, canApprove = false }: { post: Post; clientId: string; clientName: string; media: Media[]; onMedia: (m: Media) => void; onClose: () => void; onSaved: (msg: string) => void; canApprove?: boolean }) {
+  const [uploader, setUploader] = useState("");
+  const [drive, setDrive] = useState<{ connected: boolean; files: Array<{ id: string; name: string; thumbnailLink?: string; mimeType?: string }> } | null>(null);
+  const [note, setNote] = useState("");
+  const openDrive = async () => { setErr(""); try { const r = await call<{ connected: boolean; files: Array<{ id: string; name: string; thumbnailLink?: string; mimeType?: string }> }>("/api/media-library?drive=1&folder=root"); setDrive({ connected: r.connected, files: (r.files || []).filter((f) => String(f.mimeType || "").startsWith("image/")) }); } catch (e) { setErr(e instanceof Error ? e.message : "Google Drive couldn't be opened."); } };
+  const importDrive = async (fileId: string, name: string) => { setBusy("upload"); try { const r = await call<{ item: Media }>("/api/media-library", { action: "importDrive", scope: clientId, fileId, name, folder: "Social posts" }); onMedia(r.item); setP((cur) => ({ ...cur, images: [...cur.images, r.item.url].slice(0, 10) })); } catch (e) { setErr(e instanceof Error ? e.message : "Couldn't import from Drive."); } finally { setBusy(""); } };
+  const review = async (action: "approve" | "reject" | "publish") => { setBusy("save"); setErr(""); try { if (action !== "publish") await call("/api/social-posts", { action: "save", clientId, post: p }); const r = await call<{ result?: { status: string } }>("/api/social-posts", { action, clientId, id: p.id, note }); onSaved(action === "approve" ? "Approved and scheduled." : action === "reject" ? "Sent back with your note." : r.result?.status === "posted" ? "Published ✓" : "Publish attempted — see results on the post."); } catch (e) { setErr(e instanceof Error ? e.message : "Couldn't do that."); } finally { setBusy(""); } };
   const [p, setP] = useState<Post>(post);
   const [prompt, setPrompt] = useState("");
   const [ideas, setIdeas] = useState<string[]>([]);
@@ -98,7 +107,7 @@ function PostEditor({ post, clientId, clientName, media, onMedia, onClose, onSav
 
   return <div className="sp-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
     <div className="sp-editor" role="dialog" aria-modal="true" aria-label="Social post">
-      <header><b>{p.id ? "Edit post" : "New post"}</b><span className={`sp-badge ${p.status}`}>{p.status === "draft" ? "Draft" : p.status === "scheduled" ? "Scheduled" : "Posted"}</span><button type="button" className="sp-x" aria-label="Close" onClick={onClose}>×</button></header>
+      <header><b>{p.id ? "Edit post" : "New post"}</b><span className={`sp-badge ${p.status}`}>{STATUS_LABEL[p.status] || p.status}</span>{p.createdByName && <small className="sp-by">by {p.createdByName}{p.authorType === "subaccount" ? " (client team)" : ""}</small>}<button type="button" className="sp-x" aria-label="Close" onClick={onClose}>×</button></header>
       <div className="sp-editor-body">
         <div className="sp-col">
           <div className="sp-row2"><label>Date<input type="date" value={dateVal} onChange={(e) => setWhen(e.target.value, timeVal)} /></label><label>Time<input type="time" value={timeVal} onChange={(e) => setWhen(dateVal, e.target.value)} /></label></div>
@@ -111,8 +120,11 @@ function PostEditor({ post, clientId, clientName, media, onMedia, onClose, onSav
           <b className="sp-label">Photos</b>
           <div className="sp-images">{p.images.map((u) => <span key={u}><img src={u} alt="" /><button type="button" aria-label="Remove" onClick={() => setP({ ...p, images: p.images.filter((x) => x !== u) })}>×</button></span>)}
             <button type="button" className="sp-add" onClick={() => setPicker((v) => !v)}>🖼️<small>Media Library</small></button>
+            <button type="button" className="sp-add" onClick={() => void openDrive()}>🟢<small>Google Drive</small></button>
             <label className="sp-add">{busy === "upload" ? "…" : "⬆️"}<small>Upload</small><input type="file" accept="image/*" multiple hidden onChange={(e) => { void upload(e.target.files); e.target.value = ""; }} /></label></div>
-          {picker && <div className="sp-picker">{media.length ? media.slice(0, 48).map((m) => { const on = p.images.includes(m.url); return <button key={m.id} type="button" className={on ? "on" : ""} onClick={() => setP({ ...p, images: on ? p.images.filter((x) => x !== m.url) : [...p.images, m.url].slice(0, 10) })}><img src={m.url} alt={m.name} loading="lazy" /></button>; }) : <p>No photos in {clientName}'s Media Library yet. Upload one.</p>}</div>}
+          {picker && [...new Set(media.map((m) => m.createdBy).filter(Boolean))].length > 1 && <select className="sp-uploader" value={uploader} onChange={(e) => setUploader(e.target.value)} aria-label="Uploaded by"><option value="">Uploaded by anyone</option>{[...new Set(media.map((m) => m.createdBy).filter(Boolean))].map((u) => <option key={u}>{u}</option>)}</select>}
+          {drive && <div className="sp-drive">{!drive.connected ? <p>Connect your own Google Drive to pick images from it. <a className="primary-button" href="/api/media-library/drive?mine=1">Connect my Google Drive</a></p> : drive.files.length ? drive.files.slice(0, 48).map((f) => <button key={f.id} type="button" title={f.name} onClick={() => void importDrive(f.id, f.name)}>{f.thumbnailLink ? <img src={f.thumbnailLink} alt="" referrerPolicy="no-referrer" /> : <span>{f.name}</span>}</button>) : <p>No images in the top of your Drive. <a href="/api/media-library/drive?mine=1">Use a different Google account</a></p>}<button type="button" className="text-button" onClick={() => setDrive(null)}>Close Drive</button></div>}
+          {picker && <div className="sp-picker">{media.filter((m) => !uploader || m.createdBy === uploader).length ? media.filter((m) => !uploader || m.createdBy === uploader).slice(0, 48).map((m) => { const on = p.images.includes(m.url); return <button key={m.id} type="button" className={on ? "on" : ""} onClick={() => setP({ ...p, images: on ? p.images.filter((x) => x !== m.url) : [...p.images, m.url].slice(0, 10) })}><img src={m.url} alt={m.name} loading="lazy" /></button>; }) : <p>No photos in {clientName}'s Media Library yet. Upload one.</p>}</div>}
           <div className="sp-preview"><b className="sp-label">Preview</b><div className="sp-preview-card"><div className="sp-pv-head"><span>{clientName.slice(0, 1)}</span><b>{clientName}</b><small>{new Date(p.postAt).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</small></div>{p.caption && <p>{p.caption}</p>}{p.images[0] && <img src={p.images[0]} alt="" />}</div></div>
         </div>
       </div>
@@ -120,7 +132,10 @@ function PostEditor({ post, clientId, clientName, media, onMedia, onClose, onSav
       <footer>{p.id && <button type="button" className="text-button sp-del" onClick={() => void remove()}>Delete</button>}{p.caption && <button type="button" className="text-button" onClick={() => { void navigator.clipboard?.writeText(p.caption); }}>Copy caption</button>}<span style={{ flex: 1 }} />
         {p.status === "scheduled" && Date.parse(p.postAt) < Date.now() && <button type="button" className="secondary-button" disabled={!!busy} onClick={() => void save("posted")}>Mark as posted</button>}
         <button type="button" className="secondary-button" disabled={!!busy} onClick={() => void save("draft")}>Save draft</button>
-        <button type="button" className="primary-button" disabled={!!busy || !p.caption.trim() || !p.platforms.length} onClick={() => void save("scheduled")}>Schedule</button></footer>
+        {canApprove && p.id && p.status === "pending" ? <><input className="sp-note" placeholder="Note for the client (optional)" value={note} onChange={(e) => setNote(e.target.value)} /><button type="button" className="secondary-button" disabled={!!busy} onClick={() => void review("reject")}>Send back</button><button type="button" className="primary-button" disabled={!!busy} onClick={() => void review("approve")}>Approve &amp; schedule</button></>
+          : <button type="button" className="primary-button" disabled={!!busy || !p.caption.trim() || !p.platforms.length} onClick={() => void save("scheduled")}>{canApprove ? "Schedule" : "Send for approval"}</button>}
+        {canApprove && p.id && ["scheduled", "failed"].includes(p.status) && <button type="button" className="secondary-button" disabled={!!busy} onClick={() => void review("publish")}>Publish now</button>}</footer>
+      {(p.reviewNote || Object.keys(p.publish || {}).length > 0) && <div className="sp-results">{p.reviewNote && <p className="sp-review">💬 {p.reviewedBy ? `${p.reviewedBy}: ` : ""}{p.reviewNote}</p>}{Object.entries(p.publish || {}).map(([k, r]) => <p key={k} className={r.ok ? "ok" : "bad"}><b>{PLATFORMS.find((x) => x[0] === k)?.[1] || k}</b> {r.ok ? <>posted {r.url && <a href={r.url} target="_blank" rel="noreferrer">view ↗</a>}</> : r.error}</p>)}</div>}
     </div>
   </div>;
 }

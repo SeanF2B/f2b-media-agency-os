@@ -5,20 +5,37 @@ import { useEffect, useState } from "react";
 // looks (image, text, date, status). Live posts read from Google need the Business Profile connection.
 type Post = { id: string; postAt: string; platforms: string[]; caption: string; images: string[]; status: string };
 
-export function GbpPosts({ clientId, businessName = "", onOpenCalendar }: { clientId: string; businessName?: string; onOpenCalendar?: () => void }) {
-  const [posts, setPosts] = useState<Post[] | null>(null);
+const SAMPLE: Post[] = [
+  { id: "s1", postAt: new Date(Date.now() + 2 * 86_400_000).toISOString(), platforms: ["google"], caption: "Storm season is here. Book a free roof check this week and we’ll spot loose slates and blocked gutters before the next downpour. Call or tap Learn more to book.", images: ["https://images.unsplash.com/photo-1632759145351-1d592919f522?w=600&q=70"], status: "scheduled" },
+  { id: "s2", postAt: new Date(Date.now() - 3 * 86_400_000).toISOString(), platforms: ["google"], caption: "Before and after: a full re-roof in Salthill finished in four days, with a 10-year guarantee. Thanks to the Murphys for the lovely review!", images: ["https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&q=70"], status: "posted" },
+  { id: "s3", postAt: new Date(Date.now() - 10 * 86_400_000).toISOString(), platforms: ["google"], caption: "Tip: clear your gutters twice a year, in late autumn and spring. Overflowing gutters are the number one cause of damp fascia boards.", images: [], status: "posted" },
+];
+
+export function GbpPosts({ clientId, businessName = "", onOpenCalendar, sample = false }: { clientId: string; businessName?: string; onOpenCalendar?: () => void; sample?: boolean }) {
+  const [posts, setPosts] = useState<Post[] | null>(sample ? SAMPLE : null);
   useEffect(() => {
+    if (sample) { setPosts(SAMPLE); return; }
     let live = true;
     const q = new URLSearchParams({ clientId, from: new Date(Date.now() - 90 * 86_400_000).toISOString(), to: new Date(Date.now() + 45 * 86_400_000).toISOString() });
-    fetch(`/api/social-posts?${q}`, { cache: "no-store" }).then((r) => r.ok ? r.json() : { posts: [] }).then((j: { posts?: Post[] }) => { if (live) setPosts((j.posts || []).filter((p) => p.platforms.includes("google")).sort((a, b) => b.postAt.localeCompare(a.postAt)).slice(0, 8)); }).catch(() => { if (live) setPosts([]); });
+    // Calendar posts for Google + the live posts on the Business Profile itself (when Google Business is connected).
+    Promise.all([
+      fetch(`/api/social-posts?${q}`, { cache: "no-store" }).then((r) => r.ok ? r.json() : { posts: [] }).catch(() => ({ posts: [] })),
+      fetch(`/api/gbp?view=posts&clientId=${encodeURIComponent(clientId)}`, { cache: "no-store" }).then((r) => r.ok ? r.json() : { posts: [] }).catch(() => ({ posts: [] })),
+    ]).then(([cal, gbp]: [{ posts?: Post[] }, { posts?: Array<{ id: string; summary: string; image: string; at: string }> }]) => {
+      if (!live) return;
+      const planned = (cal.posts || []).filter((p) => p.platforms.includes("google"));
+      const onGoogle: Post[] = (gbp.posts || []).map((g) => ({ id: g.id, postAt: g.at, platforms: ["google"], caption: g.summary, images: g.image ? [g.image] : [], status: "posted" }));
+      const seen = new Set(onGoogle.map((p) => p.caption.slice(0, 60)));
+      setPosts([...onGoogle, ...planned.filter((p) => !seen.has(p.caption.slice(0, 60)))].sort((a, b) => b.postAt.localeCompare(a.postAt)).slice(0, 10));
+    }).catch(() => { if (live) setPosts([]); });
     return () => { live = false; };
-  }, [clientId]);
+  }, [clientId, sample]);
   if (!posts) return null;
   const when = (s: string) => new Date(s).toLocaleDateString("en-IE", { day: "numeric", month: "short" });
   return <div className="gbpp">
     <style>{CSS}</style>
-    <div className="gbpp-head"><b>Google posts</b><small>{posts.length ? "From the social calendar" : ""}</small>{onOpenCalendar && <button type="button" className="dh-golink" onClick={onOpenCalendar}>{posts.length ? "Open social calendar →" : "Plan a Google post →"}</button>}</div>
-    {!posts.length ? <p className="dh-muted">No Google Business posts planned or published in the last 90 days.</p> : <div className="gbpp-row">
+    <div className="gbpp-head"><b>Google posts</b><small>{posts.length ? "On Google and in the Content calendar" : ""}</small>{onOpenCalendar && <button type="button" className="dh-golink" onClick={onOpenCalendar}>{posts.length ? "Open Content calendar →" : "Plan a Google post →"}</button>}</div>
+    {!posts.length ? <p className="dh-muted">No Google posts yet. Plan one in the Content calendar and it will show here with a preview. Posts made directly on Google show once the Google Business posting connection is set up.</p> : <div className="gbpp-row">
       {posts.map((p) => { const upcoming = Date.parse(p.postAt) > Date.now(); return <article key={p.id} className="gbpp-card">
         <div className="gbpp-top"><span className="gbpp-avatar">{(businessName || "B").slice(0, 1)}</span><span><b>{businessName || "Your business"}</b><small>{when(p.postAt)}</small></span><em className={`gbpp-status ${upcoming ? "next" : /publish|posted|live|done/i.test(p.status) ? "live" : ""}`}>{upcoming ? "Scheduled" : /publish|posted|live|done/i.test(p.status) ? "Posted" : p.status || "Draft"}</em></div>
         {p.images[0] ? <img src={p.images[0]} alt="" loading="lazy" /> : null}

@@ -2,7 +2,7 @@
 import { env } from "cloudflare:workers";
 import { authorizeAdmin } from "@/lib/settings-auth";
 import { configuredMetaApiVersion } from "@/lib/meta-ads-direct";
-import { META_MESSAGING_SCOPES } from "@/lib/conversations/meta-rules";
+import { META_MESSAGING_SCOPES, META_POSTING_SCOPES } from "@/lib/conversations/meta-rules";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +20,6 @@ export async function GET(request: Request) {
   let version: string; try { version = configuredMetaApiVersion(); } catch { return back(request, "version-not-configured", clientId); }
   const state = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
   const dialog = new URL(`https://www.facebook.com/${version}/dialog/oauth`);
-  dialog.search = new URLSearchParams({ client_id: env.META_APP_ID, redirect_uri: `${url.origin}/api/meta-messaging/callback`, response_type: "code", scope: META_MESSAGING_SCOPES.join(","), state, auth_type: "rerequest" }).toString();
+  dialog.search = new URLSearchParams({ client_id: env.META_APP_ID, redirect_uri: `${url.origin}/api/meta-messaging/callback`, response_type: "code", scope: [...META_MESSAGING_SCOPES, ...(url.searchParams.get("posting") === "1" ? META_POSTING_SCOPES : [])].join(","), state, auth_type: "rerequest" }).toString();
   return new Response(null, { status: 302, headers: { Location: dialog.toString(), "Set-Cookie": `f2b_meta_msg_state=${state}.${clientId || "agency"}; Max-Age=600; Path=/api/meta-messaging; Secure; HttpOnly; SameSite=Lax`, "Cache-Control": "no-store" } });
 }

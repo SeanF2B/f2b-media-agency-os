@@ -1,7 +1,7 @@
 import { allowedStockHost, cleanFolder, cleanName, detectMediaType, driveFileIdFromLink, isStockProvider, MEDIA_MAX_BYTES, MEDIA_PAGE_SIZE, newFileKey, normalizeOpenverse, normalizePexels, normalizePixabay, normalizeUnsplash, publicMediaUrl, STOCK_PROVIDERS, type StockProvider, type StockResult } from "../../../lib/media-library/core";
 import { env } from "cloudflare:workers";
 import { aiConfigured, aiEndpoint, aiHeaders, aiImageModel, resolveAiProvider } from "../../../lib/ai-provider";
-import { driveAccessToken, driveConnection, driveOAuthReady, mediaAccess, ok, reply, stockKey, type MediaAccess } from "../../../lib/media-library/server";
+import { driveAccessToken, driveConnection, driveOAuthReady, driveTokenFor, mediaAccess, ok, reply, stockKey, userDriveKey, type MediaAccess } from "../../../lib/media-library/server";
 
 export const dynamic = "force-dynamic";
 
@@ -113,7 +113,7 @@ async function stockLookup(access: MediaAccess, provider: StockProvider, id: str
 // ---------- Google Drive ----------
 const DRIVE_MEDIA_QUERY = "(mimeType contains 'image/' or mimeType contains 'video/' or mimeType = 'application/pdf' or mimeType = 'application/vnd.google-apps.folder')";
 async function driveList(access: MediaAccess, folder: string, query: string, pageToken: string) {
-  const token = await driveAccessToken(access.db, access.ownerId);
+  const token = await driveTokenFor(access.db, access.ownerId, access.userEmail);
   if (!token) return { connected: false, files: [] as unknown[], nextPageToken: "" };
   const clauses = [DRIVE_MEDIA_QUERY, "trashed = false"];
   if (query) clauses.push(`name contains '${query.replace(/['\\]/g, "")}'`);
@@ -129,7 +129,7 @@ async function driveList(access: MediaAccess, folder: string, query: string, pag
 async function driveImport(access: MediaAccess, idOrLink: string) {
   const fileId = driveFileIdFromLink(idOrLink);
   if (!fileId) throw new Error("Paste a Google Drive file link (Share → Copy link).");
-  const token = await driveAccessToken(access.db, access.ownerId).catch(() => null);
+  const token = await driveTokenFor(access.db, access.ownerId, access.userEmail).catch(() => null);
   if (token) {
     const metaResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=name,mimeType,size,imageMediaMetadata(width,height)&supportsAllDrives=true`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15000) });
     if (metaResponse.ok) {
@@ -152,8 +152,9 @@ export async function GET(request: Request) {
   try {
     if (url.searchParams.has("status")) {
       const providers = await Promise.all(STOCK_PROVIDERS.map(async (item) => ({ id: item.id, label: item.label, ready: !item.needsKey || Boolean(await stockKey(access.db, access.ownerId, item.id)), signup: item.signup })));
-      const drive = await driveConnection(access.db, access.ownerId).catch(() => null);
-      return ok({ providers, drive: { available: driveOAuthReady(), connected: Boolean(drive), email: drive?.account_email || "" }, clients: access.clients, canUseAgency: access.canUseAgency, isAdmin: access.isAdmin });
+      const mine = await driveConnection(access.db, userDriveKey(access.userEmail)).catch(() => null);
+      const drive = mine || await driveConnection(access.db, access.ownerId).catch(() => null);
+      return ok({ providers, drive: { available: driveOAuthReady(), connected: Boolean(drive), email: drive?.account_email || "", mine: Boolean(mine) }, clients: access.clients, canUseAgency: access.canUseAgency, isAdmin: access.isAdmin });
     }
     const stock = url.searchParams.get("stock");
     if (stock !== null) {
@@ -177,12 +178,17 @@ export async function GET(request: Request) {
       if (scope === null) return reply("You don't have access to that client's media.", 403);
       filters.push(`scope_id = ?${binds.length + 1}`); binds.push(scope);
     }
+    const baseFilters = [...filters], baseBinds = [...binds];
     if (cursor) { filters.push(`created_at < ?${binds.length + 1}`); binds.push(cursor); }
     if (["image", "video", "document"].includes(kind)) { filters.push(`kind = ?${binds.length + 1}`); binds.push(kind); }
+    // Content calendar: filter by who uploaded it.
+    const by = (url.searchParams.get("createdBy") || "").slice(0, 160);
+    if (by) { filters.push(`created_by = ?${binds.length + 1}`); binds.push(by); }
     const rows = await access.db.prepare(`SELECT ${COLUMNS} FROM media_library_items WHERE ${filters.join(" AND ")} ORDER BY created_at DESC LIMIT ${MEDIA_PAGE_SIZE + 1}`).bind(...binds).all<Row>();
     const list = rows.results || [];
     const items = list.slice(0, MEDIA_PAGE_SIZE).map(toItem);
-    return ok({ items, nextCursor: list.length > MEDIA_PAGE_SIZE ? items[items.length - 1]?.createdAt || "" : "" });
+    const uploaders = url.searchParams.has("uploaders") ? ((await access.db.prepare(`SELECT created_by AS name, COUNT(*) AS n FROM media_library_items WHERE ${baseFilters.join(" AND ")} GROUP BY created_by ORDER BY n DESC LIMIT 50`).bind(...baseBinds).all<{ name: string; n: number }>()).results || []) : undefined;
+    return ok({ items, nextCursor: list.length > MEDIA_PAGE_SIZE ? items[items.length - 1]?.createdAt || "" : "", ...(uploaders ? { uploaders } : {}) });
   } catch (error) {
     return reply(error instanceof Error ? error.message : "The Media Library could not be loaded.", 502);
   }

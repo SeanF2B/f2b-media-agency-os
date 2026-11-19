@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import { getDisplayCurrency } from "@/lib/display-currency";
 import {
-  CalendarDays, CircleCheck, Crown, FileText, Globe, History, Image, LayoutDashboard, Mail, Megaphone,
+  CalendarDays, CalendarHeart, CircleCheck, Crown, FileText, Globe, History, Image, LayoutDashboard, Mail, Megaphone,
   MessageCircle, BookOpen, Receipt, ReceiptEuro, ReceiptPoundSterling, ReceiptText, Rocket, Search, Send, Settings, Smartphone, SquareKanban, TrendingUp, UserCog, UserPlus, Users, Workflow, Zap,
 } from "lucide-react";
 
@@ -19,6 +19,7 @@ const icons: Record<string, LucideIcon> = {
   Bookkeeping: BookOpen,
   Tasks: CircleCheck,
   Scheduling: CalendarDays,
+  Content: CalendarHeart,
   Operations: Workflow,
   Onboarding: UserPlus,
   Team: UserCog,

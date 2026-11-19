@@ -5,7 +5,7 @@ export function canOpenPage(page: string, permissions: TeamPermissions, isAdmin:
     : page === "Activity" || page === "Activity & Time" ? permissions.overview || permissions.timesheets || permissions.clientActivity || permissions.allActivity
     : page === "Clients" ? permissions.clients || hasClientScope
     : page === "Scheduling" ? isAdmin || permissions.scheduling
-    : page === "CRM" || page === "Conversations" ? isAdmin || (hasClientScope && (CRM_ROLES as readonly string[]).includes(role))
+    : page === "CRM" || page === "Conversations" || page === "Content" ? isAdmin || (hasClientScope && (CRM_ROLES as readonly string[]).includes(role))
     : page === "CRM Automations" || page === "Invoicing" || page === "Bookkeeping" ? isAdmin
     : page === "Tasks" ? permissions.tasks || permissions.aiTasks
     : page === "Operations" || page === "Operating World" || page === "Onboarding" ? isAdmin

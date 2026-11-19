@@ -79,4 +79,6 @@ export function metaSendMode(lastInAt: string | null | undefined, byStaff: boole
   return { ok: false, reason: byStaff ? "It's been more than 7 days since they last wrote. Meta won't deliver a reply until they message again." : "Outside the 24-hour window, so only a person can reply." };
 }
 
+/** Extra permissions asked for only when posting is switched on (Content calendar → Connect posting). */
+export const META_POSTING_SCOPES = ["pages_manage_posts", "instagram_content_publish"];
 export const META_MESSAGING_SCOPES = ["pages_show_list", "pages_messaging", "pages_manage_metadata", "pages_read_engagement", "business_management", "instagram_basic", "instagram_manage_messages"];

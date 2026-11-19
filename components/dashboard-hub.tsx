@@ -360,7 +360,7 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
             <Tile icon={<MousePointerClick size={18} />} label="Website clicks" value={bp?.websiteClicks != null ? num(bp.websiteClicks) : "—"}><Delta now={bp?.websiteClicks} before={bp?.previous?.websiteClicks} /></Tile>
           </div>
           {!bp && <p className="dh-muted">{L(m.businessNote || "Connect this client’s Google Business Profile to see views, calls and directions.")}</p>}
-          {!sample && clientId && clientId !== "all" && <GbpPosts clientId={clientId} businessName={clientOf(clientId)?.name || ""} onOpenCalendar={() => go("Operations:clients")} />}
+          {(sample || (clientId && clientId !== "all")) && <GbpPosts sample={sample} clientId={clientId} businessName={clientOf(clientId)?.name || "Your business"} onOpenCalendar={() => go("Content")} />}
       </section>
     </>; })()}
     {isAdmin && marketingPicked && m && m.scope !== "all" && <section className="panel dh-panel dh-sec-showup" aria-label="Where you show up" data-admin=""><div className="dh-head"><div><p className="eyebrow">🔎 {periodLabel.toUpperCase()}</p><h2>Where you show up</h2></div></div>

@@ -16,7 +16,7 @@ export function ensureMediaTables(db: D1Database) {
   return schemaReady;
 }
 
-export type MediaAccess = { db: D1Database; bucket: R2Bucket; ownerId: string; userLabel: string; isAdmin: boolean; clients: Array<{ id: string; name: string }>; allowedScopes: Set<string>; canUseAgency: boolean };
+export type MediaAccess = { db: D1Database; bucket: R2Bucket; ownerId: string; userLabel: string; userEmail: string; isAdmin: boolean; clients: Array<{ id: string; name: string }>; allowedScopes: Set<string>; canUseAgency: boolean };
 
 /** Owners/admins see every library. Other teammates see the clients they've been given (and the agency library only if unrestricted). */
 export async function mediaAccess(): Promise<{ response: Response } | { response?: never; access: MediaAccess }> {
@@ -50,7 +50,7 @@ export async function mediaAccess(): Promise<{ response: Response } | { response
   const allowedScopes = new Set<string>(allowedClients.map((client) => client.id));
   if (canUseAgency) allowedScopes.add("");
   await ensureMediaTables(env.DB);
-  return { access: { db: env.DB, bucket: env.BUCKET, ownerId, userLabel: member?.name || user.displayName || user.email, isAdmin, clients: allowedClients, allowedScopes, canUseAgency } };
+  return { access: { db: env.DB, bucket: env.BUCKET, ownerId, userLabel: member?.name || user.displayName || user.email, userEmail: email, isAdmin, clients: allowedClients, allowedScopes, canUseAgency } };
 }
 
 /** A stock-photo key pasted under Settings → API keys (named "Unsplash", "Pexels" or "Pixabay"), or a Worker secret. */
@@ -99,4 +99,11 @@ export async function driveAccessToken(db: D1Database, ownerId: string) {
   const result = await response.json() as { access_token?: string; error?: string };
   if (!response.ok || !result.access_token) throw new Error(result.error === "invalid_grant" ? "Google Drive access expired — reconnect Google Drive." : "Google Drive could not refresh its access. Try reconnecting.");
   return result.access_token;
+}
+
+/** Each person can connect their own Google Drive (stored under "user:<email>"); falls back to the agency Drive. */
+export const userDriveKey = (email: string) => `user:${email.toLowerCase()}`;
+export async function driveTokenFor(db: D1Database, ownerId: string, email: string) {
+  const own = email ? await driveAccessToken(db, userDriveKey(email)).catch(() => null) : null;
+  return own || await driveAccessToken(db, ownerId);
 }
