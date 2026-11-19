@@ -121,7 +121,7 @@ export function PageDrill({ kind, clientId, start, end, currency = "EUR", onClos
                 {targets.map((t) => <tr key={`t-${t}`}><td>{t} <small>· target, no Google data yet</small></td><td>—</td><td>—</td><td>—</td><td>—</td></tr>)}
               </tbody></table> : <p className="dh-muted">No Google searches for this page in this period yet. Set a target keyword below.</p>}<KeywordEditor page={p} clientId={clientId} onSaved={(x) => patchPage(p.path, x)} /></details>; })()}
             <details className="pd-dd"><summary>Meta details <small>{[!p.title && "no title", !p.description && "no description", p.title.length > 60 && "title too long", p.description.length > 160 && "description too long"].filter(Boolean).join(" · ") || "title · description · H1"}</small></summary>
-              <div className="pd-serp"><small>{(() => { try { return new URL(p.url).hostname.replace(/^www\./, "") + p.path; } catch { return p.path; } })()}</small><b>{p.title || "No title tag"}</b><p>{p.description || "No meta description"}</p></div>
+              <a className="pd-serp" href={p.url} target="_blank" rel="noreferrer" title="Open page in a new tab"><small>{(() => { try { return new URL(p.url).hostname.replace(/^www\./, "") + p.path; } catch { return p.path; } })()} ↗</small><b>{p.title || "No title tag"}</b><p>{p.description || "No meta description"}</p></a>
               <Field label="Meta title" value={p.title} max={60} />
                 <Field label="Meta description" value={p.description} max={160} />
                 <Field label="H1" value={p.h1} />
@@ -171,7 +171,7 @@ export function PageDrill({ kind, clientId, start, end, currency = "EUR", onClos
               <span className={tone(k.position)}>{k.position != null ? `#${k.position}` : "—"}</span><span>{n(k.clicks)}</span><span>{n(k.impressions)}</span><span>{k.impressions ? `${n(k.clicks / k.impressions * 100)}%` : "—"}</span>
             </button>
             {isOpen && <div className="pd-body">{k.pages.map(({ page: pg, clicks, impressions, position }) => <div key={pg.path} className="pd-kwpage">
-              <div className="pd-serp"><small>{(() => { try { return new URL(pg.url).hostname.replace(/^www\./, "") + pg.path; } catch { return pg.path; } })()}</small><b>{pg.title || "No title tag"}</b><p>{pg.description || "No meta description"}</p></div>
+              <a className="pd-serp" href={pg.url} target="_blank" rel="noreferrer" title="Open page in a new tab"><small>{(() => { try { return new URL(pg.url).hostname.replace(/^www\./, "") + pg.path; } catch { return pg.path; } })()} ↗</small><b>{pg.title || "No title tag"}</b><p>{pg.description || "No meta description"}</p></a>
               <div className="pd-cols">
                 <div><Field label="Meta title" value={pg.title} max={60} /><Field label="Meta description" value={pg.description} max={160} /><Field label="H1" value={pg.h1} />
                   <div className="pd-mini"><span>Target keyword: <b>{pg.targetKeyword || "—"}</b></span>{pg.title && !pg.title.toLowerCase().includes(k.term.toLowerCase()) && <span className="bad">Keyword not in title</span>}<a href={pg.url} target="_blank" rel="noreferrer">Open page ↗</a></div></div>
@@ -283,7 +283,9 @@ html.dark .pd .pd-ad-preview b,[data-theme=dark] .pd .pd-ad-preview b{color:#8ab
 .pd .pd-kw .pd-row{grid-template-columns:minmax(0,1fr) repeat(4,72px)}
 .pd .pd-kwpage{display:flex;flex-direction:column;gap:10px;padding-bottom:12px;border-bottom:1px dashed rgba(127,127,127,.2)}
 .pd .pd-kwpage:last-child{border-bottom:0;padding-bottom:0}
-.pd .pd-serp{padding:10px 12px;border-radius:10px;background:rgba(127,127,127,.06);max-width:640px}
+.pd .pd-serp{display:block;padding:10px 12px;border-radius:10px;background:rgba(127,127,127,.06);max-width:640px;color:inherit;text-decoration:none;cursor:pointer;transition:transform .15s,box-shadow .15s,background .15s}
+.pd .pd-serp:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(0,0,0,.08);background:rgba(127,127,127,.1)}
+.pd .pd-serp:hover b{text-decoration:underline}
 .pd .pd-serp small{font-size:12px;opacity:.7}
 .pd .pd-serp b{display:block;color:#1a0dab;font-size:17px;font-weight:500;margin:2px 0;line-height:1.3}
 .pd .pd-serp p{margin:0;font-size:13px;opacity:.85;line-height:1.45}
