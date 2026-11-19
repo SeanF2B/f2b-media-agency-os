@@ -207,7 +207,16 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
           const overall = (() => {
             const days = periodStart && periodEnd ? Math.max(1, Math.round((Date.parse(periodEnd) - Date.parse(periodStart)) / 86_400_000) + 1) : 30;
             const monthlyFee = (clientOf(clientId)?.services || []).reduce((t, x) => t + (Number(x.fee) || 0), 0);
-            const fee = sample ? 750 : Math.round(monthlyFee * Math.min(12, days / 30.44) * 100) / 100;
+            // Fees are billed per calendar month: a period starting on the 1st (This month, Last month, quarters)
+            // carries the full fee for every month it touches; other ranges (e.g. Last 7 days) are pro-rated.
+            const months = (() => {
+              if (!periodStart || !periodEnd) return days / 30.44;
+              const a = new Date(`${periodStart}T12:00:00Z`), b = new Date(`${periodEnd}T12:00:00Z`);
+              if (a.getUTCDate() !== 1) return days / 30.44;
+              return (b.getUTCFullYear() - a.getUTCFullYear()) * 12 + b.getUTCMonth() - a.getUTCMonth() + 1;
+            })();
+            const fullMonths = Number.isInteger(months);
+            const fee = sample ? 750 : Math.round(monthlyFee * Math.min(12, months) * 100) / 100;
             const orgClicks = (m.gsc && !m.gsc.error ? m.gsc.clicks : sp?.organic.clicks) ?? 0;
             const clicks = orgClicks + (sp?.paid.clicks ?? m.adClicks?.value ?? 0) + (m.meta?.clicks || 0);
             const adSpend = (m.adSpend?.value || 0) + (m.meta?.spend || 0);
@@ -216,7 +225,7 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
             const total = adSpend + fee, won = sales?.wonValue ?? null;
             const roi = won != null && total > 0 ? Math.round((won - total) / total * 100) : null;
             const ret = won != null && total > 0 ? won / total : null;
-            return { fee, monthlyFee, clicks, adSpend, conversions, leads, total, won, roi, ret, value: sales?.value ?? null };
+            return { fee, monthlyFee, months, fullMonths, clicks, adSpend, conversions, leads, total, won, roi, ret, value: sales?.value ?? null };
           })();
           const O = ({ label, value, tone = "", hint }: { label: string; value: string; tone?: string; hint?: string }) => <div className={`dh-ov ${tone}`} title={hint}><small>{label}</small><b>{value}</b>{hint && <em>{hint}</em>}</div>;
           return <><div className="dh-overall" aria-label="Overall performance">
@@ -227,7 +236,7 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
               <O label="Conversions" value={v(overall.conversions)} hint="Ad conversions, Meta leads, organic leads & calls" />
               <O label="Clicks" value={v(overall.clicks)} hint="Organic + Google Ads + Meta" />
               <O label="Ad spend" value={money(overall.adSpend, cur)} tone="expense" hint="Google + Meta" />
-              <O label="F2B service fee" value={money(overall.fee, cur)} tone="expense" hint={overall.monthlyFee ? `${money(overall.monthlyFee, cur)}/mo, pro-rated` : "No service fee on this client"} />
+              <O label="F2B service fee" value={money(overall.fee, cur)} tone="expense" hint={overall.monthlyFee ? (overall.fullMonths ? `${money(overall.monthlyFee, cur)}/mo × ${overall.months} month${overall.months === 1 ? "" : "s"}` : `${money(overall.monthlyFee, cur)}/mo, pro-rated to ${Math.round(overall.months * 30.44)} days`) : "No service fee on this client"} />
               <O label="Total cost" value={money(overall.total, cur)} tone="expense" hint="Ad spend + service fee" />
               <O label="Won revenue" value={overall.won != null ? money(overall.won, cur) : "—"} tone={(overall.won || 0) > 0 ? "good" : ""} hint="Actual" />
               <O label="Return" value={overall.ret != null ? `${overall.ret.toFixed(1)}×` : "—"} tone={overall.ret == null ? "" : overall.ret >= 1 ? "good" : "expense"} hint="Won ÷ total cost" />
