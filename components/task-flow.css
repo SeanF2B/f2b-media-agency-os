@@ -108,3 +108,6 @@
 .app-shell.dark-mode .tfa-ask, .app-shell.dark-mode .tfa-file { background: #171c20; border-color: #333d45; }
 .app-shell.dark-mode .tfa-ask textarea, .app-shell.dark-mode .tfa-note { background: #20272d; border-color: #3c4850; }
 @media (max-width: 640px) { .tfa-grid { grid-template-columns: 1fr 1fr; gap: 10px; } .tfa-sum { display: none; } .tfa-src { display: none; } }
+.tfa-modal .tf-title b { font-size: 15px; }
+.tfa-modal .tf-title small { color: #667085 !important; opacity: 1 !important; font-size: 12.5px; }
+.app-shell.dark-mode .tfa-modal .tf-title small { color: #a9b4bc !important; }

@@ -118,7 +118,9 @@ export function TaskApprovalsPanel({ tasks, clients, staff, canDecide, busyTaskI
     // Older requests may only hold a status line; prefer the agent's actual draft when it posted one.
     const agentDraft = requestTextFromTask(task);
     const original = agentDraft && !request.request.includes(agentDraft.slice(0, 60)) ? agentDraft : request.request;
-    const summary = shorten(tidy(original) || tidy(request.reason) || task.title);
+    // Don't repeat the title in the one-line summary.
+    const stripTitle = (text: string) => { const t = task.title.trim(); return t && text.toLowerCase().startsWith(t.toLowerCase()) ? text.slice(t.length).replace(/^[\s:.\-–·>]+/, "") : text; };
+    const summary = shorten(stripTitle(tidy(original)) || stripTitle(tidy(request.reason)) || "Needs your OK");
     const reason = tidy(request.reason);
     return { request, client, assignee, original, summary, reason };
   };
