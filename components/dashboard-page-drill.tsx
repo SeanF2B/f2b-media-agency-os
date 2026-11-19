@@ -121,11 +121,11 @@ export function PageDrill({ kind, clientId, start, end, currency = "EUR", onClos
       const rows = (data.pages as OrgPage[]).filter((p) => !term || `${p.path} ${p.title} ${p.description} ${p.targetKeyword} ${p.queries.map((x) => x.query).join(" ")}`.toLowerCase().includes(term));
       if (!rows.length) return <p className="dh-muted">No pages found.</p>;
       return <div className="pd-list">
-        <div className="pd-row pd-headrow"><span>Page</span><span>Clicks</span><span>Impr.</span><span>Pos.</span><span>Visits</span><span>Calls</span><span>Leads</span><span>Conv.</span></div>
+        <div className="pd-row pd-headrow pd-org"><span>Page</span><span>Clicks</span><span>Impr.</span><span title="Click-through rate: clicks ÷ impressions">CTR</span><span>Pos.</span><span>Visits</span><span>Calls</span><span>Leads</span><span>Conv.</span></div>
         {rows.map((p) => { const isOpen = open === p.path; return <div key={p.path} className={`pd-item ${isOpen ? "open" : ""}`}>
-          <button type="button" className="pd-row" onClick={() => setOpen(isOpen ? "" : p.path)} aria-expanded={isOpen}>
+          <button type="button" className="pd-row pd-org" onClick={() => setOpen(isOpen ? "" : p.path)} aria-expanded={isOpen}>
             <span className="pd-page"><i>{isOpen ? "▾" : "▸"}</i><b>{p.path}</b><small>{p.queries.length ? `${p.queries.length} keyword${p.queries.length === 1 ? "" : "s"} · ` : ""}{p.title || "No title tag"}</small></span>
-            <span>{n(p.clicks)}</span><span>{n(p.impressions)}</span><span>{p.position != null ? `#${p.position}` : "—"}</span><span>{n(p.visits)}</span><span className={p.calls ? "good" : ""}>{n(p.calls)}</span><span className={p.leads ? "good" : ""}>{n(p.leads)}</span><span>{n(p.conversions)}</span>
+            <span>{n(p.clicks)}</span><span>{n(p.impressions)}</span><span>{p.ctr != null ? `${p.ctr}%` : "—"}</span><span>{p.position != null ? `#${p.position}` : "—"}</span><span>{n(p.visits)}</span><span className={p.calls ? "good" : ""}>{n(p.calls)}</span><span className={p.leads ? "good" : ""}>{n(p.leads)}</span><span>{n(p.conversions)}</span>
           </button>
           {isOpen && <div className="pd-body">
             {(() => { const targets = [p.targetKeyword, ...String(p.supportingKeywords || "").split(/[,\n]/)].map((x) => x.trim()).filter((t) => t && !p.queries.some((x) => x.query.toLowerCase() === t.toLowerCase()));
@@ -251,8 +251,8 @@ const CSS = `
 .pd .pd-row{display:grid;grid-template-columns:minmax(0,1fr) repeat(7,72px);gap:8px;align-items:center;width:100%;padding:9px 6px;border:0;border-bottom:1px solid rgba(127,127,127,.12);background:transparent;color:inherit;font:inherit;font-size:13px;text-align:right;cursor:pointer}
 .pd .pd-row>span:first-child{text-align:left}
 .pd button.pd-row:hover{background:rgba(127,127,127,.06)}
-.pd .pd-headrow{cursor:default;font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding-top:8px;position:sticky;top:0;z-index:4;background:var(--f2b-white,#fff);color:color-mix(in srgb,currentColor 60%,transparent);box-shadow:0 1px 0 rgba(127,127,127,.18)}
-html.dark .pd .pd-headrow,body.f2b-dark .pd .pd-headrow,.dark-mode .pd .pd-headrow{background:#1b2127}
+.pd .pd-headrow{cursor:default;font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding-top:8px;position:sticky;top:0;z-index:4;background:var(--f2b-white,#fff);color:color-mix(in srgb,currentColor 60%,transparent);box-shadow:0 1px 0 rgba(127,127,127,.18),0 -24px 0 var(--f2b-white,#fff)}
+html.dark .pd .pd-headrow,body.f2b-dark .pd .pd-headrow,.dark-mode .pd .pd-headrow{background:#1b2127;box-shadow:0 1px 0 rgba(255,255,255,.12),0 -24px 0 #1b2127}
 .pd .pd-page{display:flex;align-items:baseline;gap:8px;min-width:0}
 .pd .pd-page i{font-style:normal;opacity:.5;width:10px}
 .pd .pd-page b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:45%}
@@ -298,6 +298,7 @@ html.dark .pd .pd-headrow,body.f2b-dark .pd .pd-headrow,.dark-mode .pd .pd-headr
 .pd .pd-onpage{margin:0 0 10px}
 .pd .pd-onpage span{font-weight:600}
 html.dark .pd .pd-ad-preview b,[data-theme=dark] .pd .pd-ad-preview b{color:#8ab4f8}
+.pd .pd-org.pd-row{grid-template-columns:minmax(0,1fr) repeat(8,66px)}
 .pd .pd-kw .pd-row{grid-template-columns:minmax(0,1fr) repeat(4,72px)}
 .pd .pd-kwpage{display:flex;flex-direction:column;gap:10px;padding-bottom:12px;border-bottom:1px dashed rgba(127,127,127,.2)}
 .pd .pd-kwpage:last-child{border-bottom:0;padding-bottom:0}
