@@ -83,7 +83,7 @@ import { useSampleData } from "@/hooks/use-sample-data";
 import { Building2 as Building2Icon, KeyRound as KeyRoundIcon, CreditCard as CreditCardIcon, Rocket as RocketIcon, CalendarDays as CalendarDaysIcon, Image as ImageNavIcon, Ban as BanLucide, Briefcase as BriefcaseIcon, Info as InfoLucide, MapPin as MapPinLucide, Search as SearchLucide, Target as TargetLucide, CircleCheck as CircleCheckIcon, Lightbulb as LightbulbIcon, Copy as CopyLucide, Paperclip, Factory as FactoryIcon, Send as SendIcon, Pencil as PencilLucide, Trash2 as Trash2Lucide, MessageSquareText as MessageSquareTextIcon, SquareKanban as SquareKanbanIcon, Users as UsersIcon, FileText as FileTextNavIcon, BookOpen as BookOpenNavIcon, Wallet as WalletNavIcon, Settings as SettingsNavIcon } from "lucide-react";
 import { applyBranding, extractLogoColours, useBranding, type Branding } from "@/lib/branding";
 import { approvalEvidenceBlockReason, canCloseAiTask, canResumeAiTaskRun, hasRunnablePendingApproval, isApprovalReady } from "@/lib/ai-task-lifecycle";
-import { BOARD_COLUMNS, approveTask, boardColumn, completeTask, hasLaterOccurrence, moveToPending, needsOwnerDecision, rejectTask, sendBackFromHistory, type TaskApprovalRequest, type TaskHistoryEvent, flowPendingReason, isLiveRun } from "@/lib/task-flow";
+import { BOARD_COLUMNS, approveTask, boardColumn, completeTask, hasLaterOccurrence, moveToPending, needsOwnerDecision, rejectTask, sendBackFromHistory, type TaskApprovalRequest, type TaskHistoryEvent, flowPendingReason, isLiveRun, isStalledStart } from "@/lib/task-flow";
 import { TaskApprovalsPanel, TaskFlowCardMeta, TaskHistoryPanel } from "@/components/task-flow-panels";
 import { agentIconFor, withAgentIcon } from "@/lib/agent-icons";
 import { GOOGLE_ADS_TASK_TEMPLATES, RETIRED_GOOGLE_ADS_TASK_TEMPLATE_IDS, defaultGoogleAdsTaskSettings, googleAdsTemplateEnabled, nextGoogleAdsTemplateDate, type GoogleAdsTaskSettings } from "@/lib/google-ads-task-templates";
@@ -5048,6 +5048,8 @@ function TasksView({ onQuickAdd, scopeClientId = "", workspace, activeTimer, tim
   const [pendingReasonDraft, setPendingReasonDraft] = useState("");
   const [pendingReasonTargetStatus, setPendingReasonTargetStatus] = useState("");
   const pendingReasonFor = (task: Task) => {
+    // Approved / started but no AI picked it up: one clear reason naming the agent.
+    if (isAiAssignedTask(task) && isStalledStart(task)) return flowPendingReason(task, workspace.staff.find((member) => member.id === task.assigneeId)?.name || "The AI");
     if (task.pendingReason?.trim()) return friendlyAiTaskReason(task.pendingReason);
     const pendingApprovals = (task.aiApprovals || []).filter((approval) => approval.status === "pending");
     if (pendingApprovals.length) return `Waiting for approval on ${pendingApprovals.length} proposed change${pendingApprovals.length === 1 ? "" : "s"}.`;

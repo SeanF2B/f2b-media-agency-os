@@ -64,7 +64,7 @@ export function TaskFlowCardMeta({ task, botIds, agentName = "The AI" }: { task:
       <span>📨 Awaiting your approval · {mail === "sent" ? "emailed" : mail === "failed" ? "email failed" : "in Approvals"}</span>
     </div>;
   }
-  if (column === "pending" && ai && isStalledStart(task)) return <div className="tf-card-meta is-stalled"><span>⚠️ {flowPendingReason(task, agentName)}</span></div>;
+  // Stalled starts: the card's Pending reason line already says it — no duplicate strip.
   if (column === "done" && ai && activeTimeMs(task) > 0) return <div className="tf-card-meta is-done"><span>⏱ Active {formatDuration(activeTimeMs(task))}</span></div>;
   return null;
 }
