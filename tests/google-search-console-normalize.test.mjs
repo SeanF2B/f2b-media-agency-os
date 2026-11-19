@@ -21,3 +21,8 @@ test("Search Console rows preserve date, query and page dimensions with numeric 
     date: "2026-10-22", query: "roofer galway", page: "https://example.ie/roofing", clicks: 8, impressions: 120, ctr: 0.066, position: 4.2,
   }]);
 });
+
+test("Search Console rows are read from Google's { rows: [...] } response", () => {
+  assert.equal(normalizeSearchConsoleRows({ rows: [{ keys: ["2026-11-10", "roof repair galway", "https://example.ie/"], clicks: 3, impressions: 40, ctr: 0.075, position: 5.2 }] }, "sc-domain:example.ie").length, 1);
+  assert.deepEqual(normalizeSearchConsoleRows({ responseAggregationType: "byPage" }, "x"), []);
+});

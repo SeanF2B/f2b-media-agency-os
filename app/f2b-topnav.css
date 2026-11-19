@@ -3510,3 +3510,20 @@ html body .app-shell.dark-mode .tt-owner-toggle .tt-owner-caret { color: #e6edf2
 @media (max-width: 760px) { .tt-row-nested td:nth-child(2) { padding-left: 10px !important; } .tt-owner-toggle { padding-left: 4px; } }
 html body .app-shell .tt-owner-toggle .avatar, html body .app-shell .tt-owner .avatar.tt-avatar { flex: 0 0 auto !important; aspect-ratio: 1 / 1; padding: 0 !important; max-width: none; background-size: cover !important; background-position: center !important; background-repeat: no-repeat !important; border-radius: 50% !important; }
 html body .app-shell .tt-owner-toggle .avatar { width: 24px !important; height: 24px !important; min-width: 24px !important; min-height: 24px !important; }
+
+/* Books → Staff hours & earnings: the fold arrow sits inside the card's top-right corner (it used to float above the box) */
+html body .app-shell .books-staff-hours { position: relative; }
+html body .app-shell .books-staff-hours-close { position: absolute; top: 14px; right: 14px; z-index: 3; display: inline-grid; place-items: center; width: 30px; height: 30px; margin: 0; padding: 0; border-radius: 999px; border: 1px solid rgba(127,127,127,.22); background: var(--f2b-white, #fff); color: inherit; cursor: pointer; box-shadow: none; transition: transform .15s, border-color .15s; }
+html body .app-shell .books-staff-hours-close:hover { transform: translateY(-1px); border-color: var(--brand-primary, #101828); }
+html body .app-shell.dark-mode .books-staff-hours-close, body.f2b-dark .app-shell .books-staff-hours-close { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.16); }
+html body .app-shell .books-staff-hours.open .sch-earn-head { padding-right: 44px; }
+html body .app-shell .books-staff-hours-bar { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 10px; text-align: left; cursor: pointer; }
+html body .app-shell .books-staff-hours-bar > svg { flex: none; }
+@media (max-width: 860px) { html body .app-shell .books-staff-hours-close { top: 10px; right: 10px; } html body .app-shell .books-staff-hours.open .sch-earn-head { padding-right: 40px; } }
+
+/* Dashboard → Reviews & Google Business / Where you show up: section headings that fold open */
+html body .app-shell button.dh-sub.dh-fold { display: flex; align-items: baseline; gap: 8px; width: 100%; margin: 16px 0 8px; padding: 10px 14px; border: 1px solid rgba(127,127,127,.18); border-radius: 14px; background: color-mix(in srgb, currentColor 3%, transparent); color: inherit; font: inherit; font-size: 15px; font-weight: 800; text-align: left; cursor: pointer; transition: transform .15s, border-color .15s; }
+html body .app-shell button.dh-sub.dh-fold:hover { transform: translateY(-1px); border-color: var(--brand-primary, #101828); }
+html body .app-shell button.dh-sub.dh-fold small { font-size: 12.5px; font-weight: 500; opacity: .65; }
+html body .app-shell button.dh-sub.dh-fold .dh-fold-chev { font-size: 10px; opacity: .6; flex: none; }
+html body .app-shell button.dh-sub.dh-fold.open { margin-bottom: 10px; }
