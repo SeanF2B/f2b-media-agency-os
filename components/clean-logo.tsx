@@ -171,3 +171,85 @@ export function DarkLogoFixer({ dark }: { dark: boolean }) {
   }, [dark]);
   return null;
 }
+
+// ---------- Agency logo on the top bar: never a box behind it ----------
+// Removes a baked-in card of ANY flat colour (e.g. a navy rounded rectangle), not just white, then crops to the artwork.
+// On a light bar, light/white lettering is turned dark so it stays readable; brand colours (the blue icon) are kept.
+const barCache = new Map<string, Promise<string>>();
+export function barReadyLogo(src: string, dark: boolean): Promise<string> {
+  const key = `${dark ? "d" : "l"}|${src}`;
+  const hit = barCache.get(key); if (hit) return hit;
+  const job = (async () => {
+    const img = await loadImage(src);
+    const scale = Math.min(1, 640 / Math.max(img.naturalWidth || 1, img.naturalHeight || 1));
+    const w = Math.max(1, Math.round(img.naturalWidth * scale)), h = Math.max(1, Math.round(img.naturalHeight * scale));
+    const canvas = document.createElement("canvas"); canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true }); if (!ctx) return src;
+    ctx.drawImage(img, 0, 0, w, h);
+    const data = ctx.getImageData(0, 0, w, h); const px = data.data;
+    const at = (x: number, y: number) => (y * w + x) * 4;
+    // Card colour: opaque points just inside the edges that all agree (works for square cards and rounded ones with transparent corners).
+    const ix = Math.max(1, Math.round(w * 0.04)), iy = Math.max(1, Math.round(h * 0.06));
+    const probes = [at(0, 0), at(w - 1, 0), at(0, h - 1), at(w - 1, h - 1), at(ix, iy), at(w - 1 - ix, iy), at(ix, h - 1 - iy), at(w - 1 - ix, h - 1 - iy), at(ix, h >> 1), at(w - 1 - ix, h >> 1)].filter((i) => px[i + 3] > 200);
+    let removed = false;
+    if (probes.length >= 4) {
+      const [br, bg, bb] = [0, 1, 2].map((c) => { const v = probes.map((i) => px[i + c]).sort((a, b) => a - b); return v[v.length >> 1]; });
+      const dist = (i: number) => Math.max(Math.abs(px[i] - br), Math.abs(px[i + 1] - bg), Math.abs(px[i + 2] - bb));
+      if (probes.filter((i) => dist(i) < 28).length >= 4) {
+        const seen = new Uint8Array(w * h); const stack: number[] = [];
+        for (let x = 0; x < w; x++) stack.push(x, (h - 1) * w + x);
+        for (let y = 0; y < h; y++) stack.push(y * w, y * w + w - 1);
+        let cleared = 0;
+        while (stack.length) {
+          const p = stack.pop()!; if (seen[p]) continue; seen[p] = 1;
+          const i = p * 4;
+          if (px[i + 3] < 200) { px[i + 3] = 0; cleared++; } // transparent corners / anti-aliased card edge
+          else { const d = dist(i); if (d > 48) continue; px[i + 3] = d < 22 ? 0 : Math.round(px[i + 3] * ((d - 22) / 26)); cleared++; }
+          const x = p % w, y = (p / w) | 0;
+          if (x > 0) stack.push(p - 1); if (x < w - 1) stack.push(p + 1); if (y > 0) stack.push(p - w); if (y < h - 1) stack.push(p + w);
+        }
+        removed = cleared > w * h * 0.05 && cleared < w * h * 0.995;
+        if (!removed) ctx.drawImage(img, 0, 0, w, h); // would erase everything: keep the original
+      }
+    }
+    const pixels = removed ? data : ctx.getImageData(0, 0, w, h); const q = pixels.data;
+    if (!dark && removed) {
+      // Light bar: white / pale grey lettering (made for the dark card) becomes dark ink. Light shapes enclosed by colour
+      // (e.g. white bars inside the blue icon) are left alone; only light shapes that sit on the now-transparent area change.
+      const isLight = (i: number) => { if (q[i + 3] < 24) return false; const r = q[i], g = q[i + 1], b = q[i + 2]; return Math.max(r, g, b) - Math.min(r, g, b) < 60 && 0.2126 * r + 0.7152 * g + 0.0722 * b > 150; };
+      const done = new Uint8Array(w * h);
+      for (let start = 0; start < w * h; start++) {
+        if (done[start] || !isLight(start * 4)) continue;
+        const comp: number[] = []; const st = [start]; done[start] = 1; let open = false;
+        while (st.length) {
+          const p = st.pop()!; comp.push(p);
+          const x = p % w, y = (p / w) | 0;
+          for (const [nx, ny] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]) {
+            if (nx < 0 || ny < 0 || nx >= w || ny >= h) { open = true; continue; }
+            const n = ny * w + nx, ni = n * 4;
+            if (q[ni + 3] < 24) { open = true; continue; }
+            if (!done[n] && isLight(ni)) { done[n] = 1; st.push(n); }
+          }
+        }
+        if (!open) continue;
+        for (const p of comp) { const i = p * 4, lum = 0.2126 * q[i] + 0.7152 * q[i + 1] + 0.0722 * q[i + 2]; const v = Math.round(16 + (255 - lum) * 0.4); q[i] = v; q[i + 1] = v + 8; q[i + 2] = v + 16; }
+      }
+    }
+    ctx.putImageData(pixels, 0, 0);
+    // Crop to the visible artwork.
+    let x0 = w, y0 = h, x1 = -1, y1 = -1;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (q[at(x, y) + 3] > 16) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    if (x1 < 0) return src;
+    const out = document.createElement("canvas"); out.width = x1 - x0 + 1; out.height = y1 - y0 + 1;
+    out.getContext("2d")!.drawImage(canvas, x0, y0, out.width, out.height, 0, 0, out.width, out.height);
+    return out.toDataURL("image/png");
+  })().catch(() => src);
+  barCache.set(key, job);
+  return job;
+}
+export function BarLogo({ src, dark, alt, className }: { src: string; dark: boolean; alt: string; className?: string }) {
+  const [out, setOut] = useState("");
+  useEffect(() => { let live = true; setOut(""); void barReadyLogo(src, dark).then((r) => { if (live) setOut(r); }); return () => { live = false; }; }, [src, dark]);
+  // Nothing until the cleaned copy is ready, so the boxed version never flashes.
+  return out ? <img className={className} src={out} alt={alt} /> : <span className={className} aria-label={alt} />;
+}

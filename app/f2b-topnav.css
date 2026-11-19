@@ -3554,3 +3554,10 @@ html body .wa-open-button { background: var(--f2b-white, #fff) !important; color
 html body .wa-open-button:hover { box-shadow: 0 4px 12px rgba(16,24,40,.08) !important; border-color: var(--brand-secondary, var(--brand-primary, #1479b8)) !important; }
 html body .wa-open-button .brand-icon, html body .wa-open-button .ch-icon-fb { flex: none; }
 html body .app-shell.dark-mode .wa-open-button { background: #2a3238 !important; color: #f1f5f7 !important; border-color: #3c4850 !important; }
+
+/* Agency logo on the top bar: no box behind it (card stripped in code), sized by its own shape */
+html body .app-shell .tn-logo:has(.brand-bar-logo), html body .app-shell .tn-side-head:has(.brand-bar-logo) .brand-lockup { background: transparent !important; box-shadow: none !important; border: 0 !important; padding: 0 !important; }
+html body .app-shell .tn-logo:has(.brand-bar-logo) { width: auto !important; min-width: 0 !important; overflow: visible !important; }
+html body .app-shell .brand-lockup.sidebar-logo:has(.brand-bar-logo) { width: auto !important; flex: 0 0 auto !important; }
+html body .app-shell .brand-icon-image.brand-bar-logo { width: auto !important; height: 34px !important; max-width: 150px !important; object-fit: contain; display: block; }
+@media (max-width: 860px) { html body .app-shell .brand-icon-image.brand-bar-logo { height: 28px !important; max-width: 110px !important; } }
