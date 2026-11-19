@@ -120,7 +120,7 @@ export function PageDrill({ kind, clientId, start, end, currency = "EUR", onClos
                 {p.queries.map((x) => <tr key={x.query}><td>{x.query}</td><td className={x.position == null ? "" : x.position <= 3 ? "good" : x.position > 10 ? "bad" : ""}>{x.position != null ? `#${x.position}` : "—"}</td><td>{n(x.clicks)}</td><td>{n(x.impressions)}</td><td>{x.impressions ? `${n(x.clicks / x.impressions * 100)}%` : "—"}</td></tr>)}
                 {targets.map((t) => <tr key={`t-${t}`}><td>{t} <small>· target, no Google data yet</small></td><td>—</td><td>—</td><td>—</td><td>—</td></tr>)}
               </tbody></table> : <p className="dh-muted">No Google searches for this page in this period yet. Set a target keyword below.</p>}<KeywordEditor page={p} clientId={clientId} onSaved={(x) => patchPage(p.path, x)} /></details>; })()}
-            <details className="pd-dd"><summary>Meta details <small>{[!p.title && "no title", !p.description && "no description", p.title.length > 60 && "title too long", p.description.length > 160 && "description too long"].filter(Boolean).join(" · ") || "title · description · H1"}</small></summary>
+            <details className="pd-dd" open><summary>Meta details <small>{[!p.title && "no title", !p.description && "no description", p.title.length > 60 && "title too long", p.description.length > 160 && "description too long"].filter(Boolean).join(" · ") || "title · description · H1"}</small></summary>
               <a className="pd-serp" href={p.url} target="_blank" rel="noreferrer" title="Open page in a new tab"><small>{(() => { try { return new URL(p.url).hostname.replace(/^www\./, "") + p.path; } catch { return p.path; } })()} ↗</small><b>{p.title || "No title tag"}</b><p>{p.description || "No meta description"}</p></a>
               <Field label="Meta title" value={p.title} max={60} />
                 <Field label="Meta description" value={p.description} max={160} />
@@ -306,12 +306,12 @@ html.dark .pd .pd-serp b,[data-theme=dark] .pd .pd-serp b{color:#8ab4f8}
 .pd .pd-edit label{display:flex;flex-direction:column;gap:4px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;opacity:.9}
 .pd .pd-edit label em{font-style:normal;opacity:.7;text-transform:none}.pd .pd-edit label em.warn{color:#b45309;opacity:1}
 .pd .pd-edit input,.pd .pd-edit textarea{font:inherit;font-size:13px;text-transform:none;letter-spacing:0;padding:8px 10px;border-radius:10px;border:1px solid rgba(127,127,127,.25);background:transparent;color:inherit;resize:vertical;transition:border-color .15s,transform .15s,box-shadow .15s}
-.pd .pd-edit input:hover,.pd .pd-edit textarea:hover{border-color:var(--secondary,#c81e1e);transform:translateY(-1px)}
+.pd .pd-edit input:hover,.pd .pd-edit textarea:hover{border-color:var(--brand-primary,#101828);transform:translateY(-1px)}
 .pd .pd-edit-foot{display:flex;align-items:center;gap:10px}
 .pd .pd-edit-foot small{font-size:12px;opacity:.75}
-.pd .pd-btn{padding:7px 14px;border-radius:999px;border:0;background:var(--primary,#c81e1e);color:#fff;font:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:transform .15s,box-shadow .15s}
+html body .pd .pd-btn{padding:7px 14px;border-radius:999px;border:0;background:var(--brand-primary,#101828) !important;color:#fff !important;-webkit-text-fill-color:#fff !important;font:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:transform .15s,box-shadow .15s}
 .pd .pd-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.15)}
-.pd .pd-btn:disabled{opacity:.5;cursor:default}
+html body .pd .pd-btn:disabled{opacity:.45;cursor:default}
 @media (max-width:900px){.pd .pd-edit-row{grid-template-columns:1fr}}
 @media (max-width:900px){.pd .pd-row{grid-template-columns:minmax(0,1fr) repeat(3,56px)}.pd .pd-row>span:nth-child(n+5){display:none}.pd .pd-cols{grid-template-columns:1fr}.pd .pd-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.pd .pd-kw .pd-row>span:nth-child(n+5){display:none}.pd .pd-page{flex-direction:column;gap:0}.pd .pd-page b{max-width:100%}}
 `;
