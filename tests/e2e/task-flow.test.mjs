@@ -256,3 +256,14 @@ test("Runs left 'running' for days (like the ones on the live board) are moved t
   assert.equal(readTask("t-live").aiRunState, "running", "a genuinely live run is left alone");
   assert.equal(flow.boardColumn(readTask("t-live"), botIds), "in_progress");
 });
+
+test("If another process re-opens a waiting task as 'running', the scheduler puts it straight back in Pending (no new email)", async () => {
+  const data = readWorkspace(); const t = data.tasks.find((x) => x.id === "t-stuck");
+  writeTask({ ...t, status: "In progress", aiRunState: "running", aiRunStartedAt: new Date().toISOString(), aiProgressAt: new Date().toISOString() });
+  assert.equal(flow.boardColumn(readTask("t-stuck"), botIds), "pending");
+  const before = emails.length;
+  await processDueAiTasks(env, new Date());
+  assert.equal(readTask("t-stuck").status, "Blocked");
+  assert.equal(readTask("t-stuck").approvalRequest.id, t.approvalRequest.id);
+  assert.equal(emails.length, before, "same approval request, no second email");
+});

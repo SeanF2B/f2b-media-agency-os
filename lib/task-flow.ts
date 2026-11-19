@@ -151,6 +151,8 @@ export function boardColumn(task: FlowTask, botIds?: ReadonlySet<string>, now = 
   const ai = isAiTask(task, botIds);
   if (ai) {
     const applyingChange = (task.aiApprovals || []).some((item) => item.status === "applying");
+    // Waiting on the owner is Pending by definition, whatever run state another process left behind.
+    if (task.approvalRequest?.status === "awaiting") return "pending";
     if (isLiveRun(task, now) || task.aiStartNowRequestedAt || applyingChange) return "in_progress";
     if (task.aiRunState === "running") return "pending"; // went quiet — stopped
     if (task.approvalRequest?.status === "awaiting" || PENDING_STATUSES.has(String(task.status))) return "pending";

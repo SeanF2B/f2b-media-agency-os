@@ -121,3 +121,9 @@ test("parking a task that is already waiting on the owner keeps the same approva
   assert.equal(again.approvalRequest.emailStatus, "sent");
   assert.equal(again.status, "Blocked");
 });
+
+test("a task waiting on the owner shows Pending even if another process marks it running", () => {
+  const p = moveToPending({ ...base, status: "In progress", aiRunState: "running" }, { by: "Bot", at: at(1), reason: "Waiting" }).task;
+  const reopened = { ...p, status: "In progress", aiRunState: "running", aiRunStartedAt: new Date().toISOString(), aiProgressAt: new Date().toISOString() };
+  assert.equal(boardColumn(reopened, bot), "pending");
+});
