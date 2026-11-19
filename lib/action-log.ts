@@ -74,7 +74,7 @@ export async function logAction(db: Db, e: { actor: string; method: string; path
   const p = await whoIs(db, e.actor);
   const raw = String((e.body as any)?.action || (e.body as any)?.op || "");
   // Read-only lookups sent as POST (get…, list…, load…, preview…) are not actions.
-  if (!e.action && /^(get|list|load|read|fetch|search|find|preview|lookup|poll|refresh|count|check|status|overview|summary|report|calendar|hours|availability|slots|suggest|draft-preview|stats|history|open|view|export-preview)(?![a-z])|^(get|list|load|read|fetch|search|find|preview|lookup|poll|refresh|count|check)[A-Z_-]/.test(raw)) return;
+  if (!e.action && /^(get|list|load|read|fetch|search|find|preview|lookup|poll|refresh|count|check|status|overview|summary|report|calendar|hours|availability|slots|suggest|draft-preview|stats|history|open|view|export-preview|sync|heartbeat|ping|track)(?![a-z])|^(get|list|load|read|fetch|search|find|preview|lookup|poll|refresh|count|check|sync)[A-Z_-]/.test(raw)) return;
   const action = e.action || verb(e.method, summary);
   const isDelete = e.method === "DELETE" || /delete|remove|cancel|void|archive|trash/i.test(action);
   await db.prepare("INSERT INTO action_log (id, at, actor, actor_name, actor_type, client_id, area, action, target, detail, method, path, status, is_delete, ip) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15)")
