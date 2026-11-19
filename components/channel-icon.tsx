@@ -1,5 +1,4 @@
 "use client";
-import { BrandIcon } from "./brand-icon";
 
 // One small icon per messaging channel (real product logos, simple drawn fallback until they load).
 export const CHANNELS = [
@@ -19,10 +18,7 @@ const FALLBACK: Record<string, React.ReactNode> = {
   sms: <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="15" rx="4" fill="#34C759" /><path fill="#34C759" d="M7 17h5l-5 4Z" /><circle cx="8" cy="10.5" r="1.3" fill="#fff" /><circle cx="12" cy="10.5" r="1.3" fill="#fff" /><circle cx="16" cy="10.5" r="1.3" fill="#fff" /></svg>,
   email: <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="3" fill="#EA4335" /><path fill="none" stroke="#fff" strokeWidth="2" d="m4 7 8 6 8-6" /></svg>,
 };
-const BRAND_ID: Record<string, string> = { whatsapp: "whatsapp", instagram: "instagram", messenger: "messenger", email: "gmail-bookkeeping" };
-
+// Drawn logos only: the favicon service returns a generic globe for some (e.g. whatsapp.com), so channels never use it.
 export function ChannelIcon({ channel, size = 18, className = "" }: { channel: string; size?: number; className?: string }) {
-  const fb = <span className={`ch-icon-fb ${className}`} style={{ width: size, height: size, display: "inline-flex" }}>{FALLBACK[channel] || FALLBACK.sms}</span>;
-  // SMS has no brand logo; it always uses the drawn bubble.
-  return BRAND_ID[channel] ? <BrandIcon id={BRAND_ID[channel]} size={size} className={className} fallback={fb} /> : fb;
+  return <span className={`ch-icon-fb ${className}`} style={{ width: size, height: size, display: "inline-flex", flex: "none" }} aria-hidden="true">{FALLBACK[channel] || FALLBACK.sms}</span>;
 }
