@@ -205,10 +205,19 @@ export function requestTextFromTask(task: Pick<FlowTask, "aiRecommendations">): 
     .filter(Boolean).join("\n\n———\n\n");
 }
 
-/** Once the owner decides, the agent's original request items are closed so they don't linger elsewhere. */
-function closeAgentRequests<T extends FlowTask>(task: T, at: string): T {
+/**
+ * Once the owner decides, record it on the agent's own request items in the format the agent API reads
+ * (approvedAt / rejectedAt), and close them so they don't linger elsewhere.
+ */
+function closeAgentRequests<T extends FlowTask>(task: T, at: string, decision?: { approved: boolean; by: string; note?: string }): T {
   if (!openAgentRequests(task).length) return task;
-  return { ...task, aiRecommendations: (task.aiRecommendations || []).map((item) => String(item.id).startsWith("agent-approval-") && !item.supersededAt ? { ...item, supersededAt: at } : item) };
+  return { ...task, aiRecommendations: (task.aiRecommendations || []).map((item) => {
+    if (!String(item.id).startsWith("agent-approval-") || item.supersededAt) return item;
+    if (!decision) return { ...item, supersededAt: at };
+    return decision.approved
+      ? { ...item, approvedAt: at, approvedBy: decision.by, ...(decision.note ? { approvalNote: decision.note.slice(0, 4000) } : {}), supersededAt: at }
+      : { ...item, rejectedAt: at, rejectedBy: decision.by, ...(decision.note ? { ownerFeedback: decision.note.slice(0, 4000) } : {}), supersededAt: at };
+  }) };
 }
 
 // ---------------------------------------------------------------- transitions
@@ -276,7 +285,7 @@ export function approveTask<T extends FlowTask>(task: T, input: Actor & { edited
     decidedBy: input.by,
   };
   let next: T = {
-    ...closeAgentRequests(task, input.at),
+    ...closeAgentRequests(task, input.at, { approved: true, by: input.by, note: [approvalRequest.editedRequest ? `Approved with edits: ${approvalRequest.editedRequest}` : "", approvalRequest.ownerNote || ""].filter(Boolean).join("\n\n") }),
     status: TASK_STATUS.inProgress,
     pendingReason: undefined,
     pendingReasonBy: undefined,
@@ -293,7 +302,7 @@ export function approveTask<T extends FlowTask>(task: T, input: Actor & { edited
 export function rejectTask<T extends FlowTask>(task: T, input: Actor & { note?: string }): { task: T; error: string } {
   if (!task.approvalRequest || task.approvalRequest.status !== "awaiting") return { task, error: "This task is not waiting for approval." };
   let next: T = {
-    ...closeAgentRequests(task, input.at),
+    ...closeAgentRequests(task, input.at, { approved: false, by: input.by, note: input.note }),
     status: TASK_STATUS.done,
     outcome: "rejected",
     completedAt: input.at,

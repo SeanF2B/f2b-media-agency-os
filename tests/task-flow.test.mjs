@@ -127,3 +127,12 @@ test("a task waiting on the owner shows Pending even if another process marks it
   const reopened = { ...p, status: "In progress", aiRunState: "running", aiRunStartedAt: new Date().toISOString(), aiProgressAt: new Date().toISOString() };
   assert.equal(boardColumn(reopened, bot), "pending");
 });
+
+test("approve/reject are recorded on the agent's request in the agent API's own format", () => {
+  const stuck = { ...base, status: "In progress", aiRunState: "running", aiRecommendations: [{ id: "agent-approval-1", title: "Post", detail: "caption" }] };
+  const pending = moveToPending(stuck, { by: "S", at: at(1), reason: "Waiting" }).task;
+  const ok = approveTask(pending, { by: "Sean", at: at(2), editedRequest: "new caption", ai: true }).task.aiRecommendations[0];
+  assert.equal(ok.approvedAt, at(2)); assert.match(ok.approvalNote, /new caption/);
+  const no = rejectTask(pending, { by: "Sean", at: at(2), note: "no" }).task.aiRecommendations[0];
+  assert.equal(no.rejectedAt, at(2)); assert.equal(no.ownerFeedback, "no");
+});
