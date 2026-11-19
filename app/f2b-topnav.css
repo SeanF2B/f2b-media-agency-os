@@ -3498,7 +3498,8 @@ html body .app-shell a.contact-action.whatsapp-action svg { color: #25d366; }
 .tt-owner-group td.tt-check { box-shadow: inset 3px 0 0 var(--tt-group) !important; }
 .tt-owner-toggle { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; padding: 3px 8px 3px 18px; border-radius: 8px; font-size: 13px; transition: background .15s ease, transform .15s ease; }
 .tt-owner-toggle:hover { background: color-mix(in srgb, var(--brand-secondary, var(--tt-group)) 12%, transparent); transform: translateY(-1px); }
-.tt-owner-toggle .tt-caret { color: var(--tt-group); font-size: 11px; }
+html body .app-shell .tt-owner-toggle .tt-owner-caret { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 6px; font-size: 12px; line-height: 1; color: #344054; background: rgba(127,138,160,.14); }
+html body .app-shell.dark-mode .tt-owner-toggle .tt-owner-caret { color: #e6edf2; background: rgba(255,255,255,.1); }
 .tt-owner-toggle .avatar, .tt-owner-toggle img { width: 22px; height: 22px; min-width: 22px; border-radius: 50%; font-size: 9px; }
 .tt-owner-toggle b { font-weight: 700; }
 .tt-owner-overdue { color: #d13b3b; font-style: normal; font-weight: 700; }
