@@ -101,3 +101,14 @@ test("a run marked running that went quiet is Pending, not In progress", () => {
   assert.equal(boardColumn(stuck, bot, now), "pending");
   assert.equal(boardColumn({ ...stuck, aiProgressAt: "2026-11-19T18:55:00Z" }, bot, now), "in_progress", "recent progress = genuinely running");
 });
+
+test("the approval shows the agent's actual draft, and deciding closes the agent's request item", async () => {
+  const { requestTextFromTask, openAgentRequests } = await import("../lib/task-flow.ts");
+  const stuck = { ...base, status: "In progress", aiRunState: "running", aiRecommendations: [{ id: "agent-approval-1", title: "Approval needed: GBP post – Roof Replacement", detail: "Is your roof ready for winter? Book a free check." }, { id: "rec-x", title: "Other", detail: "x" }] };
+  assert.match(requestTextFromTask(stuck), /^GBP post – Roof Replacement\n\nIs your roof ready for winter/);
+  const pending = moveToPending(stuck, { by: "Scheduler", at: at(1), reason: "Stopped: Waiting for Sean’s approval" }).task;
+  assert.match(pending.approvalRequest.request, /Is your roof ready for winter/);
+  const approved = approveTask(pending, { by: "Sean", at: at(2), ai: true }).task;
+  assert.equal(openAgentRequests(approved).length, 0);
+  assert.equal(approved.aiRecommendations.find((item) => item.id === "rec-x").supersededAt, undefined, "other suggestions untouched");
+});

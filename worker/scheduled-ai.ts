@@ -2,7 +2,7 @@ import { GOOGLE_ADS_TASK_TEMPLATES, RETIRED_GOOGLE_ADS_TASK_TEMPLATE_IDS, google
 import { logSystemEmail } from "../lib/email-log";
 import { buildGoogleAdsAuditReport } from "../lib/google-ads-audit-report";
 import { aiConfigured, aiEndpoint, aiHeaders, aiModel, resolveAiProvider } from "../lib/ai-provider";
-import { approvalEmail, approvedRunInstructions, finishAiRun, isAbandonedRun, moveToPending, startTask, type TaskApprovalRequest, type TaskHistoryEvent } from "../lib/task-flow";
+import { approvalEmail, approvedRunInstructions, finishAiRun, isAbandonedRun, moveToPending, requestTextFromTask, startTask, type TaskApprovalRequest, type TaskHistoryEvent } from "../lib/task-flow";
 
 type AiMode = "Google Ads" | "Meta Ads" | "SEO" | "Audit" | "Research" | "Setup" | "Sites";
 type TaskAttachment = { id: string; name: string; type: string; size: number; uploadedAt: string; uploadedBy: string; storageKey?: string };
@@ -1964,7 +1964,7 @@ async function parkAbandonedRuns(env: SchedulerEnv, now: Date) {
       if (!task || !isAbandonedRun(task, now.getTime())) return null;
       const progress = String(task.aiProgressText || "").trim();
       const reason = progress ? `Stopped: ${progress}` : "The AI run stopped without finishing.";
-      return moveToPending(task, { at, by: "Scheduler", reason, request: [progress, task.aiFeedback].filter(Boolean).join("\n\n") || task.aiInstructions || task.title, kind: "stopped", aiRunState: "needs_review" }).task;
+      return moveToPending(task, { at, by: "Scheduler", reason, request: requestTextFromTask(task) || [progress, task.aiFeedback].filter(Boolean).join("\n\n") || task.aiInstructions || task.title, kind: "stopped", aiRunState: "needs_review" }).task;
     });
   }
 }

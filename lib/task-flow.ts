@@ -101,6 +101,8 @@ export type FlowTask = {
   aiFeedback?: string;
   aiApprovals?: Array<{ status: string; [key: string]: unknown }>;
   attachments?: FlowAttachment[];
+  /** Agents post the thing they want approved here (id "agent-approval-…"). */
+  aiRecommendations?: Array<{ id: string; title?: string; detail?: string; attachmentIds?: string[]; rejectedAt?: string; supersededAt?: string; followUpTaskId?: string; [key: string]: unknown }>;
   paused?: boolean;
   approvalRequest?: TaskApprovalRequest;
   /** Set when the owner approved: the next run finishes straight to Done. */
@@ -189,6 +191,24 @@ export function scheduleLabel(task: Pick<FlowTask, "due" | "dueAt" | "repeatTime
   return `${day} · ${time}`;
 }
 
+/** Requests an agent posted for approval that are still open. */
+export function openAgentRequests(task: Pick<FlowTask, "aiRecommendations">) {
+  return (task.aiRecommendations || []).filter((item) => String(item.id).startsWith("agent-approval-") && !item.rejectedAt && !item.supersededAt && !item.followUpTaskId);
+}
+
+/** The actual thing the AI wants approved (post copy, plan, fix list), as editable text. */
+export function requestTextFromTask(task: Pick<FlowTask, "aiRecommendations">): string {
+  return openAgentRequests(task)
+    .map((item) => [String(item.title || "").replace(/^Approval needed:\s*/i, "").trim(), String(item.detail || "").trim()].filter(Boolean).join("\n\n"))
+    .filter(Boolean).join("\n\n———\n\n");
+}
+
+/** Once the owner decides, the agent's original request items are closed so they don't linger elsewhere. */
+function closeAgentRequests<T extends FlowTask>(task: T, at: string): T {
+  if (!openAgentRequests(task).length) return task;
+  return { ...task, aiRecommendations: (task.aiRecommendations || []).map((item) => String(item.id).startsWith("agent-approval-") && !item.supersededAt ? { ...item, supersededAt: at } : item) };
+}
+
 // ---------------------------------------------------------------- transitions
 
 /** The AI (or a person) starts working. To do → In progress. */
@@ -212,7 +232,8 @@ export function startTask<T extends FlowTask>(task: T, actor: Actor, ai: boolean
 export function moveToPending<T extends FlowTask>(task: T, input: Actor & { reason: string; request?: string; kind?: "stopped" | "handover" | "needs_approval" | "failed" | "cancelled"; aiRunState?: string }): { task: T; error: string } {
   const reason = shortText(input.reason, 300);
   if (!reason) return { task, error: "A reason is required before a task can move to Pending." };
-  const request = String(input.request ?? "").trim().slice(0, 20_000) || reason;
+  const given = String(input.request ?? "").trim();
+  const request = (given && given !== reason ? given : requestTextFromTask(task) || given || reason).slice(0, 20_000);
   const approvalRequest: TaskApprovalRequest = {
     id: newId(),
     status: "awaiting",
@@ -258,7 +279,7 @@ export function approveTask<T extends FlowTask>(task: T, input: Actor & { edited
     decidedBy: input.by,
   };
   let next: T = {
-    ...task,
+    ...closeAgentRequests(task, input.at),
     status: TASK_STATUS.inProgress,
     pendingReason: undefined,
     pendingReasonBy: undefined,
@@ -275,7 +296,7 @@ export function approveTask<T extends FlowTask>(task: T, input: Actor & { edited
 export function rejectTask<T extends FlowTask>(task: T, input: Actor & { note?: string }): { task: T; error: string } {
   if (!task.approvalRequest || task.approvalRequest.status !== "awaiting") return { task, error: "This task is not waiting for approval." };
   let next: T = {
-    ...task,
+    ...closeAgentRequests(task, input.at),
     status: TASK_STATUS.done,
     outcome: "rejected",
     completedAt: input.at,

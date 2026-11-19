@@ -79,9 +79,10 @@ export function TaskApprovalsPanel({ tasks, clients, staff, canDecide, busyTaskI
       return <article className="tf-card" key={task.id}>
         <header><ClientMark client={client} /><div className="tf-title"><b>{task.title}</b><small>{client?.name || "Internal"} · {assignee?.name || "Unassigned"} · asked {when(request.requestedAt)}</small></div>{onOpenTask && <button type="button" className="tf-link" onClick={() => onOpenTask(task.id)}>Open card</button>}</header>
         <p className="tf-reason"><span>⏳ Why it stopped</span>{request.reason}</p>
-        <label className="tf-field"><span>What {assignee?.isBot ? "the AI" : "they"} are asking for <small>Edit freely — your version is what gets done</small></span>
+        <label className="tf-field"><span>{assignee?.isBot ? "What the AI is asking for" : "What they are asking for"} <small>Edit freely — your version is what gets done</small></span>
           <textarea rows={Math.min(14, Math.max(4, draft.split("\n").length + 1))} value={draft} disabled={!canDecide || busy} onChange={(event) => setDrafts((current) => ({ ...current, [task.id]: event.target.value }))} />
         </label>
+        {(task.attachments || []).length > 0 && <details className="tf-details" open={(task.attachments || []).length <= 3}><summary>Attached files · {(task.attachments || []).length}</summary><Files task={task} /></details>}
         {adsChanges.length > 0 && <p className="tf-muted">Approving applies {adsChanges.length} proposed account change{adsChanges.length === 1 ? "" : "s"}: {adsChanges.map((item) => item.title).filter(Boolean).join(" · ")}</p>}
         <label className="tf-field"><span>Note to {assignee?.isBot ? "the AI" : "them"} <small>Optional</small></span>
           <input value={notes[task.id] || ""} disabled={!canDecide || busy} placeholder="e.g. Use the Salthill job photo" onChange={(event) => setNotes((current) => ({ ...current, [task.id]: event.target.value }))} />
