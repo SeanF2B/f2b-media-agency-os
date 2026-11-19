@@ -81,10 +81,11 @@ export function ConversationsView({ scopeClientId, clients, staff = [], currentS
   // Fit the inbox to the window so the reply box is always visible without scrolling the page.
   const gridRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const fit = () => { const el = gridRef.current; if (!el) return; const top = el.getBoundingClientRect().top + window.scrollY; const footer = document.querySelector(".f2b-mobile-tabs, .tn-mobile-footer") as HTMLElement | null; const room = window.innerHeight - (top - window.scrollY) - 16 - (footer && footer.offsetHeight && getComputedStyle(footer).display !== "none" ? footer.offsetHeight : 0); el.style.height = `${Math.max(380, room)}px`; };
+    // Fit to the space above the bottom tab bar (on phones the nav floats at the bottom), so the reply box is always visible.
+    const fit = () => { const el = gridRef.current; if (!el) return; const vh = window.visualViewport?.height || window.innerHeight; const top = el.getBoundingClientRect().top; const bars = [...document.querySelectorAll<HTMLElement>(".tn-nav, .f2b-mobile-tabs, .tn-mobile-footer")].map((b) => b.getBoundingClientRect()).filter((r) => r.height > 0 && r.top > vh / 2 && r.top < vh); const bottom = bars.length ? Math.min(...bars.map((r) => r.top)) - 8 : vh - 12; const h = Math.max(260, Math.round(bottom - top)); el.style.setProperty("--cv-fit-h", `${h}px`); el.style.height = `${h}px`; };
     fit(); const t = window.setTimeout(fit, 300);
-    window.addEventListener("resize", fit);
-    return () => { window.clearTimeout(t); window.removeEventListener("resize", fit); };
+    window.addEventListener("resize", fit); window.visualViewport?.addEventListener("resize", fit);
+    return () => { window.clearTimeout(t); window.removeEventListener("resize", fit); window.visualViewport?.removeEventListener("resize", fit); };
   });
   const clientName = (id: string) => clients.find((c) => c.id === id)?.name || "";
   useEffect(() => {
@@ -127,7 +128,7 @@ export function ConversationsView({ scopeClientId, clients, staff = [], currentS
 
   return <section className="cv" aria-label="Conversations">
     <header className="cv-head"><div><p className="eyebrow">💬 CONVERSATIONS{scopeClientId ? ` · ${clientName(scopeClientId).toUpperCase()}` : ""}</p><h1>Customer conversations</h1><p>WhatsApp, Instagram, Facebook, SMS and email, in one inbox.</p></div>
-      <div className="cv-head-actions">{waNumbers.length > 0 && <button type="button" className="primary-button" onClick={() => setNewChat(true)}>＋ New WhatsApp chat</button>}<button type="button" className="wa-open-button" onClick={() => setWaSetupOpen(true)}><span aria-hidden="true">●</span> WhatsApp setup</button><button type="button" className="secondary-button" onClick={() => setSettingsOpen(true)}>⚙️ Conversation settings</button></div></header>
+      <div className="cv-head-actions">{waNumbers.length > 0 && <button type="button" className="primary-button" onClick={() => setNewChat(true)}>＋ New WhatsApp chat</button>}<button type="button" className="wa-open-button" onClick={() => setWaSetupOpen(true)}><ChannelIcon channel="whatsapp" size={16} /> WhatsApp setup</button><button type="button" className="secondary-button" onClick={() => setSettingsOpen(true)}>⚙️ Conversation settings</button></div></header>
     {error && <div className="cv-error" role="alert">{error}</div>}
     {loading ? <div className="empty-state" role="status">Loading conversations…</div> : <>{!configured && <div className="cv-banner">💬 Emails the system sends show here already. To also text and WhatsApp customers, <button type="button" className="text-button" onClick={() => setWaSetupOpen(true)}>set up WhatsApp</button>.</div>}
     <div className={`cv-grid ${active ? "has-thread" : ""}`} ref={gridRef}>
