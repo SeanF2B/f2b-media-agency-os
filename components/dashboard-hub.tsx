@@ -6,7 +6,7 @@ import { BarChart3, BookOpen, CalendarCheck, CalendarPlus, CheckCircle2, Clipboa
 import { BrandIcon } from "./brand-icon";
 
 // ROAS and close rate, graded only when there's enough data to judge fairly.
-export type SalesStats = { leads: number; won: number; wonValue: number; adsLeads: number; adsWon: number; adsWonValue: number; periodLabel: string };
+export type SalesStats = { leads: number; value?: number; won: number; wonValue: number; adsLeads: number; adsWon: number; adsWonValue: number; periodLabel: string };
 type Grade = "good" | "ok" | "low" | "na";
 function roasGrade(wonValue: number, spend: number | null, leads: number): { value: string; grade: Grade; tip: string } {
   if (!spend || spend <= 0) return { value: "—", grade: "na", tip: "" };
@@ -37,7 +37,7 @@ import { CampaignPicker } from "./campaign-picker";
 import { PageDrill } from "./dashboard-page-drill";
 
 type HubTask = { id: string; clientId: string; title: string; status: string; assigneeId: string; due?: string; dueAt?: string; completedAt?: string; service?: string; reviewStatus?: string; reviewApproverId?: string; aiRunState?: string; aiApprovals?: Array<{ status: string }> };
-type HubClient = { id: string; name: string; logo?: string; googleAdsAccountId?: string; appointmentBased?: boolean };
+type HubClient = { id: string; name: string; logo?: string; googleAdsAccountId?: string; appointmentBased?: boolean; services?: Array<{ name: string; fee?: number }> };
 type HubStaff = { id: string; name: string; isBot?: boolean };
 type Stat = { value: number; previous: number | null } | null;
 type Marketing = {
@@ -121,7 +121,7 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
   const [mSrc, setMSrc] = useState<"organic" | "ads" | "meta">("organic"); // phones: one marketing source at a time
   const [sample] = useSampleData();
   // Won deals from the CRM (sample figures when Sample is on).
-  const sales: SalesStats | null = sample ? { leads: 47, won: 12, wonValue: 18400, adsLeads: 19, adsWon: 5, adsWonValue: 7600, periodLabel: "sample" } : salesStats;
+  const sales: SalesStats | null = sample ? { leads: 47, value: 31200, won: 12, wonValue: 18400, adsLeads: 19, adsWon: 5, adsWonValue: 7600, periodLabel: "sample" } : salesStats;
   const [apptRange, setApptRange] = useState<"today" | "tomorrow" | "week" | "all" | "date">("today");
   const [apptDate, setApptDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [gReviews, setGReviews] = useState<{ total: number | null; averageRating: number | null } | null>(null);
@@ -203,7 +203,38 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
       {!marketingPicked ? <p className="dh-muted">Marketing results are per client — pick a client in the top bar to see theirs.</p> : loading && !m ? <><p className="dh-muted">Loading results…</p></> : !m ? <></> : <>
         {(() => { const sp = m.split; const v = (x: number | null | undefined) => x == null ? "—" : num(x);
           const Row = ({ icon, label, value, good }: { icon: ReactNode; label: string; value: string; good?: boolean }) => <div className={`dh-split-row ${good ? "good" : ""}`}><span className="dh-split-ico">{icon}</span><span>{label}</span><b>{value}</b></div>;
-          return <><div className="dh-msrc" role="tablist" aria-label="Marketing source">{([["organic", "Organic"], ["ads", "Google Ads"], ["meta", "Meta"]] as const).map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={mSrc === k} className={mSrc === k ? "on" : ""} onClick={() => { setMSrc(k); setDetail(""); }}>{l}</button>)}</div>
+          // Overall: every channel together, with total cost = ad spend (Google + Meta) + F2B service fee (pro-rated to the period).
+          const overall = (() => {
+            const days = periodStart && periodEnd ? Math.max(1, Math.round((Date.parse(periodEnd) - Date.parse(periodStart)) / 86_400_000) + 1) : 30;
+            const monthlyFee = (clientOf(clientId)?.services || []).reduce((t, x) => t + (Number(x.fee) || 0), 0);
+            const fee = sample ? 750 : Math.round(monthlyFee * Math.min(12, days / 30.44) * 100) / 100;
+            const orgClicks = (m.gsc && !m.gsc.error ? m.gsc.clicks : sp?.organic.clicks) ?? 0;
+            const clicks = orgClicks + (sp?.paid.clicks ?? m.adClicks?.value ?? 0) + (m.meta?.clicks || 0);
+            const adSpend = (m.adSpend?.value || 0) + (m.meta?.spend || 0);
+            const conversions = (sp?.paid.conversions ?? m.conversions?.value ?? 0) + (m.meta?.leads || 0) + (sp?.organic.leads || 0) + (sp?.organic.calls || 0);
+            const leads = sales ? sales.leads : (sp?.organic.leads || 0) + (sp?.paid.leads || 0) + (sp?.otherLeads || 0);
+            const total = adSpend + fee, won = sales?.wonValue ?? null;
+            const roi = won != null && total > 0 ? Math.round((won - total) / total * 100) : null;
+            const ret = won != null && total > 0 ? won / total : null;
+            return { fee, monthlyFee, clicks, adSpend, conversions, leads, total, won, roi, ret, value: sales?.value ?? null };
+          })();
+          const O = ({ label, value, tone = "", hint }: { label: string; value: string; tone?: string; hint?: string }) => <div className={`dh-ov ${tone}`} title={hint}><small>{label}</small><b>{value}</b>{hint && <em>{hint}</em>}</div>;
+          return <><div className="dh-overall" aria-label="Overall performance">
+            <div className="dh-overall-head"><b>Overall</b><small>All channels · {periodLabel.toLowerCase()}</small></div>
+            <div className="dh-overall-grid">
+              <O label="Leads" value={v(overall.leads)} tone={overall.leads > 0 ? "good" : ""} />
+              <O label="Lead value" value={overall.value != null ? money(overall.value, cur) : "—"} hint="Estimated" />
+              <O label="Conversions" value={v(overall.conversions)} hint="Ad conversions, Meta leads, organic leads & calls" />
+              <O label="Clicks" value={v(overall.clicks)} hint="Organic + Google Ads + Meta" />
+              <O label="Ad spend" value={money(overall.adSpend, cur)} tone="expense" hint="Google + Meta" />
+              <O label="F2B service fee" value={money(overall.fee, cur)} tone="expense" hint={overall.monthlyFee ? `${money(overall.monthlyFee, cur)}/mo, pro-rated` : "No service fee on this client"} />
+              <O label="Total cost" value={money(overall.total, cur)} tone="expense" hint="Ad spend + service fee" />
+              <O label="Won revenue" value={overall.won != null ? money(overall.won, cur) : "—"} tone={(overall.won || 0) > 0 ? "good" : ""} hint="Actual" />
+              <O label="Return" value={overall.ret != null ? `${overall.ret.toFixed(1)}×` : "—"} tone={overall.ret == null ? "" : overall.ret >= 1 ? "good" : "expense"} hint="Won ÷ total cost" />
+              <O label="ROI" value={overall.roi != null ? `${overall.roi > 0 ? "+" : ""}${overall.roi}%` : "—"} tone={overall.roi == null ? "" : overall.roi >= 0 ? "good" : "expense"} hint="(Won − total cost) ÷ total cost" />
+            </div>
+          </div>
+          <div className="dh-msrc" role="tablist" aria-label="Marketing source">{([["organic", "Organic"], ["ads", "Google Ads"], ["meta", "Meta"]] as const).map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={mSrc === k} className={mSrc === k ? "on" : ""} onClick={() => { setMSrc(k); setDetail(""); }}>{l}</button>)}</div>
           <div className={`dh-split m-src-${mSrc}`}>
             <div className="dh-split-col"><div className="dh-split-head"><BrandIcon id="google" size={20} fallback={null} /><b>Organic</b><small>Google search & Maps (free)</small></div>
               {(() => { const g = m.gsc && !m.gsc.error ? m.gsc : null; const clicks = g ? g.clicks : sp?.organic.clicks; return <>
