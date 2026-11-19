@@ -151,3 +151,4 @@ html body .wa-summary div { padding: 10px; border-radius: 10px; background: rgba
 html body .wa-summary dt { font-size: 11px; font-weight: 700; opacity: .65; }
 html body .wa-summary dd { margin: 2px 0 0; font-weight: 700; overflow-wrap: anywhere; }
 @media (max-width: 640px) { html body .wa-steps li { font-size: 12px; padding: 6px; } html body .wa-summary { grid-template-columns: 1fr; } html body .wa-row { grid-template-columns: 1fr auto; } }
+html body .wa-modal { z-index: 3000 !important; }
