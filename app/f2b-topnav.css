@@ -3491,3 +3491,16 @@ html body .app-shell a.contact-action.whatsapp-action svg { color: #25d366; }
   html body .app-shell .cv-grid.cv-grid.has-thread { height: calc(100dvh - var(--tn-bar-h, 62px) - 92px) !important; }
   html body .app-shell .cv-compose:not(.cv-email-compose) > textarea::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
+
+/* Task table: per-staff dropdowns inside each client group */
+.tt-owner-group td { padding: 4px 10px !important; height: 36px; border-bottom: 1px solid #edf1f4; }
+.app-shell.dark-mode .tt-owner-group td { border-color: #2c353c; }
+.tt-owner-group td.tt-check { box-shadow: inset 3px 0 0 var(--tt-group) !important; }
+.tt-owner-toggle { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; padding: 3px 8px 3px 18px; border-radius: 8px; font-size: 13px; transition: background .15s ease, transform .15s ease; }
+.tt-owner-toggle:hover { background: color-mix(in srgb, var(--brand-secondary, var(--tt-group)) 12%, transparent); transform: translateY(-1px); }
+.tt-owner-toggle .tt-caret { color: var(--tt-group); font-size: 11px; }
+.tt-owner-toggle .avatar, .tt-owner-toggle img { width: 22px; height: 22px; min-width: 22px; border-radius: 50%; font-size: 9px; }
+.tt-owner-toggle b { font-weight: 700; }
+.tt-owner-overdue { color: #d13b3b; font-style: normal; font-weight: 700; }
+.tt-row-nested td:nth-child(2) { padding-left: 40px !important; }
+@media (max-width: 760px) { .tt-row-nested td:nth-child(2) { padding-left: 10px !important; } .tt-owner-toggle { padding-left: 4px; } }
