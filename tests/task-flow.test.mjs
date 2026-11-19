@@ -91,7 +91,7 @@ test("History can send a finished task back to the AI with edits (pre-approved)"
   const done = finishAiRun(startTask(base, { by: "Bot", at: at(0) }, true), { by: "Bot", at: at(1), finished: true }).task;
   const { task, error } = sendBackFromHistory(done, { by: "Sean", at: at(2), editedRequest: "Use the blue logo", ai: true });
   assert.equal(error, "");
-  assert.equal(boardColumn(task, bot), "in_progress");
+  assert.equal(boardColumn(task, bot, Date.parse(at(3))), "in_progress");
   assert.equal(finishAiRun(startTask(task, { by: "Bot", at: at(3) }, true), { by: "Bot", at: at(4), finished: false, reason: "x" }).column, "done");
 });
 
@@ -135,4 +135,29 @@ test("approve/reject are recorded on the agent's request in the agent API's own 
   assert.equal(ok.approvedAt, at(2)); assert.match(ok.approvalNote, /new caption/);
   const no = rejectTask(pending, { by: "Sean", at: at(2), note: "no" }).task.aiRecommendations[0];
   assert.equal(no.rejectedAt, at(2)); assert.equal(no.ownerFeedback, "no");
+});
+
+test("approved but never started → Pending with a reason after 30 min; queued before that", async () => {
+  const { isStalledStart, flowPendingReason } = await import("../lib/task-flow.ts");
+  const pending = moveToPending({ ...base, status: "In progress", aiRunState: "running" }, { by: "B", at: at(0), reason: "Waiting" }).task;
+  const approved = approveTask(pending, { by: "Sean", at: at(1), ai: true }).task;
+  assert.equal(boardColumn(approved, bot, Date.parse(at(20))), "in_progress", "within 30 min: waiting for the agent");
+  assert.equal(boardColumn(approved, bot, Date.parse(at(40))), "pending", "30+ min and nobody started it");
+  assert.equal(isStalledStart(approved, Date.parse(at(40))), true);
+  assert.match(flowPendingReason(approved, "Google ADS Specialist", Date.parse(at(40))), /Approved at .*Google ADS Specialist hasn't started it/);
+});
+
+test("active time: recorded per run, live while running, shown after completion", async () => {
+  const { activeTimeMs, formatDuration } = await import("../lib/task-flow.ts");
+  const running = startTask(base, { by: "B", at: at(0) }, true);
+  assert.equal(activeTimeMs(running, Date.parse(at(3))), 3 * 60_000, "live timer counts up");
+  const parked = moveToPending({ ...running, aiProgressAt: at(4) }, { by: "B", at: at(4), reason: "needs input" }).task;
+  assert.equal(parked.aiActiveMs, 4 * 60_000);
+  const again = startTask(approveTask(parked, { by: "S", at: at(10), ai: true }).task, { by: "B", at: at(11) }, true);
+  const done = finishAiRun(again, { by: "B", at: at(13), finished: true, runStartedAt: at(11) }).task;
+  assert.equal(done.aiActiveMs, 6 * 60_000, "4 min + 2 min, idle/approval time not counted");
+  assert.equal(formatDuration(done.aiActiveMs), "6m 00s");
+  // abandoned run only counts until its last progress
+  const abandoned = moveToPending({ ...startTask(base, { by: "B", at: at(0) }, true), aiProgressAt: at(5) }, { by: "Scheduler", at: at(50), reason: "quiet" }).task;
+  assert.equal(abandoned.aiActiveMs, 5 * 60_000);
 });

@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import "./task-flow.css";
 import {
-  OWNER_APPROVER_EMAIL, boardColumn, frequencyLabel, historyItems, needsOwnerDecision, requestTextFromTask, scheduleLabel,
+  OWNER_APPROVER_EMAIL, activeTimeMs, boardColumn, flowPendingReason, formatDuration, frequencyLabel, historyItems, isLiveRun, isQueuedStart, isStalledStart, needsOwnerDecision, requestTextFromTask, scheduleLabel,
   type FlowAttachment, type FlowTask,
 } from "@/lib/task-flow";
 
@@ -38,23 +38,37 @@ function Files({ task }: { task: PanelTask }) {
   </li>)}</ul>;
 }
 
-/** Small strip on a board card: date + frequency in To do, reason + approval state in Pending. */
-export function TaskFlowCardMeta({ task, botIds }: { task: PanelTask; botIds: ReadonlySet<string> }) {
+/** Ticks once a second while mounted — only rendered for cards with a live AI run. */
+function LiveActiveTime({ task }: { task: PanelTask }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const id = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(id); }, []);
+  return <>{formatDuration(activeTimeMs(task, now))}</>;
+}
+
+/** Small strip on a board card: date + frequency in To do, a live timer while the AI works, the reason in Pending. */
+export function TaskFlowCardMeta({ task, botIds, agentName = "The AI" }: { task: PanelTask; botIds: ReadonlySet<string>; agentName?: string }) {
   const column = boardColumn(task, botIds);
+  const ai = botIds.has(String(task.assigneeId || ""));
   if (column === "todo") return <div className="tf-card-meta is-todo" title="Scheduled">
     <span>📅 {scheduleLabel(task)}</span><span>🔁 {frequencyLabel(task)}</span>
+  </div>;
+  if (column === "in_progress" && ai && isLiveRun(task)) return <div className="tf-card-meta is-live" title="Active AI time on this task">
+    <span className="tf-live"><i aria-hidden="true" />Working · <LiveActiveTime task={task} /></span>
+  </div>;
+  if (column === "in_progress" && ai && isQueuedStart(task)) return <div className="tf-card-meta is-queued">
+    <span>⏳ {task.approvalGrantedAt ? "Approved · " : ""}waiting for {agentName} to start</span>
   </div>;
   if (column === "pending" && task.approvalRequest?.status === "awaiting") {
     const mail = task.approvalRequest.emailStatus;
     return <div className="tf-card-meta is-pending">
-      <span>📨 Awaiting approval · {mail === "sent" ? "emailed" : mail === "failed" ? "email failed — open Approvals" : mail === "skipped" ? "in Approvals" : "sending to"} {OWNER_APPROVER_EMAIL}</span>
+      <span>📨 Awaiting your approval · {mail === "sent" ? "emailed" : mail === "failed" ? "email failed" : "in Approvals"}</span>
     </div>;
   }
-  if (column === "in_progress" && task.approvalGrantedAt) return <div className="tf-card-meta is-approved"><span>✅ Approved — the AI is finishing it</span></div>;
+  if (column === "pending" && ai && isStalledStart(task)) return <div className="tf-card-meta is-stalled"><span>⚠️ {flowPendingReason(task, agentName)}</span></div>;
+  if (column === "done" && ai && activeTimeMs(task) > 0) return <div className="tf-card-meta is-done"><span>⏱ Active {formatDuration(activeTimeMs(task))}</span></div>;
   return null;
 }
 
-/** Plain-English, short version of an agent's request/reason (drops "Stopped:", "Waiting for X's approval (in Approvals):" etc.). */
 function tidy(text = "") {
   return text
     .replace(/^\s*(stopped|blocked|paused)\s*[:\-–]\s*/i, "")
@@ -203,7 +217,7 @@ export function TaskHistoryPanel({ tasks, clients, staff, canSendBack, busyTaskI
       const approved = approval?.editedRequest || approval?.request || "";
       const isEditing = editing === task.id;
       return <article className={`tf-card is-${outcome}`} key={task.id}>
-        <header><ClientMark client={client} /><div className="tf-title"><b>{task.title}</b><small>{client?.name || "Internal"} · {assignee?.name || "Unassigned"} · {when(finishedAt)}</small></div><span className={`tf-outcome is-${outcome}`}>{outcome === "rejected" ? "✕ Rejected" : approval?.status === "approved" ? "✓ Approved & done" : "✓ Done"}</span></header>
+        <header><ClientMark client={client} /><div className="tf-title"><b>{task.title}</b><small>{client?.name || "Internal"} · {assignee?.name || "Unassigned"} · {when(finishedAt)}{activeTimeMs(task) > 0 ? ` · ⏱ ${formatDuration(activeTimeMs(task))} active` : ""}</small></div><span className={`tf-outcome is-${outcome}`}>{outcome === "rejected" ? "✕ Rejected" : approval?.status === "approved" ? "✓ Approved & done" : "✓ Done"}</span></header>
         {approval && <details className="tf-details"><summary>Approval · {approval.status}{approval.decidedBy ? ` by ${approval.decidedBy}` : ""}</summary>
           <p><b>Why it stopped:</b> {approval.reason}</p>
           <p><b>{approval.editedRequest ? "Approved version (edited)" : "Request"}:</b></p><pre>{approved}</pre>

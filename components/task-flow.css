@@ -111,3 +111,16 @@
 .tfa-modal .tf-title b { font-size: 15px; }
 .tfa-modal .tf-title small { color: #667085 !important; opacity: 1 !important; font-size: 12.5px; }
 .app-shell.dark-mode .tfa-modal .tf-title small { color: #a9b4bc !important; }
+
+.tf-card-meta.is-live span { background: rgb(22 163 74 / 14%); color: #15803d; font-variant-numeric: tabular-nums; }
+.tf-card-meta.is-queued span { background: rgb(59 130 246 / 12%); color: #1d4ed8; }
+.tf-card-meta.is-stalled span { background: rgb(234 88 12 / 12%); color: #c2410c; white-space: normal; }
+.tf-card-meta.is-done span { background: var(--soft, #eef2f6); }
+.tf-live i { display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: #16a34a; animation: tf-pulse 1.2s ease-in-out infinite; vertical-align: 1px; }
+@keyframes tf-pulse { 50% { opacity: .35; transform: scale(.8); } }
+/* One consistent card action button (Start now / Cancel / Retry / Starting…) */
+.tf-card-action { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 104px; height: 32px; padding: 0 12px; border-radius: 9px; font: inherit; font-size: .78rem; font-weight: 700; cursor: pointer; border: 1px solid rgb(22 163 74 / 30%); background: rgb(22 163 74 / 8%); color: #15803d; transition: transform .15s, box-shadow .15s; white-space: nowrap; }
+.tf-card-action:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 12px rgb(15 23 42 / 10%); }
+.tf-card-action:disabled { opacity: .6; cursor: default; }
+.tf-card-action.is-cancel { border-color: rgb(220 38 38 / 35%); background: rgb(220 38 38 / 7%); color: #b42318; }
+.tf-card-action.is-retry { border-color: rgb(15 111 180 / 35%); background: rgb(15 111 180 / 8%); color: #0f6fb4; }

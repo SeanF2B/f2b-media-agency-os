@@ -92,6 +92,8 @@ export type FlowTask = {
   aiRunStartedAt?: string;
   aiProgressText?: string;
   aiProgressAt?: string;
+  /** Total time the AI has spent actively working on this task (ms), summed across runs. */
+  aiActiveMs?: number;
   aiRunAt?: string;
   aiRunAttempt?: number;
   aiStartNowRequestedAt?: string;
@@ -132,6 +134,59 @@ export function isAbandonedRun(task: FlowTask, now = Date.now()): boolean {
   return task.status !== TASK_STATUS.done && task.aiRunState === "running" && !isLiveRun(task, now);
 }
 
+/** A "start now" (or an approval) that no AI has picked up within the window has stalled. */
+export function isStalledStart(task: FlowTask, now = Date.now()): boolean {
+  if (task.status === TASK_STATUS.done || isLiveRun(task, now)) return false;
+  const asked = Math.max(Date.parse(task.aiStartNowRequestedAt || "") || 0, Date.parse(task.approvalGrantedAt || "") || 0);
+  return asked > 0 && now - asked >= ABANDONED_RUN_MS && (Boolean(task.aiStartNowRequestedAt) || task.approvalRequest?.status === "approved");
+}
+
+/** True while a start request (or approval) is still within the pick-up window. */
+export function isQueuedStart(task: FlowTask, now = Date.now()): boolean {
+  if (task.status === TASK_STATUS.done || isLiveRun(task, now) || !task.aiStartNowRequestedAt) return false;
+  return now - (Date.parse(task.aiStartNowRequestedAt) || 0) < ABANDONED_RUN_MS;
+}
+
+/** Active AI time: everything recorded so far plus the live run in progress. */
+export function activeTimeMs(task: FlowTask, now = Date.now()): number {
+  let total = Math.max(0, Number(task.aiActiveMs) || 0);
+  if (isLiveRun(task, now)) total += Math.max(0, now - (Date.parse(task.aiRunStartedAt || "") || now));
+  else if (!total && task.status === TASK_STATUS.done && task.aiRunStartedAt && task.completedAt) {
+    const span = Date.parse(task.completedAt) - Date.parse(task.aiRunStartedAt);
+    if (span > 0 && span < 12 * 3600_000) total = span; // runs recorded before time tracking existed
+  }
+  return total;
+}
+
+export function formatDuration(ms: number): string {
+  const sec = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  return h ? `${h}h ${String(m).padStart(2, "0")}m` : m ? `${m}m ${String(s).padStart(2, "0")}s` : `${s}s`;
+}
+
+/** Add the run that is ending to the task's active time. */
+function withRunTime<T extends FlowTask>(task: T, at: string, startedAt?: string): T {
+  const start = Date.parse(startedAt || (task.aiRunState === "running" ? task.aiRunStartedAt || "" : "")) || 0;
+  // An abandoned run only counts up to its last sign of life, not the idle time after it.
+  const end = Date.parse(startedAt || isLiveRun(task, Date.parse(at) || Date.now()) ? at : task.aiProgressAt || "") || 0;
+  if (!start || end <= start || end - start > 12 * 3600_000) return task;
+  return { ...task, aiActiveMs: Math.max(0, Number(task.aiActiveMs) || 0) + (end - start) };
+}
+
+/** Plain-English reason for a Pending card when none was stored. */
+export function flowPendingReason(task: FlowTask, agentName = "The AI", now = Date.now()): string {
+  if (task.pendingReason) return task.pendingReason;
+  if (isStalledStart(task, now)) {
+    const asked = task.approvalGrantedAt || task.aiStartNowRequestedAt || "";
+    const time = asked ? new Date(asked).toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Dublin" }) : "";
+    return task.approvalRequest?.status === "approved"
+      ? `Approved${time ? ` at ${time}` : ""}, but ${agentName} hasn't started it. Press Retry to start it again.`
+      : `Asked to start${time ? ` at ${time}` : ""}, but ${agentName} hasn't picked it up. Press Retry.`;
+  }
+  if (task.aiRunState === "running") return `${agentName} stopped sending progress for 30+ minutes.`;
+  return task.approvalRequest?.reason || "";
+}
+
 export function isAiTask(task: Pick<FlowTask, "assigneeId" | "aiMode">, botIds?: ReadonlySet<string>): boolean {
   const id = String(task.assigneeId || "");
   if (botIds) return botIds.has(id);
@@ -153,7 +208,8 @@ export function boardColumn(task: FlowTask, botIds?: ReadonlySet<string>, now = 
     const applyingChange = (task.aiApprovals || []).some((item) => item.status === "applying");
     // Waiting on the owner is Pending by definition, whatever run state another process left behind.
     if (task.approvalRequest?.status === "awaiting") return "pending";
-    if (isLiveRun(task, now) || task.aiStartNowRequestedAt || applyingChange) return "in_progress";
+    if (isLiveRun(task, now) || isQueuedStart(task, now) || applyingChange) return "in_progress";
+    if (isStalledStart(task, now)) return "pending"; // approved / started, but no AI picked it up
     if (task.aiRunState === "running") return "pending"; // went quiet — stopped
     if (task.approvalRequest?.status === "awaiting" || PENDING_STATUSES.has(String(task.status))) return "pending";
     if (["failed", "needs_review", "needs_connection", "cancelled"].includes(String(task.aiRunState))) return "pending";
@@ -251,7 +307,7 @@ export function moveToPending<T extends FlowTask>(task: T, input: Actor & { reas
     ? { ...prior, reason, request: prior.request && prior.request !== prior.reason ? prior.request : request }
     : { id: newId(), status: "awaiting", reason, request, to: OWNER_APPROVER_EMAIL, requestedAt: input.at, requestedBy: input.by, emailStatus: "queued" };
   let next: T = {
-    ...task,
+    ...withRunTime(task, input.at),
     status: TASK_STATUS.pending,
     pendingReason: shortText(reason, 150),
     pendingReasonBy: input.by,
@@ -319,7 +375,8 @@ export function rejectTask<T extends FlowTask>(task: T, input: Actor & { note?: 
 }
 
 /** Mark finished. Merges any files the work produced so they show in History. */
-export function completeTask<T extends FlowTask>(task: T, input: Actor & { attachments?: FlowAttachment[]; note?: string }): T {
+export function completeTask<T extends FlowTask>(input0: T, input: Actor & { attachments?: FlowAttachment[]; note?: string; runStartedAt?: string }): T {
+  const task = withRunTime(input0, input.at, input.runStartedAt);
   const files = input.attachments || [];
   const attachments = files.length
     ? [...(task.attachments || []).filter((item) => !files.some((file) => file.id === item.id)), ...files]
@@ -345,10 +402,11 @@ export function completeTask<T extends FlowTask>(task: T, input: Actor & { attac
  * - Otherwise finished cleanly → Done.
  * - Otherwise → Pending with the reason and request, and an approval request to the owner.
  */
-export function finishAiRun<T extends FlowTask>(task: T, input: Actor & { finished: boolean; reason?: string; request?: string; attachments?: FlowAttachment[]; note?: string }): { task: T; column: BoardColumn } {
-  if (task.approvalGrantedAt || input.finished) {
-    return { task: completeTask(task, { at: input.at, by: input.by, attachments: input.attachments, note: input.note || (task.approvalGrantedAt ? "Completed after owner approval" : undefined) }), column: "done" };
+export function finishAiRun<T extends FlowTask>(task0: T, input: Actor & { finished: boolean; reason?: string; request?: string; attachments?: FlowAttachment[]; note?: string; runStartedAt?: string }): { task: T; column: BoardColumn } {
+  if (task0.approvalGrantedAt || input.finished) {
+    return { task: completeTask(task0, { at: input.at, by: input.by, attachments: input.attachments, note: input.note || (task0.approvalGrantedAt ? "Completed after owner approval" : undefined), runStartedAt: input.runStartedAt }), column: "done" };
   }
+  const task = withRunTime(task0, input.at, input.runStartedAt);
   const withFiles: T = input.attachments?.length ? { ...task, attachments: [...(task.attachments || []), ...input.attachments.filter((file) => !(task.attachments || []).some((item) => item.id === file.id))] } : task;
   const pending = moveToPending(withFiles, { at: input.at, by: input.by, reason: input.reason || "The AI stopped before finishing and needs a decision.", request: input.request, kind: "needs_approval", aiRunState: "needs_review" });
   return { task: pending.task, column: "pending" };

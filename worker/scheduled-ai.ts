@@ -1881,7 +1881,7 @@ async function runTask(env: SchedulerEnv, task: ScheduledTask, workspace: any, n
     const pendingRequest = stagedApprovals.length
       ? stagedApprovals.map((item) => `• ${item.title}\n  ${item.rationale}`).join("\n")
       : [result.suggested_next_step, result.summary].map((item) => String(item || "").trim()).filter(Boolean).join("\n\n");
-    return finishAiRun(resultTask, { at: runAt, by: agentName, finished: completed, reason: pendingReason || "The AI stopped before finishing and needs your decision.", request: pendingRequest, attachments: [...taskScreenshots, ...auditReportAttachments], note: shortTaskNoteLine(result.summary, 280) }).task;
+    return finishAiRun(resultTask, { runStartedAt: existing.aiRunStartedAt, at: runAt, by: agentName, finished: completed, reason: pendingReason || "The AI stopped before finishing and needs your decision.", request: pendingRequest, attachments: [...taskScreenshots, ...auditReportAttachments], note: shortTaskNoteLine(result.summary, 280) }).task;
   }, {
     notes: savedNote,
     entries: { id: crypto.randomUUID(), taskId: task.id, clientId: task.clientId, staffId: task.assigneeId, startAt: runStartedAt, endAt: runAt, seconds: Math.max(1, Math.round((Date.now() - new Date(runStartedAt).getTime()) / 1000)), note: `${agentName} task run duration`, billable: false },
