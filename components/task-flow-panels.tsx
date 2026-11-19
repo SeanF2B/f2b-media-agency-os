@@ -6,7 +6,7 @@
 import { useMemo, useState } from "react";
 import "./task-flow.css";
 import {
-  OWNER_APPROVER_EMAIL, boardColumn, frequencyLabel, historyItems, needsOwnerDecision, scheduleLabel,
+  OWNER_APPROVER_EMAIL, boardColumn, frequencyLabel, historyItems, needsOwnerDecision, requestTextFromTask, scheduleLabel,
   type FlowAttachment, type FlowTask,
 } from "@/lib/task-flow";
 
@@ -73,7 +73,10 @@ export function TaskApprovalsPanel({ tasks, clients, staff, canDecide, busyTaskI
       const request = task.approvalRequest!;
       const client = clients.find((item) => item.id === task.clientId);
       const assignee = staff.find((item) => item.id === task.assigneeId);
-      const draft = drafts[task.id] ?? request.request;
+      // Older requests may only hold a status line; show the agent's actual draft when it posted one.
+      const agentDraft = requestTextFromTask(task);
+      const original = agentDraft && !request.request.includes(agentDraft.slice(0, 60)) ? agentDraft : request.request;
+      const draft = drafts[task.id] ?? original;
       const busy = busyTaskId === task.id;
       const adsChanges = (task.aiApprovals || []).filter((item) => item.status === "pending");
       return <article className="tf-card" key={task.id}>
@@ -91,7 +94,7 @@ export function TaskApprovalsPanel({ tasks, clients, staff, canDecide, busyTaskI
           <small className={`tf-mail is-${request.emailStatus || "queued"}`}>{request.emailStatus === "sent" ? `Emailed ${request.to}` : request.emailStatus === "failed" ? `Email failed: ${request.emailDetail || "unknown error"}` : request.emailStatus === "skipped" ? "Email not configured — waiting here" : `Emailing ${request.to}…`}</small>
           {canDecide ? <div className="tf-actions">
             <button type="button" className="secondary-button tf-reject" disabled={busy} onClick={() => void onReject(task.id, notes[task.id] || "")}>Reject</button>
-            <button type="button" className="primary-button" disabled={busy || !draft.trim()} onClick={() => void onApprove(task.id, draft, notes[task.id] || "")}>{busy ? "Working…" : draft.trim() !== request.request.trim() ? "Approve with edits" : "Approve"}</button>
+            <button type="button" className="primary-button" disabled={busy || !draft.trim()} onClick={() => void onApprove(task.id, draft, notes[task.id] || "")}>{busy ? "Working…" : draft.trim() !== original.trim() ? "Approve with edits" : "Approve"}</button>
           </div> : <small className="tf-muted">Only the owner can decide.</small>}
         </footer>
       </article>;
