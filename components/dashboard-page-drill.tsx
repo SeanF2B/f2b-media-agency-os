@@ -24,6 +24,19 @@ function Field({ label, value, max }: { label: string; value: string; max?: numb
 }
 
 
+/** Keywords the page targets today, read from its live title (first part), H1 and meta keywords. */
+function onPageKeywords(p: OrgPage) {
+  const clean = (t: string) => t.toLowerCase().replace(/[“”"']/g, "").replace(/\s+/g, " ").trim();
+  const out: string[] = [];
+  const add = (t: string) => { const c = clean(t); if (c.length >= 3 && c.split(" ").length <= 7 && !out.includes(c)) out.push(c); };
+  const segs = String(p.title || "").split(/\s[|–—-]\s/);
+  if (segs[0]) add(segs[0]);
+  for (const s of segs.slice(1)) if (/\b(galway|cork|dublin|ireland|near me)\b/i.test(s)) add(s);
+  if (p.h1 && p.h1.split(" ").length <= 7) add(p.h1);
+  for (const k of String(p.metaKeywords || "").split(",")) add(k);
+  return out.slice(0, 8);
+}
+
 // Edit a page's meta title / description / focus keyword through the website builder (saves to the
 // preview working copy, same as the builder), or its target keywords (SEO → Pages targets).
 function MetaEditor({ page, clientId, onSaved }: { page: OrgPage; clientId: string; onSaved: (patch: Partial<OrgPage>, note: string) => void }) {
@@ -67,7 +80,7 @@ function KeywordEditor({ page, clientId, onSaved }: { page: OrgPage; clientId: s
     } catch (e) { setMsg(e instanceof Error ? e.message : "Couldn’t save."); } finally { setBusy(false); }
   };
   return <div className="pd-edit pd-edit-row">
-    <label>Target keyword<input value={primary} placeholder="e.g. roof repair galway" onChange={(e) => setPrimary(e.target.value)} /></label>
+    <label>Target keyword<input value={primary} placeholder={onPageKeywords(page)[0] ? `e.g. ${onPageKeywords(page)[0]}` : "e.g. roof repair galway"} onChange={(e) => setPrimary(e.target.value)} /></label>
     <label>Supporting keywords<input value={supporting} placeholder="comma separated" onChange={(e) => setSupporting(e.target.value)} /></label>
     <div className="pd-edit-foot"><button type="button" className="pd-btn" disabled={busy} onClick={save}>{busy ? "Saving…" : "Save keywords"}</button>{msg && <small>{msg}</small>}</div>
   </div>;
@@ -116,10 +129,12 @@ export function PageDrill({ kind, clientId, start, end, currency = "EUR", onClos
           </button>
           {isOpen && <div className="pd-body">
             {(() => { const targets = [p.targetKeyword, ...String(p.supportingKeywords || "").split(/[,\n]/)].map((x) => x.trim()).filter((t) => t && !p.queries.some((x) => x.query.toLowerCase() === t.toLowerCase()));
-              return <details className="pd-dd" open><summary>Keywords <small>({p.queries.length + targets.length})</small></summary>{p.queries.length || targets.length ? <table><thead><tr><th>Keyword</th><th>Pos.</th><th>Clicks</th><th>Impr.</th><th>CTR</th></tr></thead><tbody>
+              const onPage = onPageKeywords(p).filter((t) => !targets.some((x) => x.toLowerCase() === t.toLowerCase()) && !p.queries.some((x) => x.query.toLowerCase() === t.toLowerCase()));
+              return <details className="pd-dd" open><summary>Keywords <small>({p.queries.length + targets.length + onPage.length})</small></summary>
+                {onPage.length > 0 && <div className="pd-chips pd-onpage"><small>Currently targeted on the page (title, H1, meta keywords)</small>{onPage.map((t) => <span key={t}>{t}</span>)}</div>}{p.queries.length || targets.length ? <table><thead><tr><th>Keyword</th><th>Pos.</th><th>Clicks</th><th>Impr.</th><th>CTR</th></tr></thead><tbody>
                 {p.queries.map((x) => <tr key={x.query}><td>{x.query}</td><td className={x.position == null ? "" : x.position <= 3 ? "good" : x.position > 10 ? "bad" : ""}>{x.position != null ? `#${x.position}` : "—"}</td><td>{n(x.clicks)}</td><td>{n(x.impressions)}</td><td>{x.impressions ? `${n(x.clicks / x.impressions * 100)}%` : "—"}</td></tr>)}
                 {targets.map((t) => <tr key={`t-${t}`}><td>{t} <small>· target, no Google data yet</small></td><td>—</td><td>—</td><td>—</td><td>—</td></tr>)}
-              </tbody></table> : <p className="dh-muted">No Google searches for this page in this period yet. Set a target keyword below.</p>}<KeywordEditor page={p} clientId={clientId} onSaved={(x) => patchPage(p.path, x)} /></details>; })()}
+              </tbody></table> : <p className="dh-muted">No Google searches for this page in this period yet. {onPage.length ? "Google hasn’t sent search data for this page yet." : "Set a target keyword below."}</p>}<KeywordEditor page={p} clientId={clientId} onSaved={(x) => patchPage(p.path, x)} /></details>; })()}
             <details className="pd-dd" open><summary>Meta details <small>{[!p.title && "no title", !p.description && "no description", p.title.length > 60 && "title too long", p.description.length > 160 && "description too long"].filter(Boolean).join(" · ") || "title · description · H1"}</small></summary>
               <a className="pd-serp" href={p.url} target="_blank" rel="noreferrer" title="Open page in a new tab"><small>{(() => { try { return new URL(p.url).hostname.replace(/^www\./, "") + p.path; } catch { return p.path; } })()} ↗</small><b>{p.title || "No title tag"}</b><p>{p.description || "No meta description"}</p></a>
               <Field label="Meta title" value={p.title} max={60} />
@@ -279,6 +294,8 @@ const CSS = `
 .pd .pd-chips small{font-size:11px;opacity:.6;margin-right:4px;width:100%}
 .pd .pd-chips span{font-size:12px;padding:3px 8px;border-radius:999px;border:1px solid rgba(127,127,127,.2)}
 .pd .pd-chips span.long{border-radius:8px}
+.pd .pd-onpage{margin:0 0 10px}
+.pd .pd-onpage span{font-weight:600}
 html.dark .pd .pd-ad-preview b,[data-theme=dark] .pd .pd-ad-preview b{color:#8ab4f8}
 .pd .pd-kw .pd-row{grid-template-columns:minmax(0,1fr) repeat(4,72px)}
 .pd .pd-kwpage{display:flex;flex-direction:column;gap:10px;padding-bottom:12px;border-bottom:1px dashed rgba(127,127,127,.2)}
