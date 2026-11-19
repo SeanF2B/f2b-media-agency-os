@@ -27,7 +27,7 @@ export async function encryptMetaToken(token: string) {
   const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await key(), new TextEncoder().encode(token));
   return { iv: toBase64Url(iv), ciphertext: toBase64Url(new Uint8Array(ciphertext)) };
 }
-async function decryptMetaToken(iv: string, ciphertext: string) {
+export async function decryptMetaToken(iv: string, ciphertext: string) {
   const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromBase64Url(iv) }, await key(), fromBase64Url(ciphertext));
   return new TextDecoder().decode(plain);
 }
