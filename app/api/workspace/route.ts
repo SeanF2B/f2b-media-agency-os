@@ -1,4 +1,5 @@
 import { assertDeletable, AccountError } from "@/lib/client-accounts/client-accounts-core";
+import { diffWorkspace, ensureActionLog, logAction } from "@/lib/action-log";
 import { getChatGPTUser } from "../../chatgpt-auth";
 import { env } from "cloudflare:workers";
 import { enforceOwnerOnlyOverview, fullTeamPermissions, getMemberPermissions, isSubAccountRole, type TeamPermissions } from "@/lib/access-permissions";
@@ -316,7 +317,14 @@ export async function PUT(request: Request) {
       const version = `workspace-${crypto.randomUUID()}`;
       const result = await env.DB!.prepare("UPDATE workspace_documents SET data = json_set(?1, '$.chessGames', json(COALESCE(json_extract(data, '$.chessGames'), '[]'))), updated_at = ?2 WHERE id = ?3 AND updated_at = ?4")
         .bind(JSON.stringify(mergedWorkspace), version, "f2b-agency", latest.updated_at).run();
-      if (result.meta.changes === 1) return Response.json({ ok: true, updatedAt: new Date().toISOString() });
+      if (result.meta.changes === 1) {
+        // Audit log → Activity: what changed in this save, field by field.
+        try {
+          const changes = diffWorkspace(latestData, mergedWorkspace);
+          if (changes.length) { await ensureActionLog(env.DB!); for (const c of changes) await logAction(env.DB!, { actor: user.email, method: "PUT", path: "/api/workspace", status: 200, clientId: c.clientId, area: c.area, action: c.action, target: c.target, detail: c.detail }); }
+        } catch (e) { console.error("action log", e); }
+        return Response.json({ ok: true, updatedAt: new Date().toISOString() });
+      }
     }
     return Response.json({ error: "The workspace changed while saving. Please try again." }, { status: 409 });
   } catch (error) {

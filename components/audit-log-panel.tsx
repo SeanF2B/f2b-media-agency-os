@@ -8,6 +8,8 @@ type Data = {
   active: Array<{ email: string; name: string; day: string; seconds: number; firstAt: string; lastAt: string; pages: Record<string, number> }>;
   calls: Array<{ id: string; client: string; direction: string; channel: string; trigger: string; number: string; contact: string; purpose: string; status: string; outcome: string; state: string; summary: string; durationSec: number; startedAt: string; endedAt: string; error: string; hasRecording: boolean }>;
   callSummary: { total: number; answered: number; unanswered: number; dropped: number; failed: number; talkSeconds: number; inbound: number; outbound: number };
+  activity: Array<{ at: string; actor: string; name: string; type: string; client: string; area: string; action: string; target: string; detail: Record<string, any>; ok: boolean; status: number; isDelete: boolean; ip: string }>;
+  messages: Array<{ at: string; channel: string; from: string; number: string; client: string; preview: string }>;
 };
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 const PERIODS: Array<[string, string, number]> = [["1", "Today", 0], ["7", "Last 7 days", 6], ["30", "Last 30 days", 29], ["90", "Last 90 days", 89]];
@@ -20,7 +22,11 @@ const STATE: Record<string, string> = { answered: "Answered", unanswered: "Unans
 export function AuditLogPanel() {
   const [period, setPeriod] = useState("7");
   const [email, setEmail] = useState("");
-  const [tab, setTab] = useState<"logins" | "active" | "calls">("logins");
+  const [tab, setTab] = useState<"activity" | "logins" | "active" | "calls" | "messages">("activity");
+  const [aType, setAType] = useState("");
+  const [aArea, setAArea] = useState("");
+  const [onlyDeletes, setOnlyDeletes] = useState(false);
+  const [q, setQ] = useState("");
   const [callFilter, setCallFilter] = useState("");
   const [open, setOpen] = useState("");
   const [data, setData] = useState<Data | null>(null);
@@ -40,14 +46,38 @@ export function AuditLogPanel() {
 
   return <section className="panel alp">
     <style>{CSS}</style>
-    <div><p className="eyebrow">AGENCY ONLY</p><h2>Audit log</h2><p className="alp-sub">Who signed in and when, how long each person was actively working (mouse, keyboard or touch use while the OS is open), and every phone call with talk time, unanswered and dropped calls.</p></div>
+    <div><p className="eyebrow">AGENCY ONLY</p><h2>Audit log</h2><p className="alp-sub">Every action taken in the OS by agency staff, sub-account staff and client logins (created, edited, moved, deleted), who signed in and when, how long each person was actively working (mouse, keyboard or touch use while the OS is open), and every phone call with talk time, unanswered and dropped calls, and every message received.</p></div>
     <div className="alp-bar">
       <div className="alp-seg">{PERIODS.map(([k, l]) => <button key={k} type="button" className={period === k ? "on" : ""} onClick={() => setPeriod(k)}>{l}</button>)}</div>
       <select value={email} onChange={(e) => setEmail(e.target.value)} aria-label="Team member"><option value="">Everyone</option>{(data?.staff || []).map((s) => <option key={s.email} value={s.email}>{s.name}</option>)}</select>
     </div>
-    <div className="alp-tabs" role="tablist">{([["logins", "Sign-ins"], ["active", "Active time"], ["calls", "Calls"]] as const).map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{l}</button>)}</div>
+    <div className="alp-tabs" role="tablist">{([["activity", "Activity"], ["logins", "Sign-ins"], ["active", "Active time"], ["calls", "Calls"], ["messages", "Messages received"]] as const).map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{l}</button>)}</div>
     {err && <p className="alp-muted">{err}</p>}
     {!data && !err && <p className="alp-muted">Loading…</p>}
+
+    {data && tab === "activity" && (() => {
+      const areas = [...new Set(data.activity.map((a) => a.area))].sort();
+      const term = q.trim().toLowerCase();
+      const rows = data.activity.filter((a) => (!aType || a.type === aType) && (!aArea || a.area === aArea) && (!onlyDeletes || a.isDelete) && (!term || `${a.name} ${a.action} ${a.target} ${a.client} ${a.area}`.toLowerCase().includes(term)));
+      return <>
+        <div className="alp-bar">
+          <select value={aType} onChange={(e) => setAType(e.target.value)} aria-label="Who"><option value="">Agency, sub-account &amp; client logins</option><option>Agency staff</option><option>Sub-account staff</option><option>Client login</option><option>System</option></select>
+          <select value={aArea} onChange={(e) => setAArea(e.target.value)} aria-label="Area"><option value="">All areas</option>{areas.map((a) => <option key={a}>{a}</option>)}</select>
+          <label className="alp-check"><input type="checkbox" checked={onlyDeletes} onChange={(e) => setOnlyDeletes(e.target.checked)} /> Deletes &amp; cancellations only</label>
+          <input className="alp-search" placeholder="Search actions…" value={q} onChange={(e) => setQ(e.target.value)} />
+        </div>
+        <div className="alp-wrap"><table className="alp-table"><thead><tr><th>When</th><th>Who</th><th>Area</th><th>Action</th><th>What</th><th>Client</th></tr></thead><tbody>
+          {rows.map((a, i) => <Fragment key={i}><tr className={`alp-click ${a.isDelete ? "del" : ""}`} onClick={() => setOpen(open === `a${i}` ? "" : `a${i}`)}><td>{when(a.at)}</td><td><b>{a.name}</b><small>{a.type}</small></td><td>{a.area}</td><td><span className={`alp-act ${a.isDelete ? "del" : ""} ${a.ok ? "" : "fail"}`}>{a.action}</span>{!a.ok && <small className="bad">failed ({a.status})</small>}</td><td>{a.target || "—"}</td><td>{a.client || "—"}</td></tr>
+            {open === `a${i}` && <tr className="alp-detail"><td colSpan={6}><div>{Object.entries(a.detail).filter(([k]) => k !== "id").map(([k, v]) => <span key={k}>{k}: <b>{typeof v === "object" && v ? `${(v as any).from ?? ""} → ${(v as any).to ?? ""}` : String(v)}</b></span>)}{a.ip && <span>IP <b>{a.ip}</b></span>}<span>{a.actor}</span></div></td></tr>}</Fragment>)}
+          {!rows.length && <tr><td colSpan={6} className="alp-muted">No actions in this period. Actions are recorded from today.</td></tr>}
+        </tbody></table>{data.activity.length >= 1000 && <small className="alp-muted">Showing the latest 1,000 actions. Pick a shorter period or one person to see more.</small>}</div>
+      </>;
+    })()}
+
+    {data && tab === "messages" && <div className="alp-wrap"><table className="alp-table"><thead><tr><th>When</th><th>Channel</th><th>From</th><th>Client</th><th>Message</th></tr></thead><tbody>
+      {data.messages.map((m, i) => <tr key={i}><td>{when(m.at)}</td><td>{m.channel}</td><td><b>{m.from}</b>{m.from !== m.number && <small>{m.number}</small>}</td><td>{m.client || "—"}</td><td>{m.preview}</td></tr>)}
+      {!data.messages.length && <tr><td colSpan={5} className="alp-muted">No messages received in this period.</td></tr>}
+    </tbody></table></div>}
 
     {data && tab === "logins" && <div className="alp-wrap"><table className="alp-table"><thead><tr><th>When</th><th>Who</th><th>Where</th><th>Device</th><th>IP</th></tr></thead><tbody>
       {data.logins.map((l, i) => <tr key={i}><td>{when(l.at)}</td><td><b>{l.name}</b><small>{l.email}</small></td><td>{l.place || "—"}</td><td>{l.device}</td><td><small>{l.ip}</small></td></tr>)}
@@ -105,4 +135,9 @@ const CSS = `
 .alp .alp-state{display:inline-block;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;background:#f1f5f9;color:#475569}
 .alp .alp-state.answered{background:#dcfce7;color:#166534}.alp .alp-state.unanswered{background:#fef3c7;color:#92400e}.alp .alp-state.dropped,.alp .alp-state.failed{background:#fee2e2;color:#991b1b}
 .alp .bad{color:#b42318}
+.alp .alp-check{display:inline-flex;align-items:center;gap:6px;font-size:13px}
+.alp .alp-search{padding:7px 10px;border-radius:10px;border:1px solid rgba(127,127,127,.28);background:transparent;color:inherit;font:inherit;min-width:200px}
+.alp .alp-act{display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;background:#eef2ff;color:#3730a3}
+.alp .alp-act.del{background:#fee2e2;color:#991b1b}.alp .alp-act.fail{opacity:.6;text-decoration:line-through}
+.alp tr.del td:first-child{box-shadow:inset 3px 0 0 #dc2626}
 `;

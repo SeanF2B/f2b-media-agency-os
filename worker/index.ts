@@ -323,9 +323,18 @@ const worker = {
     installUsageMeter(env.DB);
     const usagePath = new URL(appRequest.url).pathname;
     const usage = usagePath.startsWith("/api/") ? { clientId: await clientIdFromRequest(appRequest).catch(() => ""), route: usagePath, feature: featureFor(usagePath), actor: identity?.email || "", waitUntil: (p: Promise<unknown>) => ctx.waitUntil(p) } : { waitUntil: (p: Promise<unknown>) => ctx.waitUntil(p) };
+    // Settings → Audit log → Activity: every saving action (who, what, where, when, result). Secrets never stored.
+    // The body is read from a copy taken before the app consumes the request.
+    const { shouldLogRequest } = await import("../lib/action-log");
+    const logThis = Boolean(env.DB) && shouldLogRequest(appRequest.method, usagePath) && !usagePath.startsWith("/api/marketing-public");
+    const logBody: Promise<unknown> = logThis && /json/i.test(appRequest.headers.get("content-type") || "") && Number(appRequest.headers.get("content-length") || 0) < 512_000 ? appRequest.clone().json().catch(() => null) : Promise.resolve(null);
     const response = await runWithUsage(usage, () => runWithConnectorBinding(binding, () =>
       handler.fetch(appRequest, env, ctx),
     ));
+    if (logThis) {
+      const actor = identity?.email || "", ip = appRequest.headers.get("cf-connecting-ip") || "", clientId = (usage as { clientId?: string }).clientId || "";
+      ctx.waitUntil(logBody.then(async (body) => { const { logAction } = await import("../lib/action-log"); await logAction(env.DB!, { actor, method: appRequest.method, path: usagePath, status: response.status, clientId, body, ip }); }).catch((e) => console.error("action log", e)));
+    }
     return withSecurityHeaders(response, appRequest === authenticatedRequest ? incomingUrl.pathname : "/f/");
   },
 };
