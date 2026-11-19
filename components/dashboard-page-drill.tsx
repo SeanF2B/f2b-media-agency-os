@@ -251,7 +251,8 @@ const CSS = `
 .pd .pd-row{display:grid;grid-template-columns:minmax(0,1fr) repeat(7,72px);gap:8px;align-items:center;width:100%;padding:9px 6px;border:0;border-bottom:1px solid rgba(127,127,127,.12);background:transparent;color:inherit;font:inherit;font-size:13px;text-align:right;cursor:pointer}
 .pd .pd-row>span:first-child{text-align:left}
 .pd button.pd-row:hover{background:rgba(127,127,127,.06)}
-.pd .pd-headrow{cursor:default;font-size:11px;text-transform:uppercase;letter-spacing:.04em;opacity:.6;padding-top:2px}
+.pd .pd-headrow{cursor:default;font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding-top:8px;position:sticky;top:0;z-index:4;background:var(--f2b-white,#fff);color:color-mix(in srgb,currentColor 60%,transparent);box-shadow:0 1px 0 rgba(127,127,127,.18)}
+html.dark .pd .pd-headrow,body.f2b-dark .pd .pd-headrow,.dark-mode .pd .pd-headrow{background:#1b2127}
 .pd .pd-page{display:flex;align-items:baseline;gap:8px;min-width:0}
 .pd .pd-page i{font-style:normal;opacity:.5;width:10px}
 .pd .pd-page b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:45%}
