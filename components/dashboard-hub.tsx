@@ -36,7 +36,7 @@ const AppointmentsDashboard = lazy(() => import("./scheduling-view").then((modul
 import { CampaignPicker } from "./campaign-picker";
 import { PageDrill } from "./dashboard-page-drill";
 
-type HubTask = { id: string; clientId: string; title: string; status: string; assigneeId: string; due?: string; dueAt?: string; completedAt?: string; service?: string; reviewStatus?: string; reviewApproverId?: string; aiRunState?: string; aiApprovals?: Array<{ status: string }> };
+type HubTask = { id: string; clientId: string; title: string; status: string; assigneeId: string; due?: string; dueAt?: string; completedAt?: string; service?: string; reviewStatus?: string; reviewApproverId?: string; aiRunState?: string; aiApprovals?: Array<{ status: string }>; approvalRequest?: { status?: string; requestedAt?: string } | null };
 type HubClient = { id: string; name: string; logo?: string; googleAdsAccountId?: string; appointmentBased?: boolean; services?: Array<{ name: string; fee?: number }> };
 type HubStaff = { id: string; name: string; isBot?: boolean };
 type Stat = { value: number; previous: number | null } | null;
@@ -146,13 +146,17 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
   const upcoming = useMemo(() => tasks.filter((t) => inScope(t) && !/^done$/i.test(t.status) && (showAi || !bots.has(t.assigneeId))).sort((a, b) => (a.dueAt || a.due || "9999").localeCompare(b.dueAt || b.due || "9999")).slice(0, 6), [tasks, showAi, bots, scopeClientId]); // eslint-disable-line react-hooks/exhaustive-deps
   const completed = useMemo(() => tasks.filter((t) => inScope(t) && /^done$/i.test(t.status) && t.completedAt).sort((a, b) => (b.completedAt || "").localeCompare(a.completedAt || "")).slice(0, 6), [tasks, scopeClientId]); // eslint-disable-line react-hooks/exhaustive-deps
   // Approvals waiting on the signed-in person (the owner sees everything unassigned too).
-  const mineFor = (t: HubTask, approver?: string) => !currentStaffId || approver === currentStaffId || (!approver && t.assigneeId === currentStaffId);
-  const aiList = tasks.filter((t) => inScope(t) && ((t.aiApprovals || []).some((a) => a.status === "pending") || t.aiRunState === "needs_review"));
-  const humanList = tasks.filter((t) => inScope(t) && t.reviewStatus === "submitted");
+  const awaitingOwner = (t: HubTask) => t.approvalRequest?.status === "awaiting";
+  const isBotTask = (t: HubTask) => Boolean(staff.find((p) => p.id === t.assigneeId)?.isBot);
+  // Task-flow approval requests go to the owner/admins, so they count as "yours" for admins.
+  const mineFor = (t: HubTask, approver?: string) => (awaitingOwner(t) && isAdmin) || !currentStaffId || approver === currentStaffId || (!approver && t.assigneeId === currentStaffId);
+  const aiList = tasks.filter((t) => inScope(t) && ((t.aiApprovals || []).some((a) => a.status === "pending") || t.aiRunState === "needs_review" || (awaitingOwner(t) && isBotTask(t))));
+  const humanList = tasks.filter((t) => inScope(t) && (t.reviewStatus === "submitted" || (awaitingOwner(t) && !isBotTask(t))));
   const aiPending = aiList.length, humanPending = humanList.length;
   const aiMine = aiList.filter((t) => mineFor(t)), humanMine = humanList.filter((t) => mineFor(t, t.reviewApproverId));
-  const OVERLOAD = 5;
-  const tone = (mine: number) => mine >= OVERLOAD ? "overload" : mine > 0 ? "waiting" : "clear";
+  const oldestHours = (list: HubTask[]) => list.reduce((h, t) => { const at = Date.parse(t.approvalRequest?.requestedAt || ""); return at ? Math.max(h, (Date.now() - at) / 3_600_000) : h; }, 0);
+  // Same colours as Appointment updates: green when none, yellow when any are waiting, red when overloaded (5+ or waiting 2+ days).
+  const tone = (n: number, hours = 0) => n >= OVERLOAD || (n > 0 && hours >= 48) ? "overload" : n > 0 ? "waiting" : "clear";
   const clientOf = (id: string) => clients.find((c) => c.id === id);
   // "Run one in Operations → AI visibility" etc. become buttons that open that place (with this client picked).
   const go = (target: string) => { if (target.startsWith("Operations") && clientId && clientId !== "all") { try { localStorage.setItem("f2b-ops-client", clientId); } catch { /* storage off */ } } onNavigate?.(target); };
@@ -204,7 +208,7 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
     <section className="dh-actions" aria-label="Quick actions">{actions.map((a) => <button type="button" key={a.label} className={`dh-action ${a.tint}`} onClick={a.run}><span className="dh-action-icon">{a.icon}</span><span><b>{a.label}</b><small>{a.hint}</small></span></button>)}</section>
 
     <section className="dh-approvals" aria-label="Pending approvals">
-      {[{ key: "ai" as const, label: "AI approvals", n: aiPending, mine: aiMine.length, icon: <Sparkles size={18} />, hint: "Changes the AI wants you to approve" }, { key: "human" as const, label: "Team approvals", n: humanPending, mine: humanMine.length, icon: <Users size={18} />, hint: "Work your team submitted for review" }].map((a) => { const t = tone(a.mine); return <button type="button" key={a.key} className={`dh-approval ${t} ${apprOpen === a.key ? "open" : ""}`} aria-expanded={apprOpen === a.key} onClick={() => { setApprOpen(apprOpen === a.key ? "" : a.key); appt.setOpen(false); }}><span className="dh-approval-icon">{a.icon}</span><span className="dh-approval-text"><b>{a.label}</b><small>{t === "overload" ? `${a.mine} waiting on you — catch up` : a.mine ? `${a.mine} waiting on you` : a.n ? `${a.n} with others · nothing for you` : "All done"}</small></span><span className="dh-approval-n">{a.mine || (a.n ? a.n : "✓")}</span></button>; })}
+      {[{ key: "ai" as const, label: "AI approvals", n: aiPending, mine: aiMine.length, icon: <Sparkles size={18} />, hint: "Changes the AI wants you to approve" }, { key: "human" as const, label: "Team approvals", n: humanPending, mine: humanMine.length, icon: <Users size={18} />, hint: "Work your team submitted for review" }].map((a) => { const t = tone(a.n, oldestHours(a.key === "ai" ? aiList : humanList)); return <button type="button" key={a.key} className={`dh-approval ${t} ${apprOpen === a.key ? "open" : ""}`} aria-expanded={apprOpen === a.key} onClick={() => { setApprOpen(apprOpen === a.key ? "" : a.key); appt.setOpen(false); }}><span className="dh-approval-icon">{a.icon}</span><span className="dh-approval-text"><b>{a.label}</b><small>{t === "overload" ? `${a.n} waiting — catch up` : a.mine ? `${a.mine} waiting on you` : a.n ? `${a.n} waiting with others` : "All done"}</small></span><span className="dh-approval-n">{a.n || "✓"}</span></button>; })}
       {appt.card(() => setApprOpen(""))}
     </section>
     {apprOpen && (() => { const list = apprOpen === "ai" ? aiList : humanList; const who = (id?: string) => staff.find((p) => p.id === id)?.name || ""; return <section className="dh-appr-list" aria-label="Approvals">
