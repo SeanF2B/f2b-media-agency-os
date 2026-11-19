@@ -36,6 +36,7 @@ const AppointmentsDashboard = lazy(() => import("./scheduling-view").then((modul
 import { CampaignPicker } from "./campaign-picker";
 import { PageDrill } from "./dashboard-page-drill";
 import { UsageClientPanel } from "./usage-billing-panel";
+import { GbpPosts } from "./gbp-posts";
 
 type HubTask = { id: string; clientId: string; title: string; status: string; assigneeId: string; due?: string; dueAt?: string; completedAt?: string; service?: string; reviewStatus?: string; reviewApproverId?: string; aiRunState?: string; aiApprovals?: Array<{ status: string }>; approvalRequest?: { status?: string; requestedAt?: string } | null };
 type HubClient = { id: string; name: string; logo?: string; googleAdsAccountId?: string; appointmentBased?: boolean; services?: Array<{ name: string; fee?: number }> };
@@ -359,6 +360,7 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
             <Tile icon={<MousePointerClick size={18} />} label="Website clicks" value={bp?.websiteClicks != null ? num(bp.websiteClicks) : "—"}><Delta now={bp?.websiteClicks} before={bp?.previous?.websiteClicks} /></Tile>
           </div>
           {!bp && <p className="dh-muted">{L(m.businessNote || "Connect this client’s Google Business Profile to see views, calls and directions.")}</p>}
+          {!sample && clientId && clientId !== "all" && <GbpPosts clientId={clientId} businessName={clientOf(clientId)?.name || ""} onOpenCalendar={() => go("Operations:clients")} />}
       </section>
     </>; })()}
     {isAdmin && marketingPicked && m && m.scope !== "all" && <section className="panel dh-panel dh-sec-showup" aria-label="Where you show up" data-admin=""><div className="dh-head"><div><p className="eyebrow">🔎 {periodLabel.toUpperCase()}</p><h2>Where you show up</h2></div></div>

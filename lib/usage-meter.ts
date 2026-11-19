@@ -16,13 +16,23 @@ export function usageContext(): UsageContext | undefined { return store.getStore
 const FEATURES: Array<[RegExp, string]> = [
   [/^\/api\/seo-suggest/, "SEO page suggestions & AI recommendations"], [/^\/api\/seo\/keywords/, "Keyword research"], [/^\/api\/seo\/keyword-seeds/, "Keyword ideas"],
   [/^\/api\/seo\/rank-tracking/, "Rank tracking"], [/^\/api\/seo\/local-rank/, "Local map rankings"], [/^\/api\/seo\/backlinks/, "Backlinks"], [/^\/api\/community-leads/, "Community lead discovery"],
-  [/^\/api\/ai-visibility/, "AI visibility checks"], [/^\/api\/assistant/, "AI assistant"], [/^\/api\/ai-assist/, "AI writing help"], [/^\/api\/ai-command/, "AI commands"], [/^\/api\/ai-employee/, "AI employees"],
-  [/^\/api\/proposals/, "Proposals"], [/^\/api\/client-reports/, "Client reports"], [/^\/api\/setup-drafts/, "Setup wizards"], [/^\/api\/studio|^\/api\/marketing-studio/, "Content studio"],
+  [/^\/api\/ai-visibility/, "AI visibility checks"], [/^\/api\/assistant/, "AI assistant"], [/^\/api\/ai-assist/, "AI polish & writing help"], [/^\/api\/ai-command/, "AI commands"], [/^\/api\/ai-employee/, "AI employees"],
+  [/^\/api\/proposals/, "Proposals"], [/^\/api\/client-reports/, "Reports & audits"], [/^\/api\/setup-drafts/, "Setup wizards"], [/^\/api\/studio|^\/api\/marketing-studio/, "Content studio"],
   [/^\/api\/social-posts/, "Social posts"], [/^\/api\/email-marketing/, "Email marketing"], [/^\/api\/outreach/, "Outreach"], [/^\/api\/conversations|^\/api\/whatsapp/, "Conversation AI"],
   [/^\/api\/scheduling/, "Scheduling AI"], [/^\/api\/tasks|^\/api\/task-suggestions/, "Task AI"], [/^\/api\/media-library/, "Media library AI"], [/^\/api\/onboarding|^\/api\/marketing-public\/onboarding/, "Onboarding audits"],
   [/^\/api\/operating-world/, "Operating World"], [/^\/api\/marketing-public/, "Public funnels"],
 ];
 export function featureFor(path: string) { for (const [re, label] of FEATURES) if (re.test(path)) return label; return path.replace(/^\/api\//, "").split("/")[0] || "Other"; }
+
+/** What exactly the request asked for (e.g. "review", "polish", "website-audit"), for detailed usage lines. */
+export async function actionFromRequest(request: Request): Promise<string> {
+  const url = new URL(request.url);
+  let v = url.searchParams.get("action") || url.searchParams.get("mode") || url.searchParams.get("kind") || url.searchParams.get("type") || "";
+  if (!v && request.method === "POST" && /json/i.test(request.headers.get("content-type") || "") && Number(request.headers.get("content-length") || 0) < 512_000) {
+    try { const b = await request.clone().json() as Record<string, unknown>; for (const k of ["mode", "action", "op", "kind", "type", "task", "tool"]) { if (typeof b?.[k] === "string" && b[k]) { v = String(b[k]); break; } } } catch { /* not JSON */ }
+  }
+  return v.replace(/[-_]/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase().slice(0, 40);
+}
 
 /** Reads clientId from the query string or a JSON body, without consuming the original request. */
 export async function clientIdFromRequest(request: Request): Promise<string> {

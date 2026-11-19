@@ -3561,3 +3561,6 @@ html body .app-shell .tn-logo:has(.brand-bar-logo) { width: auto !important; min
 html body .app-shell .brand-lockup.sidebar-logo:has(.brand-bar-logo) { width: auto !important; flex: 0 0 auto !important; }
 html body .app-shell .brand-icon-image.brand-bar-logo { width: auto !important; height: 34px !important; max-width: 150px !important; object-fit: contain; display: block; }
 @media (max-width: 860px) { html body .app-shell .brand-icon-image.brand-bar-logo { height: 28px !important; max-width: 110px !important; } }
+/* Settings → Billing: billing details and AI billing as matching padded cards */
+html body .app-shell .settings-billing-card { padding: 22px 24px !important; margin-bottom: 14px; }
+@media (max-width: 700px) { html body .app-shell .settings-billing-card { padding: 16px !important; } }

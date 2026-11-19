@@ -17,7 +17,7 @@ import { hasGoogleSearchConsoleConnection, readGoogleSearchConsoleRows } from ".
 import { hasGoogleAnalyticsDirectConnection, readGoogleAnalyticsReport } from "../lib/google-analytics-direct";
 import { autoLinkGoogleProperties } from "../lib/google-auto-link";
 import { runWithConnectorBinding } from "../lib/connector-context";
-import { clientIdFromRequest, featureFor, installUsageMeter, runWithUsage } from "../lib/usage-meter";
+import { actionFromRequest, clientIdFromRequest, featureFor, installUsageMeter, runWithUsage } from "../lib/usage-meter";
 import type { ConnectorBinding } from "../lib/connector-contract.mjs";
 import { isMarketingDomainVerified, marketingCustomDomainPageUrl, normalizeMarketingHostname } from "../lib/marketing-custom-domain.js";
 
@@ -322,7 +322,8 @@ const worker = {
     // AI & SEO-data usage metering (client rebilling): tag this request with its client and feature.
     installUsageMeter(env.DB);
     const usagePath = new URL(appRequest.url).pathname;
-    const usage = usagePath.startsWith("/api/") ? { clientId: await clientIdFromRequest(appRequest).catch(() => ""), route: usagePath, feature: featureFor(usagePath), actor: identity?.email || "", waitUntil: (p: Promise<unknown>) => ctx.waitUntil(p) } : { waitUntil: (p: Promise<unknown>) => ctx.waitUntil(p) };
+    const usageAction = usagePath.startsWith("/api/") ? await actionFromRequest(appRequest).catch(() => "") : "";
+    const usage = usagePath.startsWith("/api/") ? { clientId: await clientIdFromRequest(appRequest).catch(() => ""), route: usagePath, feature: `${featureFor(usagePath)}${usageAction ? ` · ${usageAction}` : ""}`.slice(0, 80), actor: identity?.email || "", waitUntil: (p: Promise<unknown>) => ctx.waitUntil(p) } : { waitUntil: (p: Promise<unknown>) => ctx.waitUntil(p) };
     // Settings → Audit log → Activity: every saving action (who, what, where, when, result). Secrets never stored.
     // The body is read from a copy taken before the app consumes the request.
     const { shouldLogRequest } = await import("../lib/action-log");
