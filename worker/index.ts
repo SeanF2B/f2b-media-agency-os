@@ -315,6 +315,10 @@ const worker = {
       }
     }
 
+    // Settings → Audit log: record staff sign-ins when the app itself is opened.
+    if (identity?.email && env.DB && appRequest.method === "GET" && new URL(appRequest.url).pathname === "/" && /text\/html/.test(appRequest.headers.get("accept") || "")) {
+      ctx.waitUntil(import("../lib/activity-log").then(({ recordLogin }) => recordLogin(env.DB!, identity.email!, appRequest)).catch(() => undefined));
+    }
     // AI & SEO-data usage metering (client rebilling): tag this request with its client and feature.
     installUsageMeter(env.DB);
     const usagePath = new URL(appRequest.url).pathname;
