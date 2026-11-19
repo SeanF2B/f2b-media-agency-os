@@ -23,6 +23,9 @@ const STATUS: Record<string, [string, string]> = {
   PENDING_VERIFICATION: ["Needs the code", "act"], TWILIO_REVIEW: ["Meta review", "wait"], DRAFT: ["Draft", "wait"], STUBBED: ["Setting up…", "wait"], OFFLINE: ["Offline", "bad"],
 };
 const statusOf = (s: string) => STATUS[s] || [s ? s.toLowerCase().replace(/_/g, " ") : "Unknown", "wait"];
+const DIAL: Record<string, string> = { IE: "353", GB: "44", US: "1", CA: "1", AU: "61", ES: "34", NL: "31" };
+/** "087 123 4567" + Ireland → +353871234567; already-international numbers are kept. */
+const toE164 = (raw: string, country: string) => { const d = raw.replace(/[^\d+]/g, ""); if (!d) return ""; if (d.startsWith("+")) return d; if (d.startsWith("00")) return `+${d.slice(2)}`; if (d.startsWith("0")) return `+${DIAL[country] || "353"}${d.slice(1)}`; return `+${d}`; };
 const COUNTRIES: Array<[string, string]> = [["IE", "🇮🇪 Ireland"], ["GB", "🇬🇧 United Kingdom"], ["US", "🇺🇸 United States"], ["CA", "🇨🇦 Canada"], ["AU", "🇦🇺 Australia"], ["ES", "🇪🇸 Spain"], ["NL", "🇳🇱 Netherlands"]];
 
 function loadFbSdk(es: Es): Promise<FbSdk> {
@@ -138,7 +141,7 @@ export function WhatsAppSetup({ clients, initialClientId = "", onClose, onLive }
 
         {step === 1 && <div className="wa-pane">
           <label>Which client is this for?<select value={clientId} onChange={(e) => { setClientId(e.target.value); setDisplayName(clientName(e.target.value)); }}><option value="">Choose a client…</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
-          <div className="wa-seg" role="radiogroup" aria-label="Number">{([["buy", "Buy a new number"], ["owned", "A number I already bought"], ["existing", "The client's own number"]] as const).map(([k, l]) => <button key={k} type="button" role="radio" aria-checked={numberMode === k} className={numberMode === k ? "on" : ""} onClick={() => { setNumberMode(k); setNumber(""); if (k === "owned" && !owned) void loadOwned(); }}>{l}</button>)}</div>
+          <div className="wa-seg" role="radiogroup" aria-label="Number">{([["buy", "Buy a new number"], ["owned", "A number I already bought"], ["existing", "The client's own number"]] as const).map(([k, l]) => <button key={k} type="button" role="radio" aria-checked={numberMode === k} className={numberMode === k ? "on" : ""} onClick={() => { setNumberMode(k); setNumber(""); if (k === "existing") setCountry("IE"); if (k === "owned" && !owned) void loadOwned(); }}>{l}</button>)}</div>
           {numberMode === "buy" && <>
             <div className="cv-3"><label>Country<select value={country} onChange={(e) => setCountry(e.target.value)}>{COUNTRIES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
               <label>Type<select value={numType} onChange={(e) => setNumType(e.target.value as "Mobile" | "Local")}><option value="Mobile">Mobile (best for WhatsApp)</option><option value="Local">Landline</option></select></label>
@@ -154,7 +157,9 @@ export function WhatsAppSetup({ clients, initialClientId = "", onClose, onLive }
           </>}
           {numberMode === "owned" && (owned === null ? <p className="cv-hint">{busy === "owned" ? "Loading your numbers…" : ""}</p> : owned.length ? <ul className="va-numbers">{owned.map((n) => <li key={n.number} className={number === n.number ? "picked" : ""}><span><b>{n.number}</b><small>{n.friendly}</small></span><button type="button" className={number === n.number ? "primary-button" : "secondary-button"} onClick={() => setNumber(n.number)}>{number === n.number ? "✓ Chosen" : "Use this"}</button></li>)}</ul> : <p className="cv-hint">No numbers in your Twilio account yet. Buy one instead.</p>)}
           {numberMode === "existing" && <>
-            <label>Client's phone number<input inputMode="tel" value={existing} placeholder="+353871234567" onChange={(e) => { setExisting(e.target.value); const d = e.target.value.replace(/[^\d+]/g, ""); setNumber(d ? (d.startsWith("+") ? d : `+${d.replace(/^00/, "")}`) : ""); }} /></label>
+            <div className="cv-2"><label>Country<select value={country} onChange={(e) => { setCountry(e.target.value); setNumber(toE164(existing, e.target.value)); }}>{COUNTRIES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
+            <label>Client's phone number<input inputMode="tel" value={existing} placeholder="087 123 4567" onChange={(e) => { setExisting(e.target.value); setNumber(toE164(e.target.value, country)); }} /></label></div>
+            {number && <p className="cv-hint">We'll register <b>{number}</b>.</p>}
             <p className="cv-hint">Meta texts a code to this number to prove it's theirs; you'll type it in here. If it's already on the WhatsApp app, the client must delete that WhatsApp account on the phone first (chat history on the app is lost).</p>
           </>}
           <footer><button type="button" className="secondary-button" onClick={() => senders.length ? setWizard(false) : onClose()}>Cancel</button><button type="button" className="primary-button" disabled={!canStep2} onClick={() => setStep(2)}>Next</button></footer>

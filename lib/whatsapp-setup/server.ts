@@ -37,6 +37,7 @@ async function sendersApi(c: Creds, path: string, method: "GET" | "POST" | "DELE
   return json;
 }
 function friendlyError(message: string) {
+  if (/terms of service/i.test(message)) return "One-time step: accept WhatsApp's terms in your Twilio account first (console.twilio.com → Messaging → Senders → WhatsApp senders, then accept the terms shown). After that, come back and press Go live again.";
   if (/waba/i.test(message) && /(not found|invalid|access)/i.test(message)) return `Meta didn't recognise that WhatsApp Business Account, or it isn't shared with your Twilio account yet. ${message}`;
   if (/display name|profile.*name/i.test(message)) return `Meta rejected the display name. Use the business's real trading name. ${message}`;
   return message;
