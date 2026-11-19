@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "../../chatgpt-auth";
 import { fullTeamPermissions, getTeamPermissions, type TeamPermissions } from "@/lib/access-permissions";
 import { loadCachedMarketingData } from "@/lib/marketing-data-history";
-import { hasGoogleSearchConsoleConnection, readGoogleSearchConsoleRows } from "@/lib/google-search-console-direct";
+import { hasGoogleSearchConsoleConnection, listGoogleSearchConsoleProperties, readGoogleSearchConsoleRows } from "@/lib/google-search-console-direct";
 import { hasGoogleAnalyticsDirectConnection, readGoogleAnalyticsReport } from "@/lib/google-analytics-direct";
 import { getGoogleAdsAdMetrics, getGoogleAdsKeywordPerformance, getGoogleAdsLandingPages, listGoogleAdsAssetsResilient, listGoogleAdsResponsiveSearchAds } from "@/lib/google-ads-direct";
 
@@ -95,17 +95,27 @@ export async function GET(request: Request) {
 
   if (kind === "organic") {
     // Search Console rows (date × query × page), shared cache key with the dashboard.
-    const property = String(client.googleSearchConsoleAccountId || "").trim();
-    let gscRows: Array<{ query: string; page: string; clicks: number; impressions: number; position: number }> = [];
+    // Linked property, else matched by the client's website domain (same rule as the dashboard totals).
+    const gscConnected = await hasGoogleSearchConsoleConnection(ownerId).catch(() => false);
+    let property = String(client.googleSearchConsoleAccountId || "").trim();
     let gscNote = "";
-    if (property && await hasGoogleSearchConsoleConnection(ownerId).catch(() => false)) {
+    if (!property && gscConnected && origin) {
+      const domain = new URL(origin).hostname.replace(/^www\./, "").toLowerCase();
+      const hostOf = (raw: string) => { try { return new URL(/^https?:/.test(raw) ? raw : `https://${raw}`).hostname.replace(/^www\./, "").toLowerCase(); } catch { return ""; } };
+      const props = await loadCachedMarketingData({ db: db as never, ownerId, clientId: "agency", service: "Search Console", key: "gsc-properties", ttlMs: H6 }, () => listGoogleSearchConsoleProperties(ownerId)).then((r) => r.data).catch(() => [] as Array<{ id: string }>);
+      const match = props.find((p) => p.id === `sc-domain:${domain}`) || props.find((p) => hostOf(String(p.id).replace(/^sc-domain:/, "")) === domain);
+      if (match) property = String(match.id);
+      else gscNote = `${domain} isn’t in the connected Search Console account yet. Add it (or give that Google login access) and its searches will appear here.`;
+    }
+    let gscRows: Array<{ query: string; page: string; clicks: number; impressions: number; position: number }> = [];
+    if (property && gscConnected) {
       const today3 = new Date(Date.now() - 3 * 86_400_000).toISOString().slice(0, 10);
       const gEnd = period.end > today3 ? today3 : period.end;
       const gStart = period.start < gEnd ? period.start : new Date(Date.parse(gEnd) - 28 * 86_400_000).toISOString().slice(0, 10);
       try { gscRows = await cache("Search Console", JSON.stringify({ report: "dash-gsc", property, a: gStart, b: gEnd }), () => readGoogleSearchConsoleRows(ownerId, property, gStart, gEnd)) as typeof gscRows; }
       catch (error) { gscNote = error instanceof Error ? error.message : "Search Console couldn’t be read."; }
       if (!gscNote && !gscRows.length) gscNote = "Google hasn’t returned search data for this period yet (new Search Console properties take about a day).";
-    } else gscNote = property ? "Search Console isn’t connected." : "No Search Console property linked yet.";
+    } else if (!gscNote) gscNote = !gscConnected ? "Search Console isn’t connected. Connect it in Operations → Launchpad." : origin ? "No Search Console property linked yet." : "Add this client’s website so Search Console can be matched.";
 
     // All pages: sitemap + anything Google or GA4 saw.
     const sitemapUrls = origin ? await cache("Website", JSON.stringify({ report: "sitemap-urls", origin }), async () => {
@@ -163,7 +173,7 @@ export async function GET(request: Request) {
 
     const list = ordered.map((p) => {
       const g = ga.get(p.path), m = (metas as Record<string, { title: string; description: string; keywords: string; h1: string; canonical: string; robots: string; status: number }>)[p.path], t = targets.get(p.path);
-      const queries = [...p.queries.entries()].sort((a, b) => b[1].clicks - a[1].clicks || b[1].impressions - a[1].impressions).slice(0, 15).map(([query, q]) => ({ query, clicks: q.clicks, impressions: q.impressions, position: q.impressions ? Math.round(q.posW / q.impressions * 10) / 10 : null }));
+      const queries = [...p.queries.entries()].sort((a, b) => b[1].clicks - a[1].clicks || b[1].impressions - a[1].impressions).slice(0, 100).map(([query, q]) => ({ query, clicks: q.clicks, impressions: q.impressions, position: q.impressions ? Math.round(q.posW / q.impressions * 10) / 10 : null }));
       return {
         path: p.path, url: p.url, clicks: p.clicks, impressions: p.impressions, position: p.impressions ? Math.round(p.posW / p.impressions * 10) / 10 : null, ctr: p.impressions ? Math.round(p.clicks / p.impressions * 1000) / 10 : null,
         title: m?.title || "", description: m?.description || "", metaKeywords: m?.keywords || "", h1: m?.h1 || "", canonical: m?.canonical || "", robots: m?.robots || "", httpStatus: m?.status ?? null,
@@ -171,7 +181,7 @@ export async function GET(request: Request) {
         visits: g?.organicSessions ?? null, allVisits: g?.sessions ?? null, conversions: g?.organicKeyEvents ?? null, calls: g?.calls.organic ?? null, leads: g?.leads.organic ?? null, allCalls: g?.calls.all ?? null, allLeads: g?.leads.all ?? null, whatsapp: g?.whatsapp ?? null, emails: g?.emails ?? null,
       };
     });
-    return reply({ kind, period, origin, pages: list, notes: { searchConsole: gscNote, analytics: gaNote }, sources: ["Google Search Console", "Google Analytics 4", "Live page HTML", "Sitemap"] });
+    return reply({ kind, period, origin, pages: list, notes: { searchConsole: gscNote, analytics: gaNote }, searchConsoleProperty: property || null, sources: ["Google Search Console", "Google Analytics 4", "Live page HTML", "Sitemap"] });
   }
 
   // ---- Google Ads ----

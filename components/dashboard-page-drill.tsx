@@ -23,8 +23,8 @@ function Field({ label, value, max }: { label: string; value: string; max?: numb
   return <div className="pd-field"><small>{label}{max ? <em className={len === 0 ? "bad" : len > max ? "warn" : ""}>{len}/{max}</em> : null}</small><p>{value || <i>Missing</i>}</p></div>;
 }
 
-export function PageDrill({ kind, clientId, start, end, currency = "EUR", onClose }: { kind: "organic" | "ads" | "assets"; clientId: string; start: string; end: string; currency?: string; onClose: () => void }) {
-  const api = kind === "organic" ? "organic" : "ads";
+export function PageDrill({ kind, clientId, start, end, currency = "EUR", onClose }: { kind: "organic" | "ads" | "assets" | "keywords"; clientId: string; start: string; end: string; currency?: string; onClose: () => void }) {
+  const api = kind === "organic" || kind === "keywords" ? "organic" : "ads";
   const key = `${api}:${clientId}:${start}:${end}`;
   const [data, setData] = useState<Payload | null>(cacheMem.get(key) || null);
   const [err, setErr] = useState("");
@@ -40,8 +40,8 @@ export function PageDrill({ kind, clientId, start, end, currency = "EUR", onClos
     return () => { live = false; };
   }, [key, api, clientId, start, end]);
 
-  const title = kind === "organic" ? "Organic landing pages" : kind === "ads" ? "Ad landing pages" : "Google Ads assets";
-  const sub = kind === "organic" ? "Meta tags · keywords · searches · clicks · impressions · visits · calls · leads" : kind === "ads" ? "Ads · keywords · sitelinks · clicks · impressions · spend · calls · leads" : "Sitelinks · callouts · snippets · calls · images, with results";
+  const title = kind === "keywords" ? "Organic keywords" : kind === "organic" ? "Organic landing pages" : kind === "ads" ? "Ad landing pages" : "Google Ads assets";
+  const sub = kind === "keywords" ? "Google searches · position · ranking page · meta title & description" : kind === "organic" ? "Meta tags · keywords · searches · clicks · impressions · visits · calls · leads" : kind === "ads" ? "Ads · keywords · sitelinks · clicks · impressions · spend · calls · leads" : "Sitelinks · callouts · snippets · calls · images, with results";
   const notes = Object.values(data?.notes || {}).filter(Boolean);
   const term = q.trim().toLowerCase();
 
@@ -51,7 +51,7 @@ export function PageDrill({ kind, clientId, start, end, currency = "EUR", onClos
     {!data && !err && <p className="dh-muted pd-loading">Loading every page…</p>}
     {err && <p className="dh-muted">{err}</p>}
     {data && notes.length > 0 && <p className="pd-notes">{notes.join(" · ")}</p>}
-    {data && kind !== "assets" && data.pages.length > 6 && <input className="pd-search" placeholder="Search pages, titles or keywords…" value={q} onChange={(e) => setQ(e.target.value)} />}
+    {data && kind !== "assets" && kind !== "keywords" && data.pages.length > 6 && <input className="pd-search" placeholder="Search pages, titles or keywords…" value={q} onChange={(e) => setQ(e.target.value)} />}
 
     {data && kind === "organic" && (() => {
       const rows = (data.pages as OrgPage[]).filter((p) => !term || `${p.path} ${p.title} ${p.description} ${p.targetKeyword} ${p.queries.map((x) => x.query).join(" ")}`.toLowerCase().includes(term));
@@ -81,6 +81,48 @@ export function PageDrill({ kind, clientId, start, end, currency = "EUR", onClos
           </div>}
         </div>; })}
       </div>;
+    })()}
+
+    {data && kind === "keywords" && (() => {
+      // Pivot pages → keywords: each Google search with its totals and the page(s) that rank for it.
+      const pages = data.pages as OrgPage[];
+      type Kw = { term: string; clicks: number; impressions: number; posW: number; posN: number; pages: Array<{ page: OrgPage; clicks: number; impressions: number; position: number | null }>; target: boolean };
+      const map = new Map<string, Kw>();
+      for (const pg of pages) for (const q of pg.queries) {
+        const k = map.get(q.query) || { term: q.query, clicks: 0, impressions: 0, posW: 0, posN: 0, pages: [], target: false };
+        k.clicks += q.clicks; k.impressions += q.impressions; if (q.position != null) { k.posW += q.position * Math.max(1, q.impressions); k.posN += Math.max(1, q.impressions); }
+        k.pages.push({ page: pg, clicks: q.clicks, impressions: q.impressions, position: q.position }); map.set(q.query, k);
+      }
+      // Saved target keywords show too, even before Google has data for them.
+      for (const pg of pages) for (const t of [pg.targetKeyword, ...String(pg.supportingKeywords || "").split(/[,\n]/)].map((x) => x.trim()).filter(Boolean)) {
+        const key = [...map.keys()].find((x) => x.toLowerCase() === t.toLowerCase()) || t;
+        const k = map.get(key) || { term: t, clicks: 0, impressions: 0, posW: 0, posN: 0, pages: [], target: false };
+        k.target = true; if (!k.pages.some((x) => x.page.path === pg.path)) k.pages.push({ page: pg, clicks: 0, impressions: 0, position: null }); map.set(key, k);
+      }
+      const all = [...map.values()].map((k) => ({ ...k, position: k.posN ? Math.round(k.posW / k.posN * 10) / 10 : null, pages: k.pages.sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions) })).sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions || a.term.localeCompare(b.term));
+      const rows = all.filter((k) => !term || `${k.term} ${k.pages.map((x) => `${x.page.path} ${x.page.title} ${x.page.description}`).join(" ")}`.toLowerCase().includes(term));
+      const tone = (p: number | null) => p == null ? "" : p <= 3 ? "good" : p <= 10 ? "" : "bad";
+      if (!all.length) return <p className="dh-muted">No Google searches for this site in this period yet{notes.length ? "" : ", and no target keywords saved in Operations → SEO"}.</p>;
+      return <>
+        {all.length > 6 && <input className="pd-search" placeholder="Search keywords, pages or meta tags…" value={q} onChange={(e) => setQ(e.target.value)} />}
+        <div className="pd-list pd-kw">
+          <div className="pd-row pd-headrow"><span>Keyword · ranking page</span><span>Pos.</span><span>Clicks</span><span>Impr.</span><span>CTR</span></div>
+          {rows.length ? rows.map((k) => { const isOpen = open === k.term; const top = k.pages[0]?.page; return <div key={k.term} className={`pd-item ${isOpen ? "open" : ""}`}>
+            <button type="button" className="pd-row" onClick={() => setOpen(isOpen ? "" : k.term)} aria-expanded={isOpen}>
+              <span className="pd-page"><i>{isOpen ? "▾" : "▸"}</i><b>{k.term}</b><small>{top ? `${top.path}${k.pages.length > 1 ? ` +${k.pages.length - 1} more` : ""}` : ""}{k.target ? " · target" : ""}</small></span>
+              <span className={tone(k.position)}>{k.position != null ? `#${k.position}` : "—"}</span><span>{n(k.clicks)}</span><span>{n(k.impressions)}</span><span>{k.impressions ? `${n(k.clicks / k.impressions * 100)}%` : "—"}</span>
+            </button>
+            {isOpen && <div className="pd-body">{k.pages.map(({ page: pg, clicks, impressions, position }) => <div key={pg.path} className="pd-kwpage">
+              <div className="pd-serp"><small>{(() => { try { return new URL(pg.url).hostname.replace(/^www\./, "") + pg.path; } catch { return pg.path; } })()}</small><b>{pg.title || "No title tag"}</b><p>{pg.description || "No meta description"}</p></div>
+              <div className="pd-cols">
+                <div><Field label="Meta title" value={pg.title} max={60} /><Field label="Meta description" value={pg.description} max={160} /><Field label="H1" value={pg.h1} />
+                  <div className="pd-mini"><span>Target keyword: <b>{pg.targetKeyword || "—"}</b></span>{pg.title && !pg.title.toLowerCase().includes(k.term.toLowerCase()) && <span className="bad">Keyword not in title</span>}<a href={pg.url} target="_blank" rel="noreferrer">Open page ↗</a></div></div>
+                <div className="pd-stats"><Stat label="Position" value={position != null ? `#${position}` : "—"} /><Stat label="Clicks" value={n(clicks)} /><Stat label="Impressions" value={n(impressions)} /><Stat label="CTR" value={impressions ? `${n(clicks / impressions * 100)}%` : "—"} /></div>
+              </div>
+            </div>)}</div>}
+          </div>; }) : <p className="dh-muted">No keywords match.</p>}
+        </div>
+      </>;
     })()}
 
     {data && kind === "ads" && (() => {
@@ -180,5 +222,13 @@ const CSS = `
 .pd .pd-chips span{font-size:12px;padding:3px 8px;border-radius:999px;border:1px solid rgba(127,127,127,.2)}
 .pd .pd-chips span.long{border-radius:8px}
 html.dark .pd .pd-ad-preview b,[data-theme=dark] .pd .pd-ad-preview b{color:#8ab4f8}
-@media (max-width:900px){.pd .pd-row{grid-template-columns:minmax(0,1fr) repeat(3,56px)}.pd .pd-row>span:nth-child(n+5){display:none}.pd .pd-cols{grid-template-columns:1fr}.pd .pd-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.pd .pd-page{flex-direction:column;gap:0}.pd .pd-page b{max-width:100%}}
+.pd .pd-kw .pd-row{grid-template-columns:minmax(0,1fr) repeat(4,72px)}
+.pd .pd-kwpage{display:flex;flex-direction:column;gap:10px;padding-bottom:12px;border-bottom:1px dashed rgba(127,127,127,.2)}
+.pd .pd-kwpage:last-child{border-bottom:0;padding-bottom:0}
+.pd .pd-serp{padding:10px 12px;border-radius:10px;background:rgba(127,127,127,.06);max-width:640px}
+.pd .pd-serp small{font-size:12px;opacity:.7}
+.pd .pd-serp b{display:block;color:#1a0dab;font-size:17px;font-weight:500;margin:2px 0;line-height:1.3}
+.pd .pd-serp p{margin:0;font-size:13px;opacity:.85;line-height:1.45}
+html.dark .pd .pd-serp b,[data-theme=dark] .pd .pd-serp b{color:#8ab4f8}
+@media (max-width:900px){.pd .pd-row{grid-template-columns:minmax(0,1fr) repeat(3,56px)}.pd .pd-row>span:nth-child(n+5){display:none}.pd .pd-cols{grid-template-columns:1fr}.pd .pd-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.pd .pd-kw .pd-row>span:nth-child(n+5){display:none}.pd .pd-page{flex-direction:column;gap:0}.pd .pd-page b{max-width:100%}}
 `;
