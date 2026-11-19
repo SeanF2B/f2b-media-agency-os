@@ -144,6 +144,20 @@ export async function GET(request: Request) {
       for (const r of rows) targets.set(pathKey(r.page_key), { primary: r.primary_kw, supporting: r.supporting });
     } catch { /* table not created yet */ }
 
+    // Website builder pages (editable meta): url → slug + saved SEO fields.
+    const builder = new Map<string, { slug: string; title: string; description: string; focusKeyword: string }>();
+    try {
+      const files = (await db.prepare("SELECT path, text FROM site_content_files WHERE client_id = ?1 AND path LIKE 'src/content/builder/%.json' AND path <> 'src/content/builder/_config.json' LIMIT 300").bind(client.id).all<{ path: string; text: string | null }>()).results || [];
+      for (const f of files) {
+        const slug = f.path.replace(/^src\/content\/builder\//, "").replace(/\.json$/, "");
+        let d: { url?: string; seo?: { title?: string; description?: string; focusKeyword?: string } } = {};
+        try { d = f.text ? JSON.parse(f.text) : {}; } catch { continue; }
+        const k = pathKey(d.url || (slug === "home" || slug === "index" ? "/" : `/${slug}/`));
+        builder.set(k, { slug, title: String(d.seo?.title || ""), description: String(d.seo?.description || ""), focusKeyword: String(d.seo?.focusKeyword || "") });
+        if (origin && !pages.has(k)) page(origin + k);
+      }
+    } catch { /* no builder site */ }
+
     // Live meta tags for every page (24h cache, max 60 pages per refresh).
     const ordered = [...pages.values()].sort((a, b) => (b.clicks - a.clicks) || ((ga.get(b.path)?.sessions || 0) - (ga.get(a.path)?.sessions || 0)) || (b.impressions - a.impressions) || a.path.localeCompare(b.path));
     const metaTargets = ordered.slice(0, 60).map((p) => p.url).filter((u) => /^https?:/i.test(u));
@@ -177,7 +191,7 @@ export async function GET(request: Request) {
       return {
         path: p.path, url: p.url, clicks: p.clicks, impressions: p.impressions, position: p.impressions ? Math.round(p.posW / p.impressions * 10) / 10 : null, ctr: p.impressions ? Math.round(p.clicks / p.impressions * 1000) / 10 : null,
         title: m?.title || "", description: m?.description || "", metaKeywords: m?.keywords || "", h1: m?.h1 || "", canonical: m?.canonical || "", robots: m?.robots || "", httpStatus: m?.status ?? null,
-        targetKeyword: t?.primary || "", supportingKeywords: t?.supporting || "", queries,
+        targetKeyword: t?.primary || "", supportingKeywords: t?.supporting || "", queries, builder: builder.get(p.path) || null,
         visits: g?.organicSessions ?? null, allVisits: g?.sessions ?? null, conversions: g?.organicKeyEvents ?? null, calls: g?.calls.organic ?? null, leads: g?.leads.organic ?? null, allCalls: g?.calls.all ?? null, allLeads: g?.leads.all ?? null, whatsapp: g?.whatsapp ?? null, emails: g?.emails ?? null,
       };
     });
