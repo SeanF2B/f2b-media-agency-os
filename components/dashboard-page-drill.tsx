@@ -34,6 +34,11 @@ export function PageDrill({ kind, clientId, start, end, currency = "EUR", onClos
   const [open, setOpen] = useState("");
   const [q, setQ] = useState("");
   const [manage, setManage] = useState("");
+  // Click a column heading to sort (again to flip). Position sorts best (lowest) first.
+  const [sort, setSort] = useState<{ k: string; dir: 1 | -1 }>({ k: "", dir: -1 });
+  const sortBy = (k: string) => setSort((cur) => cur.k === k ? { k, dir: cur.dir === -1 ? 1 : -1 } : { k, dir: k === "position" || k === "path" ? 1 : -1 });
+  const sorted = <T extends Record<string, unknown>>(list: T[]) => { if (!sort.k) return list; const k = sort.k; return [...list].sort((a, b) => { const x = a[k], y = b[k]; if (typeof x === "string" || typeof y === "string") return String(x ?? "").localeCompare(String(y ?? "")) * sort.dir; const nx = x == null ? null : Number(x), ny = y == null ? null : Number(y); if (nx == null && ny == null) return 0; if (nx == null) return 1; if (ny == null) return -1; return (nx - ny) * sort.dir; }); };
+  const H = ({ k, children, title: t }: { k: string; children: string; title?: string }) => <button type="button" className={`pd-sort ${sort.k === k ? "on" : ""}`} title={t || `Sort by ${children}`} onClick={() => sortBy(k)}>{children}{sort.k === k ? (sort.dir === -1 ? " ▼" : " ▲") : ""}</button>;
   const patchPage = (path: string, patch: Partial<OrgPage>) => setData((cur) => { if (!cur) return cur; const next = { ...cur, pages: (cur.pages as OrgPage[]).map((p) => p.path === path ? { ...p, ...patch } : p) }; cacheMem.set(key, next); return next; });
   const money = useMemo(() => new Intl.NumberFormat("en-IE", { style: "currency", currency, maximumFractionDigits: 2 }), [currency]);
   useEffect(() => {
@@ -60,10 +65,10 @@ export function PageDrill({ kind, clientId, start, end, currency = "EUR", onClos
 
     {data && kind === "organic" && manage && (() => { const mp = (data.pages as OrgPage[]).find((x) => x.path === manage); return mp ? <PageManager readOnly page={mp as ManagedPage} clientId={clientId} onClose={() => setManage("")} onSaved={(x) => patchPage(mp.path, x as Partial<OrgPage>)} /> : null; })()}
     {data && kind === "organic" && (() => {
-      const rows = (data.pages as OrgPage[]).filter((p) => !term || `${p.path} ${p.title} ${p.description} ${p.targetKeyword} ${p.queries.map((x) => x.query).join(" ")}`.toLowerCase().includes(term));
+      const rows = sorted((data.pages as OrgPage[]).filter((p) => !term || `${p.path} ${p.title} ${p.description} ${p.targetKeyword} ${p.queries.map((x) => x.query).join(" ")}`.toLowerCase().includes(term)));
       if (!rows.length) return <p className="dh-muted">No pages found.</p>;
       return <div className="pd-list">
-        <div className="pd-row pd-headrow pd-org"><span>Page</span><span>Clicks</span><span>Impr.</span><span title="Click-through rate: clicks ÷ impressions">CTR</span><span>Pos.</span><span>Visits</span><span>Calls</span><span>Leads</span><span>Conv.</span></div>
+        <div className="pd-row pd-headrow pd-org"><span><H k="path">Page</H></span><H k="clicks">Clicks</H><H k="impressions">Impr.</H><H k="ctr" title="Click-through rate: clicks ÷ impressions. Click to sort">CTR</H><H k="position">Pos.</H><H k="visits">Visits</H><H k="calls">Calls</H><H k="leads">Leads</H><H k="conversions">Conv.</H></div>
         {rows.map((p) => { return <div key={p.path} className="pd-item">
           <button type="button" className="pd-row pd-org" onClick={() => setManage(p.path)} title="Open page overview">
             <span className="pd-page"><i>↗</i><b>{p.path}</b><small>{p.queries.length ? `${p.queries.length} keyword${p.queries.length === 1 ? "" : "s"} · ` : ""}{p.title || "No title tag"}</small></span>
@@ -116,10 +121,10 @@ export function PageDrill({ kind, clientId, start, end, currency = "EUR", onClos
     })()}
 
     {data && kind === "ads" && (() => {
-      const rows = (data.pages as AdsPage[]).filter((p) => !term || `${p.path} ${p.keywords.map((k) => k.keyword).join(" ")} ${p.ads.flatMap((a) => a.headlines).join(" ")}`.toLowerCase().includes(term));
+      const rows = sorted((data.pages as AdsPage[]).filter((p) => !term || `${p.path} ${p.keywords.map((k) => k.keyword).join(" ")} ${p.ads.flatMap((a) => a.headlines).join(" ")}`.toLowerCase().includes(term)));
       if (!rows.length) return <p className="dh-muted">No ad landing pages in this period.</p>;
       return <div className="pd-list">
-        <div className="pd-row pd-headrow"><span>Page</span><span>Clicks</span><span>Impr.</span><span>Spend</span><span>CPC</span><span>Calls</span><span>Leads</span><span>Conv.</span></div>
+        <div className="pd-row pd-headrow"><span><H k="path">Page</H></span><H k="clicks">Clicks</H><H k="impressions">Impr.</H><H k="spend">Spend</H><H k="cpc">CPC</H><H k="adCalls">Calls</H><H k="leads">Leads</H><H k="conversions">Conv.</H></div>
         {rows.map((p) => { const isOpen = open === p.path; const calls = p.adCalls ?? p.calls; return <div key={p.path} className={`pd-item ${isOpen ? "open" : ""}`}>
           <button type="button" className="pd-row" onClick={() => setOpen(isOpen ? "" : p.path)} aria-expanded={isOpen}>
             <span className="pd-page"><i>{isOpen ? "▾" : "▸"}</i><b>{p.path}</b><small>{p.ads.length} ad{p.ads.length === 1 ? "" : "s"} · {p.keywords.length} keyword{p.keywords.length === 1 ? "" : "s"} · {p.sitelinks.length} sitelink{p.sitelinks.length === 1 ? "" : "s"}</small></span>
@@ -168,6 +173,7 @@ const CSS = `
 .pd .pd-row{display:grid;grid-template-columns:minmax(0,1fr) repeat(7,72px);gap:8px;align-items:center;width:100%;padding:9px 6px;border:0;border-bottom:1px solid rgba(127,127,127,.12);background:transparent;color:inherit;font:inherit;font-size:13px;text-align:right;cursor:pointer}
 .pd .pd-row>span:first-child{text-align:left}
 .pd button.pd-row:hover{background:rgba(127,127,127,.06)}
+.pd .pd-sort{border:0;background:none;padding:0;font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;cursor:pointer;text-align:inherit;white-space:nowrap}.pd .pd-sort:hover{color:var(--brand-primary,#101828)}.pd .pd-sort.on{color:var(--brand-primary,#101828);font-weight:800}
 .pd .pd-headrow{cursor:default;font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding-top:8px;position:sticky;top:0;z-index:4;background:var(--f2b-white,#fff);color:color-mix(in srgb,currentColor 60%,transparent);box-shadow:0 1px 0 rgba(127,127,127,.18),0 -24px 0 var(--f2b-white,#fff)}
 html.dark .pd .pd-headrow,body.f2b-dark .pd .pd-headrow,.dark-mode .pd .pd-headrow{background:#1b2127;box-shadow:0 1px 0 rgba(255,255,255,.12),0 -24px 0 #1b2127}
 .pd .pd-page{display:flex;align-items:baseline;gap:8px;min-width:0}
