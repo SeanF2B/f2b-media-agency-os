@@ -279,13 +279,14 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
           return null;
         })()}
         {(() => { const bp = sample ? SAMPLE_GBP : m.businessProfile; const tp = sample ? { status: "ok", rating: 4.8, total: 63 } as typeof m.trustpilot : m.trustpilot; const gR = sample ? { total: 214, averageRating: 4.9 } : gReviews; return <>
-          <FoldHead k="reviews" title="Reviews & Google Business" hint={[gR?.averageRating != null ? `${gR.averageRating.toFixed(1)} ★` : "", gR?.total != null ? `${num(gR.total)} Google reviews` : "", bp?.calls != null ? `${num(bp.calls)} calls` : ""].filter(Boolean).join(" · ")} />
-          {fold.reviews && <><div className="dh-reviews">
+          <FoldHead k="reviews" title="Reviews" hint={[gR?.averageRating != null ? `${gR.averageRating.toFixed(1)} ★` : "", gR?.total != null ? `${num(gR.total)} Google reviews` : "", tp?.status === "ok" && tp.rating != null ? `Trustpilot ${tp.rating.toFixed(1)} ★` : ""].filter(Boolean).join(" · ")} />
+          {fold.reviews && <div className="dh-reviews">
             <div className="dh-review"><BrandIcon id="business-profile" size={22} fallback={null} /><span><b>{gR?.averageRating != null ? `${gR.averageRating.toFixed(1)} ★` : "—"}</b><small>{gR?.total != null ? `${num(gR.total)} Google reviews` : "Google reviews · connect Business Profile"}</small></span></div>
             <div className="dh-review"><BrandIcon id="facebook" size={22} fallback={null} /><span><b>{sample ? "4.7 ★" : "—"}</b><small>{sample ? "88 Facebook reviews" : "Facebook reviews · connect the Facebook Page"}</small></span></div>
             <div className="dh-review"><BrandIcon id="trustpilot" size={22} fallback={null} /><span><b>{tp?.status === "ok" && tp.rating != null ? `${tp.rating.toFixed(1)} ★` : "—"}</b><small>{tp?.status === "ok" ? `${num(tp.total || 0)} Trustpilot reviews` : tp?.status === "not_found" ? "Not on Trustpilot yet" : tp?.status === "no_website" ? "Trustpilot · add the website" : "Trustpilot"}</small></span></div>
-          </div>
-          <div className="dh-tiles dh-gbp">
+          </div>}
+          <FoldHead k="gbp" title="Google Business Profile" hint={[bp?.views != null ? `${num(bp.views)} views` : "", bp?.calls != null ? `${num(bp.calls)} calls` : "", bp?.websiteClicks != null ? `${num(bp.websiteClicks)} website clicks` : ""].filter(Boolean).join(" · ") || "Not connected"} />
+          {fold.gbp && <><div className="dh-tiles dh-gbp">
             <Tile icon={<BrandIcon id="business-profile" size={20} fallback={null} />} label="Profile views" value={bp?.views != null ? num(bp.views) : "—"}><Delta now={bp?.views} before={bp?.previous?.impressions} /></Tile>
             <Tile icon={<Phone size={18} />} label="Calls" value={bp?.calls != null ? num(bp.calls) : "—"} tone={(bp?.calls || 0) > 0 ? "good" : ""}><Delta now={bp?.calls} before={bp?.previous?.calls} /></Tile>
             <Tile icon={<span>🧭</span>} label="Directions" value={bp?.directions != null ? num(bp.directions) : "—"}><Delta now={bp?.directions} before={bp?.previous?.directions} /></Tile>
