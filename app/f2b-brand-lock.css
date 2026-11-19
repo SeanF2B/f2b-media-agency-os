@@ -40,10 +40,10 @@ html body .app-shell .dh-action:is(.blue, .violet, .teal, .amber, .pink, .green)
 html body .app-shell .dh-action:hover { border-color: var(--bl-edge) !important; }
 
 /* ── Approvals / appointment updates when everything is done: brand, not green ── */
-html body .app-shell .dh-approval.clear { background: var(--bl-soft) !important; border-color: var(--bl-edge) !important; }
-html body .app-shell .dh-approval.clear .dh-approval-icon { color: var(--bl-ink) !important; }
-html body .app-shell .dh-approval.clear .dh-approval-n { background: var(--bl-ink) !important; color: #fff !important; -webkit-text-fill-color: #fff !important; }
-html body .app-shell.dark-mode .dh-approval.clear .dh-approval-n, body.f2b-dark .app-shell .dh-approval.clear .dh-approval-n { color: #111 !important; -webkit-text-fill-color: #111 !important; }
+html body .app-shell .dh-approval.clear { background: #effaf3 !important; border-color: #cdebd8 !important; }
+html body .app-shell .dh-approval.clear .dh-approval-icon { color: #1f8a4c !important; }
+html body .app-shell .dh-approval.clear .dh-approval-n { background: #22a55b !important; color: #fff !important; -webkit-text-fill-color: #fff !important; }
+html body .app-shell.dark-mode .dh-approval.clear { background: #15291e !important; border-color: #24533a !important; }
 
 /* ── Appointments week: "Free" in brand ink, not green ── */
 html body .app-shell .sch-dash-free { color: var(--bl-ink) !important; }

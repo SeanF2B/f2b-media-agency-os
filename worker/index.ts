@@ -17,6 +17,7 @@ import { hasGoogleSearchConsoleConnection, readGoogleSearchConsoleRows } from ".
 import { hasGoogleAnalyticsDirectConnection, readGoogleAnalyticsReport } from "../lib/google-analytics-direct";
 import { autoLinkGoogleProperties } from "../lib/google-auto-link";
 import { runWithConnectorBinding } from "../lib/connector-context";
+import { clientIdFromRequest, featureFor, installUsageMeter, runWithUsage } from "../lib/usage-meter";
 import type { ConnectorBinding } from "../lib/connector-contract.mjs";
 import { isMarketingDomainVerified, marketingCustomDomainPageUrl, normalizeMarketingHostname } from "../lib/marketing-custom-domain.js";
 
@@ -156,7 +157,11 @@ function withSecurityHeaders(response: Response, pathname: string): Response {
 }
 
 const worker = {
-  async scheduled(controller: ScheduledController, env: Cloudflare.Env, ctx: ExecutionContext) {
+  async scheduled(controller: ScheduledController, env: Cloudflare.Env, ctx: ExecutionContext): Promise<unknown> {
+    installUsageMeter(env.DB);
+    return runWithUsage({ feature: "Scheduled jobs", actor: "system", waitUntil: (p) => ctx.waitUntil(p) }, () => worker.runScheduled(controller, env, ctx));
+  },
+  async runScheduled(controller: ScheduledController, env: Cloudflare.Env, ctx: ExecutionContext) {
     ctx.waitUntil(Promise.allSettled([
       processCrmAutomations(env.DB! as unknown as Parameters<typeof processCrmAutomations>[0], new Date(controller.scheduledTime), {
         sendEmail: env.RESEND_API_KEY && env.TASK_NOTIFICATION_FROM ? async (message) => {
@@ -187,6 +192,8 @@ const worker = {
       }),
       processExpiredMarketingSubmissions(env.DB!, env.BUCKET, new Date(controller.scheduledTime)),
       processMonthlyClientReports(env.DB, env.BUCKET as never, new Date(controller.scheduledTime)),
+      // AI & SEO-data rebilling: last month's usage → a line on each client's draft invoice (1st–3rd, once).
+      import("../lib/usage-billing").then(({ processUsageInvoices }) => processUsageInvoices(new Date(controller.scheduledTime))),
       processOutreach(new Date(controller.scheduledTime)),
       // AI phone agent: place queued outbound calls (new-lead call-backs, automation calls, confirm calls).
       import("../lib/voice-agent/server").then(({ processVoiceQueue }) => processVoiceQueue(new Date(controller.scheduledTime))),
@@ -308,9 +315,17 @@ const worker = {
       }
     }
 
-    const response = await runWithConnectorBinding(binding, () =>
+    // Settings → Audit log: record staff sign-ins when the app itself is opened.
+    if (identity?.email && env.DB && appRequest.method === "GET" && new URL(appRequest.url).pathname === "/" && /text\/html/.test(appRequest.headers.get("accept") || "")) {
+      ctx.waitUntil(import("../lib/activity-log").then(({ recordLogin }) => recordLogin(env.DB!, identity.email!, appRequest)).catch(() => undefined));
+    }
+    // AI & SEO-data usage metering (client rebilling): tag this request with its client and feature.
+    installUsageMeter(env.DB);
+    const usagePath = new URL(appRequest.url).pathname;
+    const usage = usagePath.startsWith("/api/") ? { clientId: await clientIdFromRequest(appRequest).catch(() => ""), route: usagePath, feature: featureFor(usagePath), actor: identity?.email || "", waitUntil: (p: Promise<unknown>) => ctx.waitUntil(p) } : { waitUntil: (p: Promise<unknown>) => ctx.waitUntil(p) };
+    const response = await runWithUsage(usage, () => runWithConnectorBinding(binding, () =>
       handler.fetch(appRequest, env, ctx),
-    );
+    ));
     return withSecurityHeaders(response, appRequest === authenticatedRequest ? incomingUrl.pathname : "/f/");
   },
 };
