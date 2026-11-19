@@ -112,3 +112,12 @@ test("the approval shows the agent's actual draft, and deciding closes the agent
   assert.equal(openAgentRequests(approved).length, 0);
   assert.equal(approved.aiRecommendations.find((item) => item.id === "rec-x").supersededAt, undefined, "other suggestions untouched");
 });
+
+test("parking a task that is already waiting on the owner keeps the same approval request (no second email)", () => {
+  const first = moveToPending({ ...base, status: "In progress", aiRunState: "running" }, { by: "Bot", at: at(1), reason: "Waiting" }).task;
+  const sent = { ...first, approvalRequest: { ...first.approvalRequest, emailStatus: "sent" }, status: "In progress", aiRunState: "running" };
+  const again = moveToPending(sent, { by: "Scheduler", at: at(5), reason: "Stopped: Waiting" }).task;
+  assert.equal(again.approvalRequest.id, first.approvalRequest.id);
+  assert.equal(again.approvalRequest.emailStatus, "sent");
+  assert.equal(again.status, "Blocked");
+});

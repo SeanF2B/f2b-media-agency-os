@@ -234,16 +234,11 @@ export function moveToPending<T extends FlowTask>(task: T, input: Actor & { reas
   if (!reason) return { task, error: "A reason is required before a task can move to Pending." };
   const given = String(input.request ?? "").trim();
   const request = (given && given !== reason ? given : requestTextFromTask(task) || given || reason).slice(0, 20_000);
-  const approvalRequest: TaskApprovalRequest = {
-    id: newId(),
-    status: "awaiting",
-    reason,
-    request,
-    to: OWNER_APPROVER_EMAIL,
-    requestedAt: input.at,
-    requestedBy: input.by,
-    emailStatus: "queued",
-  };
+  // Already waiting on the owner (e.g. parked again): keep the same request so no second email goes out.
+  const prior = task.approvalRequest?.status === "awaiting" ? task.approvalRequest : null;
+  const approvalRequest: TaskApprovalRequest = prior
+    ? { ...prior, reason, request: prior.request && prior.request !== prior.reason ? prior.request : request }
+    : { id: newId(), status: "awaiting", reason, request, to: OWNER_APPROVER_EMAIL, requestedAt: input.at, requestedBy: input.by, emailStatus: "queued" };
   let next: T = {
     ...task,
     status: TASK_STATUS.pending,
