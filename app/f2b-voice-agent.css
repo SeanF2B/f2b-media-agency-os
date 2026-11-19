@@ -99,3 +99,55 @@ html body .service-chip-x { position: absolute; top: 4px; right: 4px; width: 20p
 html body .service-chip:hover .service-chip-x, html body .service-chip-x:focus-visible { opacity: 1; }
 @media (hover: none) { html body .service-chip-x { opacity: .7; } }
 html body .client-tool-row:empty { display: none; }
+
+/* ---------- WhatsApp setup (Conversations → WhatsApp setup) ---------- */
+html body .wa-open-button { display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: 10px; padding: 9px 14px; font: inherit; font-weight: 700; font-size: 13.5px; background: #25d366; color: #fff; cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
+html body .wa-open-button:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(37,211,102,.35); }
+html body .wa-open-button span { font-size: 9px; }
+html body .wa-setup header h2 { display: inline-flex; align-items: center; gap: 10px; }
+html body .wa-logo { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: #25d366; color: #fff; }
+html body .wa-empty { padding: 18px; border-radius: 14px; background: rgba(127,138,160,.08); }
+html body .wa-empty p { margin: 6px 0 0; }
+html body .wa-list { display: grid; gap: 8px; margin-bottom: 14px; }
+html body .wa-row { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid #e3e8ec; border-radius: 12px; }
+html body .app-shell.dark-mode .wa-row { border-color: #333d45; }
+html body .wa-row > div:first-child { display: grid; gap: 2px; min-width: 0; }
+html body .wa-row small { font-size: 12px; opacity: .75; }
+html body .wa-row .wa-detail { color: #b54708; opacity: 1; }
+html body .wa-verify { grid-column: 1 / -1; display: flex; gap: 8px; }
+html body .wa-verify input { flex: 1; max-width: 220px; }
+html body .wa-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+html body .wa-badge.wa-ok { background: #12b76a; color: #fff; }
+html body .wa-badge.wa-wait { background: #fef0c7; color: #93370d; }
+html body .wa-badge.wa-act { background: #f79009; color: #fff; }
+html body .wa-badge.wa-bad { background: #f04438; color: #fff; }
+html body .wa-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: wa-pulse 1.2s ease-in-out infinite; }
+@keyframes wa-pulse { 50% { opacity: .25; } }
+html body .wa-remove { border: 0; background: transparent; color: inherit; opacity: .5; cursor: pointer; font-size: 14px; padding: 4px 6px; border-radius: 6px; }
+html body .wa-remove:hover { opacity: 1; background: rgba(240,68,56,.1); color: #f04438; }
+html body .wa-add { justify-self: start; }
+html body .wa-wizard { display: grid; gap: 14px; }
+html body .wa-steps { list-style: none; margin: 0; padding: 0; display: flex; gap: 8px; }
+html body .wa-steps li { flex: 1; display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: rgba(127,138,160,.08); font-size: 13px; font-weight: 700; opacity: .6; }
+html body .wa-steps li i { font-style: normal; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: rgba(127,138,160,.25); font-size: 12px; }
+html body .wa-steps li.on { opacity: 1; background: rgba(37,211,102,.12); }
+html body .wa-steps li.on i, html body .wa-steps li.done i { background: #25d366; color: #fff; }
+html body .wa-steps li.done { opacity: .9; }
+html body .wa-pane { display: grid; gap: 12px; }
+html body .wa-pane footer { display: flex; justify-content: flex-end; gap: 8px; }
+html body .wa-seg { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: 12px; background: rgba(127,138,160,.1); }
+html body .wa-seg button { flex: 1; border: 0; background: transparent; padding: 8px 10px; border-radius: 9px; font: inherit; font-size: 13px; font-weight: 700; color: inherit; cursor: pointer; }
+html body .wa-seg button.on { background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+html body .app-shell.dark-mode .wa-seg button.on { background: #2c353c; }
+html body .va-numbers li.picked { border-color: #25d366; }
+html body .wa-reg summary { cursor: pointer; font-weight: 700; font-size: 13px; }
+html body .wa-reg[open] { display: grid; gap: 10px; }
+html body .wa-lead { margin: 0; }
+html body .wa-fb { display: inline-flex; align-items: center; justify-content: center; gap: 10px; border: 0; border-radius: 10px; padding: 12px 18px; font: inherit; font-weight: 700; background: #1877f2; color: #fff; cursor: pointer; justify-self: start; }
+html body .wa-fb:disabled { opacity: .7; cursor: wait; }
+html body .wa-note code { font-size: 12px; }
+html body .wa-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0; }
+html body .wa-summary div { padding: 10px; border-radius: 10px; background: rgba(127,138,160,.08); }
+html body .wa-summary dt { font-size: 11px; font-weight: 700; opacity: .65; }
+html body .wa-summary dd { margin: 2px 0 0; font-weight: 700; overflow-wrap: anywhere; }
+@media (max-width: 640px) { html body .wa-steps li { font-size: 12px; padding: 6px; } html body .wa-summary { grid-template-columns: 1fr; } html body .wa-row { grid-template-columns: 1fr auto; } }

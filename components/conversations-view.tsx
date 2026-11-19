@@ -6,6 +6,7 @@ import { useSampleData } from "@/hooks/use-sample-data";
 import { renderTemplate, windowState, type WaTemplate } from "@/lib/conversations/whatsapp";
 const QuickBook = lazy(() => import("./scheduling-view").then((m) => ({ default: m.QuickBook })));
 const VoiceNote = lazy(() => import("./ai-agent-panel").then((m) => ({ default: m.VoiceNote })));
+const WhatsAppSetup = lazy(() => import("./whatsapp-setup").then((m) => ({ default: m.WhatsAppSetup })));
 const AiCallButton = lazy(() => import("./ai-agent-panel").then((m) => ({ default: m.AiCallButton })));
 const VOICE_RE = /^\[\[voice:([A-Za-z0-9-]{8,64})\]\]\s?/;
 const MEDIA_RE = /(https:\/\/\S+\.(?:jpe?g|png|webp|gif)(?:\?\S*)?|\/api\/marketing-public\/media\?f=\S+)/gi;
@@ -52,6 +53,7 @@ function sampleInbox(clientId: string, clientName: string, gallery: string[]): {
 export function ConversationsView({ scopeClientId, clients }: { scopeClientId: string; clients: ClientLite[] }) {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [configured, setConfigured] = useState(true);
+  const [waSetupOpen, setWaSetupOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<"all" | "unread" | "handoff" | "notifications">("all");
@@ -114,7 +116,7 @@ export function ConversationsView({ scopeClientId, clients }: { scopeClientId: s
 
   return <section className="cv" aria-label="Conversations">
     <header className="cv-head"><div><p className="eyebrow">💬 CONVERSATIONS{scopeClientId ? ` · ${clientName(scopeClientId).toUpperCase()}` : ""}</p><h1>Customer conversations</h1><p>SMS, WhatsApp and every email the system sends, in one inbox.</p></div>
-      <div className="cv-head-actions">{waNumbers.length > 0 && <button type="button" className="primary-button" onClick={() => setNewChat(true)}>＋ New WhatsApp chat</button>}<button type="button" className="secondary-button" onClick={() => setSettingsOpen(true)}>⚙️ Conversation settings</button></div></header>
+      <div className="cv-head-actions">{waNumbers.length > 0 && <button type="button" className="primary-button" onClick={() => setNewChat(true)}>＋ New WhatsApp chat</button>}<button type="button" className="wa-open-button" onClick={() => setWaSetupOpen(true)}><span aria-hidden="true">●</span> WhatsApp setup</button><button type="button" className="secondary-button" onClick={() => setSettingsOpen(true)}>⚙️ Conversation settings</button></div></header>
     {error && <div className="cv-error" role="alert">{error}</div>}
     {loading ? <div className="empty-state" role="status">Loading conversations…</div> : <>{!configured && <div className="cv-banner">💬 Emails the system sends show here already. To also text and WhatsApp customers, <button type="button" className="text-button" onClick={() => setSettingsOpen(true)}>connect Twilio</button>.</div>}
     <div className={`cv-grid ${active ? "has-thread" : ""}`} ref={gridRef}>
@@ -143,6 +145,7 @@ export function ConversationsView({ scopeClientId, clients }: { scopeClientId: s
     {booking && <Suspense fallback={null}><QuickBook scopeClientId={active?.client_id || scopeClientId} prefill={booking} onClose={() => setBooking(null)} onBooked={() => setError("")} /></Suspense>}
     {zoom && <div className="cv-zoom" role="dialog" aria-modal="true" onMouseDown={(e) => { if (e.target === e.currentTarget) setZoom(""); }}><button type="button" aria-label="Close" onClick={() => setZoom("")}>×</button><img src={zoom} alt="" /></div>}
     {newChat && <NewChat numbers={waNumbers} clients={clients} scopeClientId={scopeClientId} onClose={() => setNewChat(false)} onStarted={async (id) => { setNewChat(false); setFilter("all"); await loadThreads(); setActiveId(id); }} />}
+    {waSetupOpen && <Suspense fallback={null}><WhatsAppSetup clients={clients} initialClientId={scopeClientId} onClose={() => { setWaSetupOpen(false); void loadThreads(); }} onLive={() => void loadThreads()} /></Suspense>}
     {settingsOpen && <ConversationSettings clients={clients} onClose={() => { setSettingsOpen(false); void loadThreads(); }} />}
   </section>;
 }
@@ -235,7 +238,7 @@ function ConversationSettings({ clients, onClose }: { clients: ClientLite[]; onC
   const save = async () => { setBusy(true); setErr(""); setMsg(""); try { const r = await call<{ settings: Settings }>("/api/conversations", { action: "save-settings", accountSid: s.accountSid, authToken: token || undefined, numbers: s.numbers, botEnabled: s.botEnabled, botName: s.botName, businessInfo: s.businessInfo, botRules: s.botRules, handoffMessage: s.handoffMessage }); setS(r.settings); setToken(""); setMsg("Saved."); } catch (e) { setErr(e instanceof Error ? e.message : "Could not save."); } finally { setBusy(false); } };
   return <div className="cv-modal" role="dialog" aria-label="Conversation settings" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}><div className="cv-dialog">
     <header><h2>Conversation settings</h2><button type="button" className="cv-x" aria-label="Close" onClick={onClose}>✕</button></header>
-    <div className="cv-steps"><h3>Set up in 3 steps</h3><ol><li>In Twilio, copy your <b>Account SID</b> and <b>Auth Token</b> (Console home) and paste them below.</li><li>Add each phone number or WhatsApp number below. Use the international format, like +353851234567. Choose which client it belongs to.</li><li>In Twilio, open the number (or WhatsApp sender) and set <b>“A message comes in”</b> to this address, with method <b>HTTP POST</b>. For WhatsApp, use your approved WhatsApp sender (Twilio → Messaging → Senders → WhatsApp senders); delivery ticks are set up automatically:
+    <div className="cv-steps"><h3>Set up in 3 steps</h3><ol><li>In Twilio, copy your <b>Account SID</b> and <b>Auth Token</b> (Console home) and paste them below.</li><li>Add each phone number or WhatsApp number below. Use the international format, like +353851234567. Choose which client it belongs to.</li><li>In Twilio, open the number (or WhatsApp sender) and set <b>“A message comes in”</b> to this address, with method <b>HTTP POST</b>. (WhatsApp numbers are set up for you from <b>WhatsApp setup</b> on the Conversations page, no Twilio steps needed.):
       <div className="cv-copy"><code>{webhook}</code><button type="button" className="secondary-button" onClick={() => void navigator.clipboard?.writeText(webhook).then(() => setMsg("Webhook address copied."))}>Copy</button></div></li></ol></div>
     {!ready && <p className="cv-error">Secure storage isn’t set up on the server yet, so the Auth Token can’t be saved. The owner needs to add the app’s credential-encryption key once.</p>}
     <h3>Twilio account</h3>

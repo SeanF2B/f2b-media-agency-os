@@ -31,6 +31,10 @@ declare namespace Cloudflare {
     META_APP_SECRET?: string;
     META_TOKEN_ENCRYPTION_KEY?: string;
     META_MARKETING_API_VERSION?: string;
+    /** WhatsApp Embedded Signup (Facebook Login for Business configuration ID) for the in-OS "Continue with Facebook" pop-up. */
+    WHATSAPP_ES_CONFIG_ID?: string;
+    /** Optional: Twilio partner solution ID passed to Embedded Signup. */
+    WHATSAPP_ES_SOLUTION_ID?: string;
     WORDPRESS_MCP_TOKEN_ENCRYPTION_KEY?: string;
     GHL_CLIENT_ID?: string;
     GHL_CLIENT_SECRET?: string;
