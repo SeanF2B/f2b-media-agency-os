@@ -3505,3 +3505,5 @@ html body .app-shell.dark-mode .tt-owner-toggle .tt-owner-caret { color: #e6edf2
 .tt-owner-overdue { color: #d13b3b; font-style: normal; font-weight: 700; }
 .tt-row-nested td:nth-child(2) { padding-left: 40px !important; }
 @media (max-width: 760px) { .tt-row-nested td:nth-child(2) { padding-left: 10px !important; } .tt-owner-toggle { padding-left: 4px; } }
+html body .app-shell .tt-owner-toggle .avatar, html body .app-shell .tt-owner .avatar.tt-avatar { flex: 0 0 auto !important; aspect-ratio: 1 / 1; padding: 0 !important; max-width: none; background-size: cover !important; background-position: center !important; background-repeat: no-repeat !important; border-radius: 50% !important; }
+html body .app-shell .tt-owner-toggle .avatar { width: 24px !important; height: 24px !important; min-width: 24px !important; min-height: 24px !important; }
