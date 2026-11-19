@@ -355,7 +355,8 @@ html body .app-shell .ops-tabs .ops-tab-icon { flex: none; opacity: .85; }
 html body .app-shell .ops-tabs button.active .ops-tab-icon { opacity: 1; }
 
 /* Leads sub-pages share one header: no duplicate titles, no jumping between tabs */
-html body .app-shell .crm-workspace .cv-head { display: none !important; }
+html body .app-shell .crm-workspace .cv-head { display: flex !important; justify-content: flex-end; margin: 0 0 -4px; }
+html body .app-shell .crm-workspace .cv-head > div:first-child { display: none !important; }
 html body .app-shell .leads-clients-head { margin-bottom: 14px; }
 html body .app-shell .leads-clients-head + .page-heading { justify-content: flex-end; margin-top: 0; min-height: 0; }
 html body .app-shell .leads-clients-head + .page-heading > div:first-child { display: none !important; }
@@ -3360,7 +3361,9 @@ html body .app-shell .settings-subtabs.crm-tabs > button { display: inline-flex;
 
 /* ===== Phones: Conversations fills the screen down to the bottom bar (send always in view), compact WhatsApp-style reply ===== */
 @media (max-width: 860px) {
-  html body .app-shell .cv > .cv-head { display: none !important; }
+  html body .app-shell .cv > .cv-head { display: flex !important; justify-content: flex-end; }
+  html body .app-shell .cv > .cv-head > div:first-child { display: none !important; }
+  html body .app-shell .cv > .cv-head .cv-head-actions button { padding: 7px 11px; font-size: 12.5px; }
   html body .app-shell .cv > .cv-banner { padding: 8px 10px !important; font-size: 12px !important; margin: 0 0 8px !important; }
   html body .app-shell .cv-grid.cv-grid { height: calc(100dvh - var(--tn-bar-h, 62px) - 200px) !important; min-height: 320px !important; border-radius: 14px !important; }
   html body .app-shell .cv-filters { gap: 6px !important; padding: 8px !important; align-items: center; }
