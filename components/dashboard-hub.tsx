@@ -35,6 +35,7 @@ function GradedRow({ icon, label, value, grade, tip, detail }: { icon: ReactNode
 const AppointmentsDashboard = lazy(() => import("./scheduling-view").then((module) => ({ default: module.AppointmentsDashboard })));
 import { CampaignPicker } from "./campaign-picker";
 import { PageDrill } from "./dashboard-page-drill";
+import { UsageClientPanel } from "./usage-billing-panel";
 
 type HubTask = { id: string; clientId: string; title: string; status: string; assigneeId: string; due?: string; dueAt?: string; completedAt?: string; service?: string; reviewStatus?: string; reviewApproverId?: string; aiRunState?: string; aiApprovals?: Array<{ status: string }>; approvalRequest?: { status?: string; requestedAt?: string } | null };
 type HubClient = { id: string; name: string; logo?: string; googleAdsAccountId?: string; appointmentBased?: boolean; services?: Array<{ name: string; fee?: number }> };
@@ -380,6 +381,7 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
     </section>}
 
 
+    {!isAdmin && scopeClientId && <UsageClientPanel clientId={scopeClientId} />}
     {isAdmin && adsPanel && <div className="dh-ads-wrap">{adsPanel}</div>}
     {isAdmin && activityPanel}
     {isAdmin && <div className="dh-grid">

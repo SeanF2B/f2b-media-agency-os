@@ -1,4 +1,5 @@
 import { GOOGLE_ADS_TASK_TEMPLATES, RETIRED_GOOGLE_ADS_TASK_TEMPLATE_IDS, googleAdsTemplateEnabled, nextGoogleAdsTemplateDate } from "../lib/google-ads-task-templates";
+import { runWithUsage } from "../lib/usage-meter";
 import { logSystemEmail } from "../lib/email-log";
 import { buildGoogleAdsAuditReport } from "../lib/google-ads-audit-report";
 import { aiConfigured, aiEndpoint, aiHeaders, aiModel, resolveAiProvider } from "../lib/ai-provider";
@@ -2057,7 +2058,7 @@ export async function processDueAiTasks(env: SchedulerEnv, scheduledTime = new D
   task.aiRunState = "running";
   task.aiRunStartedAt = new Date().toISOString();
   task.status = "In progress";
-  try { await runTask(env, task, workspace, scheduledTime); }
+  try { await runWithUsage({ clientId: task.clientId, feature: `AI employees · ${task.aiMode || task.service || "task"}`.slice(0, 80), actor: task.agentName || "AI task" }, () => runTask(env, task, workspace, scheduledTime)); }
   catch (error) {
     if (error instanceof AiTaskCancelledError) {
       await finishCancelledAiTask(env, task);

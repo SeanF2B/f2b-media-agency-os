@@ -1,6 +1,7 @@
 // F2B Agency OS · Conversations: Twilio SMS + WhatsApp inbox with an AI bot.
 // Credentials live encrypted in D1 (same AES-GCM key as the other saved API keys). Tables are CREATE TABLE IF NOT EXISTS only.
 import { env } from "cloudflare:workers";
+import { runWithUsage } from "../usage-meter";
 import { decryptAiCredential, encryptAiCredential } from "@/lib/ai-credentials";
 import { aiEndpoint, aiHeaders, aiModel, resolveAiProvider } from "@/lib/ai-provider";
 
@@ -150,7 +151,9 @@ export async function addMessage(ownerId: string, threadId: string, m: { directi
 /* ---------------- AI bot ---------------- */
 const outputText = (r: any) => { if (typeof r?.output_text === "string") return r.output_text.trim(); return (r?.output || []).flatMap((i: any) => i.content || []).filter((p: any) => p.type === "output_text" && typeof p.text === "string").map((p: any) => p.text).join("\n").trim(); };
 const HUMAN_RE = /\b(human|real person|speak to (?:someone|a person|somebody)|call me|ring me|agent|manager|complain|complaint|solicitor|lawyer|refund)\b/i;
-export async function botReply(ownerId: string, p: { settings: ConvSettings; config: NumberConfig; clientName: string; channel: Channel; history: Array<{ sender: string; body: string }>; forceTest?: boolean }): Promise<{ text: string; handoff: boolean } | null> {
+/** Conversation AI reply, metered against the sub-account it answers for (client rebilling). */
+export async function botReply(...args: Parameters<typeof botReplyInner>) { return runWithUsage({ clientId: args[1].config.clientId || "", feature: `Conversation AI · ${args[1].channel}` }, () => botReplyInner(...args)); }
+async function botReplyInner(ownerId: string, p: { settings: ConvSettings; config: NumberConfig; clientName: string; channel: Channel; history: Array<{ sender: string; body: string }>; forceTest?: boolean }): Promise<{ text: string; handoff: boolean } | null> {
   const lastCustomer = [...p.history].reverse().find((m) => m.sender === "customer")?.body || "";
   if (HUMAN_RE.test(lastCustomer)) { const b0 = await getClientBot(ownerId, p.config.clientId || ""); return { text: b0?.handoff || p.settings.handoffMessage || DEFAULT_HANDOFF, handoff: true }; }
   const provider = await resolveAiProvider(env as any, ownerId);
