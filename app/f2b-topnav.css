@@ -3365,7 +3365,7 @@ html body .app-shell .settings-subtabs.crm-tabs > button { display: inline-flex;
   html body .app-shell .cv > .cv-head > div:first-child { display: none !important; }
   html body .app-shell .cv > .cv-head .cv-head-actions button { padding: 7px 11px; font-size: 12.5px; }
   html body .app-shell .cv > .cv-banner { padding: 8px 10px !important; font-size: 12px !important; margin: 0 0 8px !important; }
-  html body .app-shell .cv-grid.cv-grid { height: calc(100dvh - var(--tn-bar-h, 62px) - 200px) !important; min-height: 320px !important; border-radius: 14px !important; }
+  html body .app-shell .cv-grid.cv-grid { height: var(--cv-fit-h, calc(100dvh - var(--tn-bar-h, 62px) - 200px)) !important; min-height: 260px !important; border-radius: 14px !important; }
   html body .app-shell .cv-filters { gap: 6px !important; padding: 8px !important; align-items: center; }
   html body .app-shell .cv-filters .cv-bell { width: 40px !important; height: 40px !important; min-width: 40px; display: inline-grid !important; place-items: center; padding: 0 !important; }
   html body .app-shell .cv-filters .cv-bell svg { width: 22px !important; height: 22px !important; }
@@ -3527,3 +3527,9 @@ html body .app-shell button.dh-sub.dh-fold:hover { transform: translateY(-1px); 
 html body .app-shell button.dh-sub.dh-fold small { font-size: 12.5px; font-weight: 500; opacity: .65; }
 html body .app-shell button.dh-sub.dh-fold .dh-fold-chev { font-size: 10px; opacity: .6; flex: none; }
 html body .app-shell button.dh-sub.dh-fold.open { margin-bottom: 10px; }
+
+/* WhatsApp setup button: calm, not solid green — neutral button with the small WhatsApp logo */
+html body .wa-open-button { background: var(--f2b-white, #fff) !important; color: var(--f2b-ink, #1f2a30) !important; border: 1px solid var(--f2b-border, #dce3e7) !important; box-shadow: none; }
+html body .wa-open-button:hover { box-shadow: 0 4px 12px rgba(16,24,40,.08) !important; border-color: var(--brand-secondary, var(--brand-primary, #1479b8)) !important; }
+html body .wa-open-button .brand-icon, html body .wa-open-button .ch-icon-fb { flex: none; }
+html body .app-shell.dark-mode .wa-open-button { background: #2a3238 !important; color: #f1f5f7 !important; border-color: #3c4850 !important; }
