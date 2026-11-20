@@ -31,7 +31,7 @@ export function useAccountSetup(enabled: boolean) {
 }
 
 /** "Your setup" panel at the top of Launchpad. Everyone has it; staff come back here any time. */
-export function AccountSetupPanel({ setup, reload, clients }: { setup: AccountSetup; reload: () => void; clients: Array<{ id: string; name: string }> }) {
+export function AccountSetupPanel({ setup, reload, clients, compact = false }: { setup: AccountSetup; reload: () => void; clients: Array<{ id: string; name: string }>; /** Admin Launchpad: only your own links; the tiles and Messaging table below cover the rest. */ compact?: boolean }) {
   const [busy, setBusy] = useState("");
   const [note, setNote] = useState("");
   const [waOpen, setWaOpen] = useState(false);
@@ -64,6 +64,17 @@ export function AccountSetupPanel({ setup, reload, clients }: { setup: AccountSe
   const ops = setup.items.filter((i) => i.section === "operations");
   const biz = setup.items.filter((i) => i.section === "business" && !i.linked);
   const msg = setup.items.filter((i) => i.section === "messaging");
+  if (compact) {
+    const mine = ops.filter((i) => !i.linked && i.available);
+    const bizLeft = setup.items.filter((i) => i.section === "business" && i.required && !i.linked).map((i) => i.name);
+    if (!mine.length && !bizLeft.length) return null;
+    return <section className="asp asp-compact" aria-label="Your setup">
+      <style>{CSS}</style>
+      <p className="asp-line"><b>Your setup · {left} left</b>{bizLeft.length > 0 && <span> Also connect below: {bizLeft.join(", ")}.</span>}</p>
+      {mine.length > 0 && <ul>{mine.map(row)}</ul>}
+      {note && <p className="asp-note" role="status">{note}</p>}
+    </section>;
+  }
   return <section className="asp" aria-label="Your setup">
     <style>{CSS}</style>
     <div className="asp-head">
@@ -97,5 +108,6 @@ const CSS = `
 .asp-btn{display:inline-flex;align-items:center;padding:7px 12px;border-radius:9px;border:0;background:var(--brand-primary,#287cac);color:#fff !important;font:inherit;font-size:12.5px;font-weight:700;text-decoration:none;cursor:pointer;white-space:nowrap;transition:transform .15s}.asp-btn:hover{transform:translateY(-1px)}
 .asp-ghost{padding:6px 11px;border-radius:9px;border:1px solid rgba(127,127,127,.3);background:transparent;color:inherit;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap}
 .asp-ok{font-size:12.5px;font-weight:800;color:#16a34a;white-space:nowrap}.asp-note{margin:12px 0 0;font-size:13px}
+.asp-compact{padding:12px 14px}.asp-line{margin:0 0 8px;font-size:13px}.asp-line span{opacity:.75}
 @media (max-width:600px){.asp{padding:14px}.asp li{flex-wrap:wrap}.asp-act{width:100%}.asp-act>*{flex:1;justify-content:center}}
 `;

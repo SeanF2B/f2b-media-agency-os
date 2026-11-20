@@ -1,7 +1,7 @@
 "use client";
 
 import { appAlert, appConfirm, appPrompt } from "./app-dialog";
-import { lazy, Suspense, useEffect, useState, type CSSProperties } from "react";
+import { lazy, Suspense, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { MessagingLaunchpad } from "./staff-messaging";
 const WhatsAppSetup = lazy(() => import("./whatsapp-setup").then((m) => ({ default: m.WhatsAppSetup })));
 import { BrandIcon } from "./brand-icon";
@@ -57,7 +57,7 @@ const integrationIcons: Record<string, string> = {
   dataforseo: "🔍", pagespeed: "⚡", wordpress: "🌐", "marketing-public": "🚀", gohighlevel: "🧩", "landing-hosting": "🪄",
 };
 
-export function IntegrationsView({ onNavigate, onApplyGoogleMatches, clients = [] }: { onNavigate: (page: string) => void; onApplyGoogleMatches?: (matches: GooglePropertyMatch[]) => Promise<boolean>; clients?: Array<{ id: string; name: string; logo?: string }> }) {
+export function IntegrationsView({ onNavigate, onApplyGoogleMatches, clients = [], setupSlot }: { onNavigate: (page: string) => void; onApplyGoogleMatches?: (matches: GooglePropertyMatch[]) => Promise<boolean>; clients?: Array<{ id: string; name: string; logo?: string }>; setupSlot?: ReactNode }) {
   const [waFor, setWaFor] = useState<string | null>(null);
   const [linking, setLinking] = useState(false);
   const [linkMessage, setLinkMessage] = useState("");
@@ -143,6 +143,7 @@ export function IntegrationsView({ onNavigate, onApplyGoogleMatches, clients = [
   }
   return <main className="page-heading integrations-view launchpad-view">
     <header className="launchpad-heading"><div><p className="eyebrow">🚀 WORKSPACE CONNECTIONS</p><h1>Let’s get you on the path to success</h1><p className="muted">Connect your tools and check which workspace services are ready.</p></div><div className="launchpad-actions">{onApplyGoogleMatches && <button className="primary-button" type="button" onClick={() => void autoLinkGoogle()} disabled={linking || loading} title="Match each client to its Search Console and GA4 property using the connected Google login">{linking ? "Linking…" : "Auto-link Google properties"}</button>}<button className="secondary-button" type="button" onClick={() => void load()} disabled={loading}>{loading ? "Checking…" : "↻ Refresh"}</button></div></header>
+    {setupSlot}
     {linkMessage && <p role="status" className="integrations-message launchpad-state">{linkMessage}</p>}
     {loading && <p role="status" className="integrations-message launchpad-state">Checking connection setup…</p>}
     {message && <div role="alert" className="launchpad-error"><span>{message}</span><button className="secondary-button" type="button" onClick={() => void load()} disabled={loading}>Try again</button></div>}
