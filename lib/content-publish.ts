@@ -128,6 +128,33 @@ export async function listGooglePosts(ownerId: string, clientId: string) {
   return { connected: true, matched: true, posts: (r.localPosts || []).map((p) => ({ id: p.name, summary: p.summary || "", image: p.media?.[0]?.googleUrl || p.media?.[0]?.sourceUrl || "", at: p.createTime || "", url: p.searchUrl || "", state: p.state || "" })) };
 }
 
+/** Google reviews for a client's Business Profile, cached for 6 hours (used on booking pages to show reviews that mention a staff member). */
+export type GoogleReview = { author: string; rating: number; text: string; at: string };
+const STAR: Record<string, number> = { ONE: 1, TWO: 2, THREE: 3, FOUR: 4, FIVE: 5 };
+export async function listGoogleReviews(ownerId: string, clientId: string): Promise<GoogleReview[]> {
+  const db = env.DB!;
+  await db.prepare("CREATE TABLE IF NOT EXISTS gbp_review_cache (owner_id TEXT NOT NULL, client_id TEXT NOT NULL, data TEXT NOT NULL DEFAULT '[]', fetched_at TEXT NOT NULL, PRIMARY KEY (owner_id, client_id))").run();
+  const hit = await db.prepare("SELECT data, fetched_at FROM gbp_review_cache WHERE owner_id=?1 AND client_id=?2").bind(ownerId, clientId).first<{ data: string; fetched_at: string }>();
+  if (hit && Date.now() - Date.parse(hit.fetched_at) < 6 * 3_600_000) { try { return JSON.parse(hit.data) as GoogleReview[]; } catch { /* refetch */ } }
+  try {
+    await ensureContentTables(db);
+    const loc = await locationFor(ownerId, clientId);
+    if (!loc) return [];
+    const token = await gbpToken(ownerId);
+    const r = await gapi<{ reviews?: Array<{ reviewer?: { displayName?: string }; starRating?: string; comment?: string; createTime?: string }> }>(`https://mybusiness.googleapis.com/v4/${loc.account}/locations/${loc.location.replace(/^locations\//, "")}/reviews?pageSize=50&orderBy=updateTime%20desc`, token);
+    const list = (r.reviews || []).map((v) => ({ author: String(v.reviewer?.displayName || "Google user").slice(0, 80), rating: STAR[String(v.starRating)] || 5, text: String(v.comment || "").replace(/\(Translated by Google\)[\s\S]*$/, "").trim().slice(0, 1200), at: String(v.createTime || "") })).filter((v) => v.text);
+    await db.prepare("INSERT INTO gbp_review_cache (owner_id, client_id, data, fetched_at) VALUES (?1,?2,?3,?4) ON CONFLICT(owner_id, client_id) DO UPDATE SET data=excluded.data, fetched_at=excluded.fetched_at").bind(ownerId, clientId, JSON.stringify(list), new Date().toISOString()).run();
+    return list;
+  } catch { return hit ? (JSON.parse(hit.data || "[]") as GoogleReview[]) : []; }
+}
+/** Reviews that mention this person by first name (e.g. "Jeliza was amazing"). */
+export function reviewsMentioning(reviews: GoogleReview[], fullName: string) {
+  const first = fullName.split(/[\s|]+/)[0]?.trim();
+  if (!first || first.length < 3) return [];
+  const re = new RegExp(`(^|[^\\p{L}])${first.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^\\p{L}]|$)`, "iu");
+  return reviews.filter((r) => re.test(r.text));
+}
+
 // ---------- Publish one post ----------
 export async function publishPost(db: Db, ownerId: string, row: Row) {
   await ensureContentTables(db);

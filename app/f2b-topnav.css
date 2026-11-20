@@ -3675,3 +3675,19 @@ html body .app-shell.dark-mode .cv-compose2 .cv-botswitch.on { background: rgba(
   html body .app-shell .cv-chat-head { flex-wrap: nowrap !important; }
   html body .app-shell .cv-suggest button { max-width: 200px; font-size: 12.5px; padding: 6px 10px; }
 }
+
+/* Booking-link menu: roomier, nothing cut off */
+html body .app-shell .cv-compose2 .cv-links { width: min(360px, calc(100vw - 32px)) !important; max-height: min(480px, 62vh) !important; padding: 12px !important; gap: 6px !important; }
+html body .app-shell .cv-links > b { padding: 0 4px 4px !important; }
+html body .app-shell .cv-links-staff { display: grid; gap: 4px; font-size: 12px; font-weight: 700; padding: 0 4px 6px; border-bottom: 1px solid rgba(127,127,127,.15); margin-bottom: 2px; }
+html body .app-shell .cv-links-staff select { font: inherit; font-weight: 500; font-size: 13.5px; height: 38px; padding: 0 10px; border: 1px solid #dce3e7; border-radius: 10px; background: transparent; color: inherit; }
+html body .app-shell .cv-links-form { padding: 8px 4px 2px !important; gap: 10px !important; border-top: 1px solid rgba(127,127,127,.15); }
+html body .app-shell .cv-links-form input, html body .app-shell .cv-links-form select { height: 38px; width: 100%; }
+html body .app-shell .cv-links-row { gap: 10px !important; }
+html body .app-shell .cv-links-row button { width: 100%; height: 40px; padding: 0 10px !important; white-space: nowrap; }
+@media (max-width: 860px) { html body .app-shell .cv-links-staff select, html body .app-shell .cv-links-form input, html body .app-shell .cv-links-form select { font-size: 16px; } }
+/* Reply box: grows while typing; Send always fits beside it */
+html body .app-shell .cv-compose2 > .cv-writerow { min-width: 0; width: 100%; }
+html body .app-shell .cv-compose2 .cv-writerow textarea { width: auto !important; min-width: 0 !important; max-height: 200px; overflow-y: auto; transition: height .12s ease; }
+html body .app-shell .cv-compose2 > .cv-toolrow { width: 100%; min-width: 0; }
+html body .app-shell .cv-compose2 > .cv-toolrow .cv-tools { margin-left: auto !important; }
