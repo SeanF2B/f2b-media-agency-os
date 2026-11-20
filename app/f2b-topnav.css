@@ -3588,3 +3588,40 @@ html body .app-shell .settings-billing-card { padding: 22px 24px !important; mar
   html body .app-shell .cv-compose:not(.cv-email-compose) > div > .cv-tools .cv-tool::before { content: none !important; }
   html body .app-shell .cv-chat-actions .cv-invoice { font-size: 12px !important; }
 }
+
+/* Conversations filter row: channel chips + staff picker on ONE tidy line (desktop and phones) */
+html body .app-shell .cv-channel-bar { flex-wrap: nowrap !important; overflow-x: auto; scrollbar-width: none; gap: 5px !important; padding: 8px 10px !important; }
+html body .app-shell .cv-channel-bar::-webkit-scrollbar { display: none; }
+html body .app-shell .cv-channel-bar > button { flex: none; height: 32px !important; min-width: 32px; padding: 0 8px !important; border-radius: 10px !important; }
+html body .app-shell .cv-channel-bar > button.on { box-shadow: none !important; border: 1.5px solid currentColor !important; }
+html body .app-shell .cv-staff-select { flex: none; margin-left: auto !important; }
+html body .app-shell .cv-staff-select select { height: 32px !important; max-width: 118px; padding: 0 22px 0 8px !important; font-size: 12.5px !important; border-radius: 10px !important; }
+@media (max-width: 860px) {
+  html body .app-shell .cv-channel-bar > button { height: 34px !important; min-width: 34px; }
+  html body .app-shell .cv-staff-select select { height: 34px !important; max-width: 104px; font-size: 16px !important; }
+  html body .app-shell .cv-suggest button { max-width: 220px; }
+  html body .app-shell .cv-held-card { max-width: 100%; }
+}
+
+/* Phones: Scheduling is booking only — no section tabs */
+@media (max-width: 860px) { html body .app-shell .sch .sch-tabs { display: none !important; } }
+/* Staff & availability cards: same connection icons as the Team cards */
+html body .app-shell .sch-staff-chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+html body .app-shell .sch-staff-chips .staff-conn { margin: 4px 0 0; }
+
+/* Content (More → Content): clean, and the month fits the screen without scrolling */
+html body .app-shell .content-page > .page-heading { margin-bottom: 8px !important; }
+html body .app-shell .content-page > .page-heading p.muted { display: none; }
+html body .app-shell .content-page .sp-head { margin-bottom: 6px; }
+html body .app-shell .content-page .sp-head p { display: none; }
+html body .app-shell .content-page .sp-head h3 { font-size: 15px; margin: 0; }
+html body .app-shell .content-page .cv-conn { padding: 6px 10px !important; gap: 14px !important; font-size: 12px; }
+html body .app-shell .content-page .sp-nav { margin: 4px 0 6px; }
+html body .app-shell .content-page .sp-grid { gap: 3px; }
+html body .app-shell .content-page .sp-day { min-height: clamp(54px, calc((100dvh - 470px) / 6), 104px); }
+html body .app-shell .content-page .sp-dow { padding: 2px 4px; }
+@media (max-width: 760px) {
+  html body .app-shell .content-page .cv-conn { display: none; }
+  html body .app-shell .content-page .sp-grid { grid-template-columns: repeat(7, minmax(0, 1fr)) !important; overflow: visible; }
+  html body .app-shell .content-page .sp-day { min-height: clamp(44px, calc((100dvh - 360px) / 6), 70px); padding: 2px; }
+}

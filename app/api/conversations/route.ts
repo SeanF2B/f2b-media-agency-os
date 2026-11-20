@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { authorizeAdminOrSubAccount, respond } from "@/lib/settings-auth";
 import { aiCredentialStorageReady } from "@/lib/ai-credentials";
-import { addMessage, botReply, e164, ensureTables, getClientBot, listTwilioTemplates, sanitizeBot, saveClientBot, BLANK_BOT, loadSettings, saveSettings, sendTwilio, twilioCredentials, upsertThread, type NumberConfig } from "@/lib/conversations/core";
+import { addMessage, suggestReplies, botReply, e164, ensureTables, getClientBot, listTwilioTemplates, sanitizeBot, saveClientBot, BLANK_BOT, loadSettings, saveSettings, sendTwilio, twilioCredentials, upsertThread, type NumberConfig } from "@/lib/conversations/core";
 import { renderTemplate, windowState } from "@/lib/conversations/whatsapp";
 import { ensureMetaTables, getStaffMessaging, sendMeta, sendMetaAttachment } from "@/lib/conversations/meta";
 
@@ -25,6 +25,12 @@ export async function GET(request: Request) {
     if (allowed && view === "settings") return respond({ error: "Only an admin can change Conversation settings." }, 403);
     const { settings } = await loadSettings(auth.ownerId);
     if (view === "settings") return respond({ settings, secureStorageReady: aiCredentialStorageReady(), webhookUrl: `${url.origin}/api/marketing-public/twilio` });
+    if (view === "held") {
+      // AI approvals: bot replies held back (e.g. they contained a booking link), for the Dashboard and the inbox.
+      const rows = (await env.DB!.prepare("SELECT m.id, m.thread_id, m.body, m.error, m.created_at, t.client_id, t.contact_name, t.contact, t.channel FROM conv_messages m JOIN conv_threads t ON t.id = m.thread_id WHERE m.owner_id=?1 AND m.status='held' ORDER BY m.created_at DESC LIMIT 100").bind(auth.ownerId).all<any>().catch(() => ({ results: [] }))).results || [];
+      const inView = rows.filter((r: any) => (!allowed || allowed.includes(String(r.client_id || ""))) && (scope === "agency" || r.client_id === scope));
+      return respond({ held: inView.map((r: any) => ({ id: r.id, threadId: r.thread_id, body: r.body, reason: r.error, at: r.created_at, clientId: r.client_id, name: r.contact_name || r.contact, channel: r.channel })) });
+    }
     if (view === "thread") {
       const id = url.searchParams.get("id") || "";
       const thread = await env.DB!.prepare("SELECT * FROM conv_threads WHERE id=?1 AND owner_id=?2").bind(id, auth.ownerId).first();
@@ -130,6 +136,30 @@ export async function POST(request: Request) {
       await env.DB!.prepare("UPDATE conv_threads SET bot_on=0, status=CASE WHEN status='closed' THEN 'open' ELSE status END WHERE id=?1").bind(id).run();
       if (error) return respond({ error, messageId: m.id }, 502);
       return respond({ ok: true, messageId: m.id });
+    }
+    if (action === "held-approve" || action === "held-discard") {
+      const msgId = String(b.messageId || "");
+      const held = await env.DB!.prepare("SELECT * FROM conv_messages WHERE id=?1 AND thread_id=?2 AND status='held'").bind(msgId, id).first<any>();
+      if (!held) return respond({ error: "That reply was already handled." }, 404);
+      if (action === "held-discard") { await env.DB!.prepare("DELETE FROM conv_messages WHERE id=?1").bind(msgId).run(); return respond({ ok: true }); }
+      const text = String(b.body ?? held.body).trim().slice(0, 1900);
+      if (!text) return respond({ error: "The reply is empty." }, 400);
+      let sid = "", error = "";
+      try {
+        if (thread.channel === "messenger" || thread.channel === "instagram") { const mode = metaSendMode(thread.last_in_at, true); if (!mode.ok) throw new Error(mode.reason); sid = await sendMeta(auth.ownerId, { accountId: thread.our_number, contactId: thread.contact, text, tag: mode.tag }); }
+        else if (thread.channel === "whatsapp" || thread.channel === "sms") { if (thread.channel === "whatsapp" && !windowState(thread.last_in_at).open) throw new Error("The 24-hour WhatsApp window has closed. Send an approved template instead."); const creds = await twilioCredentials(auth.ownerId); if (!creds) throw new Error("Add your Twilio details in Conversation settings first."); sid = await sendTwilio(creds, { from: thread.our_number, to: thread.contact, body: text, channel: thread.channel, statusCallback }); }
+        else throw new Error("This chat can't send that reply.");
+      } catch (e) { error = e instanceof Error ? e.message : "Could not send."; }
+      if (error) return respond({ error }, 502);
+      await env.DB!.prepare("UPDATE conv_messages SET body=?2, status='sent', twilio_sid=?3, error='', sender='staff' WHERE id=?1").bind(msgId, text, sid).run();
+      await env.DB!.prepare("UPDATE conv_threads SET status='open', last_preview=?2 WHERE id=?1").bind(id, text.slice(0, 120)).run();
+      return respond({ ok: true });
+    }
+    if (action === "suggest") {
+      const { settings } = await loadSettings(auth.ownerId);
+      const history = ((await env.DB!.prepare("SELECT sender, body FROM conv_messages WHERE thread_id=?1 AND status<>'held' ORDER BY created_at DESC LIMIT 12").bind(id).all<{ sender: string; body: string }>()).results || []).reverse();
+      const client = await env.DB!.prepare("SELECT json_extract(value,'$.name') AS name FROM workspace_documents, json_each(data,'$.clients') WHERE id='f2b-agency' AND json_extract(value,'$.id')=?1").bind(thread.client_id || "").first<{ name: string }>().catch(() => null);
+      return respond({ replies: await suggestReplies(auth.ownerId, { settings, clientId: thread.client_id || "", clientName: client?.name || "", channel: thread.channel, history }) });
     }
     if (action === "assign") {
       const to = String(b.staffId || "").slice(0, 100);

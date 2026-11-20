@@ -53,7 +53,7 @@ export async function saveClientBot(ownerId: string, clientId: string, bot: Clie
 }
 function botKnowledge(bot: ClientBot | null) {
   if (!bot) return "";
-  const parts: Array<[string, string]> = [["About the business", bot.about], ["Services", bot.services], ["Prices", bot.prices], ["Opening hours", bot.hours], ["Area / location", bot.area], ["Team", bot.team], ["Frequently asked questions", bot.faqs], ["Booking link (share it when someone wants to book)", bot.bookingLink], ["House rules from the business", bot.rules]];
+  const parts: Array<[string, string]> = [["About the business", bot.about], ["Services", bot.services], ["Prices", bot.prices], ["Opening hours", bot.hours], ["Area / location", bot.area], ["Team", bot.team], ["Frequently asked questions", bot.faqs], ["House rules from the business", bot.rules]];
   return parts.filter(([, v]) => v.trim()).map(([k, v]) => `${k}:\n${v.trim()}`).join("\n\n");
 }
 
@@ -171,6 +171,8 @@ async function botReplyInner(ownerId: string, p: { settings: ConvSettings; confi
     bot?.tone ? `Tone of voice: ${bot.tone}.` : "",
     botKnowledge(bot) ? `What you know about ${p.clientName || "the business"} (trained by the owner):\n${botKnowledge(bot)}` : "",
     "Goal: answer simply, find out what the customer needs, and collect their name, what they need and the best time for a call back. Offer to book a call or quote.",
+    // House rule (all sub-accounts): the AI never sends booking / scheduling links itself. A person approves them.
+    "Never include any booking, scheduling or calendar link or URL in your reply. If the customer wants to book, ask for their preferred day and time and say the team will confirm.",
     "Only state facts from the business information below. Never invent prices, availability, guarantees or opening times; if you don't know, say the team will confirm.",
     "If the customer is upset, asks for a person, mentions legal/medical/emergency matters, or you cannot help, reply with a short polite message and end with the exact token [HANDOFF].",
     p.config.info ? `Business information for ${p.clientName || "this business"}:\n${p.config.info}` : "",
@@ -187,6 +189,47 @@ async function botReplyInner(ownerId: string, p: { settings: ConvSettings; confi
     text = text.replace(/\[HANDOFF\]/gi, "").trim().slice(0, 600);
     return text ? { text, handoff } : null;
   } catch { return null; }
+}
+
+/** House rule: a bot reply that contains a booking / scheduling link is never sent; it waits in AI approvals. */
+const SCHEDULER_RE = /(\/f\/book\/|calendly\.com|cal\.com\/|youcanbook\.me|acuityscheduling\.com|setmore\.com|simplybook\.|booksy\.com|fresha\.com|square\.site\/book|leadconnectorhq\.com\/widget\/booking|msgsndr\.com|calendar\.app\.google|calendar\.google\.com\/calendar\/appointments|outlook\.office365\.com\/book|bookings\.cloud\.microsoft)/i;
+export function hasSchedulingLink(text: string, extraLinks: string[] = []) {
+  if (SCHEDULER_RE.test(text)) return true;
+  return extraLinks.some((l) => { const u = l.trim().replace(/^https?:\/\//, "").replace(/\/$/, ""); return u.length > 6 && text.includes(u); });
+}
+/** Keep a bot reply for approval instead of sending it (shown in the chat and in AI approvals). */
+export async function holdBotReply(ownerId: string, threadId: string, text: string, reason: string) {
+  await ensureTables();
+  await env.DB!.prepare("CREATE INDEX IF NOT EXISTS conv_messages_held ON conv_messages (owner_id, status)").run().catch(() => undefined);
+  const m = await addMessage(ownerId, threadId, { direction: "out", sender: "bot", body: text, status: "held", error: reason.slice(0, 300) });
+  await env.DB!.prepare("UPDATE conv_threads SET status='handoff' WHERE id=?1").bind(threadId).run();
+  return m;
+}
+/** The client's own booking link (from Train AI bot), so it is caught too. */
+export async function botLinksFor(ownerId: string, clientId: string) { const b = await getClientBot(ownerId, clientId); return b?.bookingLink ? [b.bookingLink] : []; }
+
+/** Three short suggested replies for staff (never sent automatically). */
+export async function suggestReplies(...args: Parameters<typeof suggestRepliesInner>) { return runWithUsage({ clientId: args[1].clientId || "", feature: `Suggested replies · ${args[1].channel}` }, () => suggestRepliesInner(...args)); }
+async function suggestRepliesInner(ownerId: string, p: { settings: ConvSettings; clientId: string; clientName: string; channel: ThreadChannel; history: Array<{ sender: string; body: string }> }): Promise<string[]> {
+  const provider = await resolveAiProvider(env as any, ownerId);
+  const endpoint = provider ? aiEndpoint(env as any, "responses", provider) : null;
+  if (!provider || !endpoint) return [];
+  const bot = await getClientBot(ownerId, p.clientId);
+  const instructions = [
+    `Suggest exactly 3 different short replies a staff member at ${p.clientName || "the business"} could send next to this customer by ${CHANNEL_LABEL[p.channel] || "message"}.`,
+    "Each under 220 characters, warm, plain text, no markdown, UK/Irish English. Make them genuinely different (e.g. answer + question, ask for details, offer a call or visit).",
+    "Only use facts from the business information. Never invent prices or times.",
+    botKnowledge(bot) ? `Business information:\n${botKnowledge(bot)}` : "",
+    'Return only JSON: {"replies":["...","...","..."]}',
+  ].filter(Boolean).join("\n\n");
+  const input = p.history.slice(-12).map((m) => ({ role: m.sender === "customer" ? "user" : "assistant", content: m.body }));
+  try {
+    const res = await fetch(endpoint, { method: "POST", headers: aiHeaders(env as any, provider)!, body: JSON.stringify({ model: aiModel(env as any, undefined, provider), instructions, input }), signal: AbortSignal.timeout(15000) });
+    if (!res.ok) return [];
+    const raw = outputText(await res.json());
+    const json = JSON.parse((raw.match(/\{[\s\S]*\}/) || ["{}"])[0]) as { replies?: unknown };
+    return (Array.isArray(json.replies) ? json.replies : []).map((r) => String(r || "").trim().slice(0, 400)).filter(Boolean).slice(0, 3);
+  } catch { return []; }
 }
 
 /** First message from a new customer: add them to the CRM pipeline as a new lead (best effort, never blocks the reply). */

@@ -154,8 +154,11 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
   const mineFor = (t: HubTask, approver?: string) => (awaitingOwner(t) && isAdmin) || !currentStaffId || approver === currentStaffId || (!approver && t.assigneeId === currentStaffId);
   const aiList = tasks.filter((t) => inScope(t) && ((t.aiApprovals || []).some((a) => a.status === "pending") || t.aiRunState === "needs_review" || (awaitingOwner(t) && isBotTask(t))));
   const humanList = tasks.filter((t) => inScope(t) && (t.reviewStatus === "submitted" || (awaitingOwner(t) && !isBotTask(t))));
-  const aiPending = aiList.length, humanPending = humanList.length;
-  const aiMine = aiList.filter((t) => mineFor(t)), humanMine = humanList.filter((t) => mineFor(t, t.reviewApproverId));
+  // Chat replies the AI held back for approval (it never sends booking links itself) count as AI approvals too.
+  const [heldReplies, setHeldReplies] = useState<Array<{ id: string; threadId: string; body: string; name: string; channel: string; clientId: string }>>([]);
+  useEffect(() => { let live = true; fetch(`/api/conversations?view=held&clientId=${encodeURIComponent(scopeClientId || "agency")}`, { cache: "no-store" }).then((r) => r.ok ? r.json() : { held: [] }).then((j: { held?: typeof heldReplies }) => { if (live) setHeldReplies(j.held || []); }).catch(() => undefined); return () => { live = false; }; }, [scopeClientId]);
+  const aiPending = aiList.length + heldReplies.length, humanPending = humanList.length;
+  const aiMine = [...aiList.filter((t) => mineFor(t)), ...(isAdmin ? heldReplies : [])], humanMine = humanList.filter((t) => mineFor(t, t.reviewApproverId));
   const oldestHours = (list: HubTask[]) => list.reduce((h, t) => { const at = Date.parse(t.approvalRequest?.requestedAt || ""); return at ? Math.max(h, (Date.now() - at) / 3_600_000) : h; }, 0);
   const OVERLOAD = 5;
   // Same colours as Appointment updates: green when none, yellow when any are waiting, red when overloaded (5+ or waiting 2+ days).
@@ -218,7 +221,8 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
       <div className="dh-appr-list-head"><b>{apprOpen === "ai" ? "AI approvals" : "Team approvals"}</b><button type="button" className="text-button" onClick={() => setApprOpen("")}>Close</button></div>
       {list.length ? list.map((t) => { const mine = mineFor(t, apprOpen === "human" ? t.reviewApproverId : undefined); return <div key={t.id} className={`dh-appr-item ${mine ? "mine" : ""}`}><span className="dh-appr-dot" /><span className="dh-appr-main"><b>{t.title}</b><small>{apprOpen === "human" ? `Submitted by ${who(t.assigneeId) || "the team"}${t.reviewApproverId ? ` · approver ${who(t.reviewApproverId)}` : ""}` : `${who(t.assigneeId) || "AI"} · ${t.service || "Task"}`}{mine ? " · needs you" : ""}</small></span>
         <span className="dh-appr-acts">{apprOpen === "human" && onReviewTask && mine && <><button type="button" className="dh-appr-ok" onClick={() => onReviewTask(t.id, "approve")}>Approve</button><button type="button" className="dh-appr-no" onClick={() => onReviewTask(t.id, "request_changes")}>Changes</button></>}{onOpenTask && <button type="button" className="dh-appr-open" onClick={() => onOpenTask(t.id)}>Open</button>}</span></div>; })
-        : <p className="dh-muted">Nothing waiting. 🎉</p>}
+        : heldReplies.length && apprOpen === "ai" ? null : <p className="dh-muted">Nothing waiting. 🎉</p>}
+      {apprOpen === "ai" && heldReplies.map((h) => <div key={h.id} className="dh-appr-item mine"><span className="dh-appr-dot" /><span className="dh-appr-main"><b>Reply to {h.name}</b><small>{h.channel === "whatsapp" ? "WhatsApp" : h.channel === "instagram" ? "Instagram" : h.channel === "messenger" ? "Facebook" : "SMS"}{!scopeClientId && clientOf(h.clientId) ? ` · ${clientOf(h.clientId)!.name}` : ""} · AI wants to send a booking link</small></span><span className="dh-appr-acts"><button type="button" className="dh-appr-open" onClick={() => onNavigate("Conversations")}>Open</button></span></div>)}
     </section>; })()}
     {appt.list}
     {showAppts && <Suspense fallback={null}><AppointmentsDashboard key={scopeClientId || "agency"} showStaffHours scopeClientId={scopeClientId} sample={sample} clientName={clients.find((c) => c.id === scopeClientId)?.name || ""} periodStart={periodStart} periodEnd={periodEnd} periodLabel={periodLabel} onOpen={() => onNavigate("Scheduling")} /></Suspense>}

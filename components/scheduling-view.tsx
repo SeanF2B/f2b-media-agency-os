@@ -10,6 +10,7 @@ import { ReportGeneratingAnimation, currencySymbolFor } from "./report-generatin
 import { computePayslip, maskPps, normalisePps, validPps, DEFAULT_PERSON, EMPTY_YTD, type PayrollEmployer, type PayrollPerson } from "@/lib/scheduling/payroll";
 import type { PayLine, PayslipRecord } from "@/lib/scheduling/payroll-store";
 import { uploadToMedia } from "@/lib/upload-media";
+import { StaffConnectionIcons } from "./staff-messaging";
 import { buildPayslipPdf, bytesToBase64, type PdfLogo } from "@/lib/scheduling/payslip-pdf";
 
 type DayKey = "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
@@ -327,8 +328,7 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff, content
             {offSoon > 0 && <span className="iv-small">🏖 {offSoon} day{offSoon === 1 ? "" : "s"} off coming up</span>}
           </div>
           <div className="sch-staff-chips">
-            <span className={`sch-chip-status ${s.google ? "on" : ""}`}><img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_48dp.png" alt="" width={14} height={14} />{s.google ? "Google synced" : "Google not connected"}</span>
-            <span className={`sch-chip-status ${s.feedUrl ? "on" : ""}`}>📅 {s.feedUrl ? "Apple/Outlook feed on" : "No calendar feed"}</span>
+            <StaffConnectionIcons member={{ id: s.id, name: s.name, clientAccessIds: undefined }} onOpen={onEditStaff ? () => onEditStaff(s.id) : undefined} />
             {rating && <span className={`sch-chip-status ${s.profile?.showReviews ? "on gold" : ""}`}>★ {rating} · {s.profile?.reviews.length}</span>}
           </div>
         </div>; })}

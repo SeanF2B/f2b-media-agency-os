@@ -2,7 +2,7 @@
 // Every request is verified with Twilio's X-Twilio-Signature (HMAC-SHA1 with the saved Auth Token) before anything is stored.
 import { env } from "cloudflare:workers";
 import { detectMediaType, MEDIA_SCHEMA_SQL, newFileKey, publicMediaUrl } from "@/lib/media-library/core";
-import { addMessage, botReply, leadToCrm, e164, findOwnerByNumber, loadSettings, twilioCredentials, upsertThread, verifyTwilio, type Channel } from "@/lib/conversations/core";
+import { addMessage, botLinksFor, botReply, hasSchedulingLink, holdBotReply, leadToCrm, e164, findOwnerByNumber, loadSettings, twilioCredentials, upsertThread, verifyTwilio, type Channel } from "@/lib/conversations/core";
 
 export const dynamic = "force-dynamic";
 const xml = (body: string, status = 200) => new Response(`<?xml version="1.0" encoding="UTF-8"?><Response>${body}</Response>`, { status, headers: { "Content-Type": "text/xml; charset=utf-8", "Cache-Control": "no-store" } });
@@ -64,6 +64,8 @@ export async function POST(request: Request) {
   const workspace = await env.DB.prepare("SELECT json_extract(value,'$.name') AS name FROM workspace_documents, json_each(data,'$.clients') WHERE id='f2b-agency' AND json_extract(value,'$.id')=?1").bind(found.config.clientId).first<{ name: string }>().catch(() => null);
   const reply = await botReply(found.ownerId, { settings, config: found.config, clientName: workspace?.name || found.config.label || "", channel, history: rows });
   if (!reply) { await env.DB.prepare("UPDATE conv_threads SET status='handoff' WHERE id=?1").bind(thread.id).run(); return xml(""); }
+  // House rule: the AI never sends a booking / scheduling link itself; it waits in AI approvals.
+  if (hasSchedulingLink(reply.text, await botLinksFor(found.ownerId, found.config.clientId))) { await holdBotReply(found.ownerId, thread.id, reply.text, "AI wanted to send a booking link"); return xml(""); }
   await addMessage(found.ownerId, thread.id, { direction: "out", sender: "bot", body: reply.text });
   if (reply.handoff) await env.DB.prepare("UPDATE conv_threads SET bot_on=0, status='handoff' WHERE id=?1").bind(thread.id).run();
   return xml(`<Message>${esc(reply.text)}</Message>`);

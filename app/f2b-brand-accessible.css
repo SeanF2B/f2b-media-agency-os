@@ -9780,3 +9780,17 @@ html.f2b-dark .onb-admin, .dark-mode .onb-admin { background:#0f172a; color:#f8f
 .cv-links-form{display:grid;gap:8px;padding:6px}.cv-links-form label{display:grid;gap:4px;font-size:12px;font-weight:700}
 .cv-links-form input,.cv-links-form select{font:inherit;font-weight:400;font-size:13.5px;padding:8px 10px;border:1px solid #dce3e7;border-radius:10px;background:transparent;color:inherit;min-width:0}
 .cv-links-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.cv-links-row button{justify-content:center}
+
+/* AI suggested replies + held replies (AI approvals) */
+.cv-suggest{display:flex;align-items:center;gap:6px;overflow-x:auto;padding:0 0 8px;scrollbar-width:none}.cv-suggest::-webkit-scrollbar{display:none}
+.cv-suggest-label{flex:none;display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:800;opacity:.7}
+.cv-suggest button{flex:none;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:1px solid color-mix(in srgb,var(--brand-primary,#1479b8) 35%,#dce3e7);background:color-mix(in srgb,var(--brand-primary,#1479b8) 7%,#fff);color:inherit;border-radius:999px;padding:7px 12px;font:inherit;font-size:13px;cursor:pointer;transition:transform .15s,border-color .15s}
+.cv-suggest button:hover{transform:translateY(-1px);border-color:var(--brand-primary,#1479b8)}
+.cv-suggest-loading{font-size:12.5px;opacity:.6}
+.cv-held{justify-content:flex-end}
+.cv-held-card{max-width:min(520px,92%);border:1.5px dashed #f59e0b;background:#fffbeb;color:#422006;border-radius:16px;padding:12px 14px;display:grid;gap:6px}
+.cv-held-card b{display:inline-flex;align-items:center;gap:6px;font-size:13px}.cv-held-card small{font-size:12px;opacity:.8}.cv-held-card p{margin:0;white-space:pre-wrap;font-size:14px}
+.cv-held-card textarea{font:inherit;font-size:14px;border:1px solid #fcd34d;border-radius:10px;padding:8px 10px;background:#fff;color:inherit}
+.cv-held-acts{display:flex;gap:6px;flex-wrap:wrap}.cv-held-acts button{height:34px;padding:0 12px!important;font-size:13px!important}
+.app-shell.dark-mode .cv-suggest button{background:#22282e;border-color:#3c4850;color:#f1f5f7}
+.app-shell.dark-mode .cv-held-card{background:rgba(245,158,11,.12);color:#fde68a;border-color:rgba(245,158,11,.6)}.app-shell.dark-mode .cv-held-card textarea{background:#22282e;border-color:#3c4850}
