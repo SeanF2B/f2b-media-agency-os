@@ -3,7 +3,7 @@
 // Operations → Reports → Proposals → Catalogue (saved per agency in proposal_settings.catalogue).
 // Pure data — imported by the API, the renderer and the browser editor.
 
-export type ServiceVisual = "search" | "maps" | "seo" | "ai" | "site" | "landing" | "handover" | "social" | "retarget" | "email" | "whatsapp" | "dashboard";
+export type ServiceVisual = "search" | "maps" | "seo" | "ai" | "site" | "landing" | "handover" | "social" | "retarget" | "email" | "whatsapp" | "calls" | "dashboard";
 
 export type CatalogueService = {
   key: string;
@@ -67,8 +67,12 @@ export const SERVICE_CATALOGUE: CatalogueService[] = [
     deliverables: ["Automatic follow-ups", "A monthly newsletter", "Designed in your branding", "See who opens and clicks"] },
   { key: "whatsapp", name: "WhatsApp & AI Assistant", group: "Automation", visual: "whatsapp", setupFee: 0, monthlyFee: 20, addon: true,
     tagline: "Reply to every enquiry in seconds, day or night.",
-    summary: "When someone gets in touch they get an instant, friendly reply on WhatsApp, and our AI assistant can answer questions and book them in for you.",
-    deliverables: ["Instant WhatsApp replies", "Answers common questions", "Books appointments for you", "Hands over to you anytime"] },
+    summary: "Every enquiry gets an instant, friendly reply on WhatsApp. The assistant learns from your past conversations so it sounds like you, and it never sends an invoice or booking link without your approval.",
+    deliverables: ["Instant replies, day or night", "Learns to sound like you", "Answers questions for you", "Invoices & booking links need your OK"] },
+  { key: "ai-calls", name: "AI Call Answering", group: "Automation", visual: "calls", setupFee: 0, monthlyFee: 97, addon: true,
+    tagline: "Every call answered, even when you're busy on a job.",
+    summary: "A friendly AI receptionist answers your calls day or night, takes the caller's details, answers common questions and offers appointment times. Every call is recorded and summarised in your CRM, so no enquiry slips through.",
+    deliverables: ["Every call answered, 24/7", "Natural, friendly voice", "Call notes & recordings in your CRM", "Missed calls get a text back"] },
   { key: "setup", name: "Technical Setup & Handover", group: "Websites", visual: "handover", setupFee: 0, monthlyFee: 0,
     tagline: "We handle the whole switch-over — fast, with no setbacks.",
     summary: "We take care of the entire handover: your domain, Google Analytics (GA4) and call & form tracking. Your Google rankings belong to your domain, so all your existing SEO work is kept. It's done quickly, with no downtime and no setbacks.",

@@ -5,7 +5,7 @@
 // With editable=true every text block is contenteditable and images are click-to-swap; edits are posted
 // to the parent window (the live editor). Pure function — runs in the browser and on the Worker.
 
-import { businessArea, businessServices, defaultAds, defaultKeywords, renumberPhases, type ProposalBrand, type ProposalDeck, type Slide } from "./deck";
+import { STORY_CHAPTER, businessArea, businessServices, defaultAds, defaultKeywords, renumberPhases, type ProposalBrand, type ProposalDeck, type Slide } from "./deck";
 
 export type RenderOptions = {
   editable?: boolean;
@@ -117,6 +117,7 @@ export function renderProposalHtml(deck: ProposalDeck, brand: ProposalBrand, opt
       check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
       clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
       plus: '<path d="M12 5v14M5 12h14"/>',
+      phone: '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/>',
       star: '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" fill="currentColor"/>',
       globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/>',
       like: '<path d="M7 11v9H4v-9zM7 11l4-8c1.5 0 2.5 1 2.5 2.5V9h5a2 2 0 0 1 2 2.3l-1.2 6.8A2 2 0 0 1 17.3 20H7"/>',
@@ -125,8 +126,8 @@ export function renderProposalHtml(deck: ProposalDeck, brand: ProposalBrand, opt
     };
     return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[iconName] || paths.spark}</svg>`;
   };
-  const visualIcon: Record<string, string> = { search: "search", maps: "pin", seo: "chart", ai: "spark", site: "monitor", landing: "cursor", social: "social", retarget: "repeat", email: "mail", whatsapp: "chat", dashboard: "gear", handover: "repeat" };
-  const serviceVisual = (key: string) => ({ "google-ads": "search", seo: "seo", geo: "ai", aeo: "ai", gbp: "maps", website: "site", landing: "landing", "meta-ads": "social", retargeting: "retarget", social: "social", email: "email", whatsapp: "whatsapp", crm: "dashboard", setup: "handover" } as Record<string, string>)[key] || "site";
+  const visualIcon: Record<string, string> = { search: "search", maps: "pin", seo: "chart", ai: "spark", site: "monitor", landing: "cursor", social: "social", retarget: "repeat", email: "mail", whatsapp: "chat", calls: "phone", dashboard: "gear", handover: "repeat" };
+  const serviceVisual = (key: string) => ({ "google-ads": "search", seo: "seo", geo: "ai", aeo: "ai", gbp: "maps", website: "site", landing: "landing", "meta-ads": "social", retargeting: "retarget", social: "social", email: "email", whatsapp: "whatsapp", "ai-calls": "calls", crm: "dashboard", setup: "handover" } as Record<string, string>)[key] || "site";
   const card = (slide: Slide, iconName: string, titlePath: string, bodyPath: string) => `<div class="icard a"><span class="icard-ico">${icon(iconName)}</span>${t(slide, titlePath, "b")}${t(slide, bodyPath, "p")}</div>`;
   const browser = (inner: string) => `<div class="browser"><div class="browser-bar"><i></i><i></i><i></i><span>${esc(domain)}</span></div><div class="browser-body">${inner}</div></div>`;
 
@@ -164,7 +165,8 @@ export function renderProposalHtml(deck: ProposalDeck, brand: ProposalBrand, opt
       case "search": return desktop(searchScreen(slide), "big a d2");
       case "social": case "retarget": return `<div class="feed a d2">${[0, 1, 2].map((index) => `${index ? `<span class="arrow">→</span>` : ""}${phone(adPost(slide, index), "sm")}`).join("")}</div>`;
       case "email": return `<div class="duo a d2">${phone(`<div class="mail"><div class="mail-head">${logoMark()}</div><h4>${esc(slide.data.cardTitle || "Your latest news")}</h4>${photo(slide, "images.0", photoAt(0), "mail-img")}<p></p><p></p><span class="mail-btn">Book a consultation</span><div class="mail-cards">${[1, 2].map((index) => `<span>${photo(slide, `images.${index}`, photoAt(index))}<b>${esc(tc(services[index - 1] || (index === 1 ? "Latest work" : "Customer stories")))}</b></span>`).join("")}</div></div>`, "solo")}</div>`;
-      case "whatsapp": return `<div class="feed a d2">${phone(`<div class="formui"><div class="mail-head">${logoMark()}</div><b>Tell us about your project</b><i></i><i></i><i></i><i class="tall"></i><span>Request a quote →</span></div>`, "sm")}<span class="arrow">→</span>${phone(`<div class="chatui"><div class="chat-top"><i class="ad-av">${logoMark()}</i>${esc(name)}</div><p class="in">Hi! Thanks for your enquiry — when suits you for a quick call?</p><p class="out">Tomorrow afternoon would be perfect</p><p class="in">Great — you're booked in for 2pm ✓</p></div>`, "sm")}</div>`;
+      case "whatsapp": return `<div class="feed a d2">${phone(`<div class="chatui"><div class="chat-top"><i class="ad-av">${logoMark()}</i>${esc(name)}</div><p class="in">Hi, how much would ${esc((services[0] || "a job").toLowerCase())} cost?</p><p class="out">Hi! Happy to help 😊 It depends on the size of the job. Can I grab a few details and get you a proper quote?</p><p class="in">Perfect, thanks</p><p class="out">Great — I can do Thursday 10am or Friday 2pm for a quick visit?</p></div>`, "sm")}<div class="wa-side"><div class="sd-card"><div class="sd-h">${icon("spark")}<b>Learns to sound like you</b></div><p class="wa-note">Trained on your past WhatsApp conversations: your prices, tone and answers.</p><div class="wa-learn"><span>Your tone</span><i style="--w:92%"></i><span>Prices &amp; FAQs</span><i style="--w:86%"></i></div></div><div class="sd-card wa-approve"><div class="sd-h">${icon("check")}<b>Waiting for your OK</b></div><div class="wa-req"><span>${icon("mail")}Send invoice · €450</span><span>${icon("clock")}Send booking link</span></div><div class="wa-btns"><em class="ok">Approve</em><em>Edit</em></div><small>Never sends an invoice or booking link without your approval.</small></div></div></div>`;
+      case "calls": return `<div class="feed a d2">${phone(`<div class="callui"><small>AI receptionist</small><span class="call-av">${logoMark()}</span><b>${esc(name)}</b><em>On a call · 01:24</em><div class="wave">${[30, 60, 90, 50, 80, 40, 70, 95, 55, 35, 65, 45].map((h) => `<i style="height:${h}%"></i>`).join("")}</div><p>"Thursday at 10 works — I'll pop that in for you now."</p><span class="call-end">${icon("phone")}</span></div>`, "sm")}<span class="arrow">→</span><div class="sd-card call-card"><div class="sd-h">${icon("phone")}<b>New lead from a call</b><em>2 min ago</em></div><div class="call-row"><span>Caller</span><b>Mary O'Brien</b></div><div class="call-row"><span>Wants</span><b>${esc(tc(services[0] || "A quote"))}</b></div><div class="call-row"><span>Suggested</span><b>Thu 10:00 · awaiting your OK</b></div><div class="call-rec">${icon("phone")}<i></i><small>Recording · 3:12</small></div><p class="wa-note">Summary and recording saved to the CRM. Missed calls get an instant text back.</p></div></div>`;
       case "dashboard": return crmGraphic();
       case "handover": return `<div class="hand a d2">
         <div class="hand-flow"><div class="hand-card old"><small>Today</small><b>${esc(domain)}</b><span>Current setup</span></div>
@@ -259,7 +261,8 @@ export function renderProposalHtml(deck: ProposalDeck, brand: ProposalBrand, opt
         <div class="find">${(d.items || []).map((_: unknown, i: number) => `<div class="find-card a" style="--d:${i}"><span class="find-n">${String(i + 1).padStart(2, "0")}</span>${t(slide, `items.${i}.title`, "b")}${t(slide, `items.${i}.detail`, "p")}</div>`).join("")}</div>${swoosh("tl")}${n}</div></section>`;
       case "service": {
         const visual = serviceVisual(String(d.serviceKey || ""));
-        return `<section class="slide service v-${visual}" id="s-${attr(slide.id)}"><div class="in">${t(slide, "heading", "h2", "title a")}
+        const chapter = STORY_CHAPTER[String(d.serviceKey || "")];
+        return `<section class="slide service v-${visual}" id="s-${attr(slide.id)}"><div class="in">${chapter ? `<p class="chapter a">${esc(chapter)}</p>` : ""}${t(slide, "heading", "h2", "title a")}
         <div class="svc"><div class="svc-panel a">${card(slide, visualIcon[visual] || "spark", "cardTitle", "cardBody")}<ul class="ticks">${(d.bullets || []).map((_: string, i: number) => `<li class="a" style="--d:${i + 2}">${icon("check")}${t(slide, `bullets.${i}`)}</li>`).join("")}</ul></div><div class="svc-visual">${serviceGraphic(slide)}</div></div>${n}</div></section>`;
       }
       case "examples": return `<section class="slide examples" id="s-${attr(slide.id)}"><div class="in">${t(slide, "heading", "h2", "title a")}
@@ -754,4 +757,18 @@ h1,h2,b{font-weight:800}
 .aid-row{display:grid;grid-template-columns:1fr 1fr;gap:16u}
 .sd-art .tile .lg-t,.gbp-post .tile .lg-t{font-size:14u}.sd-art .tile .lg{max-width:80%;max-height:60%}
 .gbpd .listing-top>b{font-size:20u}
+.chapter{text-align:center;font-size:18u;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:-38u 0 8u}
+.wa-side{display:grid;gap:14u;width:380u}.wa-note{font-size:12.5u;line-height:1.5;color:#4b5563}
+.wa-learn{display:grid;grid-template-columns:auto 1fr;gap:6u 10u;align-items:center;margin-top:10u;font-size:12u;color:#374151}.wa-learn i{height:8u;border-radius:99px;background:#eef0f3;position:relative;overflow:hidden}.wa-learn i:after{content:"";position:absolute;inset:0;width:var(--w);background:#25d366;border-radius:inherit}
+.wa-req{display:grid;gap:6u}.wa-req span{display:flex;align-items:center;gap:8u;background:#f6f8fb;border-radius:10u;padding:8u 10u;font-size:13u;font-weight:600}.wa-req svg{width:16u;height:16u;color:var(--accent)}
+.wa-btns{display:flex;gap:8u;margin:10u 0 8u}.wa-btns em{font-style:normal;font-size:12.5u;font-weight:700;border-radius:99px;padding:6u 16u;border:1.5u solid #d1d5db;color:#374151}.wa-btns em.ok{background:#16a34a;border-color:#16a34a;color:#fff}
+.wa-approve small{display:block;font-size:11.5u;line-height:1.4;color:#6b7280}
+.callui{height:100%;background:radial-gradient(120% 80% at 50% 0%,#1f2937,#0b0d12);color:#fff;display:flex;flex-direction:column;align-items:center;padding:70u 16u 24u;gap:8u;text-align:center}
+.callui small{font-size:12u;opacity:.7;letter-spacing:.06em;text-transform:uppercase}.call-av{width:84u;height:84u;border-radius:50%;background:#fff;display:grid;place-items:center;overflow:hidden;margin-top:8u}.call-av .lg{max-width:70%;max-height:70%;object-fit:contain}.call-av .lg-t{color:var(--brand);font-size:12u}
+.callui>b{font-size:18u}.callui>em{font-style:normal;font-size:13u;color:#4ade80}
+.wave{display:flex;align-items:center;gap:4u;height:50u;margin:14u 0}.wave i{width:5u;border-radius:3u;background:#4ade80}
+.callui p{font-size:13u;line-height:1.45;opacity:.9;background:rgba(255,255,255,.08);border-radius:12u;padding:10u}
+.call-end{margin-top:auto;width:52u;height:52u;border-radius:50%;background:#ef4444;display:grid;place-items:center}.call-end svg{width:24u;height:24u;transform:rotate(135deg)}
+.call-card{width:360u}.call-row{display:flex;justify-content:space-between;gap:10u;padding:7u 0;border-top:1px solid #f1f3f6;font-size:13u}.call-row span{color:#6b7280}
+.call-rec{display:flex;align-items:center;gap:8u;background:#f6f8fb;border-radius:10u;padding:8u 10u;margin:8u 0}.call-rec svg{width:16u;height:16u;color:var(--accent)}.call-rec i{flex:1;height:6u;border-radius:99px;background:linear-gradient(90deg,var(--accent) 35%,#dbe3ee 0)}.call-rec small{font-size:11.5u;color:#6b7280}
 `;
