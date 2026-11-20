@@ -136,6 +136,9 @@ export function ConversationsView({ scopeClientId, clients, staff = [], currentS
     return () => window.clearTimeout(t);
   }, [wantSuggest, active?.id, lastIn?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const [linkStaff, setLinkStaff] = useState("");
+  // Reply box grows with what you type (up to ~8 lines), then scrolls.
+  const taRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => { const el = taRef.current; if (!el) return; el.style.height = "auto"; el.style.height = `${Math.min(el.scrollHeight + 2, window.innerWidth < 860 ? 140 : 200)}px`; }, [text, activeId]);
   const withStaff = (url: string) => linkStaff ? `${url}${url.includes("?") ? "&" : "?"}staff=${encodeURIComponent(linkStaff)}` : url;
   const [custom, setCustom] = useState<null | { name: string; minutes: number; who: string; busy: boolean }>(null);
   const [invoiceFor, setInvoiceFor] = useState<null | { clientId: string; name: string; email: string }>(null);
@@ -240,7 +243,7 @@ export function ConversationsView({ scopeClientId, clients, staff = [], currentS
           </div>
           {replyVia === "email" && <input className="cv-subject" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Email subject" maxLength={200} />}
           <div className="cv-writerow">
-            <textarea value={text} rows={1} maxLength={replyVia === "email" ? 10000 : 1500} placeholder={replyVia === "email" ? "Write an email…" : "Write a reply…"} title="Enter to send, Shift+Enter for a new line" onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && replyVia !== "email") { e.preventDefault(); void send(); } }} />
+            <textarea ref={taRef} value={text} rows={1} maxLength={replyVia === "email" ? 10000 : 1500} placeholder={replyVia === "email" ? "Write an email…" : "Write a reply…"} title="Enter to send, Shift+Enter for a new line" onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && replyVia !== "email") { e.preventDefault(); void send(); } }} />
             <button type="submit" className="primary-button cv-send" aria-label="Send" disabled={busy || uploading || (!text.trim() && !files.length)}><SendHorizontal size={18} /><span>Send</span></button>
           </div>
         </form>

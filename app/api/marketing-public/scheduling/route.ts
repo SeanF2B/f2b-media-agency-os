@@ -8,6 +8,7 @@ import { env } from "cloudflare:workers";
 import { loadSchedulingWorkspace, schedulingDeps } from "@/lib/scheduling/context";
 import { SchedulingError, getStaffProfiles, publicProfile, reviewLinkOwner, addCollectedReview, availableSlots, cancelBooking, createBooking, getBookingByToken, getCalendar, getCalendarBySlug, icsFeed, updateBooking, bookingView } from "@/lib/scheduling/server";
 import { getGroupBySlug } from "@/lib/scheduling/groups";
+import { listGoogleReviews, reviewsMentioning } from "@/lib/content-publish";
 import { chooseStaff, locationLabel, utcToLocal } from "@/lib/scheduling/core";
 
 export const dynamic = "force-dynamic";
@@ -37,14 +38,26 @@ async function publicInfo(slug: string) {
   return { cal, ws, client };
 }
 
-async function publicCalendar(info: NonNullable<Awaited<ReturnType<typeof publicInfo>>>) {
+// Sample reviews for demos (Sample data in the OS → booking page Preview adds ?sample=1). Never shown on real links.
+const SAMPLE_REVIEWS = ["Honestly the best experience — so friendly and really took the time to get it right.", "Brilliant from start to finish. Would recommend to anyone.", "Super professional, on time and the result was even better than I hoped."];
+async function publicCalendar(info: NonNullable<Awaited<ReturnType<typeof publicInfo>>>, sample = false) {
   const { cal, ws, client } = info;
   const profiles = await getStaffProfiles(env.DB as never, cal.ownerId, cal.staffIds).catch(() => ({} as Record<string, never>));
+  // Google Business Profile reviews that mention each team member by name (cached; best effort).
+  const google = cal.clientId ? await listGoogleReviews(cal.ownerId, cal.clientId).catch(() => []) : [];
   const img = (u?: string) => /^(https:|data:image\/|\/media\/)/.test(u || "") ? u : "";
   const settingsStaff = ws.staff.filter((s) => cal.staffIds.includes(s.id));
   return {
     calendar: { slug: cal.slug, name: cal.name, kind: cal.kind, description: cal.description, durationMin: cal.durationMin, location: locationLabel(cal.locationType, cal.locationType === "onsite" ? "" : cal.locationDetail), price: cal.price, currency: cal.currency, color: cal.color, assignMode: cal.assignMode, questions: cal.questions, timezone: cal.timezone, maxDaysAhead: cal.maxDaysAhead, redirectUrl: cal.redirectUrl, confirmationMessage: cal.confirmationMessage },
-    staff: settingsStaff.map((s) => { const p = publicProfile(profiles[s.id]); return { id: s.id, name: s.name.split("|")[0].trim(), avatar: img(s.avatar), title: p?.title || (s.name.includes("|") ? s.name.split("|")[1].trim() : ""), profile: p }; }),
+    staff: settingsStaff.map((s) => {
+      const name = s.name.split("|")[0].trim();
+      const base = publicProfile(profiles[s.id]);
+      const fromGoogle = reviewsMentioning(google, name).slice(0, 10).map((r) => ({ author: r.author, rating: r.rating, text: r.text, source: "Google", date: r.at.slice(0, 10) }));
+      const demo = sample && !fromGoogle.length && !(base?.reviews || []).length ? SAMPLE_REVIEWS.map((text, i) => ({ author: ["Aoife B.", "Ciarán D.", "Megan W."][i], rating: 5, text, source: "Google", date: "" })) : [];
+      const reviews = [...fromGoogle, ...(base?.reviews || []), ...demo].slice(0, 30);
+      const p = base || reviews.length ? { title: base?.title || "", bio: base?.bio || "", photos: base?.photos || [], reviews, reviewCount: reviews.length, rating: reviews.length ? Math.round((reviews.reduce((n, r) => n + r.rating, 0) / reviews.length) * 10) / 10 : 0 } : null;
+      return { id: s.id, name, avatar: img(s.avatar), title: p?.title || (s.name.includes("|") ? s.name.split("|")[1].trim() : ""), profile: p };
+    }),
     business: { name: client?.name || ws.agencyName || "F2B Media", logo: client?.logo && /^(https:|data:image\/)/.test(client.logo) ? client.logo : "", color: client?.branding?.primary && /^#[0-9a-f]{6}$/i.test(client.branding.primary) ? client.branding.primary : cal.color, phone: client?.phone || "" },
   };
 }
@@ -101,10 +114,16 @@ export async function GET(request: Request) {
     if (date) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return fail("Invalid date.");
       const staffId = str(url.searchParams.get("staffId"), 120);
+      if (url.searchParams.get("sample") === "1") {
+        // Demo: plenty of free times every day so the flow can be shown (nothing is booked).
+        const days = Math.min(14, Math.max(1, Number(url.searchParams.get("days")) || 7)); const out: Array<{ start: string; staffIds: string[] }> = [];
+        for (let d = 0; d < days; d++) { const day = new Date(`${date}T00:00:00Z`); day.setUTCDate(day.getUTCDate() + d); if (day.getTime() < Date.now() - 86_400_000) continue; for (const h of [9, 10, 11, 13, 14, 15, 16]) { const t = new Date(day); t.setUTCHours(h, (d + h) % 2 ? 30 : 0); if (t.getTime() > Date.now() + 3_600_000) out.push({ start: t.toISOString(), staffIds: info.cal.staffIds.slice(0, 1) }); } }
+        return json({ slots: out });
+      }
       const slots = await availableSlots(schedulingDeps(request), info.cal, { fromDate: date, days: Math.min(14, Math.max(1, Number(url.searchParams.get("days")) || 7)), staffId: staffId && info.cal.staffIds.includes(staffId) ? staffId : undefined, excludeBookingId: undefined });
       return json({ slots: slots.map((s) => ({ start: s.start, staffIds: s.staffIds })) });
     }
-    return json(await publicCalendar(info));
+    return json({ ...(await publicCalendar(info, url.searchParams.get("sample") === "1")), sample: url.searchParams.get("sample") === "1" });
   } catch (error) {
     console.error("Public scheduling GET", error);
     return fail(error instanceof SchedulingError ? error.message : "Bookings are unavailable right now. Please try again shortly.", error instanceof SchedulingError ? error.status : 500);

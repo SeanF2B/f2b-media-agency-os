@@ -155,6 +155,15 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff, content
   const staffById = useMemo(() => new Map((data?.staff || []).map((s) => [s.id, s])), [data]);
   const personOf = (id: string) => { const p = staffById.get(id); return p ? { name: p.name.split("|")[0].trim(), avatar: p.avatar } : { name: "?" }; };
   const clientName = (id: string) => (id ? data?.clients.find((c) => c.id === id)?.name || "Client" : "Agency");
+  // Sample data on: Preview opens the booking page in sample mode (made-up free times, nothing saved). Sample calendars carry their details in the link.
+  const previewUrl = (c: Calendar) => {
+    const url = `${data?.publicBase || "/f/book/"}${c.slug}`;
+    if (!sample) return url;
+    if (!c.id.startsWith("sample-")) return `${url}?sample=1`;
+    const staff = c.staffIds.map((id) => data?.staff.find((p) => p.id === id)).filter(Boolean).slice(0, 6).map((p) => ({ id: p!.id, name: p!.name.split("|")[0].trim(), title: p!.role || "", avatar: /^https:\/\//.test(p!.avatar || "") && (p!.avatar || "").length < 400 ? p!.avatar : "" }));
+    const payload = { b: { name: sampleClientName || "Your business", color: c.color }, c: { name: c.name, durationMin: c.durationMin, kind: c.kind, description: c.description, color: c.color }, s: staff };
+    try { return `${url}?sample=1&demo=${encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(payload)))))}`; } catch { return `${url}?sample=1`; }
+  };
   const visible = useMemo(() => (data?.bookings || []).filter((b) => (!staffFilter || b.staffIds.includes(staffFilter)) && (!calFilter || b.calendarId === calFilter)), [data, staffFilter, calFilter]);
 
   const stats = useMemo(() => {
@@ -308,7 +317,7 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff, content
         <div className="iv-actions">
           <button type="button" className="iv-btn" onClick={() => { void navigator.clipboard?.writeText(`${data.publicBase}${c.slug}`); setNote(`Booking link copied: ${data.publicBase}${c.slug}`); }}><Link2 size={13} /> Copy link</button>
           <button type="button" className="iv-btn" onClick={() => { void navigator.clipboard?.writeText(embedCode(`${data.publicBase}${c.slug}`)); setNote("Embed code copied. Paste it into the client's website where the booking form should appear."); }}><Copy size={13} /> Embed</button>
-          <a className="iv-btn" href={`${data.publicBase}${c.slug}`} target="_blank" rel="noopener noreferrer">Preview</a>
+          <a className="iv-btn" href={previewUrl(c)} target="_blank" rel="noopener noreferrer">Preview</a>
           {data.canManage && <button type="button" className="iv-btn" onClick={() => setEditCal(c)}><Settings2 size={13} /> Edit</button>}
         </div></div>)}
       {!data.calendars.length && <div className="iv-card sch-empty"><CalendarDays size={28} /><b>No booking calendars yet</b><p className="iv-small">Create one for each service (e.g. “Roof survey”) or consultation. Each gets its own booking link and website widget.</p>{data.canManage && <button type="button" className="primary-button" onClick={() => setEditCal(blankCalendar(data))}><Plus size={15} /> New booking calendar</button>}</div>}
