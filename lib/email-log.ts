@@ -68,6 +68,9 @@ export async function logSystemEmail(db: LogDb | undefined, m: { ownerId?: strin
 
 /** Serves a stored email as a locked-down page for an <iframe sandbox>: no scripts, no forms, links open in a new tab. */
 export function emailHtmlResponse(html: string) {
-  const page = /<head[\s>]/i.test(html) ? html.replace(/<head([^>]*)>/i, '<head$1><base target="_blank">') : `<!doctype html><html><head><meta charset="utf-8"><base target="_blank"></head><body style="margin:0">${html}</body></html>`;
+  const base = '<meta charset="utf-8"><base target="_blank">';
+  const page = /<head[\s>]/i.test(html) ? html.replace(/<head([^>]*)>/i, `<head$1>${base}`)
+    : /<html[\s>]/i.test(html) ? html.replace(/<html([^>]*)>/i, `<html$1><head>${base}</head>`)
+    : `<!doctype html><html><head>${base}</head><body style="margin:0">${html}</body></html>`;
   return new Response(page, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "private, no-store", "x-content-type-options": "nosniff", "x-frame-options": "SAMEORIGIN", "content-security-policy": "sandbox allow-popups allow-popups-to-escape-sandbox; script-src 'none'; form-action 'none'; frame-ancestors 'self'" } });
 }

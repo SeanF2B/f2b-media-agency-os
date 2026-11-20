@@ -239,7 +239,7 @@ async function saveLead(request: Request, env: Env, site: SiteConfig) {
 type MailIn = { kind: string; job: string; answers: [string, string][]; urgency: string; property: string; town: string; details: string; name: string; phone: string; email: string; photos: string[]; channel: string; page: string; when: string };
 function leadEmail(site: SiteConfig, m: MailIn) {
   const urgent = /leaking|as soon as possible|emergency|urgent/i.test(m.urgency);
-  const subject = `${urgent ? "🚨 URGENT – " : ""}New ${m.kind === "contact" ? "enquiry" : "quote request"}: ${m.job}${m.town ? ` in ${m.town}` : ""} – ${m.name}`;
+  const subject = `${/leaking/i.test(m.urgency) ? "🚨 URGENT – " : urgent ? "⚡ " : ""}New ${m.kind === "contact" ? "enquiry" : "quote request"}: ${m.job}${m.town ? ` in ${m.town}` : ""} – ${m.name}`;
   const when = new Date(m.when).toLocaleString("en-IE", { timeZone: "Europe/Dublin", weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   const tel = m.phone.replace(/[^\d+]/g, "");
   const wa = tel.replace(/^\+/, "");
@@ -250,7 +250,7 @@ function leadEmail(site: SiteConfig, m: MailIn) {
 <div style="max-width:560px;margin:0 auto;padding:24px 14px">
 <div style="background:${site.dark};border-radius:18px 18px 0 0;padding:20px 24px;color:#fff;border-bottom:4px solid ${site.brandColor}">
 <div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.75">${esc(site.name)} · Website</div>
-<div style="font-size:22px;font-weight:800;margin-top:6px">${urgent ? "🚨 " : ""}New ${m.kind === "contact" ? "enquiry" : "quote request"}</div>
+<div style="font-size:22px;font-weight:800;margin-top:6px">${/leaking/i.test(m.urgency) ? "🚨 " : urgent ? "⚡ " : ""}New ${m.kind === "contact" ? "enquiry" : "quote request"}</div>
 <div style="font-size:14px;opacity:.85;margin-top:4px">${esc(when)}</div></div>
 ${urgent ? `<div style="background:#fff7ed;color:#b45309;font-weight:700;padding:12px 24px;border-left:4px solid ${site.brandColor}">${/leaking/i.test(m.urgency) ? "Customer says it is leaking now – call back as soon as you can." : "Customer wants this done as soon as possible – a quick call back wins the job."}</div>` : ""}
 <div style="background:#fff;padding:22px 24px">
