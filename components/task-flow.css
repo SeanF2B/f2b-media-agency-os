@@ -131,3 +131,6 @@
 .tf-stop-button:hover:not(:disabled) { background: rgb(220 38 38 / 15%); transform: translateY(-1px); box-shadow: 0 4px 12px rgb(220 38 38 / 18%); }
 .tf-stop-button.is-stopping span { animation: tf-pulse 1s ease-in-out infinite; }
 .tf-stop-button:disabled { cursor: default; }
+
+.tf-card-meta span { display: inline-flex; align-items: center; gap: 5px; }
+.tf-card-meta svg { width: 13px; height: 13px; flex: none; stroke-width: 2.2; opacity: .85; }

@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import "./task-flow.css";
+import { CalendarDays, Repeat, Hourglass, Mail, Timer } from "lucide-react";
 import {
   OWNER_APPROVER_EMAIL, activeTimeMs, boardColumn, flowPendingReason, formatDuration, frequencyLabel, historyItems, isLiveRun, isQueuedStart, isStalledStart, needsOwnerDecision, requestTextFromTask, scheduleLabel,
   type FlowAttachment, type FlowTask,
@@ -50,22 +51,22 @@ export function TaskFlowCardMeta({ task, botIds, agentName = "The AI" }: { task:
   const column = boardColumn(task, botIds);
   const ai = botIds.has(String(task.assigneeId || ""));
   if (column === "todo") return <div className="tf-card-meta is-todo" title="Scheduled">
-    <span>📅 {scheduleLabel(task)}</span><span>🔁 {frequencyLabel(task)}</span>
+    <span><CalendarDays aria-hidden="true" />{scheduleLabel(task)}</span><span><Repeat aria-hidden="true" />{frequencyLabel(task)}</span>
   </div>;
   if (column === "in_progress" && ai && isLiveRun(task)) return <div className="tf-card-meta is-live" title="Active AI time on this task">
     <span className="tf-live"><i aria-hidden="true" />Working · <LiveActiveTime task={task} /></span>
   </div>;
   if (column === "in_progress" && ai && isQueuedStart(task)) return <div className="tf-card-meta is-queued">
-    <span>⏳ {task.approvalGrantedAt ? "Approved · " : ""}waiting for {agentName} to start</span>
+    <span><Hourglass aria-hidden="true" />{task.approvalGrantedAt ? "Approved · " : ""}waiting for {agentName} to start</span>
   </div>;
   if (column === "pending" && task.approvalRequest?.status === "awaiting") {
     const mail = task.approvalRequest.emailStatus;
     return <div className="tf-card-meta is-pending">
-      <span>📨 Awaiting your approval · {mail === "sent" ? "emailed" : mail === "failed" ? "email failed" : "in Approvals"}</span>
+      <span><Mail aria-hidden="true" />Awaiting your approval · {mail === "sent" ? "emailed" : mail === "failed" ? "email failed" : "in Approvals"}</span>
     </div>;
   }
   // Stalled starts: the card's Pending reason line already says it — no duplicate strip.
-  if (column === "done" && ai && activeTimeMs(task) > 0) return <div className="tf-card-meta is-done"><span>⏱ Active {formatDuration(activeTimeMs(task))}</span></div>;
+  if (column === "done" && ai && activeTimeMs(task) > 0) return <div className="tf-card-meta is-done"><span><Timer aria-hidden="true" />Active {formatDuration(activeTimeMs(task))}</span></div>;
   return null;
 }
 
