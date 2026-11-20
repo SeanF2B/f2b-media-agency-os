@@ -527,7 +527,7 @@ export function MarketingStudioView({ kind, clients, staff = [], active, scopeCl
     finally { setCustomDomainBusy(false); }
   }
   function open(asset: Asset) { setAiProposal(null); setAiProposalName(""); setAssetId(asset.id); setFolderId(asset.folderId || ""); setName(asset.name); setClientId(asset.clientId || ""); replaceDraft({ ...defaults[kind], ...(asset.data || {}) }); setShowSubmissions(false); setShowVersions(false); setMessage(""); setError(""); setAutomationEditorTab("builder"); if (asset.kind === "automation") setAutomationView("editor"); void loadVersions(asset.id); if (asset.kind === "automation") void loadExecutions(asset.id); }
-  function create() { setAiProposal(null); setAiProposalName(""); setAssetId(""); setFolderId(selectedFolder === "__unfiled" ? "" : selectedFolder); setName(`New ${labels[kind].slice(0, -1).toLowerCase()}`); setClientId(kind === "automation" ? automationClientFilter : ""); replaceDraft(structuredClone(defaults[kind])); setShowSubmissions(false); setAutomationEditorTab("builder"); if (kind === "automation") setAutomationView("editor"); setMessage("Draft ready. Save once to enable automatic saving."); setError(""); }
+  function create() { setAiProposal(null); setAiProposalName(""); setAssetId(""); setFolderId(selectedFolder === "__unfiled" ? "" : selectedFolder); setName(`New ${labels[kind].slice(0, -1).toLowerCase()}`); setClientId(kind === "automation" ? automationClientFilter : scopeClientId); replaceDraft(structuredClone(defaults[kind])); setShowSubmissions(false); setAutomationEditorTab("builder"); if (kind === "automation") setAutomationView("editor"); setMessage("Draft ready. Save once to enable automatic saving."); setError(""); }
   async function createFolder() {
     if (!folderName.trim()) { setError("Enter a folder name first."); return; }
     setBusy(true); setError("");
@@ -850,7 +850,8 @@ async function restoreVersion(version: number) {
     }) });
   }
 
-  const list = useMemo(() => assets.filter((asset) => asset.kind === kind && (!selectedFolder || asset.folderId === selectedFolder)), [assets, kind, selectedFolder]);
+  // Opened for one client (e.g. Operations → Sites → Funnels): only that client's projects.
+  const list = useMemo(() => assets.filter((asset) => asset.kind === kind && (!selectedFolder || asset.folderId === selectedFolder) && (kind === "automation" || !scopeClientId || asset.clientId === scopeClientId)), [assets, kind, selectedFolder, scopeClientId]);
   const automationList = useMemo(() => assets.filter((asset) => asset.kind === "automation" && (!selectedFolder || (selectedFolder === "__unfiled" ? !asset.folderId : asset.folderId === selectedFolder)) && (!automationClientFilter || asset.clientId === automationClientFilter) && (automationStatusFilter === "all" || asset.status === automationStatusFilter) && (!automationSearch.trim() || asset.name.toLowerCase().includes(automationSearch.trim().toLowerCase()))), [assets, selectedFolder, automationClientFilter, automationStatusFilter, automationSearch]);
   const funnelPaletteTypes = (kind === "funnel" ? { quickAdd: ["hero", "text", "image", "video", "embed", "button", "faq", "testimonial", "pricing", "columns", "container"], sections: ["hero", "text", "faq", "testimonial", "pricing", "columns"], rows: ["columns", "container"], elements: ["text", "image", "video", "embed", "button"] }[funnelPaletteTab] : []) as string[];
   return <div className={`page-heading sites-page marketing-studio ${kind === "automation" ? "marketing-automation-page" : ""}`}>
