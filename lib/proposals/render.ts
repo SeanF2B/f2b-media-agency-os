@@ -127,7 +127,7 @@ export function renderProposalHtml(deck: ProposalDeck, brand: ProposalBrand, opt
     return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[iconName] || paths.spark}</svg>`;
   };
   const visualIcon: Record<string, string> = { search: "search", maps: "pin", seo: "chart", ai: "spark", site: "monitor", landing: "cursor", social: "social", retarget: "repeat", email: "mail", whatsapp: "chat", calls: "phone", dashboard: "gear", handover: "repeat" };
-  const serviceVisual = (key: string) => ({ "google-ads": "search", seo: "seo", geo: "ai", aeo: "ai", gbp: "maps", website: "site", landing: "landing", "meta-ads": "social", retargeting: "retarget", social: "social", email: "email", whatsapp: "whatsapp", "ai-calls": "calls", crm: "dashboard", setup: "handover" } as Record<string, string>)[key] || "site";
+  const serviceVisual = (key: string) => ({ "google-ads": "search", seo: "seo", geo: "ai", aeo: "ai", gbp: "maps", reviews: "maps", website: "site", landing: "landing", "meta-ads": "social", retargeting: "retarget", social: "social", email: "email", whatsapp: "whatsapp", "ai-calls": "calls", crm: "dashboard", setup: "handover" } as Record<string, string>)[key] || "site";
   const card = (slide: Slide, iconName: string, titlePath: string, bodyPath: string) => `<div class="icard a"><span class="icard-ico">${icon(iconName)}</span>${t(slide, titlePath, "b")}${t(slide, bodyPath, "p")}</div>`;
   const browser = (inner: string) => `<div class="browser"><div class="browser-bar"><i></i><i></i><i></i><span>${esc(domain)}</span></div><div class="browser-body">${inner}</div></div>`;
 

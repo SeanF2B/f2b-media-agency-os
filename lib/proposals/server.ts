@@ -203,8 +203,10 @@ export async function updateProposal(ctx: ProposalContext, id: string, patch: Ro
   const deck = patch.deck !== undefined ? (patch.deck === null ? null : sanitizeDeck(patch.deck)) : current.deck;
   const status = patch.status && STATUSES.has(String(patch.status)) ? String(patch.status) : current.status;
   const title = patch.title !== undefined ? clip(patch.title, 160) || current.title : current.title;
-  await db().prepare("UPDATE proposals SET business_name = ?3, website = ?4, title = ?5, status = ?6, brand = ?7, inputs = ?8, services = ?9, deck = ?10, approved_at = CASE WHEN ?6 = 'approved' AND approved_at IS NULL THEN ?11 ELSE approved_at END, updated_at = ?11 WHERE owner_id = ?1 AND id = ?2")
-    .bind(ctx.ownerId, current.id, brand.businessName || current.businessName, brand.website, title, status, JSON.stringify(brand), JSON.stringify(inputs), JSON.stringify(services), deck ? JSON.stringify(deck).slice(0, 400_000) : "", nowIso()).run();
+  // Linking a proposal to a client (set when the prospect is onboarded from the proposal). Must be a real client.
+  const clientId = patch.clientId !== undefined && ((ctx.workspace.clients || []) as Row[]).some((item) => item?.id === patch.clientId) ? String(patch.clientId) : current.clientId;
+  await db().prepare("UPDATE proposals SET client_id = ?12, business_name = ?3, website = ?4, title = ?5, status = ?6, brand = ?7, inputs = ?8, services = ?9, deck = ?10, approved_at = CASE WHEN ?6 = 'approved' AND approved_at IS NULL THEN ?11 ELSE approved_at END, updated_at = ?11 WHERE owner_id = ?1 AND id = ?2")
+    .bind(ctx.ownerId, current.id, brand.businessName || current.businessName, brand.website, title, status, JSON.stringify(brand), JSON.stringify(inputs), JSON.stringify(services), deck ? JSON.stringify(deck).slice(0, 400_000) : "", nowIso(), clientId).run();
   return getProposal(ctx.ownerId, current.id);
 }
 export async function deleteProposal(ctx: ProposalContext, id: string) {

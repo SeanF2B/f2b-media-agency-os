@@ -103,8 +103,9 @@ function wpAdminUrl(siteUrl: string) {
   try { const url = new URL(/^https?:\/\//i.test(siteUrl) ? siteUrl : `https://${siteUrl}`); return `${url.origin}${url.pathname.replace(/\/+$/, "").replace(/\/wp-admin$/, "")}/wp-admin/`; } catch { return siteUrl; }
 }
 
-export function OperationsView({ tasksView, clientsView, clients, tasks, tab: rawTab, onTab, onOpenPage, onOpenWebsite, onOpenDns, onStartOnboarding, onboarding, onCreateGbpTask, onCreateCommunityTask, renderTool, automations, onStartReviews, onEditClient, onPickClient }: { tasksView?: ReactNode; clientsView?: ReactNode; onPickClient?: (clientId: string) => void; 
+export function OperationsView({ tasksView, clientsView, clients, tasks, tab: rawTab, onTab, onOpenPage, onOpenWebsite, onOpenDns, onStartOnboarding, onboarding, onCreateGbpTask, onCreateCommunityTask, renderTool, automations, onStartReviews, onEditClient, onPickClient, onOnboardFromProposal }: { tasksView?: ReactNode; clientsView?: ReactNode; onPickClient?: (clientId: string) => void; 
   onStartReviews?: (clientId: string) => string; onEditClient?: (clientId: string) => void;
+  onOnboardFromProposal?: (input: import("./proposal-studio-view").OnboardFromProposal) => Promise<string | null>;
   clients: OpsClient[]; tasks: OpsTask[]; tab: string; onTab: (tab: OperationsTab) => void;
   onOpenPage: (page: string, clientId?: string) => void; onOpenWebsite: (client: OpsClient) => void; onOpenDns: () => void;
   onStartOnboarding?: (clientId: string) => void; onboarding?: React.ReactNode; automations?: React.ReactNode; hasLeadFactory?: boolean;
@@ -258,7 +259,7 @@ export function OperationsView({ tasksView, clientsView, clients, tasks, tab: ra
     {tab === "proposals" && renderTool && (selected || proposalMode === "proposals") && <>
       <div className="ops-subbar">{seg(proposalMode, setProposalMode, [["report-keywords", "Keywords"], ["proposals", "Proposals"]], "Proposals sections")}</div>
       {proposalMode === "proposals"
-        ? <div className="ops-embed ops-proposals"><Suspense fallback={<div className="page-loading" role="status" aria-label="Loading proposals…"><i /></div>}><ProposalStudioView clients={clients} defaultClientId={selected?.id} /></Suspense></div>
+        ? <div className="ops-embed ops-proposals"><Suspense fallback={<div className="page-loading" role="status" aria-label="Loading proposals…"><i /></div>}><ProposalStudioView clients={clients} defaultClientId={selected?.id} onOnboard={onOnboardFromProposal} /></Suspense></div>
         : selected && <div className="ops-embed" key={`kw-${selected.id}`}>{renderTool("report-keywords", selected.id)}</div>}
     </>}
     {tab === "seo" && seoMode === "ai" && selected && <>

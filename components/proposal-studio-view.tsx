@@ -14,6 +14,11 @@ import { SLIDE_KINDS, blankSlide, renumberPhases, type ProposalBrand, type Propo
 import { renderProposalHtml } from "@/lib/proposals/render";
 
 type StudioClient = { id: string; name: string; logo?: string; status?: string };
+/** Everything needed to turn a proposal into a client: who they are and the client service lines they're signing up for. */
+export type OnboardFromProposal = {
+  proposalId: string; clientId: string | null; name: string; website: string; logo: string; colour: string;
+  services: Array<{ name: string; campaignName?: string; fee: number; setupFee: number }>;
+};
 type Proposal = {
   id: string; clientId: string | null; contactId: string | null; businessName: string; website: string; title: string; status: string;
   brand: ProposalBrand; inputs: ProposalInputs; services: SelectedService[]; deck: ProposalDeck | null; uploads: ProposalUpload[];
@@ -74,7 +79,7 @@ function TextField({ proposalId, field, label, value, onChange, rows = 1, placeh
   </label>;
 }
 
-export function ProposalStudioView({ clients, defaultClientId }: { clients: StudioClient[]; defaultClientId?: string }) {
+export function ProposalStudioView({ clients, defaultClientId, onOnboard }: { clients: StudioClient[]; defaultClientId?: string; onOnboard?: (input: OnboardFromProposal) => Promise<string | null> }) {
   const [list, setList] = useState<ListItem[] | null>(null);
   const [catalogue, setCatalogue] = useState<CatalogueService[]>(SERVICE_CATALOGUE);
   const [openId, setOpenId] = useState("");
@@ -88,7 +93,7 @@ export function ProposalStudioView({ clients, defaultClientId }: { clients: Stud
   useEffect(() => { void load(); }, [load]);
   const clientLogo = (id: string | null) => clients.find((client) => client.id === id)?.logo || "";
 
-  if (openId) return <ProposalWorkspace id={openId} catalogue={catalogue} onBack={() => { setOpenId(""); void load(); }} />;
+  if (openId) return <ProposalWorkspace id={openId} catalogue={catalogue} clients={clients} onOnboard={onOnboard} onBack={() => { setOpenId(""); void load(); }} />;
   return <section className="ps" aria-label="Proposals">
     <header className="ps-head">
       <div><h2>Proposals</h2><p>Premium, personalised marketing proposals built from the prospect&apos;s own website, your audits and call notes — edit live, share a link or download a PDF.</p></div>
@@ -174,7 +179,7 @@ function CatalogueEditor({ catalogue, onClose, onSaved }: { catalogue: Catalogue
   </div>;
 }
 
-function ProposalWorkspace({ id, catalogue, onBack }: { id: string; catalogue: CatalogueService[]; onBack: () => void }) {
+function ProposalWorkspace({ id, catalogue, clients, onOnboard, onBack }: { id: string; catalogue: CatalogueService[]; clients: StudioClient[]; onOnboard?: (input: OnboardFromProposal) => Promise<string | null>; onBack: () => void }) {
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [sources, setSources] = useState<SourceRef[]>([]);
   const [tab, setTab] = useState<"brief" | "editor">("brief");
@@ -257,13 +262,13 @@ function ProposalWorkspace({ id, catalogue, onBack }: { id: string; catalogue: C
     {error && <p className="error-text" role="alert">{error}</p>}
     {notice && <p className="ps-notice" role="status">{notice}</p>}
     {busy === "generate" ? <ReportGeneratingAnimation steps={GEN_STEPS} title={`Designing ${proposal.businessName}'s proposal`} /> : tab === "brief"
-      ? <Brief proposal={proposal} catalogue={catalogue} sources={sources} busy={busy} change={change} onExtract={extract} onUpload={upload} onImport={(ref) => run("import", async () => { const { proposal: next } = await api<{ proposal: Proposal }>({ action: "import", id, ref }); setProposal(next); })} onGenerate={generate} />
+      ? <Brief proposal={proposal} catalogue={catalogue} clients={clients} onOnboard={onOnboard ? async (input) => { await flush(); const clientId = await onOnboard(input); if (clientId && clientId !== proposal.clientId) { try { const { proposal: next } = await api<{ proposal: Proposal }>({ action: "update", id, patch: { clientId } }); setProposal(next); } catch { /* link is a nice-to-have */ } } return clientId; } : undefined} sources={sources} busy={busy} change={change} onExtract={extract} onUpload={upload} onImport={(ref) => run("import", async () => { const { proposal: next } = await api<{ proposal: Proposal }>({ action: "import", id, ref }); setProposal(next); })} onGenerate={generate} />
       : proposal.deck && <Editor proposal={proposal} change={change} flush={flush} setProposal={setProposal} onUpload={upload} uploadOne={uploadOne} onRegenerate={() => { if (window.confirm("Rewrite the whole proposal from the brief? Your text edits will be replaced.")) void generate(); }} />}
   </section>;
 }
 
-function Brief({ proposal, catalogue, sources, busy, change, onExtract, onUpload, onImport, onGenerate }: {
-  proposal: Proposal; catalogue: CatalogueService[]; sources: SourceRef[]; busy: string; change: (next: Partial<Proposal>) => void;
+function Brief({ proposal, catalogue, clients, onOnboard, sources, busy, change, onExtract, onUpload, onImport, onGenerate }: {
+  proposal: Proposal; catalogue: CatalogueService[]; clients: StudioClient[]; onOnboard?: (input: OnboardFromProposal) => Promise<string | null>; sources: SourceRef[]; busy: string; change: (next: Partial<Proposal>) => void;
   onExtract: (website?: string) => void; onUpload: (files: FileList | File[] | null) => void; onImport: (ref: string) => void; onGenerate: () => void;
 }) {
   const { brand, inputs } = proposal;
@@ -272,11 +277,33 @@ function Brief({ proposal, catalogue, sources, busy, change, onExtract, onUpload
   const selected = new Map(proposal.services.map((item) => [item.key, item]));
   const toggle = (item: CatalogueService) => change({ services: selected.has(item.key) ? proposal.services.filter((s) => s.key !== item.key) : [...proposal.services, { key: item.key, setupFee: item.setupFee, monthlyFee: item.monthlyFee, addon: Boolean(item.addon) }] });
   const patchService = (key: string, patch: Partial<SelectedService>) => change({ services: proposal.services.map((s) => s.key === key ? { ...s, ...patch } : s) });
-  const groups = [...new Set(catalogue.map((item) => item.group))];
+  const GROUP_ORDER = ["Google", "Marketing", "AI", "Websites & CRM"];
+  const groups = [...new Set(catalogue.map((item) => item.group))].sort((a, b) => (GROUP_ORDER.indexOf(a) + 99) % 99 - (GROUP_ORDER.indexOf(b) + 99) % 99);
+  const defs = new Map(catalogue.map((item) => [item.key, item]));
+  const [term, setTerm] = useState(12);
+  const [withAddons, setWithAddons] = useState(false);
+  const [onboarding, setOnboarding] = useState(false);
+  const [onboardMsg, setOnboardMsg] = useState("");
+  const linkedClient = proposal.clientId ? clients.find((item) => item.id === proposal.clientId) : undefined;
+  const signing = proposal.services.filter((s) => !s.addon || withAddons);
+  /** Proposal services → client service lines (GEO/AEO fold into SEO, Retargeting is a Meta Ads campaign). */
+  const clientLines = () => { const lines = new Map<string, { name: string; campaignName?: string; fee: number; setupFee: number }>(); for (const s of signing) { const def = defs.get(s.key); const name = def?.clientService; if (!name) { const first = [...lines.values()][0]; if (first) first.setupFee += s.setupFee; continue; } const campaignName = name === "Meta Ads" || name === "Google Ads" ? def?.clientCampaign : undefined; const key = `${name}|${campaignName || ""}`; const line = lines.get(key) || { name, campaignName, fee: 0, setupFee: 0 }; line.fee += s.monthlyFee; line.setupFee += s.setupFee; lines.set(key, line); } return [...lines.values()]; };
+  const onboard = async () => {
+    if (!onOnboard || !signing.length) return;
+    setOnboarding(true); setOnboardMsg("");
+    try {
+      const logo = /^https:\/\//i.test(brand.logo) ? brand.logo : "";
+      const id = await onOnboard({ proposalId: proposal.id, clientId: proposal.clientId, name: brand.businessName || proposal.businessName || "New client", website: brand.website, logo, colour: brand.colours[0] || "", services: clientLines() });
+      if (!id) setOnboardMsg("Onboarding didn't start. Try again.");
+    } catch (err) { setOnboardMsg(err instanceof Error ? err.message : "Onboarding didn't start. Try again."); }
+    finally { setOnboarding(false); }
+  };
   const imported = new Set(inputs.sources.map((source) => source.id));
   const symbol = inputs.currency === "GBP" ? "£" : inputs.currency === "USD" ? "$" : "€";
   const core = proposal.services.filter((s) => !s.addon);
   const total = { setup: core.reduce((sum, s) => sum + s.setupFee, 0), monthly: core.reduce((sum, s) => sum + s.monthlyFee, 0) };
+  const addonTotal = { setup: proposal.services.filter((s) => s.addon).reduce((sum, s) => sum + s.setupFee, 0), monthly: proposal.services.filter((s) => s.addon).reduce((sum, s) => sum + s.monthlyFee, 0) };
+  const fmt = (value: number) => `${symbol}${value.toLocaleString("en-IE")}`;
   const shots = [["Desktop screenshot", brand.screenshotDesktop], ["Phone screenshot", brand.screenshotMobile]] as const;
   return <div className="ps-brief" data-no-ai>
     <section className="ps-card-sec">
@@ -323,11 +350,33 @@ function Brief({ proposal, catalogue, sources, busy, change, onExtract, onUpload
     </section>
 
     <section className="ps-card-sec">
-      <h3><span>4</span>Services</h3>
-      {groups.map((group) => <div key={group} className="ps-svc-group"><span className="ps-label">{group}</span><div className="ps-svcs">{catalogue.filter((item) => item.group === group).map((item) => { const on = selected.get(item.key); return <div key={item.key} className={`ps-svc ${on ? "on" : ""}`}>
-        <button type="button" className="ps-svc-main" aria-pressed={Boolean(on)} onClick={() => toggle(item)}><i>{on ? "✓" : "+"}</i><span><b>{item.name}</b><small>{item.tagline}</small></span></button>
-        {on && <div className="ps-svc-price"><label>Setup {symbol}<input type="number" min={0} value={on.setupFee} onChange={(event) => patchService(item.key, { setupFee: Number(event.target.value) || 0 })} /></label><label>Monthly {symbol}<input type="number" min={0} value={on.monthlyFee} onChange={(event) => patchService(item.key, { monthlyFee: Number(event.target.value) || 0 })} /></label><label className="ps-check"><input type="checkbox" checked={on.addon} onChange={(event) => patchService(item.key, { addon: event.target.checked })} />Optional add-on</label></div>}
-      </div>; })}</div></div>)}
+      <h3><span>4</span>Services &amp; price</h3>
+      <p className="muted">The same services as a client's “Add service” list. Each one becomes that client service when you onboard them.</p>
+      <div className="ps-svc-layout">
+        <div className="ps-svc-list">{groups.map((group) => <div key={group} className="ps-svc-group"><span className="ps-label">{group}</span><div className="ps-svcs">{catalogue.filter((item) => item.group === group).map((item) => { const on = selected.get(item.key); return <div key={item.key} className={`ps-svc ${on ? "on" : ""}`}>
+          <button type="button" className="ps-svc-main" aria-pressed={Boolean(on)} onClick={() => toggle(item)}><i>{on ? "✓" : "+"}</i><span><b>{item.name}</b><small>{item.tagline}</small></span><em className="ps-svc-cs" title="Client service it becomes">{item.clientService ? `${item.clientService}${item.clientCampaign && /ads$/i.test(item.clientService) ? ` · ${item.clientCampaign}` : ""}` : "One-off"}</em></button>
+          {on ? <div className="ps-svc-price"><label>Setup {symbol}<input type="number" min={0} value={on.setupFee} onChange={(event) => patchService(item.key, { setupFee: Number(event.target.value) || 0 })} /></label><label>Monthly {symbol}<input type="number" min={0} value={on.monthlyFee} onChange={(event) => patchService(item.key, { monthlyFee: Number(event.target.value) || 0 })} /></label><label className="ps-check"><input type="checkbox" checked={on.addon} onChange={(event) => patchService(item.key, { addon: event.target.checked })} />Optional add-on</label>{item.mediaNote && <small className="ps-media">{item.mediaNote}</small>}</div>
+            : <small className="ps-svc-from">{item.setupFee ? `${fmt(item.setupFee)} setup · ` : ""}{item.monthlyFee ? `${fmt(item.monthlyFee)}/mo` : "Included"}</small>}
+        </div>; })}</div></div>)}</div>
+        <aside className="ps-calc" aria-label="Price calculator">
+          <h4>Price calculator</h4>
+          {proposal.services.length ? <>
+            <ul>{proposal.services.map((s) => { const def = defs.get(s.key); return <li key={s.key} className={s.addon ? "addon" : ""}><span>{def?.name || s.key}{s.addon && <em>add-on</em>}</span><b>{s.monthlyFee ? `${fmt(s.monthlyFee)}/mo` : ""}{s.setupFee ? <small>{fmt(s.setupFee)} setup</small> : null}</b></li>; })}</ul>
+            <div className="ps-calc-row"><span>One-off setup</span><b>{fmt(total.setup)}</b></div>
+            <div className="ps-calc-row big"><span>Monthly</span><b>{fmt(total.monthly)}<small>/mo</small></b></div>
+            {addonTotal.monthly + addonTotal.setup > 0 && <div className="ps-calc-row muted"><span>Optional add-ons</span><b>+{fmt(addonTotal.monthly)}/mo{addonTotal.setup ? ` · ${fmt(addonTotal.setup)} setup` : ""}</b></div>}
+            <div className="ps-calc-row"><span>First invoice</span><b>{fmt(total.setup + total.monthly)}</b></div>
+            <div className="ps-calc-row"><span>Contract value <select value={term} onChange={(event) => setTerm(Number(event.target.value))} aria-label="Contract length">{[1, 3, 6, 12, 24].map((m) => <option key={m} value={m}>{m} month{m === 1 ? "" : "s"}</option>)}</select></span><b>{fmt(total.setup + total.monthly * term)}</b></div>
+            {proposal.services.some((s) => defs.get(s.key)?.mediaNote && !s.addon) && <p className="ps-calc-note">Ad budgets are paid straight to Google / Meta and aren't included.</p>}
+            {onOnboard && <div className="ps-calc-onboard">
+              {addonTotal.monthly + addonTotal.setup > 0 && <label className="ps-check"><input type="checkbox" checked={withAddons} onChange={(event) => setWithAddons(event.target.checked)} />Include add-ons they've agreed to</label>}
+              <button type="button" className="primary-button" disabled={onboarding || !signing.length} onClick={() => void onboard()}>{onboarding ? "Setting up…" : linkedClient ? `Onboard ${linkedClient.name} →` : "Onboard as new client →"}</button>
+              <small>{linkedClient ? `Adds these services to ${linkedClient.name} and opens onboarding.` : "Creates the client with these services, logo and branding, then opens onboarding."}</small>
+              {onboardMsg && <small className="ps-err">{onboardMsg}</small>}
+            </div>}
+          </> : <p className="muted">Pick services to see the price.</p>}
+        </aside>
+      </div>
       <div className="ps-grid3">
         <label className="ps-field"><span className="ps-label">Start month</span><input type="month" value={inputs.startMonth} onChange={(event) => setInputs({ startMonth: event.target.value })} /></label>
         <label className="ps-field"><span className="ps-label">Currency</span><select value={inputs.currency} onChange={(event) => setInputs({ currency: event.target.value })}><option value="EUR">€ EUR</option><option value="GBP">£ GBP</option><option value="USD">$ USD</option></select></label>
