@@ -1,7 +1,7 @@
 // Public Meta webhook for Facebook Messenger + Instagram DMs. Under /api/marketing-public so the existing public Access bypass covers it.
 // GET = Meta's subscription handshake. POST = messages, verified with X-Hub-Signature-256 (HMAC-SHA256 of the raw body with the app secret).
 import { env } from "cloudflare:workers";
-import { addMessage, botReply, ensureTables, leadToCrm, loadSettings, upsertThread } from "@/lib/conversations/core";
+import { addMessage, botLinksFor, botReply, ensureTables, hasSchedulingLink, holdBotReply, leadToCrm, loadSettings, upsertThread } from "@/lib/conversations/core";
 import { ensureMetaTables, findMetaPage, metaProfileName, sendMeta } from "@/lib/conversations/meta";
 import { inboundBody, metaSendMode, metaVerifyToken, parseMetaWebhook, verifyMetaSignature } from "@/lib/conversations/meta-rules";
 
@@ -51,6 +51,7 @@ export async function POST(request: Request) {
       const client = await db.prepare("SELECT json_extract(value,'$.name') AS name FROM workspace_documents, json_each(data,'$.clients') WHERE id='f2b-agency' AND json_extract(value,'$.id')=?1").bind(found.page.clientId).first<{ name: string }>().catch(() => null);
       const reply = await botReply(found.ownerId, { settings, config: { number: ourId, channel: "whatsapp", clientId: found.page.clientId, label: client?.name || found.page.pageName, info: "" }, clientName: client?.name || found.page.pageName, channel: m.channel, history: rows });
       if (!reply) { await db.prepare("UPDATE conv_threads SET status='handoff' WHERE id=?1").bind(thread.id).run(); continue; }
+      if (hasSchedulingLink(reply.text, await botLinksFor(found.ownerId, found.page.clientId))) { await holdBotReply(found.ownerId, thread.id, reply.text, "AI wanted to send a booking link"); continue; }
       let sid = "", error = "";
       try { sid = await sendMeta(found.ownerId, { accountId: ourId, contactId: m.contactId, text: reply.text }); } catch (e) { error = e instanceof Error ? e.message : "Could not send."; }
       await addMessage(found.ownerId, thread.id, { direction: "out", sender: "bot", body: reply.text, sid, error });

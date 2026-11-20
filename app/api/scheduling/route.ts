@@ -80,7 +80,7 @@ export async function GET(request: Request) {
       // For the chat box: booking pages and calendar links this person can send.
       const base = `${schedulingDeps(request).baseUrl}/f/book/`;
       const [cals, groups] = await Promise.all([listCalendars(db, ctx.ws.ownerId, ctx.scope), listGroups(db, ctx.ws.ownerId, ctx.scope).catch(() => [])]);
-      return json({ pages: groups.filter((g) => g.active).map((g) => ({ name: g.name, url: base + g.slug, clientId: g.clientId })), calendars: cals.filter((c) => c.active).map((c) => ({ name: c.name, url: base + c.slug, clientId: c.clientId, durationMin: c.durationMin })) });
+      return json({ pages: groups.filter((g) => g.active).map((g) => ({ name: g.name, url: base + g.slug, clientId: g.clientId })), calendars: cals.filter((c) => c.active).map((c) => ({ name: c.name, url: base + c.slug, clientId: c.clientId, durationMin: c.durationMin })), staff: ctx.staff.filter((x) => x.email).map((x) => ({ id: x.id, name: x.name.split("|")[0].trim() })), canCreate: ctx.canManage });
     }
     if (view === "calendars") return json({ calendars: (await listCalendars(db, ctx.ws.ownerId, ctx.scope)).map((c) => ({ id: c.id, name: c.name, clientId: c.clientId })) });
     if (view === "slots") {

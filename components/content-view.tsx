@@ -44,7 +44,7 @@ export function ContentView({ clients, scopeClientId = "", isAgency }: { clients
   const location = gbp?.locations.find((l) => l.clientId === clientId);
   const post = async (body: Record<string, unknown>) => { const r = await fetch("/api/gbp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); const j = await r.json(); if (!r.ok) throw new Error(j.error || "Couldn’t save."); return j; };
 
-  return <section className="cv">
+  return <section className="cv content-page">
     <style>{CSS}</style>
     <div className="page-heading"><div><p className="eyebrow">FACEBOOK · INSTAGRAM · GOOGLE · LINKEDIN · TIKTOK</p><h1>Content</h1><p className="muted">Plan every social post in one calendar. {isAgency ? "Client teams can add their own posts; they come to you for approval before going out." : "Posts you add go to F2B for approval before they’re published."}</p></div></div>
 
