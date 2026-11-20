@@ -299,7 +299,11 @@ export function renderProposalHtml(deck: ProposalDeck, brand: ProposalBrand, opt
         return `<section class="slide aiteam" id="s-${attr(slide.id)}"><div class="in">${t(slide, "heading", "h2", "title a")}${t(slide, "intro", "p", "lead a")}
         <div class="ait">${cols.map((_: unknown, i: number) => `<div class="ait-col a" style="--d:${i + 1}">${shots[i] || ""}${t(slide, `columns.${i}.title`, "b", "ait-t")}${t(slide, `columns.${i}.body`, "p", "ait-p")}<ul class="ticks dark">${((cols[i] || {}).bullets || []).map((__: string, k: number) => `<li>${icon("check")}${t(slide, `columns.${i}.bullets.${k}`)}</li>`).join("")}</ul></div>`).join("")}</div>${n}</div></section>`;
       }
-      case "investment": return `<section class="slide investment" id="s-${attr(slide.id)}"><div class="in">
+      case "investment": {
+        // Big packages (full service) switch to a two-column layout without the phone so nothing runs off the slide.
+        const lines = ["setupItems", "monthlyItems", "mediaItems", "aiItems", "addonItems"].reduce((sum, key) => sum + (Array.isArray(d[key]) ? d[key].length : 0), 0);
+        const dense = lines > 15;
+        return `<section class="slide investment${dense ? " dense" : ""}" id="s-${attr(slide.id)}"><div class="in">
         <div class="inv-phone a">${phone(pic(slide, "brand.screenshotMobile", mobileShot), "solo")}</div>
         <div class="inv a d1">${t(slide, "heading", "h2", "title up")}<div class="inv-bar">${t(slide, "packageName")}</div>
           <div class="inv-body"><div class="inv-block">${t(slide, "setupLabel", "b")}<ul>${(d.setupItems || []).map((_: string, i: number) => `<li>${t(slide, `setupItems.${i}`)}</li>`).join("")}</ul></div>
@@ -309,6 +313,7 @@ export function renderProposalHtml(deck: ProposalDeck, brand: ProposalBrand, opt
           ${d.addonsLabel ? `<div class="inv-block">${t(slide, "addonsLabel", "b")}<ul>${(d.addonItems || []).map((_: string, i: number) => `<li>${t(slide, `addonItems.${i}`)}</li>`).join("")}</ul></div>` : ""}
           <div class="inv-block terms"><b>Terms</b>${t(slide, "terms", "p")}</div>${t(slide, "note", "p", "inv-note")}</div>
           ${agencyLogo ? `<img class="agency sm" src="${attr(agencyLogo)}" alt="F2B Media">` : ""}</div>${n}</div></section>`;
+      }
       case "addons": return `<section class="slide addons" id="s-${attr(slide.id)}"><div class="in"><div class="add-head a">${t(slide, "eyebrow", "p", "muted")}${t(slide, "heading", "h2", "title")}</div>
         <div class="add"><span class="bigplus a d1">${icon("plus")}</span><div class="add-list">${(d.items || []).map((_: unknown, i: number) => `<div class="add-item a" style="--d:${i + 1}"><span class="add-ico">${icon(visualIcon[serviceVisual(String(d.items[i]?.serviceKey || ""))] || "spark")}</span><div>${t(slide, `items.${i}.title`, "b")}${t(slide, `items.${i}.text`, "p")}</div>${t(slide, `items.${i}.price`, "em")}</div>`).join("")}</div></div>${n}</div></section>`;
       case "closing": return `<section class="slide closing" id="s-${attr(slide.id)}"><div class="in">${swoosh("tl")}<div class="close a">${logo ? `<img class="client-logo" src="${attr(logo)}" alt="">` : ""}${t(slide, "heading", "h2")}${t(slide, "body", "p")}${opts.approveUrl ? `<a class="cta" href="${attr(opts.approveUrl)}">${esc(d.cta || "Approve proposal")}</a>` : t(slide, "cta", "span", "cta")}${t(slide, "contact", "small")}</div>${agencyLogo ? `<img class="agency" src="${attr(agencyLogo)}" alt="F2B Media">` : ""}${swoosh("br")}</div></section>`;
@@ -778,4 +783,5 @@ h1,h2,b{font-weight:800}
 .call-rec{display:flex;align-items:center;gap:8u;background:#f6f8fb;border-radius:10u;padding:8u 10u;margin:8u 0}.call-rec svg{width:16u;height:16u;color:var(--accent)}.call-rec i{flex:1;height:6u;border-radius:99px;background:linear-gradient(90deg,var(--accent) 35%,#dbe3ee 0)}.call-rec small{font-size:11.5u;color:#6b7280}
 .was{text-decoration:line-through;text-decoration-thickness:2.5u;text-decoration-color:#ef4444;color:#9aa3b2;font-weight:500;margin-right:4u}.sk{font-size:.55em;opacity:.35}
 .inv-ai li{color:#4b5563}
+.investment.dense>.in{grid-template-columns:1fr;padding-top:60u}.investment.dense .inv-phone{display:none}.investment.dense .inv-body{display:block;columns:2;column-gap:56u}.investment.dense .inv-block{break-inside:avoid;margin-bottom:18u}.investment.dense .inv-note{break-inside:avoid}
 `;
