@@ -58,7 +58,7 @@ export function StaffConnectionIcons({ member, onOpen }: { member: Member; onOpe
       return { key: c.key, label: c.label, icon: <ChannelIcon channel={c.key} size={16} />, state: (!on ? "off" : connected ? "ok" : "missing") as "ok" | "missing" | "off", detail: !on ? "switched off for this person" : connected ? "connected" : "not connected for their accounts yet" };
     }),
     { key: "gcal", label: "Google Calendar", icon: <BrandIcon id="google-calendar" size={16} fallback={<span>📅</span>} />, state: data.google[member.id] ? "ok" : "missing", detail: data.google[member.id] ? `synced with ${data.google[member.id]}` : "not connected" },
-    { key: "ical", label: "Apple / Outlook calendar", icon: <BrandIcon id="apple-calendar" size={16} fallback={<span>🗓</span>} />, state: data.feeds.includes(member.id) ? "ok" : "missing", detail: data.feeds.includes(member.id) ? "calendar feed on" : "no calendar feed yet" },
+    { key: "ical", label: "Apple / Outlook calendar", icon: <svg viewBox="0 0 24 24" width={16} height={16} aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="4" fill="#fff" stroke="#c9ced3" /><path d="M3 8a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v1H3Z" fill="#ff3b30" /><text x="12" y="18.5" textAnchor="middle" fontSize="8.5" fontWeight="700" fill="#1f2a30" fontFamily="Arial,sans-serif">31</text></svg>, state: data.feeds.includes(member.id) ? "ok" : "missing", detail: data.feeds.includes(member.id) ? "calendar feed on" : "no calendar feed yet" },
   ];
   const done = items.filter((i) => i.state === "ok").length;
   return <div className="staff-conn" aria-label={`${member.name}'s connections: ${done} of ${items.length}`}>
