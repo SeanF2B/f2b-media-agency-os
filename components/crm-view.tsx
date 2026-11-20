@@ -4,6 +4,7 @@ import { prefetchPage } from "@/lib/view-prefetch";
 import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { lazy, Suspense, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { useFocusClient } from "@/lib/focus-client";
+import { useSampleData } from "@/hooks/use-sample-data";
 import { createCardDragFx, showFxError, type CardDragFx } from "@/lib/card-drag-fx";
 import { Image as ImageIcon, CalendarPlus, Check, ArrowUpDown, Ban, BellOff, Briefcase, Building2, Columns3, Factory, Filter, Footprints, Globe, Handshake, Mail, MapPin, Megaphone, MessageSquareText, MousePointerClick, NotebookPen, Pencil, Phone, Plus, Search, Send, Share2, SquareKanban, Tag, Trash2, UserRound, Users, Zap, type LucideIcon } from "lucide-react";
 import { CrmNotesPanel, type CrmNote } from "@/components/crm-notes-panel";
@@ -68,8 +69,13 @@ let crmClientsSyncedAt = 0;
 
 export type LeadsTab = "Pipeline" | "Contacts" | "Conversations" | "Media" | "Outreach";
 export function CrmView({ onOpenClient, scopeClientId = "", conversations, initialTab = "Pipeline", onOpenClients, onOpenLeadFactory, outreach, media, onTabChange }: { media?: ReactNode; onOpenClient: (clientId: string) => void; scopeClientId?: string; conversations?: ReactNode; onOpenClients?: () => void; onOpenLeadFactory?: () => void; initialTab?: LeadsTab; outreach?: ReactNode; onTabChange?: (tab: LeadsTab) => void }) {
-  const [data, setDataState] = useState<Payload>(() => crmCache.get(scopeClientId || "agency") || empty);
+  const [realData, setDataState] = useState<Payload>(() => crmCache.get(scopeClientId || "agency") || empty);
   const setData = useCallback((next: Payload | ((current: Payload) => Payload)) => setDataState((current) => { const value = typeof next === "function" ? (next as (c: Payload) => Payload)(current) : next; crmCache.set(scopeClientId || "agency", value); return value; }), [scopeClientId]);
+  // "Sample data" on: demo leads spread across this account's pipeline stages (nothing is saved).
+  const [sampleOn] = useSampleData();
+  const [sampleMoves, setSampleMoves] = useState<Record<string, string>>({});
+  const [sampleGone, setSampleGone] = useState<string[]>([]);
+  const data = useMemo(() => sampleOn ? withSampleLeads(realData, scopeClientId, sampleMoves, sampleGone) : realData, [sampleOn, realData, scopeClientId, sampleMoves, sampleGone]);
   const [tab, setTabState] = useState<LeadsTab>((initialTab === "Conversations" && !conversations) || (initialTab === "Outreach" && !outreach) || (initialTab === "Media" && !media) ? "Pipeline" : initialTab);
   const setTab = (next: LeadsTab) => { setTabState(next); onTabChange?.(next); };
   const crmTab = tab === "Pipeline" || tab === "Contacts";
@@ -293,6 +299,7 @@ export function CrmView({ onOpenClient, scopeClientId = "", conversations, initi
   const itemDnd = (item: Opportunity) => hasFlag("contact", item.contact_id, "dnd") || hasFlag("opportunity", item.id, "dnd");
 
   const moveOpportunity = async (id: string, stageId: string) => {
+    if (id.startsWith("sample-")) { setSampleMoves((m) => ({ ...m, [id]: stageId })); return; }
     const previousStage = data.opportunities.find((item) => item.id === id)?.stage_id;
     if (!previousStage || previousStage === stageId) return;
     setError("");
@@ -308,6 +315,7 @@ export function CrmView({ onOpenClient, scopeClientId = "", conversations, initi
   };
   const deleteOpportunity = async (item: Opportunity) => {
     if (!(await appConfirm(`Delete “${item.title}”? This removes the card and its notes and cannot be undone.`))) return;
+    if (item.id.startsWith("sample-")) { setSampleGone((g) => [...g, item.id]); return; }
     const snapshot = data;
     setError("");
     setData((current) => ({ ...current, opportunities: current.opportunities.filter((entry) => entry.id !== item.id), activities: current.activities.filter((note) => note.opportunity_id !== item.id) }));
@@ -733,4 +741,39 @@ export function CrmView({ onOpenClient, scopeClientId = "", conversations, initi
       <footer>{modal === "opportunity-edit" && editingOpp && <button type="button" className="modal-delete-button" onClick={() => { const target = editingOpp; setModal(""); void deleteOpportunity(target); }}><Ico icon={Trash2} size={14} /> Delete</button>}<button type="button" className="secondary-button" onClick={() => setModal("")}>{modal === "contact-details" ? "Close" : "Cancel"}</button>{modal !== "contact-details" && <button type="submit" className={modal === "delete-stage" ? "danger-button" : "primary-button"} disabled={busy}>{busy ? "Saving…" : modal === "delete-stage" ? "Delete stage" : "Save"}</button>}</footer>
     </form></div>}
   </section>;
+}
+
+/** Demo leads for "Sample data": 2–4 cards in each open stage plus a couple won, in the account's own pipeline. */
+function withSampleLeads(real: Payload, scopeClientId: string, moves: Record<string, string>, gone: string[]): Payload {
+  const pipelines: Pipeline[] = real.pipelines.length ? real.pipelines : [{ id: "sample-pipeline", name: "Sales pipeline", description: "", stages: ["New lead", "Contacted", "Qualified", "Proposal sent", "Appointment booked", "Won", "Lost"].map((name, i) => ({ id: `sample-stage-${i}`, name, position: i, category: name === "Won" ? "won" as const : name === "Lost" ? "lost" as const : "open" as const })) }];
+  const clientName = real.clients.find((c) => c.id === scopeClientId)?.name || real.clients[0]?.name || "";
+  const tattoo = /tattoo|ink|poppy|piercing/i.test(clientName), roof = /roof/i.test(clientName);
+  const avg = tattoo ? 280 : roof ? 4200 : 1500;
+  const people: Array<[string, string, string, string, string]> = tattoo ? [
+    ["Aoife", "Brennan", "Fine line floral · forearm", "Instagram", "Fine line"], ["Jade", "Murphy", "Helix piercing", "Instagram", "Piercing"], ["Ciarán", "Doyle", "Cover-up · shoulder", "Website form", "Cover-up"],
+    ["Megan", "Walsh", "Lobe piercings x2", "WhatsApp", "Piercing"], ["Niamh", "Kelly", "Realism portrait · calf", "Google Ads", "Realism"], ["Conor", "Byrne", "Blackwork sleeve", "Website form", "Blackwork"],
+    ["Sophie", "Ryan", "Matching tattoos x2", "Instagram", "Fine line"], ["Liam", "O'Neill", "Script · ribs", "Google Business", "Lettering"], ["Ella", "Fitzgerald", "Floral half sleeve", "Referral", "Colour"],
+    ["Darragh", "Quinn", "Geometric chest piece", "Google Ads", "Geometric"], ["Chloe", "Nolan", "Septum piercing", "WhatsApp", "Piercing"], ["Sean", "Kavanagh", "Memorial piece · wrist", "Website form", "Fine line"],
+  ] : [
+    ["Mary", "Burke", roof ? "Storm leak · kitchen" : "New enquiry", "Website form", roof ? "Repair" : "Enquiry"], ["John", "Doyle", roof ? "Gutter cleaning" : "Quote request", "Google Ads", "Maintenance"], ["Sinéad", "Kelly", roof ? "New flat roof" : "Site visit", "WhatsApp", "New build"],
+    ["Tom", "Walsh", roof ? "Chimney repair" : "Callback", "Google Business", "Repair"], ["Paul", "Ryan", roof ? "Full re-roof" : "Price check", "Website form", "Replacement"], ["Áine", "Murphy", roof ? "Velux install" : "Consultation", "Referral", "Install"],
+    ["Declan", "Moore", roof ? "Fascia & soffit" : "Follow-up", "Google Ads", "Maintenance"], ["Orla", "Byrne", roof ? "Slate replacement" : "New enquiry", "Facebook", "Repair"], ["Kevin", "Brady", roof ? "Moss removal" : "Quote request", "Website form", "Maintenance"],
+    ["Emma", "Healy", roof ? "Extension roof" : "Site visit", "Google Ads", "New build"], ["Mark", "Daly", roof ? "Leadwork" : "Callback", "WhatsApp", "Repair"], ["Ruth", "Power", roof ? "Roof survey" : "Consultation", "Referral", "Survey"],
+  ];
+  const towns = ["Dublin 8", "Rathmines", "Swords", "Drumcondra", "Tallaght", "Clontarf"];
+  const contacts: Contact[] = []; const opportunities: Opportunity[] = [];
+  const now = Date.now();
+  for (const pipe of pipelines.slice(0, 1)) {
+    const open = pipe.stages.filter((x) => x.category === "open").sort((a, b) => a.position - b.position);
+    const won = pipe.stages.find((x) => x.category === "won");
+    const slots = [...open.flatMap((st, i) => Array.from({ length: Math.max(1, 4 - Math.floor(i / 2)) }, () => st.id)), ...(won ? [won.id, won.id] : [])];
+    slots.slice(0, people.length).forEach((stageId, i) => {
+      const [first, last, title, source, type] = people[i];
+      const id = `sample-opp-${i}`, cid = `sample-contact-${i}`, at = new Date(now - (i * 19 + 2) * 3_600_000).toISOString();
+      if (gone.includes(id)) return;
+      contacts.push({ id: cid, client_id: scopeClientId || null, first_name: first, last_name: last, email: `${first.toLowerCase().replace(/[^a-z]/g, "")}.${last.toLowerCase().replace(/[^a-z]/g, "")}@example.com`, phone: `+35387${String(1000000 + i * 137531).slice(0, 7)}`, company: "", source, notes: "", created_at: at, updated_at: at });
+      opportunities.push({ id, pipeline_id: pipe.id, stage_id: moves[id] || stageId, contact_id: cid, client_id: scopeClientId || null, title, value: Math.round(avg * (0.6 + (i % 4) * 0.35)), currency: "", notes: "", source, project_type: type, project_location: towns[i % towns.length], sort_order: i, first_name: first, last_name: last, email: "", phone: "", company: "", updated_at: at } as Opportunity);
+    });
+  }
+  return { ...real, pipelines, contacts: [...contacts, ...real.contacts], opportunities: [...opportunities, ...real.opportunities] };
 }
