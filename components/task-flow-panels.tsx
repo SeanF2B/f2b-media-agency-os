@@ -8,7 +8,7 @@ import { createPortal } from "react-dom";
 import "./task-flow.css";
 import { CalendarDays, Repeat, Hourglass, Mail, Timer } from "lucide-react";
 import {
-  OWNER_APPROVER_EMAIL, activeTimeMs, boardColumn, flowPendingReason, formatDuration, frequencyLabel, historyItems, isLiveRun, isQueuedStart, isStalledStart, needsOwnerDecision, requestTextFromTask, scheduleLabel,
+  OWNER_APPROVER_EMAIL, activeTimeMs, boardColumn, flowPendingReason, formatDuration, frequencyLabel, historyItems, isLiveRun, isQueuedStart, isStalledStart, needsOwnerDecision, decisionRequest, requestTextFromTask, scheduleLabel,
   type FlowAttachment, type FlowTask,
 } from "@/lib/task-flow";
 
@@ -113,7 +113,10 @@ export function TaskApprovalsPanel({ tasks, clients, staff, canDecide, busyTaskI
   onOpenTask?: (taskId: string) => void;
   renderAvatar?: (staffId: string) => ReactNode;
 }) {
-  const queue = useMemo(() => tasks.filter(needsOwnerDecision).sort((a, b) => (Date.parse(b.approvalRequest?.requestedAt || "") || 0) - (Date.parse(a.approvalRequest?.requestedAt || "") || 0)), [tasks]);
+  // Everything in Pending is a decision for the owner, with or without an emailed request.
+  const botIds = useMemo(() => new Set(staff.filter((member) => member.isBot).map((member) => member.id)), [staff]);
+  const agentName = (task: PanelTask) => staff.find((member) => member.id === task.assigneeId)?.name || "The AI";
+  const queue = useMemo(() => tasks.filter((task) => needsOwnerDecision(task, botIds)).sort((a, b) => (Date.parse(decisionRequest(b).requestedAt) || 0) - (Date.parse(decisionRequest(a).requestedAt) || 0)), [tasks, botIds]);
   const [openId, setOpenId] = useState("");
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
@@ -127,7 +130,7 @@ export function TaskApprovalsPanel({ tasks, clients, staff, canDecide, busyTaskI
   if (!queue.length) return <section className="tf-panel tf-empty"><b>Nothing waiting for you.</b><p>When an AI or teammate needs a yes from you, it shows up here.</p></section>;
 
   const meta = (task: PanelTask) => {
-    const request = task.approvalRequest!;
+    const request = decisionRequest(task, agentName(task));
     const client = clients.find((item) => item.id === task.clientId);
     const assignee = staff.find((item) => item.id === task.assigneeId);
     // Older requests may only hold a status line; prefer the agent's actual draft when it posted one.

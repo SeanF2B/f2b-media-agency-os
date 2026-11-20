@@ -161,3 +161,18 @@ test("active time: recorded per run, live while running, shown after completion"
   const abandoned = moveToPending({ ...startTask(base, { by: "B", at: at(0) }, true), aiProgressAt: at(5) }, { by: "Scheduler", at: at(50), reason: "quiet" }).task;
   assert.equal(abandoned.aiActiveMs, 5 * 60_000);
 });
+
+test("every Pending task is a decision in Approvals: approve sends it back to work, reject closes it", async () => {
+  const { decisionRequest } = await import("../lib/task-flow.ts");
+  const now = Date.parse(at(40));
+  const stalled = approveTask(moveToPending({ ...base, status: "In progress", aiRunState: "running" }, { by: "B", at: at(0), reason: "Post ready" }).task, { by: "S", at: at(1), editedRequest: "caption v2", ai: true }).task;
+  assert.equal(boardColumn(stalled, bot, now), "pending");
+  assert.equal(needsOwnerDecision(stalled, bot, now), true, "shows in Approvals");
+  assert.match(decisionRequest(stalled, "Creatives", now).request, /caption v2/, "keeps the approved version to edit");
+  const again = approveTask(stalled, { by: "S", at: at(41), ai: true }).task;
+  assert.equal(boardColumn(again, bot, Date.parse(at(42))), "in_progress");
+  const closed = rejectTask(stalled, { by: "S", at: at(41), note: "drop it" }).task;
+  assert.equal(closed.status, "Done"); assert.equal(closed.outcome, "rejected");
+  const staffPending = { id: "s1", title: "Connect domains", assigneeId: "sean", status: "Blocked", pendingReason: "Waiting on update" };
+  assert.equal(needsOwnerDecision(staffPending, bot), true);
+});

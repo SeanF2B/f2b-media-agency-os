@@ -222,9 +222,26 @@ export function boardColumn(task: FlowTask, botIds?: ReadonlySet<string>, now = 
   return "todo";
 }
 
-/** Tasks waiting on the owner's decision — the Approvals tab. */
-export function needsOwnerDecision(task: FlowTask): boolean {
-  return task.status !== TASK_STATUS.done && task.approvalRequest?.status === "awaiting";
+/**
+ * Tasks waiting on the owner's decision — the Approvals tab. Everything in Pending is a decision for the
+ * owner (approve → it goes back to work, reject → Done), not only tasks with an emailed request.
+ */
+export function needsOwnerDecision(task: FlowTask, botIds?: ReadonlySet<string>, now = Date.now()): boolean {
+  if (task.status === TASK_STATUS.done || task.status === "Cancelled") return false;
+  return task.approvalRequest?.status === "awaiting" || boardColumn(task, botIds, now) === "pending";
+}
+
+/** The request the owner decides on: the stored one, or one built from the Pending reason. */
+export function decisionRequest(task: FlowTask, agentName = "The AI", now = Date.now()): TaskApprovalRequest {
+  if (task.approvalRequest?.status === "awaiting") return task.approvalRequest;
+  const reason = flowPendingReason(task, agentName, now) || task.pendingReason || "Waiting for your decision";
+  const previous = task.approvalRequest?.editedRequest || task.approvalRequest?.request || "";
+  return {
+    id: `pending-${task.id}`, status: "awaiting", reason,
+    request: previous || requestTextFromTask(task) || String((task as { aiInstructions?: string }).aiInstructions || (task as { notes?: string }).notes || task.title || reason),
+    to: OWNER_APPROVER_EMAIL, requestedAt: task.pendingReasonAt || task.approvalGrantedAt || task.aiStartNowRequestedAt || task.aiRunAt || task.createdAt || new Date(now).toISOString(),
+    requestedBy: "Pending", emailStatus: "skipped",
+  };
 }
 
 /** "Weekly" / "Every 2 weeks" / "One-off". */
@@ -330,12 +347,13 @@ export function moveToPending<T extends FlowTask>(task: T, input: Actor & { reas
  * straight to Done and never asks for approval again.
  */
 export function approveTask<T extends FlowTask>(task: T, input: Actor & { editedRequest?: string; note?: string; ai: boolean }): { task: T; error: string } {
-  if (!task.approvalRequest || task.approvalRequest.status !== "awaiting") return { task, error: "This task is not waiting for approval." };
+  if (task.status === TASK_STATUS.done) return { task, error: "This task is not waiting for approval." };
+  const base = decisionRequest(task);
   const edited = String(input.editedRequest ?? "").trim();
   const approvalRequest: TaskApprovalRequest = {
-    ...task.approvalRequest,
+    ...base,
     status: "approved",
-    ...(edited && edited !== task.approvalRequest.request.trim() ? { editedRequest: edited.slice(0, 20_000) } : {}),
+    ...(edited && edited !== base.request.trim() ? { editedRequest: edited.slice(0, 20_000) } : {}),
     ...(input.note?.trim() ? { ownerNote: input.note.trim().slice(0, 4000) } : {}),
     decidedAt: input.at,
     decidedBy: input.by,
@@ -356,7 +374,8 @@ export function approveTask<T extends FlowTask>(task: T, input: Actor & { edited
 
 /** Owner rejects. Pending → Done (outcome rejected). */
 export function rejectTask<T extends FlowTask>(task: T, input: Actor & { note?: string }): { task: T; error: string } {
-  if (!task.approvalRequest || task.approvalRequest.status !== "awaiting") return { task, error: "This task is not waiting for approval." };
+  if (task.status === TASK_STATUS.done) return { task, error: "This task is not waiting for approval." };
+  const base = decisionRequest(task);
   let next: T = {
     ...closeAgentRequests(task, input.at, { approved: false, by: input.by, note: input.note }),
     status: TASK_STATUS.done,
@@ -368,7 +387,7 @@ export function rejectTask<T extends FlowTask>(task: T, input: Actor & { note?: 
     approvalGrantedAt: undefined,
     aiStartNowRequestedAt: undefined,
     ...(task.aiRunState ? { aiRunState: "completed" } : {}),
-    approvalRequest: { ...task.approvalRequest, status: "rejected", ...(input.note?.trim() ? { ownerNote: input.note.trim().slice(0, 4000) } : {}), decidedAt: input.at, decidedBy: input.by },
+    approvalRequest: { ...base, status: "rejected", ...(input.note?.trim() ? { ownerNote: input.note.trim().slice(0, 4000) } : {}), decidedAt: input.at, decidedBy: input.by },
   };
   next = withEvent(next, { at: input.at, by: input.by, action: "rejected", note: input.note?.trim() || "Rejected by the owner" });
   return { task: next, error: "" };
