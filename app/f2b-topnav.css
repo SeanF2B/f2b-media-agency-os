@@ -1889,6 +1889,11 @@ html body .app-shell .main-area .ops-tabs > button:not(.active):hover { backgrou
   html body .app-shell.topnav-layout.nav-side .tn-bar { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; isolation: isolate; }
   html body .app-shell.topnav-layout.nav-side .tn-bar::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; -webkit-backdrop-filter: blur(22px) saturate(1.8); backdrop-filter: blur(22px) saturate(1.8); }
   html body .app-shell.topnav-layout.nav-side .tn-bar .tn-nav.tn-nav-all { -webkit-backdrop-filter: blur(22px) saturate(1.8); backdrop-filter: blur(22px) saturate(1.8); }
+  /* Sub-accounts: top bar and sidebar are exactly the same solid brand colour (same in light and dark mode).
+     The glass layer above sits on top of the bar's own colour and its saturate(1.8) turned it neon, and the
+     sidebar had 6% white mixed in, so the two never matched. */
+  html body .app-shell.client-scoped.topnav-layout.nav-side .tn-bar::before { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+  html body .app-shell.client-scoped.topnav-layout.nav-side .tn-bar .tn-nav.tn-nav-all { background: var(--brand-sidebar, #1f2123) !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
 }
 
 /* ===== Leads pipeline: minimal cards (name, value, View details, one stage button) ===== */
