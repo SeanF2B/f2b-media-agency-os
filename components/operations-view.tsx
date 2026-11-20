@@ -9,6 +9,7 @@ import { Briefcase, CircleCheck, Presentation, FileText, Globe, Check, Link2, Ma
 import { AiVisibilityPanel } from "./ai-visibility-panel";
 import { RankTrackingPanel } from "./rank-tracking-panel";
 import { SiteFormsPanel } from "./site-forms-panel";
+import { LinkBioPanel } from "./link-bio-panel";
 import { SetupWizard } from "./setup-wizard";
 const SocialPlanner = lazy(() => import("./social-planner").then((module) => ({ default: module.SocialPlanner })));
 const DomainsDnsView = lazy(() => import("./domains-dns-view").then((module) => ({ default: module.DomainsDnsView })));
@@ -53,7 +54,7 @@ function SiteTemplatesPanel({ clients, onEdit }: { clients: OpsClient[]; onEdit:
 }
 type SiteRow = { clientId: string; backend: string; previewUrl: string; repo: string; branch: string; updatedAt: string };
 // Where everything lives: Clients · Google Ads (Setup · Manage · Performance) · SEO (Setup · Research ·
-// Performance) · Sites (Overview · Forms · Email) · Reports. Google Maps listing lives in the client profile.
+// Performance) · Sites (Overview · Funnels · Link in bio · Forms · Email) · Reports. Google Maps listing lives in the client profile.
 const OPS_TABS: Array<[OperationsTab, string, LucideIcon]> = [["clients", "Clients", Briefcase], ["tasks", "Tasks", CircleCheck], ["sites", "Sites", Globe], ["seo", "SEO", Search], ["ads", "Google Ads", Megaphone], ["reports", "Reports", FileText], ["proposals", "Proposals", Presentation]];
 export type OperationsTab = "overview" | "clients" | "tasks" | "ads" | "seo" | "sites" | "reports" | "proposals" | "onboarding";
 type SeoMode = "setup" | "keywords" | "competitors" | "backlinks" | "pages" | "overview" | "ranks" | "audit" | "ai";
@@ -64,14 +65,14 @@ const SEO_MAIN: Array<{ key: string; label: string; views: Array<[SeoMode, strin
 ];
 const seoMainOf = (mode: SeoMode) => SEO_MAIN.find((group) => group.views.some(([key]) => key === mode)) || SEO_MAIN[2];
 type AdsMode = "setup" | "manage" | "performance";
-type SitesTab = "overview" | "forms" | "email" | "automations" | "domains" | "media";
+type SitesTab = "overview" | "funnels" | "bio" | "forms" | "email" | "automations" | "domains" | "media";
 type SiteMode = "sites" | "settings" | "media" | "templates";
 /** Older links/state used other tabs; map them onto the current areas (+ the sub-view they opened). */
 export function normalizeOpsTab(value: string): { tab: OperationsTab; sub?: string } {
   const legacy: Record<string, { tab: OperationsTab; sub?: string }> = {
     keywords: { tab: "seo", sub: "keywords" }, ai: { tab: "seo", sub: "ai" }, backlinks: { tab: "seo", sub: "backlinks" }, competitors: { tab: "seo", sub: "competitors" }, ranks: { tab: "seo", sub: "ranks" }, pages: { tab: "seo", sub: "pages" },
     local: { tab: "clients", sub: "maps" }, audits: { tab: "reports", sub: "audits" }, proposals: { tab: "proposals", sub: "proposals" }, "report-keywords": { tab: "proposals", sub: "keywords" }, prospecting: { tab: "proposals", sub: "proposals" },
-    websites: { tab: "sites", sub: "overview" }, media: { tab: "sites", sub: "media" }, "media-library": { tab: "sites", sub: "media" }, templates: { tab: "sites", sub: "templates" }, forms: { tab: "sites", sub: "forms" }, submissions: { tab: "sites", sub: "submissions" },
+    websites: { tab: "sites", sub: "overview" }, funnels: { tab: "sites", sub: "funnels" }, funnel: { tab: "sites", sub: "funnels" }, bio: { tab: "sites", sub: "bio" }, "link-in-bio": { tab: "sites", sub: "bio" }, media: { tab: "sites", sub: "media" }, "media-library": { tab: "sites", sub: "media" }, templates: { tab: "sites", sub: "templates" }, forms: { tab: "sites", sub: "forms" }, submissions: { tab: "sites", sub: "submissions" },
     email: { tab: "sites", sub: "email" }, emails: { tab: "sites", sub: "email" }, domains: { tab: "sites", sub: "domains" }, dns: { tab: "sites", sub: "domains" }, automations: { tab: "sites", sub: "automations" }, "system-emails": { tab: "sites", sub: "system" }, leadfactory: { tab: "clients" },
   };
   return legacy[value] || { tab: (OPS_TABS.some(([key]) => key === value) || value === "onboarding" ? value : "clients") as OperationsTab };
@@ -110,7 +111,7 @@ export function OperationsView({ tasksView, clientsView, clients, tasks, tab: ra
   onOpenPage: (page: string, clientId?: string) => void; onOpenWebsite: (client: OpsClient) => void; onOpenDns: () => void;
   onStartOnboarding?: (clientId: string) => void; onboarding?: React.ReactNode; automations?: React.ReactNode; hasLeadFactory?: boolean;
   onCreateGbpTask?: (clientId: string) => string; onCreateCommunityTask?: (clientId: string, results: CommunityResult[]) => string;
-  renderTool?: (tool: "keywords" | "seo-keywords" | "seo-overview" | "seo-content" | "seo-competitors" | "seo-backlinks" | "seo-audit" | "audits" | "reports" | "report-keywords" | "media" | "ads" | "site-settings" | "landing" | "surveys" | "submissions" | "seo-pages", clientId: string, opts?: { mode?: "setup" | "manage" | "performance"; onModeChange?: (mode: "setup" | "manage" | "performance") => void }) => React.ReactNode;
+  renderTool?: (tool: "keywords" | "seo-keywords" | "seo-overview" | "seo-content" | "seo-competitors" | "seo-backlinks" | "seo-audit" | "audits" | "reports" | "report-keywords" | "media" | "ads" | "site-settings" | "landing" | "surveys" | "funnels" | "submissions" | "seo-pages", clientId: string, opts?: { mode?: "setup" | "manage" | "performance"; onModeChange?: (mode: "setup" | "manage" | "performance") => void }) => React.ReactNode;
 }) {
   const [toolClientId, setToolClientIdState] = useState(() => { try { return window.localStorage.getItem("f2b-ops-client") || ""; } catch { return ""; } });
   useFocusClient((id) => { if (id) setToolClientIdState(id); });
@@ -135,6 +136,7 @@ export function OperationsView({ tasksView, clientsView, clients, tasks, tab: ra
       if (sub === "forms" || sub === "submissions") { setSitesTab("forms"); setFormsView(sub); }
       else if (sub === "domains" || sub === "dns") setSitesTab("domains");
       else if (sub === "media") setSitesTab("media");
+      else if (sub === "funnels" || sub === "bio") setSitesTab(sub);
       else if (sub === "automations") setSitesTab(automations ? "automations" : "email");
       else if (sub === "email" || sub === "system") { setSitesTab("email"); setEmailStart(sub === "email" ? "campaigns" : sub); }
       else { setSitesTab("overview"); setSiteMode(sub === "media" || sub === "templates" ? sub : "sites"); }
@@ -208,7 +210,7 @@ export function OperationsView({ tasksView, clientsView, clients, tasks, tab: ra
 
     {tab === "ads" && selected && <div className="ops-subbar">{seg(adsMode || (selected.googleAdsAccountId ? "performance" : "setup"), setAdsMode, [["setup", "Setup"], ["manage", "Manage"], ["performance", "Performance"]], "Google Ads sections")}</div>}
     {tab === "seo" && selected && <div className="ops-subbar">{seg(seoMainOf(seoMode).key, (key: string) => setSeoMode(SEO_MAIN.find((group) => group.key === key)!.views[0][0]), SEO_MAIN.map((group) => [group.key, group.label] as [string, string]), "SEO sections")}</div>}
-    {tab === "sites" && <div className="ops-subbar">{seg(sitesTab, (key: SitesTab) => { setSitesTab(key); if (key === "overview") setSiteMode("sites"); }, [["overview", "Overview"], ["forms", "Forms"], ["email", "Email"], ...(automations ? [["automations", "Automations"]] as Array<[SitesTab, string]> : []), ["domains", "Domains"], ["media", "Media"]], "Sites sections")}</div>}
+    {tab === "sites" && <div className="ops-subbar">{seg(sitesTab, (key: SitesTab) => { setSitesTab(key); if (key === "overview") setSiteMode("sites"); }, [["overview", "Overview"], ["funnels", "Funnels"], ["bio", "Link in bio"], ["forms", "Forms"], ["email", "Email"], ...(automations ? [["automations", "Automations"]] as Array<[SitesTab, string]> : []), ["domains", "Domains"], ["media", "Media"]], "Sites sections")}</div>}
     {(tab === "seo" || tab === "ads") && selected && (() => { const site = hostOf(selected.website || selected.wordpressSiteUrl); const chips: Array<[string, boolean]> = tab === "ads" ? [["Google Ads account", Boolean(selected.googleAdsAccountId)], ["Website", Boolean(site)]] : [["Website", Boolean(site)], ["Search Console", Boolean(selected.googleSearchConsoleAccountId)], ["Analytics", Boolean(selected.googleAnalyticsAccountId)], ["Business Profile", Boolean(selected.googleBusinessProfileLocationId || selected.googleBusinessProfileAccountId)]]; return <div className="ops-client-strip">
       {site ? <a href={`https://${site}`} target="_blank" rel="noreferrer" className="ops-strip-site">{site}</a> : onEditClient && <button type="button" className="text-button" onClick={() => onEditClient(selected.id)}>Add client website</button>}
       <span className="ops-strip-chips">{chips.map(([label, ok]) => <span key={label} className={ok ? "ok" : "missing"} title={ok ? `${label} connected` : `${label} not connected`}>{ok ? "✓" : "○"} {label}</span>)}</span>
@@ -243,6 +245,8 @@ export function OperationsView({ tasksView, clientsView, clients, tasks, tab: ra
     {tab === "sites" && sitesTab === "forms" && <div className="ops-forms-toggle">{seg(formsView, setFormsView, [["forms", "Forms"], ["submissions", "Submissions"]], "Forms view")}</div>}
     {tab === "sites" && sitesTab === "forms" && formsView === "forms" && <SiteFormsPanel clients={clients.filter((client) => !/^agency$/i.test(client.name.trim()))} clientId={toolClientId && clients.some((c) => c.id === toolClientId) ? toolClientId : ""} onClient={setToolClientId} />}
     {tab === "sites" && sitesTab === "forms" && formsView === "submissions" && renderTool && <div className="ops-embed" key={`subs-${selected?.id || "all"}`}>{renderTool("submissions", selected?.id || "")}</div>}
+    {tab === "sites" && sitesTab === "funnels" && renderTool && <div className="ops-embed ops-funnels" key={`funnels-${selected?.id || "all"}`}>{renderTool("funnels", selected?.id || "")}</div>}
+    {tab === "sites" && sitesTab === "bio" && <div className="ops-embed" key={`bio-${selected?.id || "none"}`}><LinkBioPanel clients={clients} clientId={selected?.id || ""} /></div>}
     {tab === "sites" && sitesTab === "media" && renderTool && <div className="ops-embed" key={`media-${selected?.id || "all"}`}>{renderTool("media", selected?.id || "")}</div>}
     {tab === "sites" && sitesTab === "domains" && <div className="ops-embed ops-domains"><Suspense fallback={<div className="page-loading" role="status" aria-label="Loading domains…"><i /></div>}><DomainsDnsView /></Suspense></div>}
     {tab === "sites" && sitesTab === "email" && emailClient && <Suspense fallback={<div className="page-loading" role="status" aria-label="Loading email…"><i /></div>}><EmailMarketingView key={emailStart} initialMode={emailStart} clientId={emailClient.id} clientName={emailClient.name} clientLogo={emailClient.logo} clientColor={emailClient.color} /></Suspense>}
