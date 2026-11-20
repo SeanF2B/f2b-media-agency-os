@@ -18,7 +18,7 @@ const ACTIONS: Record<string, string> = { tag: "Add tag", urgent: "Mark urgent (
 const blankDef = (): FormDefinition => ({ steps: [{ id: "main", title: "Form" }], fields: [], rules: [] });
 const blankSettings = (): FormSettings => ({ status: "live", notify: [], thankYouUrl: "", pages: { mode: "all", paths: [] } });
 
-export function SiteFormsPanel({ clients, clientId }: { clients: Client[]; clientId: string; onClient?: (id: string) => void }) {
+export function SiteFormsPanel({ clients, clientId, openFormId }: { clients: Client[]; clientId: string; onClient?: (id: string) => void; openFormId?: string }) {
   const [forms, setForms] = useState<FormRow[] | null>(null);
   const [stages, setStages] = useState<Record<string, Stage[]>>({});
   const [error, setError] = useState("");
@@ -31,8 +31,11 @@ export function SiteFormsPanel({ clients, clientId }: { clients: Client[]; clien
       const j = await r.json() as { forms?: FormRow[]; stages?: Record<string, Stage[]>; error?: string };
       if (!r.ok) throw new Error(j.error || "Forms unavailable.");
       setForms(j.forms || []); setStages(j.stages || {});
+      // Opened from the Automations list: go straight to that form's logic (its automation rules).
+      const target = openFormId ? (j.forms || []).find((f) => f.id === openFormId) : null;
+      if (target) { setOpenKey(target.formKey); setTab("logic"); }
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Forms unavailable."); setForms([]); }
-  }, []);
+  }, [openFormId]);
   useEffect(() => { void load(); }, [load]);
   const shown = (forms || []).filter((f) => !clientId || f.clientId === clientId);
   const open = (forms || []).find((f) => f.formKey === openKey) || null;

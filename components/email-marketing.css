@@ -140,3 +140,45 @@
 .em-empty-actions { display: inline-flex; gap: 8px; flex-wrap: wrap; }
 .em-empty-actions button { display: inline-flex; align-items: center; gap: 6px; }
 @media (max-width: 760px) { .em-empty-card.compact { grid-template-columns: 1fr; } }
+
+/* Email: category tabs (Campaigns | System emails), each with its own Templates. */
+.em-subbar .em-inner-seg { margin-left: 4px; }
+.em-thumb { position: relative; display: block; height: 150px; margin: -4px -4px 8px; border-radius: 10px; overflow: hidden; background: #f1f5f9; border: 1px solid var(--em-border); }
+.em-thumb iframe { position: absolute; top: 0; left: 0; width: 250%; height: 250%; border: 0; transform: scale(.4); transform-origin: 0 0; pointer-events: none; background: #fff; color-scheme: light; }
+.em-thumb-empty { display: grid; place-items: center; color: var(--em-muted); }
+.em-tile.is-empty { cursor: default; opacity: .7; }
+.em-tile:not(.is-empty):hover { border-color: var(--brand-secondary, var(--brand-primary, #0b74b8)); transform: translateY(-1px); }
+.em-tile { transition: transform .15s ease, border-color .15s ease; }
+
+/* System emails inbox: list on the left, the email opened on the right like a mail app. */
+.sysmail-top { justify-content: flex-start; }
+.sysmail-intro { margin: 0; font-size: 13px; }
+.sysmail-search button { border: 0; background: none; color: var(--em-muted); cursor: pointer; display: inline-flex; padding: 2px; }
+.sysmail-split { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; gap: 12px; align-items: start; }
+.sysmail-list { display: grid; gap: 6px; max-height: calc(100dvh - 260px); overflow: auto; padding-right: 2px; }
+.sysmail-item { text-align: left; display: grid; gap: 3px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--em-border); background: var(--em-card); color: inherit; font: inherit; cursor: pointer; transition: transform .15s ease, border-color .15s ease; }
+.sysmail-item:hover { transform: translateY(-1px); border-color: var(--brand-secondary, var(--brand-primary, #0b74b8)); }
+.sysmail-item.on { border-color: var(--brand-primary, #0b74b8); box-shadow: 0 0 0 1px var(--brand-primary, #0b74b8) inset; }
+.sysmail-item-top { display: flex; justify-content: space-between; gap: 8px; min-width: 0; }
+.sysmail-item-top b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.sysmail-item-top time { flex: none; color: var(--em-muted); font-size: 12px; }
+.sysmail-item-subject { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sysmail-item-meta { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.sysmail-item-meta small { color: var(--em-muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sysmail-reader { display: grid; gap: 10px; min-width: 0; padding: 14px; border-radius: 14px; border: 1px solid var(--em-border); background: var(--em-card); }
+.sysmail-reader header { display: flex; align-items: flex-start; gap: 10px; }
+.sysmail-reader header > div { flex: 1; min-width: 0; }
+.sysmail-reader h3 { margin: 0 0 2px; font-size: 16px; line-height: 1.3; }
+.sysmail-reader header p { margin: 0; color: var(--em-muted); font-size: 13px; overflow-wrap: anywhere; }
+.sysmail-back { display: none; border: 1px solid var(--em-border); background: none; color: inherit; border-radius: 10px; padding: 6px; cursor: pointer; }
+.sysmail-templates + .sysmail-reader .sysmail-back, .sysmail > .sysmail-reader .sysmail-back { display: inline-flex; }
+.sysmail-reader .email-frame iframe { height: calc(100dvh - 360px); min-height: 460px; }
+.sysmail-tip { color: var(--em-muted); font-size: 12px; }
+.sysmail-reader-empty { place-items: center; min-height: 300px; color: var(--em-muted); text-align: center; }
+@media (max-width: 899px) {
+  .sysmail-split { grid-template-columns: 1fr; }
+  .sysmail-split.has-open .sysmail-list { display: none; }
+  .sysmail-split:not(.has-open) .sysmail-reader { display: none; }
+  .sysmail-list { max-height: none; }
+  .sysmail-back { display: inline-flex; }
+}

@@ -10,7 +10,7 @@ const ok = (body: Record<string, unknown>) => Response.json(body, { headers: noS
 const clean = (value: unknown, max = 500) => (typeof value === "string" ? value.trim().slice(0, max) : "");
 
 type Staff = { id: string; name: string; email?: string; role?: string; isBot?: boolean };
-type WorkspaceData = { ownerId?: string; clients?: Array<{ id: string; name: string }>; staff?: Staff[] };
+type WorkspaceData = { ownerId?: string; clients?: Array<{ id: string; name: string; logo?: string | null; color?: string | null }>; staff?: Staff[] };
 type AutomationRow = { id: string; scope_id: string; name: string; status: "on" | "off"; trigger_type: string; definition: string; sends_email: number; next_fire_at: string | null; last_run_at: string | null; total_runs: number; enabled_by: string | null; enabled_at: string | null; created_at: string; updated_at: string };
 
 // Same access rule as /api/crm: owners and admins only (the sidebar also hides this page from everyone else).
@@ -20,7 +20,7 @@ async function context() {
   if (!env.DB) return { response: reply("The private workspace database is unavailable.", 503) };
   const row = await env.DB.prepare(`SELECT json_object(
       'ownerId', owner_id,
-      'clients', json(COALESCE((SELECT json_group_array(json_object('id', json_extract(value,'$.id'), 'name', json_extract(value,'$.name'))) FROM json_each(data, '$.clients')), '[]')),
+      'clients', json(COALESCE((SELECT json_group_array(json_object('id', json_extract(value,'$.id'), 'name', json_extract(value,'$.name'), 'logo', json_extract(value,'$.logo'), 'color', json_extract(value,'$.color'))) FROM json_each(data, '$.clients')), '[]')),
       'staff', json(COALESCE((SELECT json_group_array(json_object('id', json_extract(value,'$.id'), 'name', json_extract(value,'$.name'), 'email', json_extract(value,'$.email'), 'role', json_extract(value,'$.role'), 'isBot', json_extract(value,'$.isBot'))) FROM json_each(data, '$.staff')), '[]'))
     ) AS data FROM workspace_documents WHERE id = 'f2b-agency'`).first<{ data: string }>();
   if (!row?.data) return { response: reply("The agency workspace could not be found.", 503) };
@@ -122,7 +122,7 @@ export async function GET(request: Request) {
       scope,
       others,
       formRules,
-      clients: (workspace.clients || []).map((client) => ({ id: String(client.id), name: String(client.name || "Client") })),
+      clients: (workspace.clients || []).map((client) => ({ id: String(client.id), name: String(client.name || "Client"), logo: typeof client.logo === "string" ? client.logo : "", color: typeof client.color === "string" ? client.color : "" })),
       automations: (rows.results || []).map(listItem),
       killSwitch: { paused: Boolean(setting?.paused), pausedBy: setting?.paused_by || null, pausedAt: setting?.paused_at || null },
       notifications: notifications.results || [],

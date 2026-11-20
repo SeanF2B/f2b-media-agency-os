@@ -17,11 +17,14 @@ export function systemEmailKind(subject: string) {
 }
 const SYSTEM_EMAILS_SQL = "CREATE TABLE IF NOT EXISTS system_emails (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, client_id TEXT NOT NULL DEFAULT '', kind TEXT NOT NULL, to_email TEXT NOT NULL, to_name TEXT NOT NULL DEFAULT '', subject TEXT NOT NULL, body TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL)";
 const SYSTEM_EMAILS_IDX = "CREATE INDEX IF NOT EXISTS system_emails_owner_created_idx ON system_emails(owner_id, created_at DESC)";
+const SYSTEM_EMAILS_KIND_IDX = "CREATE INDEX IF NOT EXISTS system_emails_owner_kind_idx ON system_emails(owner_id, kind, created_at DESC)";
+/** Every category the System emails list knows about, in display order. */
+export const SYSTEM_EMAIL_KINDS = ["Team invites", "Chess", "Scheduling", "Invoices", "Tasks", "Leads & forms", "Campaigns", "Reports", "Notifications", "Tests"] as const;
 let systemEmailsReady: Promise<unknown> | null = null;
 // `html` keeps the exact designed email that went out, so System emails and Conversations can show it as sent.
 const addColumn = (db: LogDb, sql: string) => db.prepare(sql).run().catch(() => undefined);
 export function ensureSystemEmailsTable(db: LogDb) {
-  systemEmailsReady ||= db.prepare(SYSTEM_EMAILS_SQL).run().then(() => db.prepare(SYSTEM_EMAILS_IDX).run()).then(() => addColumn(db, "ALTER TABLE system_emails ADD COLUMN html TEXT NOT NULL DEFAULT ''")).catch((error) => { systemEmailsReady = null; throw error; });
+  systemEmailsReady ||= db.prepare(SYSTEM_EMAILS_SQL).run().then(() => db.prepare(SYSTEM_EMAILS_IDX).run()).then(() => addColumn(db, "ALTER TABLE system_emails ADD COLUMN html TEXT NOT NULL DEFAULT ''")).then(() => db.prepare(SYSTEM_EMAILS_KIND_IDX).run()).catch((error) => { systemEmailsReady = null; throw error; });
   return systemEmailsReady;
 }
 let convHtmlReady: Promise<unknown> | null = null;

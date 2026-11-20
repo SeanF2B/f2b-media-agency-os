@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "../../chatgpt-auth";
-import { emailHtmlResponse, ensureSystemEmailsTable } from "@/lib/email-log";
+import { emailHtmlResponse, ensureSystemEmailsTable, SYSTEM_EMAIL_KINDS } from "@/lib/email-log";
 
 // Operations → Email → System emails: every email the OS sends by itself (chess invites, team invites,
 // invoices, booking confirmations, task notifications, campaign sends…). Owner/Admin only.
@@ -20,8 +20,23 @@ export async function GET(request: Request) {
   await ensureSystemEmailsTable(env.DB as never);
   const url = new URL(request.url);
   if (url.searchParams.get("html") === "1") {
-    const one = await env.DB.prepare("SELECT html FROM system_emails WHERE id=?1 AND owner_id=?2").bind((url.searchParams.get("id") || "").slice(0, 60), row.owner_id).first<{ html: string }>();
-    return one?.html ? emailHtmlResponse(one.html) : new Response("Not found", { status: 404 });
+    const one = await env.DB.prepare("SELECT html, body FROM system_emails WHERE id=?1 AND owner_id=?2").bind((url.searchParams.get("id") || "").slice(0, 60), row.owner_id).first<{ html: string; body: string }>();
+    if (!one) return new Response("Not found", { status: 404 });
+    if (one.html) return emailHtmlResponse(one.html);
+    // Plain-text emails: show the text as the recipient reads it, with web addresses clickable.
+    const escape = (text: string) => text.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch] as string);
+    const linked = escape(one.body || "No text saved for this email.").replace(/https?:\/\/[^\s<]+/g, (href) => `<a href="${href}">${href}</a>`);
+    return emailHtmlResponse(`<div style="font:15px/1.6 -apple-system,Segoe UI,Arial,sans-serif;color:#1a1a1a;padding:28px;white-space:pre-wrap;word-break:break-word">${linked}</div>`);
+  }
+  const clientName = (id: string) => (data.clients || []).find((c) => c.id === id)?.name || "";
+  // Templates: the latest designed email of each kind, i.e. exactly what a recipient gets today.
+  // One indexed LIMIT 1 read per kind (owner_id, kind, created_at index).
+  if (url.searchParams.get("templates") === "1") {
+    const latest = await env.DB.batch(SYSTEM_EMAIL_KINDS.map((kind) => env.DB.prepare("SELECT id, client_id, kind, to_email, to_name, subject, created_at, CASE WHEN html<>'' THEN 1 ELSE 0 END AS has_html FROM system_emails WHERE owner_id=?1 AND kind=?2 ORDER BY has_html DESC, created_at DESC LIMIT 1").bind(row.owner_id, kind)));
+    return respond({ templates: SYSTEM_EMAIL_KINDS.map((kind, index) => {
+      const r = (latest[index]?.results?.[0] || null) as { id: string; client_id: string; to_email: string; to_name: string; subject: string; created_at: string; has_html: number } | null;
+      return { kind, email: r ? { id: r.id, clientName: clientName(r.client_id), to: r.to_email, toName: r.to_name, subject: r.subject, hasHtml: !!r.has_html, createdAt: r.created_at } : null };
+    }) });
   }
   const kind = (url.searchParams.get("kind") || "").slice(0, 40);
   const q = (url.searchParams.get("q") || "").trim().toLowerCase().slice(0, 100);
@@ -32,7 +47,6 @@ export async function GET(request: Request) {
   if (q) { params.push(`%${q}%`); sql += ` AND (lower(subject) LIKE ?${params.length} OR to_email LIKE ?${params.length} OR lower(to_name) LIKE ?${params.length})`; }
   sql += " ORDER BY created_at DESC LIMIT 100";
   const rows = (await env.DB.prepare(sql).bind(...params).all<{ id: string; client_id: string; kind: string; to_email: string; to_name: string; subject: string; body: string; created_at: string; has_html: number }>()).results || [];
-  const clientName = (id: string) => (data.clients || []).find((c) => c.id === id)?.name || "";
   return respond({
     emails: rows.map((r) => ({ id: r.id, clientId: r.client_id, clientName: clientName(r.client_id), kind: r.kind, to: r.to_email, toName: r.to_name, subject: r.subject, body: r.body, hasHtml: !!r.has_html, createdAt: r.created_at })),
     next: rows.length === 100 ? rows[rows.length - 1].created_at : null,

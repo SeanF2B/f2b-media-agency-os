@@ -229,3 +229,12 @@
   .ca-rule { grid-template-columns: 1fr 1fr; }
   .ca-table th:nth-child(4), .ca-table td:nth-child(4) { display: none; }
 }
+
+/* One list for every automation (agency, client and website-form rules), with the client's logo on each row. */
+.ca-unified .ca-row { cursor: pointer; transition: background .15s ease; }
+.ca-unified .ca-row:hover { background: color-mix(in srgb, var(--brand-secondary, var(--brand-primary, #0b74b8)) 6%, transparent); }
+.ca-unified td:first-child { max-width: 380px; }
+.ca-row-detail { display: block; margin-top: 4px; font-size: 12px; line-height: 1.45; color: var(--muted, #64748b); white-space: pre-line; overflow-wrap: anywhere; }
+.ca-client-badge { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; font-weight: 600; font-size: 13px; }
+.ca-client-badge img { width: 28px; height: 28px; object-fit: contain; border-radius: 7px; flex: none; }
+.ca-client-badge i { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; flex: none; font-style: normal; font-size: 11px; font-weight: 800; color: #fff; background: var(--brand-primary, #0b74b8); }
