@@ -16,7 +16,7 @@ export function TeamSignInLink({ scopeClientId = "", scopeClientName = "", onOpe
   }, [scopeClientId]);
   const origin = typeof window === "undefined" ? "" : window.location.origin;
   const link = scopeClientId && slug ? `${origin}/?client=${encodeURIComponent(slug)}` : `${origin}/`;
-  const message = `Hi,\n\nHere’s your link to the ${scopeClientName ? `${scopeClientName} account on the ` : ""}F2B Media workspace:\n${link}\n\nOpen it, enter the email address this was sent to, and you’ll get a one-time code by email to sign in. No password needed.\n\nThanks!`;
+  const message = `Hi,\n\nHere’s your link to the ${scopeClientName ? `${scopeClientName} account on the ` : ""}F2B Media workspace:\n${link}\n\nOpen it and sign in with your email and password. First time? Use the set-password link from your invite, or tap “Forgot password?” to get a new one.\n\nOn your phone you can add it to your home screen like an app.\n\nThanks!`;
   const copy = async (text: string, what: string) => {
     try { await navigator.clipboard.writeText(text); } catch { window.prompt("Copy this:", text); }
     setCopied(what); window.setTimeout(() => setCopied(""), 1600);
