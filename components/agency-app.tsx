@@ -972,6 +972,8 @@ export function AgencyApp() {
     const params = new URLSearchParams(window.location.search);
     if (params.get("page") === "Tasks" || params.has("taskId")) setPage("Tasks");
     if (params.get("page") === "CRM" && params.get("leads") === "outreach") { setLeadsTab("Outreach"); setCrmTabSeed("out-link"); setPage("CRM"); }
+    // Domain Guard alert links (Telegram / email) open Domains & DNS, where the guard panel lives.
+    if (params.get("page") === "Settings" && params.get("settings") === "domains") { setSettingsTab("dns"); setPage("Settings"); }
   }, []);
 
   useEffect(() => {

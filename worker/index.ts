@@ -147,12 +147,18 @@ function withSecurityHeaders(response: Response, pathname: string): Response {
   const setIfMissing = (name: string, value: string) => { if (!headers.has(name)) headers.set(name, value); };
   setIfMissing("X-Content-Type-Options", "nosniff");
   setIfMissing("Referrer-Policy", "strict-origin-when-cross-origin");
-  setIfMissing("Strict-Transport-Security", "max-age=15552000");
-  const privateApp = pathname === "/" || (pathname.startsWith("/api/") && !pathname.startsWith("/api/marketing-public"));
-  if (privateApp) {
+  setIfMissing("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  setIfMissing("X-Permitted-Cross-Domain-Policies", "none");
+  // Public, embeddable pages (/f/* funnels, booking pages, public marketing API) may be framed on client sites.
+  const publicPage = pathname.startsWith("/f/") || pathname.startsWith("/api/marketing-public");
+  if (!publicPage) {
+    // Stops the OS being loaded inside another site's frame (clickjacking) and blocks unused device APIs.
     setIfMissing("X-Frame-Options", "SAMEORIGIN");
+    setIfMissing("Content-Security-Policy", "frame-ancestors 'self'; base-uri 'self'; object-src 'none'");
     setIfMissing("Permissions-Policy", "camera=(), geolocation=(), payment=(), usb=(), microphone=(self)");
   }
+  // Private API answers (contacts, conversations, money) must never sit in a shared or browser cache.
+  if (pathname.startsWith("/api/") && !pathname.startsWith("/api/marketing-public") && /json/i.test(headers.get("content-type") || "")) setIfMissing("Cache-Control", "no-store");
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
@@ -197,6 +203,8 @@ const worker = {
       // AI & SEO-data rebilling: last month's usage → a line on each client's draft invoice (1st–3rd, once).
       import("../lib/usage-billing").then(({ processUsageInvoices }) => processUsageInvoices(new Date(controller.scheduledTime))),
       processOutreach(new Date(controller.scheduledTime)),
+      // Domain Guard: hijack / DNS-change / redirect / injected-script watch on every domain, high-priority alerts.
+      import("../lib/domain-guard-server").then(({ processDomainGuard }) => processDomainGuard(new Date(controller.scheduledTime))),
       // AI phone agent: place queued outbound calls (new-lead call-backs, automation calls, confirm calls).
       import("../lib/voice-agent/server").then(({ processVoiceQueue }) => processVoiceQueue(new Date(controller.scheduledTime))),
       // Online onboarding: finish audits whose browser tab closed mid-way, time out stuck ones, prune usage counters.

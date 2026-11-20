@@ -2,6 +2,7 @@
 
 import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { DomainGuardPanel } from "./domain-guard-panel";
 
 type ConnectionState = { connected: boolean; source: "secret" | "stored" | null; fingerprint: string; secureStorageReady: boolean; canStoreToken?: boolean };
 type Zone = { id: string; name: string; status: string; paused: boolean; nameServers: string[] };
@@ -189,5 +190,6 @@ export function DomainsDnsView({ clientHosts }: { clientHosts?: string[] } = {})
     </>}
 
     {message && <p className={isError ? "settings-inline-error" : "settings-inline-success"} role={isError ? "alert" : "status"}>{message}</p>}
+    {connected && !scoped && <DomainGuardPanel />}
   </section>;
 }

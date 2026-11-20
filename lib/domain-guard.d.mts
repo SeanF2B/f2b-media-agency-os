@@ -1,0 +1,26 @@
+export type GuardSeverity = "critical" | "warning" | "info";
+export type GuardFinding = { severity: GuardSeverity; key: string; title: string; detail: string };
+export type GuardSite = { ok: boolean; error?: string; status?: number; finalUrl?: string; hops?: string[]; external?: string[]; signals?: string[] };
+export type GuardObservation = {
+  domain: string;
+  zone?: { status?: string; paused?: boolean; nameServers?: string[] } | null;
+  records?: string[] | null;
+  settings?: { always_use_https?: string; min_tls_version?: string; ssl?: string } | null;
+  dnssec?: string | null;
+  registrar?: { locked?: boolean; autoRenew?: boolean; expiresAt?: string } | null;
+  site?: GuardSite | null;
+  failCount?: number;
+};
+export function recordKey(record: { type?: string; name?: string; content?: string; priority?: number | null; proxied?: boolean }): string;
+export function diffRecords(previous: Array<string | object> | null | undefined, next: Array<string | object> | null | undefined): { added: string[]; removed: string[] };
+export function describeRecord(key: string): string;
+export function isHighRiskRecord(key: string): boolean;
+export function normaliseHost(value: string): string;
+export function belongsTo(host: string, domain: string): boolean;
+export function externalHosts(html: string, domain: string): string[];
+export function hackSignals(html: string): string[];
+export function evaluate(observation: GuardObservation, baseline: GuardObservation | null, now?: Date): GuardFinding[];
+export function hashString(value: string): string;
+export function repeatAfter(severity: GuardSeverity): number;
+export function formatTelegram(findings: GuardFinding[], appUrl?: string): { text: string; buttons: Array<{ text: string; url: string }> };
+export function formatEmail(findings: GuardFinding[]): { subject: string; text: string; html: string };
