@@ -115,3 +115,33 @@ tr:hover .tt-dup, .tt-dup:focus-visible { opacity: 1; }
 @media (hover: none) { .tt-dup { opacity: 1; } }
 .tt-bulk-dup { height: 32px; padding: 0 12px; border: 1px solid var(--border, #d7dee4); border-radius: 9px; background: var(--card, #fff); color: inherit; font: inherit; font-weight: 700; cursor: pointer; }
 .tt-bulk-dup:hover { border-color: var(--brand-secondary, #ee5a29); }
+
+/* Domain Guard (Domains & DNS → security watch) */
+.dg-panel { margin-top: 22px; border-top: 1px solid var(--border); padding-top: 18px; }
+.dg-status { display: inline-flex; align-items: center; gap: 7px; padding: 7px 11px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; background: #f2f5f7; color: #3c4850; }
+.dg-status i, .dg-channels i, .dg-domain b i { width: 8px; height: 8px; border-radius: 50%; background: #9aa5ad; display: inline-block; flex: none; }
+.dg-status.dg-ok { background: #e8f7ee; color: #146c3c; } .dg-status.dg-ok i { background: #1f9d55; }
+.dg-status.dg-warning { background: #fff4e0; color: #8a4b00; } .dg-status.dg-warning i { background: #d97706; }
+.dg-status.dg-critical { background: #b91c1c; color: #fff; } .dg-status.dg-critical i { background: #fff; animation: dg-pulse 1.2s ease-in-out infinite; }
+@keyframes dg-pulse { 50% { opacity: .25; } }
+.dg-channels { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin: 14px 0 10px; font-size: 12.5px; }
+.dg-channels span { display: inline-flex; align-items: center; gap: 6px; }
+.dg-channels .on i { background: #1f9d55; } .dg-channels .off i { background: #d97706; }
+.dg-channels a { color: inherit; text-decoration: underline; }
+.dg-channels button { margin-left: auto; }
+.dg-domains { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; margin: 8px 0 18px; }
+.dg-domain { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; background: var(--card); color: inherit; transition: transform .15s ease, border-color .15s ease; }
+.dg-domain:hover { transform: translateY(-1px); border-color: var(--brand-secondary); }
+.dg-domain b { display: flex; align-items: center; gap: 7px; font-size: 13.5px; overflow-wrap: anywhere; }
+.dg-domain small { opacity: .75; font-size: 11.5px; }
+.dg-domain.dg-ok b i { background: #1f9d55; } .dg-domain.dg-warning b i { background: #d97706; } .dg-domain.dg-critical b i { background: #dc2626; animation: dg-pulse 1.2s ease-in-out infinite; }
+.dg-domain.dg-critical { border-color: #dc2626; }
+.dg-events-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.dg-events-head h3 { margin: 0; font-size: 15px; }
+.dg-events { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.dg-event { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; border: 1px solid var(--border); border-left: 4px solid #2563eb; border-radius: 10px; padding: 10px 12px; background: var(--card); color: inherit; }
+.dg-event.dg-critical { border-left-color: #dc2626; } .dg-event.dg-warning { border-left-color: #d97706; }
+.dg-event.dg-done { opacity: .6; }
+.dg-event b { display: block; font-size: 13.5px; } .dg-event small { display: block; opacity: .7; font-size: 11.5px; margin-top: 2px; }
+.dg-event pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 12px; margin: 6px 0 0; opacity: .85; }
+@media (max-width: 640px) { .dg-channels button { margin-left: 0; width: 100%; } .dg-event { flex-direction: column; } }

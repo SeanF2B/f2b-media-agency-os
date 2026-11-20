@@ -348,7 +348,7 @@ export function approveTask<T extends FlowTask>(task: T, input: Actor & { edited
     pendingReasonAt: undefined,
     approvalRequest,
     approvalGrantedAt: input.at,
-    ...(input.ai ? { aiRunState: "scheduled", aiStartNowRequestedAt: input.at, aiRunStartedAt: undefined, aiRunAttempt: (task.aiRunAttempt || 0) + 1 } : {}),
+    ...(input.ai ? { aiRunState: "scheduled", aiStartNowRequestedAt: input.at, aiRunStartedAt: undefined, aiRunAttempt: (task.aiRunAttempt || 0) + 1, aiProgressText: approvalRequest.editedRequest ? "Approved with edits — waiting for the AI to start" : "Approved — waiting for the AI to start", aiProgressAt: input.at } : {}),
   };
   next = withEvent(next, { at: input.at, by: input.by, action: "approved", note: approvalRequest.editedRequest ? "Approved with edits — sent back to the AI" : "Approved — sent back to the AI" });
   return { task: next, error: "" };

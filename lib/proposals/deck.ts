@@ -20,8 +20,23 @@ export type ProposalUpload = { id: string; name: string; kind: string; size: num
 export type ProposalInputs = {
   goal: string; audience: string; discoveryNotes: string; requirements: string; instructions: string;
   startMonth: string; currency: string; terms: string; sources: ProposalSource[];
+  /** Monthly AI credits estimate shown on the Investment slide, e.g. "€20–€40". Empty = worked out from the services. */
+  aiCredits?: string;
 };
-export type SelectedService = { key: string; setupFee: number; monthlyFee: number; addon: boolean };
+/** wasSetupFee / wasMonthlyFee: the original price, shown struck through when it's higher than the price offered (a discount). */
+export type SelectedService = { key: string; setupFee: number; monthlyFee: number; addon: boolean; wasSetupFee?: number; wasMonthlyFee?: number };
+/** Rough monthly AI usage (credits) for the services picked, as a low–high range in the agency currency. */
+export function estimateAiCredits(keys: string[]): [number, number] {
+  const per: Record<string, number> = { whatsapp: 20, "ai-calls": 40, seo: 10, geo: 5, aeo: 5, social: 10, email: 5, reviews: 5, "google-ads": 5, crm: 5 };
+  const low = 10 + keys.reduce((sum, key) => sum + (per[key] || 0), 0);
+  const round = (value: number) => Math.round(value / 5) * 5;
+  return [round(low), round(low * 2)];
+}
+/** "~~€597~~ €497" when discounted, otherwise "€497". ~~text~~ renders as struck-through text on the slides. */
+export function priceWithWas(now: number, was: number | undefined, currency: string) {
+  const fmt = (value: number) => money(value, currency);
+  return was && was > now ? `~~${fmt(was)}~~ ${fmt(now)}` : fmt(now);
+}
 
 export const SLIDE_KINDS: Array<{ kind: SlideKind; label: string; hint: string }> = [
   { kind: "cover", label: "Cover", hint: "Welcome slide with their website on a desktop" },
@@ -113,7 +128,7 @@ export function buildDeck(input: {
   const picked = input.services.map((item) => ({ ...item, def: catalogue.get(item.key) })).filter((item): item is SelectedService & { def: CatalogueService } => Boolean(item.def));
   const core = picked.filter((item) => !item.addon);
   const handover = core.find((item) => item.key === "setup");
-  const coreServices = core.filter((item) => item.key !== "setup");
+  const coreServices = core.filter((item) => item.key !== "setup").sort((a, b) => storyRank(a.key) - storyRank(b.key));
   const addons = picked.filter((item) => item.addon);
   const currency = inputs.currency || "EUR";
   const aiService = (key: string) => (ai.services || []).find((item) => item?.key === key);
@@ -164,14 +179,16 @@ export function buildDeck(input: {
   add("investment", {
     heading: "Investment",
     packageName: "Client Acquisition System",
-    setupLabel: `Initial setup: ${money(setup, currency)} / one time`,
-    setupItems: core.filter((item) => item.setupFee > 0).map((item) => `${item.def.name} setup`),
-    monthlyLabel: `Ongoing: ${money(monthly, currency)} / month`,
-    monthlyItems: core.map((item) => `${item.def.name} — ${item.monthlyFee || item.setupFee ? money(item.monthlyFee, currency) : "included"}`),
+    setupLabel: `Initial setup: ${priceWithWas(setup, core.reduce((sum, item) => sum + Math.max(item.setupFee, item.wasSetupFee || 0), 0), currency)} / one time`,
+    setupItems: core.filter((item) => item.setupFee > 0 || (item.wasSetupFee || 0) > 0).map((item) => (item.wasSetupFee || 0) > item.setupFee ? `${item.def.name} setup — ${priceWithWas(item.setupFee, item.wasSetupFee, currency)}` : `${item.def.name} setup`),
+    monthlyLabel: `Ongoing: ${priceWithWas(monthly, core.reduce((sum, item) => sum + Math.max(item.monthlyFee, item.wasMonthlyFee || 0), 0), currency)} / month`,
+    monthlyItems: core.map((item) => `${item.def.name} — ${item.monthlyFee || item.setupFee || item.wasMonthlyFee ? priceWithWas(item.monthlyFee, item.wasMonthlyFee, currency) : "included"}`),
+    aiLabel: "AI credits",
+    aiItems: [`Additional AI credits are billed monthly, based on usage — estimated ${inputs.aiCredits?.trim() || (() => { const [low, high] = estimateAiCredits(picked.map((item) => item.key)); return `${money(low, currency)}–${money(high, currency)}`; })()} / month`],
     mediaLabel: core.some((item) => item.def.mediaNote) ? "Ad spend" : "",
     mediaItems: core.map((item) => item.def.mediaNote).filter(Boolean),
     addonsLabel: addons.length ? "Optional add-ons (see below)" : "",
-    addonItems: addons.map((item) => `${item.def.name} — ${money(item.monthlyFee, currency)}/month`),
+    addonItems: addons.map((item) => `${item.def.name} — ${priceWithWas(item.monthlyFee, item.wasMonthlyFee, currency)}/month`),
     terms: first(inputs.terms, "3-month minimum. Onboarding begins once the setup fee is received. Monthly fee billed every 30 days thereafter."),
     note: "Additional website pages, SEO or larger development work are scoped separately.",
   });
@@ -229,6 +246,10 @@ export const AI_COPY_INSTRUCTIONS = [
 /** Wording from the first catalogue (too technical). Saved decks still using it unedited get today's plain-English copy. */
 const LEGACY_COPY: Record<string, { summary: string; deliverables: string[] }> = {"google-ads": {"summary": "Search campaigns built around high-intent keywords, with landing pages that match what people are actually searching for, so your budget goes on enquiries rather than browsing.", "deliverables": ["Keyword research & campaign structure", "Ad copy and assets written for each service", "Conversion tracking on calls and forms", "Weekly optimisation and negative keyword management", "Monthly performance report"]}, "seo": {"summary": "Technical fixes, service and location pages and ongoing content that help you rank for the searches your customers make, using real search data to decide what to write.", "deliverables": ["Technical SEO audit & fixes", "Service and location pages", "Keyword tracking (15 priority keywords)", "On-page optimisation", "Monthly ranking report"]}, "geo": {"summary": "We structure your content, reviews and brand mentions so AI assistants understand who you are and recommend you when people ask for a business like yours.", "deliverables": ["AI visibility baseline test", "Entity & brand consistency fixes", "Content written for AI citation", "Structured data (schema)", "Monthly AI visibility tracking"]}, "aeo": {"summary": "Clear, expert answers to the questions your customers ask, formatted for Google's AI Overviews, featured snippets and voice search.", "deliverables": ["Customer question research", "FAQ and answer content", "FAQ / HowTo schema", "Featured snippet targeting", "Answer visibility tracking"]}, "gbp": {"summary": "A fully optimised Google Business Profile with regular posts, photos and a steady flow of reviews, so you show up in the map pack when locals search.", "deliverables": ["Profile audit & full optimisation", "Weekly Google posts", "Review request automation", "Review reply drafts", "Local ranking grid tracking"]}, "website": {"summary": "A custom-designed, mobile-first website with clear service pages, strong calls to action and lead capture connected straight into your CRM.", "deliverables": ["Custom design in your branding", "Up to 8 pages incl. service pages", "Mobile-first, fast loading", "Forms connected to your CRM", "Hosting, SSL & care plan"]}, "landing": {"summary": "Dedicated landing pages for each campaign and service, with one clear action, social proof and ongoing conversion testing to lower your cost per lead.", "deliverables": ["Campaign landing pages", "Lead forms with thank-you tracking", "Heatmap & behaviour review", "A/B testing", "Monthly conversion report"]}, "meta-ads": {"summary": "Scroll-stopping Facebook and Instagram campaigns aimed at your ideal customers, with lead forms and tracking that connect straight into your pipeline.", "deliverables": ["Audience research & targeting", "Ad creative and copy", "Lead form or landing page setup", "Pixel & conversion tracking", "Weekly optimisation"]}, "retargeting": {"summary": "Light-touch ads that follow up with people who visited your website, keeping your work in front of them without pushing too hard.", "deliverables": ["Website visitor audiences", "Instagram, Facebook & Google retargeting", "Creative refreshed monthly", "Frequency caps", "Assisted conversion reporting"]}, "social": {"summary": "A planned content calendar with posts, reels and stories written and designed in your brand voice, published for you every week.", "deliverables": ["Monthly content calendar", "12 posts / month", "Stories & reels", "Community replies", "Monthly engagement report"]}, "email": {"summary": "Automated follow-ups and regular newsletters that keep you front of mind, share your latest work and make the next step easy.", "deliverables": ["Welcome & follow-up sequences", "Monthly newsletter", "List segmentation", "Templates in your branding", "Open & click reporting"]}, "whatsapp": {"summary": "When someone submits a form they get an instant WhatsApp follow-up, and an AI assistant can answer questions and book them in.", "deliverables": ["Instant WhatsApp follow-up", "AI replies to common questions", "Appointment booking", "Missed-call text back", "Hand-over to your team"]}, "crm": {"summary": "Every enquiry, call and sale tracked in one CRM and mobile app, with a live dashboard showing ad spend, leads, cost per lead and revenue.", "deliverables": ["CRM & mobile app", "Call and form tracking", "Live reporting dashboard", "Pipeline & stage values", "Monthly review call"]}};
 /** Phase numbers always follow slide order (1, 2, 3…) — after removing, hiding or reordering service slides. */
+/** Phases follow one story: build the base → get found now → get found for free → stay front of mind → never miss a lead → see the results. */
+export const STORY_ORDER = ["website", "gbp", "reviews", "google-ads", "seo", "aeo", "geo", "meta-ads", "retargeting", "social", "whatsapp", "ai-calls", "email", "crm"];
+export const STORY_CHAPTER: Record<string, string> = { website: "Build the base", gbp: "Get found now", reviews: "Get found now", "google-ads": "Get found now", seo: "Get found for free", aeo: "Get found for free", geo: "Get found for free", "meta-ads": "Stay front of mind", retargeting: "Stay front of mind", social: "Stay front of mind", whatsapp: "Never miss a lead", "ai-calls": "Never miss a lead", email: "Never miss a lead", crm: "See the results", setup: "We handle the switch" };
+function storyRank(key: string) { const index = STORY_ORDER.indexOf(key); return index < 0 ? STORY_ORDER.length : index; }
 export function renumberPhases(deck: ProposalDeck): ProposalDeck {
   let phase = 0;
   const slides = deck.slides.map((slide) => {
@@ -268,8 +289,15 @@ export function sanitizeDeck(value: unknown): ProposalDeck | null {
   };
   const slides = raw.slides.slice(0, 40).filter((slide) => slide && kinds.has(slide.kind as SlideKind) && !(slide.kind === "service" && (slide.data as Record<string, unknown>)?.serviceKey === "landing")).map((slide) => ({ id: String(slide.id || sid()).slice(0, 20), kind: slide.kind as SlideKind, hidden: Boolean(slide.hidden), data: (clip(slide.data) || {}) as Record<string, any> }));
   const current = catalogueByKey(SERVICE_CATALOGUE);
+  // Copy that was the default before the latest catalogue update (upgraded automatically if untouched).
+  const PREV_COPY: Record<string, { summary: string; deliverables: string[] }> = { whatsapp: { summary: "When someone gets in touch they get an instant, friendly reply on WhatsApp, and our AI assistant can answer questions and book them in for you.", deliverables: ["Instant WhatsApp replies", "Answers common questions", "Books appointments for you", "Hands over to you anytime"] }, seo: { summary: "We help your website climb Google's free results for the searches your customers make, so new enquiries keep coming in without paying for every click.", deliverables: ["Climb Google's free results", "A page for each of your services", "Website fixes so Google loves it", "Monthly ranking updates"] } };
   for (const slide of slides) {
     const key = String(slide.data.serviceKey || "");
+    const prev = PREV_COPY[key], next = current.get(key);
+    if (slide.kind === "service" && prev && next) {
+      if (slide.data.cardBody === prev.summary) slide.data.cardBody = next.summary;
+      if (Array.isArray(slide.data.bullets) && slide.data.bullets.every((item: unknown) => prev.deliverables.includes(String(item)))) slide.data.bullets = next.deliverables.slice(0, 4);
+    }
     const old = LEGACY_COPY[key], now = current.get(key);
     if (slide.kind !== "service" || !old || !now) continue;
     if (slide.data.cardBody === old.summary) slide.data.cardBody = now.summary;

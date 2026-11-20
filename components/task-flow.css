@@ -124,3 +124,13 @@
 .tf-card-action:disabled { opacity: .6; cursor: default; }
 .tf-card-action.is-cancel { border-color: rgb(220 38 38 / 35%); background: rgb(220 38 38 / 7%); color: #b42318; }
 .tf-card-action.is-retry { border-color: rgb(15 111 180 / 35%); background: rgb(15 111 180 / 8%); color: #0f6fb4; }
+
+/* Red stop square — only on cards whose AI run is live; sits where Start now sits, same height */
+.tf-stop-button { display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0; border-radius: 9px; border: 1px solid rgb(220 38 38 / 40%); background: rgb(220 38 38 / 8%); cursor: pointer; transition: transform .15s, background .15s, box-shadow .15s; }
+.tf-stop-button span { width: 11px; height: 11px; border-radius: 2.5px; background: #dc2626; }
+.tf-stop-button:hover:not(:disabled) { background: rgb(220 38 38 / 15%); transform: translateY(-1px); box-shadow: 0 4px 12px rgb(220 38 38 / 18%); }
+.tf-stop-button.is-stopping span { animation: tf-pulse 1s ease-in-out infinite; }
+.tf-stop-button:disabled { cursor: default; }
+
+.tf-card-meta span { display: inline-flex; align-items: center; gap: 5px; }
+.tf-card-meta svg { width: 13px; height: 13px; flex: none; stroke-width: 2.2; opacity: .85; }

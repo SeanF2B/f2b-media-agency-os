@@ -5,7 +5,7 @@ import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from "re
 import { readFocusClient, setFocusClient, useFocusClient } from "@/lib/focus-client";
 import { BrandIcon } from "./brand-icon";
 import { ConnectionDots } from "./connection-dots";
-import { Briefcase, CircleCheck, FileText, Globe, Check, Link2, Mail, MapPin, Megaphone, MessageCircle, Star, Search, type LucideIcon } from "lucide-react";
+import { Briefcase, CircleCheck, Presentation, FileText, Globe, Check, Link2, Mail, MapPin, Megaphone, MessageCircle, Star, Search, type LucideIcon } from "lucide-react";
 import { AiVisibilityPanel } from "./ai-visibility-panel";
 import { RankTrackingPanel } from "./rank-tracking-panel";
 import { SiteFormsPanel } from "./site-forms-panel";
@@ -54,8 +54,8 @@ function SiteTemplatesPanel({ clients, onEdit }: { clients: OpsClient[]; onEdit:
 type SiteRow = { clientId: string; backend: string; previewUrl: string; repo: string; branch: string; updatedAt: string };
 // Where everything lives: Clients · Google Ads (Setup · Manage · Performance) · SEO (Setup · Research ·
 // Performance) · Sites (Overview · Forms · Email) · Reports. Google Maps listing lives in the client profile.
-const OPS_TABS: Array<[OperationsTab, string, LucideIcon]> = [["clients", "Clients", Briefcase], ["tasks", "Tasks", CircleCheck], ["sites", "Sites", Globe], ["seo", "SEO", Search], ["ads", "Google Ads", Megaphone], ["reports", "Reports", FileText]];
-export type OperationsTab = "overview" | "clients" | "tasks" | "ads" | "seo" | "sites" | "reports" | "onboarding";
+const OPS_TABS: Array<[OperationsTab, string, LucideIcon]> = [["clients", "Clients", Briefcase], ["tasks", "Tasks", CircleCheck], ["sites", "Sites", Globe], ["seo", "SEO", Search], ["ads", "Google Ads", Megaphone], ["reports", "Reports", FileText], ["proposals", "Proposals", Presentation]];
+export type OperationsTab = "overview" | "clients" | "tasks" | "ads" | "seo" | "sites" | "reports" | "proposals" | "onboarding";
 type SeoMode = "setup" | "keywords" | "competitors" | "backlinks" | "pages" | "overview" | "ranks" | "audit" | "ai";
 const SEO_MAIN: Array<{ key: string; label: string; views: Array<[SeoMode, string]> }> = [
   { key: "setup", label: "Setup", views: [["setup", "Setup"]] },
@@ -70,7 +70,7 @@ type SiteMode = "sites" | "settings" | "media" | "templates";
 export function normalizeOpsTab(value: string): { tab: OperationsTab; sub?: string } {
   const legacy: Record<string, { tab: OperationsTab; sub?: string }> = {
     keywords: { tab: "seo", sub: "keywords" }, ai: { tab: "seo", sub: "ai" }, backlinks: { tab: "seo", sub: "backlinks" }, competitors: { tab: "seo", sub: "competitors" }, ranks: { tab: "seo", sub: "ranks" }, pages: { tab: "seo", sub: "pages" },
-    local: { tab: "clients", sub: "maps" }, audits: { tab: "reports", sub: "audits" }, proposals: { tab: "reports", sub: "proposals" },
+    local: { tab: "clients", sub: "maps" }, audits: { tab: "reports", sub: "audits" }, proposals: { tab: "proposals", sub: "proposals" }, "report-keywords": { tab: "proposals", sub: "keywords" }, prospecting: { tab: "proposals", sub: "proposals" },
     websites: { tab: "sites", sub: "overview" }, media: { tab: "sites", sub: "media" }, "media-library": { tab: "sites", sub: "media" }, templates: { tab: "sites", sub: "templates" }, forms: { tab: "sites", sub: "forms" }, submissions: { tab: "sites", sub: "submissions" },
     email: { tab: "sites", sub: "email" }, emails: { tab: "sites", sub: "email" }, domains: { tab: "sites", sub: "domains" }, dns: { tab: "sites", sub: "domains" }, automations: { tab: "sites", sub: "automations" }, "system-emails": { tab: "sites", sub: "system" }, leadfactory: { tab: "clients" },
   };
@@ -103,8 +103,9 @@ function wpAdminUrl(siteUrl: string) {
   try { const url = new URL(/^https?:\/\//i.test(siteUrl) ? siteUrl : `https://${siteUrl}`); return `${url.origin}${url.pathname.replace(/\/+$/, "").replace(/\/wp-admin$/, "")}/wp-admin/`; } catch { return siteUrl; }
 }
 
-export function OperationsView({ tasksView, clientsView, clients, tasks, tab: rawTab, onTab, onOpenPage, onOpenWebsite, onOpenDns, onStartOnboarding, onboarding, onCreateGbpTask, onCreateCommunityTask, renderTool, automations, onStartReviews, onEditClient, onPickClient }: { tasksView?: ReactNode; clientsView?: ReactNode; onPickClient?: (clientId: string) => void; 
+export function OperationsView({ tasksView, clientsView, clients, tasks, tab: rawTab, onTab, onOpenPage, onOpenWebsite, onOpenDns, onStartOnboarding, onboarding, onCreateGbpTask, onCreateCommunityTask, renderTool, automations, onStartReviews, onEditClient, onPickClient, onOnboardFromProposal }: { tasksView?: ReactNode; clientsView?: ReactNode; onPickClient?: (clientId: string) => void; 
   onStartReviews?: (clientId: string) => string; onEditClient?: (clientId: string) => void;
+  onOnboardFromProposal?: (input: import("./proposal-studio-view").OnboardFromProposal) => Promise<string | null>;
   clients: OpsClient[]; tasks: OpsTask[]; tab: string; onTab: (tab: OperationsTab) => void;
   onOpenPage: (page: string, clientId?: string) => void; onOpenWebsite: (client: OpsClient) => void; onOpenDns: () => void;
   onStartOnboarding?: (clientId: string) => void; onboarding?: React.ReactNode; automations?: React.ReactNode; hasLeadFactory?: boolean;
@@ -117,7 +118,8 @@ export function OperationsView({ tasksView, clientsView, clients, tasks, tab: ra
   const { tab, sub } = normalizeOpsTab(rawTab === "overview" ? "clients" : rawTab);
   const [workroom, setWorkroom] = useState(false); // client workroom (full client profile) open inside the Clients tab
   const [siteMode, setSiteMode] = useState<SiteMode>("sites");
-  const [reportMode, setReportMode] = useState<"audits" | "reports" | "report-keywords" | "proposals">("reports");
+  const [reportMode, setReportMode] = useState<"audits" | "reports">("reports");
+  const [proposalMode, setProposalMode] = useState<"report-keywords" | "proposals">("proposals");
   const [seoMode, setSeoMode] = useState<SeoMode>("pages");
   const [adsMode, setAdsMode] = useState<AdsMode | null>(null); // null = Performance for connected accounts, Setup otherwise
   const [sitesTab, setSitesTab] = useState<SitesTab>("overview");
@@ -127,7 +129,8 @@ export function OperationsView({ tasksView, clientsView, clients, tasks, tab: ra
   useEffect(() => {
     if (!sub) return;
     if (tab === "seo") setSeoMode(sub as SeoMode);
-    else if (tab === "reports") setReportMode(sub === "keywords" ? "report-keywords" : sub as "audits" | "proposals");
+    else if (tab === "reports") setReportMode(sub === "audits" ? "audits" : "reports");
+    else if (tab === "proposals") setProposalMode(sub === "keywords" ? "report-keywords" : "proposals");
     else if (tab === "sites") {
       if (sub === "forms" || sub === "submissions") { setSitesTab("forms"); setFormsView(sub); }
       else if (sub === "domains" || sub === "dns") setSitesTab("domains");
@@ -178,10 +181,10 @@ export function OperationsView({ tasksView, clientsView, clients, tasks, tab: ra
     <div className="page-heading ops-heading"><div><p className="eyebrow">Agency</p><h1>Operations</h1></div>
     </div>
     <div className="ops-tabs" role="tablist" aria-label="Operations sections">
-      {OPS_TABS.filter(([key]) => (key !== "clients" || clientsView) && (key !== "tasks" || tasksView) && (!["seo", "ads", "reports"].includes(key) || renderTool)).map(([key, label, Icon]) => { const on = tab === key || (key === "clients" && tab === "onboarding"); return <button type="button" role="tab" key={key} aria-selected={on} className={on ? "active" : ""} onClick={() => { if (key === "clients") setWorkroom(false); onTab(key); }}><Icon size={16} strokeWidth={1.9} aria-hidden="true" className="ops-tab-icon" />{label}</button>; })}
+      {OPS_TABS.filter(([key]) => (key !== "clients" || clientsView) && (key !== "tasks" || tasksView) && (!["seo", "ads", "reports", "proposals"].includes(key) || renderTool)).map(([key, label, Icon]) => { const on = tab === key || (key === "clients" && tab === "onboarding"); return <button type="button" role="tab" key={key} aria-selected={on} className={on ? "active" : ""} onClick={() => { if (key === "clients") setWorkroom(false); onTab(key); }}><Icon size={16} strokeWidth={1.9} aria-hidden="true" className="ops-tab-icon" />{label}</button>; })}
     </div>
 
-    {tab === "clients" && <p className="ops-more">Also: {[["Meta Ads", "Meta Ads"], ["Proposals", "Proposals"]].map(([page, label], index) => <span key={page}>{index ? " · " : ""}<button type="button" className="text-button" onClick={() => { if (page === "Proposals") { setReportMode("proposals"); onTab("reports"); } else onOpenPage(page); }}>{label}</button></span>)}</p>}
+    {tab === "clients" && <p className="ops-more">Also: {[["Meta Ads", "Meta Ads"], ["Proposals", "Proposals"]].map(([page, label], index) => <span key={page}>{index ? " · " : ""}<button type="button" className="text-button" onClick={() => { if (page === "Proposals") { setProposalMode("proposals"); onTab("proposals"); } else onOpenPage(page); }}>{label}</button></span>)}</p>}
     {tab === "clients" && <>
       <div className="ops-summary">
         <div><b>{active.length}</b><span>Active clients</span></div>
@@ -249,16 +252,20 @@ export function OperationsView({ tasksView, clientsView, clients, tasks, tab: ra
 
     {tab === "onboarding" && <><div className="ops-onb-switch"><button type="button" className="text-button ops-back" onClick={() => onTab("clients")}>← Back to clients</button><span className="ops-status-filter" role="tablist" aria-label="Onboarding view">{(["wizard", "online"] as const).map((key) => <button key={key} type="button" role="tab" aria-selected={onbView === key} className={onbView === key ? "on" : ""} onClick={() => setOnbView(key)}>{key === "wizard" ? "Onboard a client" : "Online onboarding"}</button>)}</span></div>{onbView === "wizard" ? onboarding : <Suspense fallback={<div className="page-loading" role="status" aria-label="Loading online onboarding…"><i /></div>}><OnboardingAdmin /></Suspense>}</>}
 
-    {tab === "reports" && renderTool && (selected || reportMode === "proposals") && <>
-      <div className="ops-subbar">{seg(reportMode, setReportMode, [["reports", "Client reports"], ["audits", "Audits"], ["report-keywords", "Keywords"], ["proposals", "Proposals"]], "Reports sections")}</div>
-      {reportMode === "proposals"
-        ? <div className="ops-embed ops-proposals"><Suspense fallback={<div className="page-loading" role="status" aria-label="Loading proposals…"><i /></div>}><ProposalStudioView clients={clients} defaultClientId={selected?.id} /></Suspense></div>
-        : selected && <div className="ops-embed" key={`rep-${reportMode}-${selected.id}`}>{renderTool(reportMode, selected.id)}</div>}
+    {tab === "reports" && renderTool && selected && <>
+      <div className="ops-subbar">{seg(reportMode, setReportMode, [["reports", "Client reports"], ["audits", "Audits"]], "Reports sections")}</div>
+      <div className="ops-embed" key={`rep-${reportMode}-${selected.id}`}>{renderTool(reportMode, selected.id)}</div>
+    </>}
+    {tab === "proposals" && renderTool && (selected || proposalMode === "proposals") && <>
+      <div className="ops-subbar">{seg(proposalMode, setProposalMode, [["report-keywords", "Keywords"], ["proposals", "Proposals"]], "Proposals sections")}</div>
+      {proposalMode === "proposals"
+        ? <div className="ops-embed ops-proposals"><Suspense fallback={<div className="page-loading" role="status" aria-label="Loading proposals…"><i /></div>}><ProposalStudioView clients={clients} defaultClientId={selected?.id} onOnboard={onOnboardFromProposal} /></Suspense></div>
+        : selected && <div className="ops-embed" key={`kw-${selected.id}`}>{renderTool("report-keywords", selected.id)}</div>}
     </>}
     {tab === "seo" && seoMode === "ai" && selected && <>
       <div className="ops-embed" key={`ai-${selected.id}`}><AiVisibilityPanel clientId={selected.id} clientName={selected.name} area={seoLocation} services={(selected.services || []).map((service) => service.name).concat((selected as OpsClient & { seoServices?: string[] }).seoServices || [])} /></div>
     </>}
-    {!selected && ["seo", "ads", "reports"].includes(tab) && !(tab === "reports" && reportMode === "proposals") && <p className="ops-empty">No active clients.</p>}
+    {!selected && ["seo", "ads", "reports", "proposals"].includes(tab) && !(tab === "proposals" && proposalMode === "proposals") && <p className="ops-empty">No active clients.</p>}
 
   </section>;
 }
