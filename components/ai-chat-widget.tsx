@@ -3,7 +3,7 @@
 // greets new users, pops up notifications (approvals, new leads, unread messages), runs page tours, and turns
 // typed or spoken requests into pre-filled forms (nothing is saved without your OK).
 import { useEffect, useRef, useState, type ReactNode, type PointerEvent as RPointerEvent, type CSSProperties } from "react";
-import { Mic, MicOff, Send, X, Compass, Sparkles, LifeBuoy, EyeOff, Bell, BellOff } from "lucide-react";
+import { Mic, MicOff, Send, X, Compass, Sparkles, LifeBuoy, EyeOff, Bell, BellOff, ChevronDown } from "lucide-react";
 
 export type AiCommand = { action: string; reply: string; fields: Record<string, string> };
 type Suggestion = { title: string; clientId: string; priority: string; service: string; why: string; source?: string };
@@ -162,15 +162,7 @@ export function AiChatWidget({ userName = "", page, pageName, clientId, avatar, 
     // Different line each time, at most once every 3 minutes per page.
     let last = 0; try { last = Number(window.sessionStorage.getItem(`f2b-ai-nudge-${page}`) || 0); } catch { /* ignore */ }
     if (Date.now() - last < 3 * 60_000) return;
-    const h = new Date().getHours();
-    // Varied greeting: by name most of the time, the odd "boss", sometimes just straight to the point.
-    const name = userName.trim().split(/\s+/)[0] || "";
-    const part = h < 12 ? "Morning" : h < 18 ? "Afternoon" : "Evening";
-    const named = name ? [`Hey ${name},`, `${part} ${name},`, `Hi ${name},`, `${name},`, `Good to see you ${name},`, `Right ${name},`] : [];
-    const general = [`${part},`, "Hey,", "Hi there,", "Quick one,", "Hey boss,", "Hi boss,"];
-    const pool = Math.random() < 0.7 && named.length ? named : general;
-    let hello = pool[Math.floor(Math.random() * pool.length)];
-    try { const prev = window.sessionStorage.getItem("f2b-ai-hello"); if (hello === prev) hello = pool[(pool.indexOf(hello) + 1) % pool.length]; window.sessionStorage.setItem("f2b-ai-hello", hello); } catch { /* ignore */ }
+    const hello = greeting(userName);
     const line = lines[Math.floor(Math.random() * lines.length)];
     const timer = window.setTimeout(() => { try { window.sessionStorage.setItem(`f2b-ai-nudge-${page}`, String(Date.now())); } catch { /* ignore */ } setToast((current) => current || { text: `${hello} ${line}`, action: { label: "Yes please", run: () => openChat() } }); }, 3500);
     return () => window.clearTimeout(timer);
@@ -230,7 +222,7 @@ export function AiChatWidget({ userName = "", page, pageName, clientId, avatar, 
     for (const item of here.filter((x) => !people.includes(x)).slice(0, 3 - actions.length)) actions.push({ label: item.title, run: () => onSuggestion(item) });
     if (!actions.length && page === "Overview" && suggestions.length) actions.push({ label: `See all ${suggestions.length}`, run: () => openWithSuggestions(suggestions) });
     if (!actions.length && PAGE_HELP[page]) actions.push(...PAGE_HELP[page].slice(0, 2).map((text) => ({ label: text, run: () => void ask(text) })));
-    say(`Hey boss 👋 ${line[page] || `What can I do on ${label}?`}`, actions.slice(0, 3));
+    say(`${greeting(userName)} ${line[page] || `What can I do on ${label}?`}`, actions.slice(0, 3));
   };
 
   // Recommendations for the page you're on.
@@ -321,7 +313,7 @@ export function AiChatWidget({ userName = "", page, pageName, clientId, avatar, 
     </div>}
     {toast && !open && <div className="ai-chat-toast" role="status"><button type="button" className="ai-chat-toast-x" aria-label="Dismiss" onClick={() => setToast(null)}><X size={14} /></button><p>{toast.text}</p><button type="button" className="ai-chat-toast-mute" onClick={() => setAlertsOff(true)}>Mute</button>{toast.action && <button type="button" className="primary-button" onClick={() => { const run = toast.action!.run; setToast(null); run(); }}>{toast.action.label}</button>}</div>}
     {open && <section className="ai-chat-panel" aria-label="AI assistant">
-      <header><span className="ai-chat-head-bot">{avatar}</span><div className="ai-emp-wrap"><button type="button" className="ai-emp-trigger" aria-haspopup="listbox" aria-expanded={pickerOpen} onClick={() => setPickerOpen((v) => !v)} title="Choose an AI employee"><b>{current.icon} {current.name}</b><span aria-hidden="true">▾</span></button><small>On {label}</small>{pickerOpen && <div className="ai-emp-menu" role="listbox">{EMPLOYEES.map((item) => <button type="button" role="option" aria-selected={item.id === employee} key={item.id || "assistant"} className={item.id === employee ? "is-on" : ""} onClick={() => void chooseEmployee(item.id)}><span className="ai-emp-ico">{item.icon}</span><span><b>{item.name}</b><small>{item.hint}</small></span></button>)}</div>}</div><button type="button" className={`ai-chat-icon${alertsOff ? " is-off" : ""}`} title={alertsOff ? "Notifications off — click to turn on" : "Turn notifications off"} aria-label={alertsOff ? "Turn notifications on" : "Turn notifications off"} aria-pressed={alertsOff} onClick={() => setAlertsOff(!alertsOff)}>{alertsOff ? <BellOff size={16} /> : <Bell size={16} />}</button><button type="button" className="ai-chat-icon" title="Hide assistant" aria-label="Hide assistant" onClick={hideBot}><EyeOff size={16} /></button><button type="button" className="ai-chat-icon" title="Raise a support ticket" aria-label="Raise a support ticket" onClick={openTicket}><LifeBuoy size={17} /></button>{TOURS[page] && <button type="button" className="ai-chat-icon" title={`Tour ${label}`} aria-label={`Tour ${label}`} onClick={() => startTour(page)}><Compass size={17} /></button>}<button type="button" className="ai-chat-icon" aria-label="Close" onClick={() => setOpen(false)}><X size={17} /></button></header>
+      <header><span className="ai-chat-head-bot">{avatar}</span><div className="ai-emp-wrap"><button type="button" className="ai-emp-trigger" aria-haspopup="listbox" aria-expanded={pickerOpen} onClick={() => setPickerOpen((v) => !v)} title="Choose an AI employee"><b>{current.icon} {current.name}</b><span aria-hidden="true"><ChevronDown size={12} /></span></button><small>On {label}</small>{pickerOpen && <div className="ai-emp-menu" role="listbox">{EMPLOYEES.map((item) => <button type="button" role="option" aria-selected={item.id === employee} key={item.id || "assistant"} className={item.id === employee ? "is-on" : ""} onClick={() => void chooseEmployee(item.id)}><span className="ai-emp-ico">{item.icon}</span><span><b>{item.name}</b><small>{item.hint}</small></span></button>)}</div>}</div><button type="button" className={`ai-chat-icon${alertsOff ? " is-off" : ""}`} title={alertsOff ? "Notifications off — click to turn on" : "Turn notifications off"} aria-label={alertsOff ? "Turn notifications on" : "Turn notifications off"} aria-pressed={alertsOff} onClick={() => setAlertsOff(!alertsOff)}>{alertsOff ? <BellOff size={16} /> : <Bell size={16} />}</button><button type="button" className="ai-chat-icon" title="Hide assistant" aria-label="Hide assistant" onClick={hideBot}><EyeOff size={16} /></button><button type="button" className="ai-chat-icon" title="Raise a support ticket" aria-label="Raise a support ticket" onClick={openTicket}><LifeBuoy size={17} /></button>{TOURS[page] && <button type="button" className="ai-chat-icon" title={`Tour ${label}`} aria-label={`Tour ${label}`} onClick={() => startTour(page)}><Compass size={17} /></button>}<button type="button" className="ai-chat-icon" aria-label="Close" onClick={() => setOpen(false)}><X size={17} /></button></header>
       <div className="ai-chat-list" ref={listRef}>{messages.map((message, index) => <div key={index} className={`ai-chat-msg ${message.from}`}><p>{message.text}</p>{message.rows && message.rows.length > 0 && <div className="ai-emp-rows">{message.rows.map((row) => <div key={row.label} className={`ai-emp-row ${row.tone || ""}`}><span>{row.label}</span><b>{row.value}</b></div>)}</div>}{message.actions && message.actions.length > 0 && <div className="ai-chat-actions">{message.actions.map((action) => <button type="button" key={action.label} onClick={action.run}>{action.label}</button>)}</div>}</div>)}{busy && <div className="ai-chat-msg bot typing"><p><i /><i /><i /></p></div>}</div>
       {ticket && <form className="ai-chat-ticket" onSubmit={(event) => { event.preventDefault(); void sendTicket(); }}>
         <b><LifeBuoy size={15} /> New support ticket</b>
@@ -337,4 +329,17 @@ export function AiChatWidget({ userName = "", page, pageName, clientId, avatar, 
     {!hiddenBot && !open && <button type="button" className="ai-chat-hide" aria-label="Hide AI assistant" title="Hide assistant" onClick={hideBot}><EyeOff size={12} /></button>}
     {hiddenBot && <button type="button" className="ai-chat-peek" aria-label="Show AI assistant" title="Show AI assistant" onClick={showBot}><span className="ai-chat-eyes"><span className="ai-eyes-icon" aria-hidden="true"><span className="ai-eyes-antenna" /><span className="ai-eyes-face"><i /><i /></span></span></span></button>}
   </div>;
+}
+
+/** Varied hello: by name most of the time, sometimes just the time of day; never the same twice in a row. */
+function greeting(userName: string) {
+  const h = new Date().getHours();
+  const name = (userName || "").trim().split(/\s+/)[0] || "";
+  const part = h < 12 ? "Morning" : h < 18 ? "Afternoon" : "Evening";
+  const named = name ? [`Hey ${name},`, `${part} ${name},`, `Hi ${name},`, `${name},`, `Good to see you ${name},`, `Right ${name},`] : [];
+  const general = [`${part},`, "Hey,", "Hi there,", "Quick one,", "Hello,"];
+  const pool = Math.random() < 0.75 && named.length ? named : general;
+  let hello = pool[Math.floor(Math.random() * pool.length)];
+  try { const prev = window.sessionStorage.getItem("f2b-ai-hello"); if (hello === prev) hello = pool[(pool.indexOf(hello) + 1) % pool.length]; window.sessionStorage.setItem("f2b-ai-hello", hello); } catch { /* ignore */ }
+  return hello;
 }

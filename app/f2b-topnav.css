@@ -2624,6 +2624,13 @@ html body .ai-chat-panel > header .ai-emp-trigger:hover { background: rgba(255,2
 html body .ai-chat-panel > header .ai-emp-trigger b { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: 13.5px; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 html body .ai-chat-panel > header .ai-emp-trigger > span { flex: none; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: rgba(255,255,255,.3); font-size: 10px; line-height: 1; }
 html body .ai-chat-panel > header .ai-emp-wrap > small { padding-left: 12px; font-size: 11px; opacity: .85; white-space: nowrap; }
+/* Header: the AI employee pill shrinks (ellipsis) instead of running over the icon buttons. */
+html body .ai-chat-panel > header { gap: 8px !important; }
+html body .ai-chat-panel > header > .ai-emp-wrap { flex: 1 1 auto; min-width: 0; grid-template-columns: minmax(0, 1fr); overflow: visible; }
+html body .ai-chat-panel > header .ai-emp-trigger { min-width: 0; justify-self: start; overflow: hidden; }
+html body .ai-chat-panel > header .ai-emp-wrap > small { overflow: hidden; text-overflow: ellipsis; }
+html body .ai-chat-panel > header .ai-chat-icon { width: 30px !important; height: 30px !important; flex: 0 0 30px !important; }
+html body .ai-chat-panel > header .ai-emp-trigger > span svg { stroke: #fff !important; }
 
 /* Reports → Keywords: find → group → report, in the report card design */
 html body .app-shell .krb { display: grid; gap: 12px; margin: 4px 0 6px; }
