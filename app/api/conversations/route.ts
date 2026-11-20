@@ -13,6 +13,31 @@ import { metaSendMode } from "@/lib/conversations/meta-rules";
 
 export const dynamic = "force-dynamic";
 
+/** Ways to reply to this customer (GHL-style channel picker): this chat's channel plus WhatsApp / SMS / email when we have their number or email. */
+type Route = { channel: string; to: string; ok: boolean; why?: string };
+async function contactDetails(ownerId: string, t: { channel: string; contact: string; client_id: string }) {
+  const phoneLike = t.channel === "sms" || t.channel === "whatsapp";
+  let phone = phoneLike ? t.contact : "", email = t.channel === "email" ? t.contact : "";
+  const db = env.DB!;
+  const row = phone ? await db.prepare("SELECT email, phone FROM crm_contacts WHERE owner_id=?1 AND phone=?2 ORDER BY updated_at DESC LIMIT 1").bind(ownerId, phone).first<{ email: string; phone: string }>().catch(() => null)
+    : email ? await db.prepare("SELECT email, phone FROM crm_contacts WHERE owner_id=?1 AND lower(email)=lower(?2) ORDER BY updated_at DESC LIMIT 1").bind(ownerId, email).first<{ email: string; phone: string }>().catch(() => null)
+    : await db.prepare("SELECT email, phone FROM crm_contacts WHERE owner_id=?1 AND COALESCE(client_id,'')=?3 AND notes LIKE ?2 LIMIT 1").bind(ownerId, `% id: ${t.contact}%`, t.client_id || "").first<{ email: string; phone: string }>().catch(() => null);
+  if (!phone && row?.phone && /^\+?\d{7,15}$/.test(String(row.phone).replace(/\s/g, ""))) phone = e164(row.phone);
+  if (!email && row?.email && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(row.email)) email = row.email.trim();
+  return { phone, email };
+}
+async function replyRoutes(ownerId: string, t: { channel: string; contact: string; client_id: string }, settings: Awaited<ReturnType<typeof loadSettings>>["settings"]): Promise<Route[]> {
+  const { phone, email } = await contactDetails(ownerId, t);
+  const twilio = settings.hasToken && Boolean(settings.accountSid);
+  const num = (ch: "sms" | "whatsapp") => settings.numbers.find((n) => n.channel === ch && n.clientId === (t.client_id || ""));
+  const out: Route[] = [];
+  if (t.channel === "messenger" || t.channel === "instagram") out.push({ channel: t.channel, to: "", ok: true });
+  out.push({ channel: "whatsapp", to: phone, ok: Boolean(phone && twilio && num("whatsapp")), why: !phone ? "No phone number on file" : !num("whatsapp") ? "No WhatsApp number for this account" : undefined });
+  out.push({ channel: "sms", to: phone, ok: Boolean(phone && twilio && num("sms")), why: !phone ? "No phone number on file" : !num("sms") ? "No SMS number for this account" : undefined });
+  out.push({ channel: "email", to: email, ok: Boolean(email && env.RESEND_API_KEY && env.TASK_NOTIFICATION_FROM), why: !email ? "No email on file" : !env.RESEND_API_KEY ? "Email sending isn't set up" : undefined });
+  return out;
+}
+
 export async function GET(request: Request) {
   const auth = await authorizeAdminOrSubAccount("open Conversations", "Conversations");
   if (auth.error) return auth.error;
@@ -37,7 +62,7 @@ export async function GET(request: Request) {
       if (!thread || (allowed && !allowed.includes(String((thread as any).client_id || "")))) return respond({ error: "That conversation could not be found." }, 404);
       const messages = (await env.DB!.prepare("SELECT id, direction, sender, body, error, status, created_at FROM conv_messages WHERE thread_id=?1 ORDER BY created_at ASC LIMIT 300").bind(id).all()).results || [];
       await env.DB!.prepare("UPDATE conv_threads SET unread=0 WHERE id=?1").bind(id).run();
-      return respond({ thread: { ...thread, unread: 0 }, messages });
+      return respond({ thread: { ...thread, unread: 0 }, messages, routes: await replyRoutes(auth.ownerId, thread as any, settings) });
     }
     const where = scope === "agency" ? "owner_id=?1" : "owner_id=?1 AND client_id=?2";
     const stmt = env.DB!.prepare(`SELECT * FROM conv_threads WHERE ${where} ORDER BY last_at DESC LIMIT 200`);
@@ -160,6 +185,25 @@ export async function POST(request: Request) {
       const history = ((await env.DB!.prepare("SELECT sender, body FROM conv_messages WHERE thread_id=?1 AND status<>'held' ORDER BY created_at DESC LIMIT 12").bind(id).all<{ sender: string; body: string }>()).results || []).reverse();
       const client = await env.DB!.prepare("SELECT json_extract(value,'$.name') AS name FROM workspace_documents, json_each(data,'$.clients') WHERE id='f2b-agency' AND json_extract(value,'$.id')=?1").bind(thread.client_id || "").first<{ name: string }>().catch(() => null);
       return respond({ replies: await suggestReplies(auth.ownerId, { settings, clientId: thread.client_id || "", clientName: client?.name || "", channel: thread.channel, history }) });
+    }
+    if (action === "route") {
+      // Reply on another channel: find or open this customer's chat on that channel and return it.
+      const want = String(b.channel || "");
+      const { settings } = await loadSettings(auth.ownerId);
+      const route = (await replyRoutes(auth.ownerId, thread, settings)).find((r) => r.channel === want);
+      if (!route) return respond({ error: "That channel isn't available." }, 400);
+      if (!route.ok) return respond({ error: route.why || "That channel isn't available for this customer." }, 400);
+      if (want === thread.channel) return respond({ id: thread.id });
+      if (want === "email") {
+        const db = env.DB!, now = new Date().toISOString();
+        let t2 = await db.prepare("SELECT id FROM conv_threads WHERE owner_id=?1 AND channel='email' AND our_number='email' AND contact=?2").bind(auth.ownerId, route.to.toLowerCase()).first<{ id: string }>();
+        if (!t2) { const nid = crypto.randomUUID(); await db.prepare("INSERT INTO conv_threads (id, owner_id, client_id, channel, our_number, contact, contact_name, bot_on, status, unread, last_at, last_preview, created_at) VALUES (?1,?2,?3,'email','email',?4,?5,0,'open',0,?6,'',?6)").bind(nid, auth.ownerId, thread.client_id || "", route.to.toLowerCase(), String(thread.contact_name || "").slice(0, 80), now).run(); t2 = { id: nid }; }
+        return respond({ id: t2.id });
+      }
+      const from = settings.numbers.find((n) => n.channel === want && n.clientId === (thread.client_id || ""));
+      if (!from) return respond({ error: "No number for that channel on this account." }, 400);
+      const t2 = await upsertThread(auth.ownerId, { channel: want as "sms" | "whatsapp", ourNumber: from.number, contact: route.to, contactName: String(thread.contact_name || ""), clientId: thread.client_id || "" });
+      return respond({ id: t2.id, windowOpen: want !== "whatsapp" || windowState(t2.last_in_at).open });
     }
     if (action === "assign") {
       const to = String(b.staffId || "").slice(0, 100);

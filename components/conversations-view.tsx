@@ -6,7 +6,7 @@ import { useSampleData } from "@/hooks/use-sample-data";
 import { ChannelIcon, CHANNELS, channelLabel } from "./channel-icon";
 import { metaSendMode } from "@/lib/conversations/meta-rules";
 import { uploadToMedia, type UploadedMedia } from "@/lib/upload-media";
-import { CalendarDays, CalendarPlus, LayoutGrid, Paperclip, Receipt, X } from "lucide-react";
+import { CalendarDays, CalendarPlus, ChevronDown, LayoutGrid, Paperclip, Receipt, SendHorizontal, Sparkles, X } from "lucide-react";
 import { renderTemplate, windowState, type WaTemplate } from "@/lib/conversations/whatsapp";
 const QuickInvoice = lazy(() => import("./invoicing-view").then((m) => ({ default: m.QuickInvoice })));
 const QuickBook = lazy(() => import("./scheduling-view").then((m) => ({ default: m.QuickBook })));
@@ -76,6 +76,9 @@ export function ConversationsView({ scopeClientId, clients, staff = [], currentS
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [routes, setRoutes] = useState<Route[]>([]);
+  const [replyVia, setReplyVia] = useState("");
+  useEffect(() => { const open = () => setSettingsOpen(true); window.addEventListener("f2b-open-conv-settings", open); return () => window.removeEventListener("f2b-open-conv-settings", open); }, []);
   const [booking, setBooking] = useState<null | { name: string; phone: string; email: string; images: string[]; notes: string }>(null);
   const [zoom, setZoom] = useState("");
   const [notice, setNotice] = useState("");
@@ -87,7 +90,7 @@ export function ConversationsView({ scopeClientId, clients, staff = [], currentS
   const gridRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     // Fit to the space above the bottom tab bar (on phones the nav floats at the bottom), so the reply box is always visible.
-    const fit = () => { const el = gridRef.current; if (!el) return; const vh = window.visualViewport?.height || window.innerHeight; const top = el.getBoundingClientRect().top; const bars = [...document.querySelectorAll<HTMLElement>(".tn-nav, .f2b-mobile-tabs, .tn-mobile-footer")].map((b) => b.getBoundingClientRect()).filter((r) => r.height > 0 && r.top > vh / 2 && r.top < vh); const bottom = bars.length ? Math.min(...bars.map((r) => r.top)) - 8 : vh - 12; const h = Math.max(260, Math.round(bottom - top)); el.style.setProperty("--cv-fit-h", `${h}px`); el.style.height = `${h}px`; };
+    const fit = () => { const el = gridRef.current; if (!el) return; const vh = window.visualViewport?.height || window.innerHeight; const top = el.getBoundingClientRect().top; const bars = [...document.querySelectorAll<HTMLElement>(".tn-nav, .f2b-mobile-tabs, .tn-mobile-footer")].map((b) => b.getBoundingClientRect()).filter((r) => r.height > 0 && r.top > vh / 2 && r.top < vh); const bottom = bars.length ? Math.min(...bars.map((r) => r.top)) - 8 : vh - 12; const h = Math.max(260, Math.round(bottom - top)); el.style.setProperty("--cv-fit-h", `${h}px`); el.style.height = `${h}px`; const root = document.documentElement; root.style.setProperty("--cv-bottom", `${Math.max(8, Math.round(vh - bottom))}px`); const bar = document.querySelector<HTMLElement>(".tn-bar"); const br = bar?.getBoundingClientRect(); if (br && br.height > 0 && br.top < vh / 2) root.style.setProperty("--cv-top", `${Math.round(br.bottom)}px`); };
     fit(); const t = window.setTimeout(fit, 300);
     window.addEventListener("resize", fit); window.visualViewport?.addEventListener("resize", fit);
     return () => { window.clearTimeout(t); window.removeEventListener("resize", fit); window.visualViewport?.removeEventListener("resize", fit); };
@@ -108,7 +111,7 @@ export function ConversationsView({ scopeClientId, clients, staff = [], currentS
   }, [scopeClientId]);
   const loadThread = useCallback(async (id: string) => {
     if (id.startsWith("sample-thread-")) return;
-    try { const r = await call<{ thread: Thread; messages: Msg[] }>(`/api/conversations?view=thread&id=${encodeURIComponent(id)}`); setActive(r.thread); setMessages(r.messages); } catch (e) { setError(e instanceof Error ? e.message : "Could not open that conversation."); }
+    try { const r = await call<{ thread: Thread; messages: Msg[]; routes?: Route[] }>(`/api/conversations?view=thread&id=${encodeURIComponent(id)}`); setActive(r.thread); setMessages(r.messages); setRoutes(r.routes || []); } catch (e) { setError(e instanceof Error ? e.message : "Could not open that conversation."); }
   }, []);
   useEffect(() => { setLoading(true); setActiveId(""); setActive(null); void loadThreads(); }, [loadThreads]);
   useEffect(() => { const t = setInterval(() => { if (document.visibilityState === "visible") { void loadThreads(); if (activeId) void loadThread(activeId); } }, 7000); return () => clearInterval(t); }, [loadThreads, loadThread, activeId]);
@@ -134,7 +137,8 @@ export function ConversationsView({ scopeClientId, clients, staff = [], currentS
   }, [wantSuggest, active?.id, lastIn?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const [custom, setCustom] = useState<null | { name: string; minutes: number; who: string; busy: boolean }>(null);
   const [invoiceFor, setInvoiceFor] = useState<null | { clientId: string; name: string; email: string }>(null);
-  useEffect(() => { setFiles([]); setLinksOpen(false); setCustom(null); setLinks(null); }, [activeId]);
+  useEffect(() => { setFiles([]); setLinksOpen(false); setCustom(null); setLinks(null); setReplyVia(""); setRoutes([]); }, [activeId]);
+  useEffect(() => { if (active && !replyVia) setReplyVia(active.channel); }, [active?.id, active?.channel]); // eslint-disable-line react-hooks/exhaustive-deps
   const addFiles = async (list: FileList | null) => {
     if (!list?.length || !active) return; setUploading(true); setError("");
     try { const up: UploadedMedia[] = []; for (const f of [...list].slice(0, 5 - files.length)) up.push(await uploadToMedia(f, active.client_id || "agency", "Conversation attachments")); setFiles((x) => [...x, ...up].slice(0, 5)); }
@@ -161,22 +165,39 @@ export function ConversationsView({ scopeClientId, clients, staff = [], currentS
     } catch (e) { setError(e instanceof Error ? e.message : "Couldn't create the booking link."); setCustom((c) => c && { ...c, busy: false }); }
   };
   const insertText = (line: string) => setText((t) => (t.trim() ? `${t.trim()}\n${line}` : line));
-  const send = async () => { const body = text.trim(); if ((!body && !files.length) || !active) return; setText(""); if (active.channel === "email") { const last = [...messages].reverse().find((m) => /^Subject: /m.test(m.body)); const prev = last ? ((last.body.match(/^Subject: (.*)$/m) || [])[1] || "") : ""; await act({ action: "send", id: active.id, body, media: files, staffId: currentStaffId, subject: subject.trim() || (prev ? (prev.startsWith("Re:") ? prev : `Re: ${prev}`) : "") }); setSubject(""); setFiles([]); return; } await act({ action: "send", id: active.id, body, media: files }); setFiles([]); };
+  const send = async () => {
+    const body = text.trim(); if ((!body && !files.length) || !active) return;
+    const via = replyVia || active.channel;
+    if (via !== active.channel && !active.id.startsWith("sample-")) {
+      // Reply on another channel (e.g. email a WhatsApp customer): open that chat, send there, stay here.
+      setBusy(true); setError("");
+      try {
+        const r = await call<{ id: string; windowOpen?: boolean }>("/api/conversations", { action: "route", id: active.id, channel: via });
+        if (r.windowOpen === false) { setBusy(false); setActiveId(r.id); setNotice("Their WhatsApp window is closed, so the first message must be an approved template. Opened their WhatsApp chat."); return; }
+        await call("/api/conversations", { action: "send", id: r.id, body, media: files, staffId: currentStaffId, subject: via === "email" ? (subject.trim() || "Re: your enquiry") : undefined });
+        setText(""); setFiles([]); setSubject(""); setNotice(`Sent by ${channelLabel(via)}.`); await loadThreads();
+      } catch (e) { setError(e instanceof Error ? e.message : "Could not send."); } finally { setBusy(false); }
+      return;
+    }
+    setText("");
+    if (active.channel === "email") { const last = [...messages].reverse().find((m) => /^Subject: /m.test(m.body)); const prev = last ? ((last.body.match(/^Subject: (.*)$/m) || [])[1] || "") : ""; await act({ action: "send", id: active.id, body, media: files, staffId: currentStaffId, subject: subject.trim() || (prev ? (prev.startsWith("Re:") ? prev : `Re: ${prev}`) : "") }); setSubject(""); setFiles([]); return; }
+    await act({ action: "send", id: active.id, body, media: files }); setFiles([]);
+  };
   const draft = async () => { if (!active) return; setBusy(true); setError(""); try { const r = await call<{ draft: string }>("/api/conversations", { action: "draft", id: active.id }); setText(r.draft); } catch (e) { setError(e instanceof Error ? e.message : "No draft."); } finally { setBusy(false); } };
 
   // Emails the system sends (lead alerts, invoices, task emails…) live under Notifications, not mixed into live chats.
   const allThreads = demo ? [...demo.threads, ...threads] : threads;
-  const byStatus = allThreads.filter((t) => filter === "notifications" ? t.channel === "email" : filter === "all" ? t.status !== "closed" && t.channel !== "email" : filter === "unread" ? t.unread > 0 : t.status === "handoff");
+  const byStatus = channelFilter === "email" ? allThreads.filter((t) => t.channel === "email") : allThreads.filter((t) => filter === "notifications" ? t.channel === "email" : filter === "all" ? t.status !== "closed" && t.channel !== "email" : filter === "unread" ? t.unread > 0 : t.status === "handoff");
   const me = currentStaffId;
   const shown = byStatus.filter((t) => (channelFilter === "all" || t.channel === channelFilter) && (staffFilter === "all" || (staffFilter === "unassigned" ? !t.assigned_to : staffFilter === "me" ? t.assigned_to === me : t.assigned_to === staffFilter)));
-  const channelCount = (key: string) => byStatus.filter((t) => t.channel === key).length;
-  const presentChannels = CHANNELS.filter((c) => c.key !== "email" || filter === "notifications").filter((c) => allThreads.some((t) => t.channel === c.key) || c.key === "whatsapp" || c.key === "instagram" || c.key === "messenger");
+  const channelCount = (key: string) => key === "email" ? allThreads.filter((t) => t.channel === "email" && t.unread > 0).length : byStatus.filter((t) => t.channel === key).length;
+  const presentChannels = CHANNELS.filter((c) => allThreads.some((t) => t.channel === c.key) || c.key === "whatsapp" || c.key === "instagram" || c.key === "messenger" || c.key === "email");
   const notes = allThreads.filter((t) => t.channel === "email").length;
   const unread = allThreads.reduce((n, t) => n + (t.unread > 0 ? 1 : 0), 0);
 
   return <section className="cv" aria-label="Conversations">
     <header className="cv-head"><div><p className="eyebrow">💬 CONVERSATIONS{scopeClientId ? ` · ${clientName(scopeClientId).toUpperCase()}` : ""}</p><h1>Customer conversations</h1><p>WhatsApp, Instagram, Facebook, SMS and email, in one inbox.</p></div>
-      <div className="cv-head-actions">{waNumbers.length > 0 && <button type="button" className="primary-button" onClick={() => setNewChat(true)}>＋ New WhatsApp chat</button>}<button type="button" className="wa-open-button" onClick={() => setWaSetupOpen(true)}><ChannelIcon channel="whatsapp" size={16} /> WhatsApp setup</button><button type="button" className="secondary-button" onClick={() => setSettingsOpen(true)}>⚙️ Conversation settings</button></div></header>
+      <div className="cv-head-actions">{waNumbers.length > 0 && <button type="button" className="primary-button" onClick={() => setNewChat(true)}>＋ New WhatsApp chat</button>}</div></header>
     {error && <div className="cv-error" role="alert">{error}</div>}
     {notice && <div className="cv-notice" role="status">{notice}</div>}
     {loading ? <div className="empty-state" role="status">Loading conversations…</div> : <>{!configured && <div className="cv-banner">💬 Emails the system sends show here already. To also text and WhatsApp customers, <button type="button" className="text-button" onClick={() => setWaSetupOpen(true)}>set up WhatsApp</button>.</div>}
@@ -195,25 +216,31 @@ export function ConversationsView({ scopeClientId, clients, staff = [], currentS
           {active.channel !== "email" && !active.id.startsWith("sample-") && <label className="cv-assign" title="Who's handling this chat"><span>Assigned</span><select value={active.assigned_to || ""} disabled={busy} onChange={(e) => void act({ action: "assign", id: active.id, staffId: e.target.value })}><option value="">Nobody</option>{people.map((p) => <option key={p.id} value={p.id}>{p.id === me ? `${p.name} (me)` : p.name}</option>)}</select></label>}
           {active.channel === "whatsapp" && (() => { const w = windowState(active.last_in_at); return <span className={`cv-window ${w.open ? "open" : "closed"}`} title="WhatsApp lets you reply freely for 24 hours after the customer's last message. After that, send an approved template.">{w.open ? `● Free replies · ${w.label}` : "○ 24-hour window closed · template needed"}</span>; })()}</div>
           {active.channel !== "email" && <div className="cv-chat-actions">
-            <button type="button" className="primary-button cv-book" onClick={() => { const pics = messages.filter((m) => m.direction === "in").flatMap((m) => photosIn(m.body)).reverse().slice(0, 3); const lastAsk = [...messages].reverse().find((m) => m.direction === "in" && m.body.replace(MEDIA_RE, "").trim().length > 8); setBooking({ name: active.contact_name || "", phone: active.channel === "sms" || active.channel === "whatsapp" ? active.contact : "", email: "", images: pics, notes: lastAsk ? `From ${channelLabel(active.channel)}: “${lastAsk.body.replace(MEDIA_RE, "").trim().slice(0, 300)}”` : "" }); }}>📅 Book</button><button type="button" className="secondary-button cv-invoice" onClick={() => setInvoiceFor({ clientId: active.client_id || scopeClientId || "", name: active.contact_name || "", email: active.channel === "email" ? active.contact : "" })}><Receipt size={15} /> Invoice</button>
-            {!active.id.startsWith("sample-") && (active.channel === "sms" || active.channel === "whatsapp") && <Suspense fallback={null}><AiCallButton clientId={active.client_id || ""} phone={active.contact} name={active.contact_name} channel={active.channel === "whatsapp" ? "whatsapp" : undefined} /></Suspense>}<label className={`cv-switch ${active.bot_on ? "on" : ""}`} title="When on, the AI bot answers new messages"><input type="checkbox" checked={!!active.bot_on} disabled={busy} onChange={(e) => void act({ action: "toggle-bot", id: active.id, on: e.target.checked })} /><span><AiEyesIcon /> Bot {active.bot_on ? "on" : "off"}</span></label>
+            
+            {!active.id.startsWith("sample-") && (active.channel === "sms" || active.channel === "whatsapp") && <Suspense fallback={null}><AiCallButton clientId={active.client_id || ""} phone={active.contact} name={active.contact_name} channel={active.channel === "whatsapp" ? "whatsapp" : undefined} /></Suspense>}
             {active.status !== "closed" ? <button type="button" className="secondary-button" disabled={busy} onClick={() => void act({ action: "status", id: active.id, status: "closed" })}>✓ Close</button> : <button type="button" className="secondary-button" disabled={busy} onClick={() => void act({ action: "status", id: active.id, status: "open" })}>Reopen</button>}</div>}</div>
         {active.status === "handoff" && <div className="cv-banner">🙋 The bot handed this one to you. Reply below, or switch the bot back on.</div>}
         <div className="cv-msgs">{active.channel === "email" ? messages.map((m) => { const subject = (m.body.match(/^Subject: (.*)$/m) || [])[1] || "(no subject)"; const body = m.body.replace(/^Subject: .*\n\n?/, ""); return <article className="cv-email" key={m.id}><header><h3>{subject}</h3><dl><div><dt>From</dt><dd>{emailFrom || "System sender"}{m.sender === "staff" ? " · sent by you" : " · automatic"}</dd></div><div><dt>To</dt><dd>{active.contact_name ? `${active.contact_name} <${active.contact}>` : active.contact}</dd></div><div><dt>Sent</dt><dd>{new Date(m.created_at).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</dd></div></dl></header><div className="cv-email-body">{body}</div>{m.error && <small className="cv-fail">Not delivered: {m.error}</small>}</article>; }) : messages.map((m) => m.status === "held" ? <HeldReply key={m.id} msg={m} busy={busy} onApprove={(body) => void act({ action: "held-approve", id: active.id, messageId: m.id, body })} onDiscard={() => void act({ action: "held-discard", id: active.id, messageId: m.id })} /> : <div key={m.id} className={`cv-msg ${m.direction === "in" ? "in" : "out"} ${m.sender}`}><div className={`cv-bubble${VOICE_RE.test(m.body) ? " cv-voice" : ""}`}>{m.body.replace(VOICE_RE, "").replace(MEDIA_RE, "").replace(/📷\s*$/gm, "").trim()}{photosIn(m.body).length > 0 && <span className="cv-photos">{photosIn(m.body).map((u) => <button key={u} type="button" className="cv-photo" onClick={() => setZoom(u)} aria-label="Open photo"><img src={u} alt="" loading="lazy" /></button>)}</span>}{VOICE_RE.test(m.body) && !m.id.startsWith("sample-") && <Suspense fallback={null}><VoiceNote callId={(m.body.match(VOICE_RE) || [])[1]} compact /></Suspense>}{m.error && <small className="cv-fail">Not delivered: {m.error}</small>}</div><small>{m.direction === "out" && m.status && <Ticks status={m.status} />}{VOICE_RE.test(m.body) ? <><AiEyesIcon /> AI phone agent</> : m.sender === "bot" && active.channel === "email" ? "Sent automatically" : m.sender === "bot" ? <><AiEyesIcon /> AI bot</> : m.sender === "staff" ? "You" : title(active)} · {new Date(m.created_at).toLocaleString("en-GB", { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}</small></div>)}<div ref={endRef} /></div>
-{active.channel === "email" ? <form className="cv-compose cv-email-compose" onSubmit={(e) => { e.preventDefault(); void send(); }}><input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject (leave empty to reply to the last email)" maxLength={200} /><textarea value={text} rows={4} maxLength={10000} placeholder={`Write an email to ${active.contact}…`} onChange={(e) => setText(e.target.value)} /><div><small className="cv-note">Sends from {emailFrom || "your system address"} to {active.contact}.</small><button type="submit" className="primary-button" disabled={busy || !text.trim()}>Send email</button></div></form> : active.channel === "whatsapp" && !windowState(active.last_in_at).open ? <TemplateComposer key={active.id} thread={active} clientName={clientName(active.client_id)} demo={active.id.startsWith("sample-")} onSent={async () => { await loadThreads(); await loadThread(active.id); }} /> : <>        <form className="cv-compose" onSubmit={(e) => { e.preventDefault(); void send(); }}>
-          <textarea value={text} rows={2} maxLength={1500} placeholder="Write a reply…" title="Enter to send, Shift+Enter for a new line" onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }} />
+{active.channel === "email" ? <form className="cv-compose cv-email-compose" onSubmit={(e) => { e.preventDefault(); void send(); }}><input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject (leave empty to reply to the last email)" maxLength={200} /><textarea value={text} rows={4} maxLength={10000} placeholder={`Write an email to ${active.contact}…`} onChange={(e) => setText(e.target.value)} /><div><small className="cv-note">Sends from {emailFrom || "your system address"} to {active.contact}.</small><button type="submit" className="primary-button" disabled={busy || !text.trim()}>Send email</button></div></form> : active.channel === "whatsapp" && !windowState(active.last_in_at).open ? <TemplateComposer key={active.id} thread={active} clientName={clientName(active.client_id)} demo={active.id.startsWith("sample-")} onSent={async () => { await loadThreads(); await loadThread(active.id); }} /> : <>        <form className="cv-compose cv-compose2" onSubmit={(e) => { e.preventDefault(); void send(); }}>
           {wantSuggest && (suggestions.loading || suggestions.list.length > 0) && <div className="cv-suggest" aria-label="Suggested replies"><span className="cv-suggest-label"><AiEyesIcon /> Suggested</span>{suggestions.loading ? <span className="cv-suggest-loading">Thinking of replies…</span> : suggestions.list.map((r, i) => <button key={i} type="button" title={r} onClick={() => setText(r)}>{r}</button>)}</div>}
           {files.length > 0 && <div className="cv-files">{files.map((f, i) => <span key={f.url} className="cv-file">{f.mime.startsWith("image/") ? <img src={f.url} alt="" /> : <Paperclip size={14} />}<small>{f.name}</small><button type="button" aria-label={`Remove ${f.name}`} onClick={() => setFiles((x) => x.filter((_, j) => j !== i))}><X size={12} /></button></span>)}</div>}
-          <div><span className="cv-tools"><button type="button" className="secondary-button cv-tool" title="Attach photos or files" aria-label="Attach photos or files" disabled={busy || uploading || files.length >= 5} onClick={() => fileRef.current?.click()}>{uploading ? "…" : <Paperclip size={16} />}</button><button type="button" className="secondary-button cv-tool" title="Send a booking link" aria-label="Send a booking link" disabled={busy} onClick={() => void openLinks()}><CalendarPlus size={16} /></button><input ref={fileRef} type="file" multiple hidden accept="image/*,video/*,audio/*,application/pdf,.doc,.docx,.xls,.xlsx" onChange={(e) => { void addFiles(e.target.files); e.target.value = ""; }} />
+          <div className="cv-toolrow">
+            <ChannelPicker routes={routes} current={replyVia} onPick={setReplyVia} />
+            <span className="cv-tools"><button type="button" className="cv-tool" title="Attach photos or files" aria-label="Attach photos or files" disabled={busy || uploading || files.length >= 5} onClick={() => fileRef.current?.click()}>{uploading ? "…" : <Paperclip size={16} />}</button><button type="button" className="cv-tool" title="Send a booking link" aria-label="Send a booking link" disabled={busy} onClick={() => void openLinks()}><CalendarPlus size={16} /></button><button type="button" className="cv-tool cv-tool-wide cv-book" title="Book an appointment" onClick={() => { const pics = messages.filter((m) => m.direction === "in").flatMap((m) => photosIn(m.body)).reverse().slice(0, 3); const lastAsk = [...messages].reverse().find((m) => m.direction === "in" && m.body.replace(MEDIA_RE, "").trim().length > 8); setBooking({ name: active.contact_name || "", phone: active.channel === "sms" || active.channel === "whatsapp" ? active.contact : "", email: "", images: pics, notes: lastAsk ? `From ${channelLabel(active.channel)}: “${lastAsk.body.replace(MEDIA_RE, "").trim().slice(0, 300)}”` : "" }); }}><CalendarDays size={16} /><span>Book</span></button><button type="button" className="cv-tool cv-tool-wide cv-invoice" title="Send an invoice" onClick={() => setInvoiceFor({ clientId: active.client_id || scopeClientId || "", name: active.contact_name || "", email: active.channel === "email" ? active.contact : "" })}><Receipt size={16} /><span>Invoice</span></button><label className={`cv-tool cv-tool-wide cv-botswitch ${active.bot_on ? "on" : ""}`} title="When on, the AI bot answers new messages"><input type="checkbox" checked={!!active.bot_on} disabled={busy} onChange={(e) => void act({ action: "toggle-bot", id: active.id, on: e.target.checked })} /><AiEyesIcon /><span>Bot {active.bot_on ? "on" : "off"}</span></label><button type="button" className="cv-tool" title="Draft a reply with AI" aria-label="Draft a reply with AI" disabled={busy} onClick={() => void draft()}><Sparkles size={16} /></button><input ref={fileRef} type="file" multiple hidden accept="image/*,video/*,audio/*,application/pdf,.doc,.docx,.xls,.xlsx" onChange={(e) => { void addFiles(e.target.files); e.target.value = ""; }} />
             {linksOpen && <div className="cv-links" role="menu"><b>Send a booking link</b>{!links ? <small>Loading…</small> : <>{links.pages.map((l) => <button key={l.url} type="button" role="menuitem" onClick={() => { insertText(`Book here: ${l.url}`); setLinksOpen(false); }}><span className="cv-links-ico page"><LayoutGrid size={15} /></span><span className="cv-links-name">{l.name}<small>Booking page · all services</small></span></button>)}{links.calendars.map((l) => <button key={l.url} type="button" role="menuitem" onClick={() => { insertText(`Book your ${l.name.toLowerCase()} here: ${l.url}`); setLinksOpen(false); }}><span className="cv-links-ico"><CalendarDays size={15} /></span><span className="cv-links-name">{l.name}<small>Calendar · {l.durationMin} min</small></span></button>)}{!links.pages.length && !links.calendars.length && !custom && <small>No booking calendars for this account yet.</small>}
               {links.canCreate && !custom && <button type="button" role="menuitem" className="cv-links-new" onClick={() => setCustom({ name: active.contact_name ? `Appointment for ${active.contact_name.split(" ")[0]}` : "Appointment", minutes: 30, who: "anyone", busy: false })}><span className="cv-links-ico new">＋</span><span className="cv-links-name">Create a custom link<small>Pick a length and who it's with</small></span></button>}
-              {custom && <form className="cv-links-form" onSubmit={(e) => { e.preventDefault(); void createCustom(); }}>
+              {custom && <div className="cv-links-form">
                 <label>Name<input value={custom.name} maxLength={120} autoFocus onChange={(e) => setCustom({ ...custom, name: e.target.value })} /></label>
                 <div className="cv-links-row"><label>Length<select value={custom.minutes} onChange={(e) => setCustom({ ...custom, minutes: Number(e.target.value) })}>{[15, 20, 30, 45, 60, 90, 120, 180, 240].map((m) => <option key={m} value={m}>{m < 60 ? `${m} min` : `${m / 60} hr${m > 60 ? "s" : ""}`}</option>)}</select></label>
                 <label>With<select value={custom.who} onChange={(e) => setCustom({ ...custom, who: e.target.value })}><option value="anyone">Anyone available</option>{(links.staff || []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label></div>
-                <div className="cv-links-row"><button type="button" className="secondary-button" onClick={() => setCustom(null)}>Back</button><button type="submit" className="primary-button" disabled={custom.busy}>{custom.busy ? "Creating…" : "Create & add link"}</button></div>
-              </form>}</>}</div>}</span>
-            <button type="button" className="secondary-button" disabled={busy} onClick={() => void draft()}>✨ Draft with AI</button><button type="submit" className="primary-button" disabled={busy || uploading || (!text.trim() && !files.length)}>Send</button></div>
+                <div className="cv-links-row"><button type="button" className="secondary-button" onClick={() => setCustom(null)}>Back</button><button type="button" className="primary-button" disabled={custom.busy} onClick={() => void createCustom()}>{custom.busy ? "Creating…" : "Create & add link"}</button></div>
+              </div>}</>}</div>}</span>
+          </div>
+          {replyVia === "email" && <input className="cv-subject" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Email subject" maxLength={200} />}
+          <div className="cv-writerow">
+            <textarea value={text} rows={1} maxLength={replyVia === "email" ? 10000 : 1500} placeholder={replyVia === "email" ? "Write an email…" : "Write a reply…"} title="Enter to send, Shift+Enter for a new line" onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && replyVia !== "email") { e.preventDefault(); void send(); } }} />
+            <button type="submit" className="primary-button cv-send" aria-label="Send" disabled={busy || uploading || (!text.trim() && !files.length)}><SendHorizontal size={18} /><span>Send</span></button>
+          </div>
         </form>
         <p className="cv-note">Sending a reply turns the bot off for this customer so you don’t talk over each other.</p></>}</>}
       </div>
@@ -223,7 +250,7 @@ export function ConversationsView({ scopeClientId, clients, staff = [], currentS
     {zoom && <div className="cv-zoom" role="dialog" aria-modal="true" onMouseDown={(e) => { if (e.target === e.currentTarget) setZoom(""); }}><button type="button" aria-label="Close" onClick={() => setZoom("")}>×</button><img src={zoom} alt="" /></div>}
     {newChat && <NewChat numbers={waNumbers} clients={clients} scopeClientId={scopeClientId} onClose={() => setNewChat(false)} onStarted={async (id) => { setNewChat(false); setFilter("all"); await loadThreads(); setActiveId(id); }} />}
     {waSetupOpen && <Suspense fallback={null}><WhatsAppSetup clients={clients} initialClientId={scopeClientId} onClose={() => { setWaSetupOpen(false); void loadThreads(); }} onLive={() => void loadThreads()} /></Suspense>}
-    {settingsOpen && <ConversationSettings clients={clients} onClose={() => { setSettingsOpen(false); void loadThreads(); }} />}
+    {settingsOpen && <ConversationSettings clients={clients} onOpenWhatsApp={() => { setSettingsOpen(false); setWaSetupOpen(true); }} onClose={() => { setSettingsOpen(false); void loadThreads(); }} />}
   </section>;
 }
 
@@ -300,7 +327,7 @@ function NewChat({ numbers, clients, scopeClientId, onClose, onStarted }: { numb
   </div></div>;
 }
 
-function ConversationSettings({ clients, onClose }: { clients: ClientLite[]; onClose: () => void }) {
+function ConversationSettings({ clients, onClose, onOpenWhatsApp }: { clients: ClientLite[]; onClose: () => void; onOpenWhatsApp?: () => void }) {
   const [s, setS] = useState<Settings | null>(null);
   const [token, setToken] = useState("");
   const [webhook, setWebhook] = useState("");
@@ -352,5 +379,18 @@ function HeldReply({ msg, busy, onApprove, onDiscard }: { msg: Msg; busy: boolea
       <div className="cv-held-acts"><button type="button" className="primary-button" disabled={busy || !text.trim()} onClick={() => onApprove(text)}>{edit ? "Send edited reply" : "Approve & send"}</button><button type="button" className="secondary-button" disabled={busy} onClick={() => setEdit((x) => !x)}>{edit ? "Cancel edit" : "Edit"}</button><button type="button" className="secondary-button" disabled={busy} onClick={onDiscard}>Discard</button></div>
     </div>
   </div>;
+}
+
+type Route = { channel: string; to: string; ok: boolean; why?: string };
+/** GHL-style channel picker beside the reply box: reply by this chat's channel, WhatsApp, SMS or email. */
+function ChannelPicker({ routes, current, onPick }: { routes: Route[]; current: string; onPick: (c: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const list = routes.length ? routes : [{ channel: current || "sms", to: "", ok: true }];
+  const has = list.some((r) => r.channel === current);
+  const all = has ? list : [{ channel: current, to: "", ok: true }, ...list];
+  return <span className="cv-chpick">
+    <button type="button" className="cv-tool cv-chpick-btn" aria-haspopup="menu" aria-expanded={open} title={`Reply by ${channelLabel(current)}`} onClick={() => setOpen((o) => !o)}><ChannelIcon channel={current} size={18} /><ChevronDown size={13} /></button>
+    {open && <><button type="button" className="cv-chpick-scrim" aria-label="Close" onClick={() => setOpen(false)} /><div className="cv-chpick-menu" role="menu"><b>Reply by</b>{all.map((r) => <button key={r.channel} type="button" role="menuitemradio" aria-checked={r.channel === current} disabled={!r.ok} className={r.channel === current ? "on" : ""} onClick={() => { onPick(r.channel); setOpen(false); }}><ChannelIcon channel={r.channel} size={18} /><span>{channelLabel(r.channel)}<small>{r.ok ? (r.to || "This chat") : r.why}</small></span>{r.channel === current && <em>✓</em>}</button>)}</div></>}
+  </span>;
 }
 
