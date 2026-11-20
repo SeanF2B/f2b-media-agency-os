@@ -315,7 +315,8 @@ const worker = {
 
     const incomingUrl = new URL(authenticatedRequest.url);
     const authIdentity = signedInEmail ? { email: signedInEmail, impersonatedBy: session?.impersonatedBy || null, viaSession: Boolean(session) } : null;
-    const authResponse = await auth.handleAuthRoute(request, env, incomingUrl, authIdentity);
+    // new Request(request, …) above took over the body stream, so read it from authenticatedRequest.
+    const authResponse = await auth.handleAuthRoute(authenticatedRequest, env, incomingUrl, authIdentity);
     if (authResponse) return withSecurityHeaders(authResponse, incomingUrl.pathname);
     // Sign-in gate: every outside request needs a signed-in user except the login pages and a few public files.
     // Service-binding calls from our other workers carry no request.cf and pass through as before.
