@@ -147,20 +147,20 @@ export function EmailMarketingView({ clientId, clientName, clientLogo, clientCol
   const shownId = stale ? loadedFor : clientId;
   const shown = names.current.get(shownId) || { name: clientName, style: baseStyle };
 
+  // Two categories, each with its own templates: Campaigns (Campaigns | Templates) and System emails (Inbox | Templates).
+  const section: "campaigns" | "system" | "automations" = mode === "automations" ? "automations" : mode === "system" || mode === "settings" ? "system" : "campaigns";
+  const sections: Array<[typeof section, string]> = [["campaigns", "Campaigns"], ["system", "System emails"], ...(automations ? [["automations", "Automations"]] as Array<[typeof section, string]> : [])];
   return <div className="em">
     <div className="ops-subbar em-subbar">
-      {automations ? <span className="ops-seg" role="tablist" aria-label="Email sections">{([["campaigns", "Campaigns"], ...(automations ? [["automations", "Automations"]] : [])] as Array<[typeof mode, string]>).map(([key, text]) => <button key={key} type="button" role="tab" aria-selected={mode === key} className={mode === key ? "active" : ""} onClick={() => setMode(key)}>{text}</button>)}</span> : <span />}
-      <button type="button" className={`secondary-button em-settings-btn${mode === "settings" || mode === "system" || mode === "builder" ? " on" : ""}`} onClick={() => setMode(mode === "settings" || mode === "system" || mode === "builder" ? "campaigns" : "settings")}>Email settings</button>
-      {data && !data.sending && (mode === "campaigns" || mode === "builder") && <span className="em-warn">Sending isn’t set up on the server yet (Resend). You can still build and save.</span>}
+      <span className="ops-seg" role="tablist" aria-label="Email sections">{sections.map(([key, text]) => <button key={key} type="button" role="tab" aria-selected={section === key} className={section === key ? "active" : ""} onClick={() => setMode(key)}>{text}</button>)}</span>
+      {section === "campaigns" && <span className="ops-seg em-inner-seg" role="tablist" aria-label="Campaign emails">{([["campaigns", "Campaigns"], ["builder", "Templates"]] as const).map(([key, text]) => <button key={key} type="button" role="tab" aria-selected={mode === key} className={mode === key ? "active" : ""} onClick={() => setMode(key)}>{text}</button>)}</span>}
+      {data && !data.sending && section === "campaigns" && <span className="em-warn">Sending isn’t set up on the server yet (Resend). You can still build and save.</span>}
     </div>
-    {error && <p className="ops-empty" role="alert">{error}</p>}
-    {mode === "automations" && automations}
-    {(mode === "settings" || mode === "system" || mode === "builder") && <div className="em-settings">
-      <div className="ops-seg" role="tablist" aria-label="Email settings">{([["settings", "System emails"], ["builder", "Saved emails"]] as const).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={(key === "settings" && (mode === "settings" || mode === "system")) || mode === key} className={(key === "settings" && (mode === "settings" || mode === "system")) || mode === key ? "active" : ""} onClick={() => setMode(key)}>{label}</button>)}</div>
-      {(mode === "settings" || mode === "system") && <SystemEmailsView />}
-    </div>}
-    {(mode === "campaigns" || mode === "builder") && !data && <div className="page-loading" role="status" aria-label="Loading email…"><i /></div>}
-    {(mode === "builder" || mode === "campaigns") && data && <div className={`em-pane${stale ? " em-stale" : ""}`} aria-busy={stale}>
+    {error && section === "campaigns" && <p className="ops-empty" role="alert">{error}</p>}
+    {section === "automations" && automations}
+    {section === "system" && <SystemEmailsView />}
+    {section === "campaigns" && !data && <div className="page-loading" role="status" aria-label="Loading email…"><i /></div>}
+    {section === "campaigns" && data && <div className={`em-pane${stale ? " em-stale" : ""}`} aria-busy={stale}>
       {mode === "builder" && <TemplatesPane key={shownId} clientId={shownId} clientName={shown.name} templates={data.templates} baseStyle={shown.style} me={data.me} onChanged={load} />}
       {mode === "campaigns" && <CampaignsPane key={shownId} clientId={shownId} clientName={shown.name} campaigns={data.campaigns} templates={data.templates} baseStyle={shown.style} me={data.me} sending={data.sending} onChanged={load} />}
     </div>}
@@ -174,9 +174,9 @@ function TemplatesPane({ clientId, clientName, templates, baseStyle, me, onChang
   const [note, setNote] = useState("");
   const flash = (text: string) => { setNote(text); window.setTimeout(() => setNote(""), 2500); };
   if (!current) return <div className="em-list">
-    <div className="ops-toolbar"><b className="em-title">Email templates · {clientName}</b><button type="button" className="primary-button" onClick={() => setCurrent(blank())}><Plus size={15} /> New email</button></div>
+    <div className="ops-toolbar"><b className="em-title">Campaign templates · {clientName}</b><button type="button" className="primary-button" onClick={() => setCurrent(blank())}><Plus size={15} /> New email</button></div>
     {!templates.length ? <div className="em-empty-card"><Mail size={28} aria-hidden="true" /><p>No saved emails yet. Build one with drag-and-drop blocks, or let AI write it for you.</p><button type="button" className="primary-button" onClick={() => setCurrent(blank())}><Sparkles size={15} /> Build your first email</button></div>
-      : <div className="em-grid">{templates.map((t) => <button key={t.id} type="button" className="em-tile" onClick={() => setCurrent(t)}><b>{t.name}</b><span>{t.subject || "No subject"}</span><small>{t.blocks.length} blocks · edited {new Date(t.updatedAt).toLocaleDateString("en-IE", { day: "numeric", month: "short" })}</small></button>)}</div>}
+      : <div className="em-grid">{templates.map((t) => <button key={t.id} type="button" className="em-tile" onClick={() => setCurrent(t)}><span className="em-thumb" aria-hidden="true"><iframe title="" tabIndex={-1} srcDoc={renderEmailHtml(t)} sandbox="" loading="lazy" /></span><b>{t.name}</b><span>{t.subject || "No subject"}</span><small>{t.blocks.length} blocks · edited {new Date(t.updatedAt).toLocaleDateString("en-IE", { day: "numeric", month: "short" })}</small></button>)}</div>}
   </div>;
   const save = async () => {
     let name = current.name;

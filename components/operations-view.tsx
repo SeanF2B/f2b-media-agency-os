@@ -126,6 +126,18 @@ export function OperationsView({ tasksView, clientsView, clients, tasks, tab: ra
   const [sitesTab, setSitesTab] = useState<SitesTab>("overview");
   const [formsView, setFormsView] = useState<"forms" | "submissions">("forms");
   const [emailStart, setEmailStart] = useState<"campaigns" | "automations" | "system">("campaigns");
+  // Automations list → a website form's rules: jump to that form's logic in Sites → Forms.
+  const [openFormId, setOpenFormId] = useState("");
+  useEffect(() => {
+    const onOpenForm = (event: Event) => {
+      const { clientId, formId } = (event as CustomEvent<{ clientId?: string; formId?: string }>).detail || {};
+      if (clientId) setToolClientId(clientId);
+      setSitesTab("forms"); setFormsView("forms"); setOpenFormId(formId || "");
+      if (tab !== "sites") onTab("sites");
+    };
+    window.addEventListener("f2b:ops-open-form", onOpenForm);
+    return () => window.removeEventListener("f2b:ops-open-form", onOpenForm);
+  }); // eslint-disable-line react-hooks/exhaustive-deps
   // Old links (e.g. "forms", "local", "automations") land on the right section inside the new tabs.
   useEffect(() => {
     if (!sub) return;
@@ -243,7 +255,7 @@ export function OperationsView({ tasksView, clientsView, clients, tasks, tab: ra
       {siteMode === "templates" && <SiteTemplatesPanel clients={clients} onEdit={(client) => onOpenWebsite(client)} />}
     </>}
     {tab === "sites" && sitesTab === "forms" && <div className="ops-forms-toggle">{seg(formsView, setFormsView, [["forms", "Forms"], ["submissions", "Submissions"]], "Forms view")}</div>}
-    {tab === "sites" && sitesTab === "forms" && formsView === "forms" && <SiteFormsPanel clients={clients.filter((client) => !/^agency$/i.test(client.name.trim()))} clientId={toolClientId && clients.some((c) => c.id === toolClientId) ? toolClientId : ""} onClient={setToolClientId} />}
+    {tab === "sites" && sitesTab === "forms" && formsView === "forms" && <SiteFormsPanel key={openFormId || "forms"} openFormId={openFormId} clients={clients.filter((client) => !/^agency$/i.test(client.name.trim()))} clientId={toolClientId && clients.some((c) => c.id === toolClientId) ? toolClientId : ""} onClient={setToolClientId} />}
     {tab === "sites" && sitesTab === "forms" && formsView === "submissions" && renderTool && <div className="ops-embed" key={`subs-${selected?.id || "all"}`}>{renderTool("submissions", selected?.id || "")}</div>}
     {tab === "sites" && sitesTab === "funnels" && renderTool && <div className="ops-embed ops-funnels" key={`funnels-${selected?.id || "all"}`}>{renderTool("funnels", selected?.id || "")}</div>}
     {tab === "sites" && sitesTab === "bio" && <div className="ops-embed" key={`bio-${selected?.id || "none"}`}><LinkBioPanel clients={clients} clientId={selected?.id || ""} /></div>}
