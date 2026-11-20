@@ -17,6 +17,9 @@ Always-on hijack and tamper watch for every domain in the F2B Cloudflare account
 | Registrar transfer lock off; expiry ≤ 30 days without auto-renew | Critical / warning |
 | Always HTTPS off, TLS < 1.2, SSL off/flexible, DNSSEC not active (hourly) | Warning |
 
+## Rule for every domain (current and future)
+Any domain added to the Cloudflare account is picked up automatically within the hour (zone list refresh) and, on its first check, gets **Always HTTPS on, minimum TLS 1.2 and DNSSEC on** applied automatically (logged as an info event in the panel). Weak settings that reappear later are re-fixed the same way. SSL mode and registrar lock are alerted on but never changed automatically. Opt out with Worker var `DOMAIN_GUARD_AUTO_SECURE=off`.
+
 ## Alerts
 - Telegram (existing F2B bot, send-only) for every critical and warning alert.
 - High-priority email to `SECURITY_ALERT_EMAIL` (Worker var) or the admin email in Settings for every critical alert (and warnings when Telegram isn't connected). Logged in system emails.

@@ -168,6 +168,37 @@ async function observe(token: string, zone: ZoneInfo, registrar: RegistrarInfo, 
   };
 }
 
+async function cfPatch(token: string, path: string, body: unknown): Promise<boolean> {
+  try {
+    const response = await fetch(`${CF_API}${path}`, { method: "PATCH", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(12_000) });
+    const payload = await response.json().catch(() => null) as { success?: boolean } | null;
+    return response.ok && Boolean(payload?.success);
+  } catch { return false; }
+}
+
+/**
+ * House rule: every domain in the account (including any added in future) runs with Always HTTPS,
+ * minimum TLS 1.2 and DNSSEC switched on. Safe to apply automatically (no origin or DNS-record changes).
+ * SSL mode and registrar lock are only alerted on, never changed, as those can be deliberate.
+ * Set the Worker var DOMAIN_GUARD_AUTO_SECURE=off to turn this off.
+ */
+async function autoSecure(token: string, zone: ZoneInfo, observation: Observation, missing: Set<string>): Promise<GuardFinding | null> {
+  if (String((env as unknown as Record<string, string | undefined>).DOMAIN_GUARD_AUTO_SECURE || "").toLowerCase() === "off") return null;
+  if (zone.status !== "active" || zone.paused) return null;
+  const fixed: string[] = [];
+  const s = observation.settings;
+  if (s?.always_use_https === "off") {
+    if (await cfPatch(token, `/zones/${zone.id}/settings/always_use_https`, { value: "on" })) { s.always_use_https = "on"; fixed.push("Always use HTTPS turned on"); } else missing.add("Zone Settings Edit");
+  }
+  if (s?.min_tls_version && Number(s.min_tls_version) < 1.2) {
+    if (await cfPatch(token, `/zones/${zone.id}/settings/min_tls_version`, { value: "1.2" })) { fixed.push(`Minimum TLS raised from ${s.min_tls_version} to 1.2`); s.min_tls_version = "1.2"; } else missing.add("Zone Settings Edit");
+  }
+  if (observation.dnssec === "disabled") {
+    if (await cfPatch(token, `/zones/${zone.id}/dnssec`, { status: "active" })) { observation.dnssec = "pending"; fixed.push("DNSSEC switched on (finishes once the DS record is at the registrar; automatic for Cloudflare-registered domains)"); } else missing.add("Zone DNSSEC Edit");
+  }
+  return fixed.length ? { severity: "info", key: `${zone.name}:auto-secured:${fixed.length}:${new Date().toISOString().slice(0, 10)}`, title: `${zone.name}: security settings applied automatically`, detail: fixed.join("\n") } : null;
+}
+
 /** Public NS must be the Cloudflare nameservers assigned to the zone; anything else = domain pointed away. */
 function nameServerFinding(observation: Observation): GuardFinding | null {
   const assigned = [...(observation.zone?.nameServers || [])].sort();
@@ -271,7 +302,9 @@ export async function processDomainGuard(now = new Date(), options: { limit?: nu
     try { baseline = state?.baseline_json ? JSON.parse(state.baseline_json) as Observation : null; } catch { baseline = null; }
     const observation = await observe(token, zone, registrar, missing, baseline, now);
     const failCount = observation.site?.ok ? 0 : (state?.fail_count || 0) + 1;
+    const secured = await autoSecure(token, zone, observation, missing);
     const findings = evaluate({ ...observation, failCount }, baseline, now);
+    if (secured) findings.push(secured);
     const nsFinding = nameServerFinding(observation);
     if (nsFinding) findings.push(nsFinding);
     toPush.push(...await recordFindings(zone.name, findings, now));
