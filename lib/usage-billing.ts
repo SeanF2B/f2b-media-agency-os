@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { addDays, cleanItems, createInvoice, ensureTables, loadSettings, totals, today } from "@/lib/invoicing/core";
-import { audit, billable, ensureUsageTables, loadBilling, markupFor } from "@/lib/usage-meter";
+import { audit, billable, ensureUsageTables, loadBilling, markupFor, serviceBilled } from "@/lib/usage-meter";
+import { SERVICES, serviceOf } from "@/lib/usage-services";
 
 // Monthly AI & SEO-data rebilling: on the 1st–3rd of each month, last month's unbilled usage for every client
 // becomes ONE line on that client's draft invoice (an existing draft is reused, otherwise a new draft is made).
@@ -24,33 +25,38 @@ export async function draftUsageInvoices(month: string, actor = "system") {
   const b = await loadBilling(db, ownerId);
   if (!b.settings.enabled) return { drafted: 0, skipped: "Rebilling is turned off." };
   const start = `${month}-01T00:00:00.000Z`, end = new Date(Date.UTC(+month.slice(0, 4), +month.slice(5, 7), 1)).toISOString();
-  const kinds = b.settings.includeSeoData ? ["ai", "seo_data"] : ["ai"];
-  const rows = (await db.prepare(`SELECT client_id, kind, COUNT(*) AS calls, SUM(cost_usd) AS cost FROM usage_log WHERE owner_id = ?1 AND created_at >= ?2 AND created_at < ?3 AND client_id <> '' AND invoice_id = '' AND kind IN (${kinds.map((_, i) => `?${i + 4}`).join(",")}) GROUP BY client_id, kind`).bind(ownerId, start, end, ...kinds).all<{ client_id: string; kind: string; calls: number; cost: number }>()).results || [];
-  const byClient = new Map<string, { ai: number; seo: number; calls: number }>();
-  for (const r of rows) { const g = byClient.get(r.client_id) || { ai: 0, seo: 0, calls: 0 }; if (r.kind === "ai") g.ai += Number(r.cost) || 0; else g.seo += Number(r.cost) || 0; g.calls += Number(r.calls) || 0; byClient.set(r.client_id, g); }
+  const kinds = SERVICES.map((d) => d.key).filter((k) => b.services.get(k)?.enabled !== false);
+  if (!kinds.length) return { drafted: 0, skipped: "Every service is switched off." };
+  const rows = (await db.prepare(`SELECT client_id, kind, COUNT(*) AS calls, SUM(input_tokens) AS units, SUM(cost_usd) AS cost FROM usage_log WHERE owner_id = ?1 AND created_at >= ?2 AND created_at < ?3 AND client_id <> '' AND invoice_id = '' AND kind IN (${kinds.map((_, i) => `?${i + 4}`).join(",")}) GROUP BY client_id, kind`).bind(ownerId, start, end, ...kinds).all<{ client_id: string; kind: string; calls: number; units: number; cost: number }>()).results || [];
+  const byClient = new Map<string, typeof rows>();
+  for (const r of rows) { if (!serviceBilled(b, r.client_id, r.kind)) continue; const g = byClient.get(r.client_id) || []; g.push(r); byClient.set(r.client_id, g); }
   let drafted = 0;
-  for (const [clientId, g] of byClient) {
+  for (const [clientId, group] of byClient) {
     const client = clients.find((c) => String(c.id) === clientId);
     if (!client || /^(inactive|archived)$/i.test(String(client.status || ""))) continue;
-    if (b.clients.get(clientId)?.enabled === false) continue;
-    const markup = markupFor(b, clientId);
-    const amount = billable(g.ai + g.seo, b.settings.usdRate, markup);
-    if (amount <= 0 || amount < b.settings.minCharge) continue;
-    const parts = [g.ai > 0 ? "AI" : "", g.seo > 0 ? "SEO data" : ""].filter(Boolean).join(" & ");
-    const item = { description: `${parts} usage · ${monthLabel(month)} (${g.calls} request${g.calls === 1 ? "" : "s"})`, qty: 1, unit: amount };
+    // One invoice line per service (e.g. "AI usage", "WhatsApp messages · 412 messages").
+    const items = group.map((g) => {
+      const def = serviceOf(g.kind), qty = def?.pricing === "unit" ? Number(g.units) || Number(g.calls) : Number(g.calls);
+      const amount = billable(Number(g.cost) || 0, b.settings.usdRate, markupFor(b, clientId, g.kind));
+      const count = def?.pricing === "unit" ? `${Math.round(qty * 100) / 100} ${def.unit}${qty === 1 ? "" : "s"}` : `${g.calls} request${g.calls === 1 ? "" : "s"}`;
+      return { kind: g.kind, amount, cost: Number(g.cost) || 0, calls: Number(g.calls), item: { description: `${def?.label || g.kind} · ${monthLabel(month)} (${count})`, qty: 1, unit: amount } };
+    }).filter((x) => x.amount > 0);
+    const total = items.reduce((t, x) => t + x.amount, 0);
+    if (!items.length || total < b.settings.minCharge) continue;
     const draft = await db.prepare("SELECT id, items, vat_rate FROM inv_invoices WHERE owner_id = ?1 AND client_id = ?2 AND status = 'draft' ORDER BY created_at DESC LIMIT 1").bind(ownerId, clientId).first<{ id: string; items: string; vat_rate: number }>();
     let invoiceId = "";
     if (draft) {
-      const items = cleanItems([...JSON.parse(draft.items || "[]"), item]); const t = totals(items, draft.vat_rate);
-      await db.prepare("UPDATE inv_invoices SET items = ?3, subtotal = ?4, vat = ?5, total = ?6 WHERE id = ?1 AND owner_id = ?2").bind(draft.id, ownerId, JSON.stringify(items), t.subtotal, t.vat, t.total).run();
+      const next = cleanItems([...JSON.parse(draft.items || "[]"), ...items.map((x) => x.item)]); const t = totals(next, draft.vat_rate);
+      await db.prepare("UPDATE inv_invoices SET items = ?3, subtotal = ?4, vat = ?5, total = ?6 WHERE id = ?1 AND owner_id = ?2").bind(draft.id, ownerId, JSON.stringify(next), t.subtotal, t.vat, t.total).run();
       invoiceId = draft.id;
     } else {
       const last = await db.prepare("SELECT vat_rate FROM inv_invoices WHERE owner_id = ?1 AND client_id = ?2 ORDER BY created_at DESC LIMIT 1").bind(ownerId, clientId).first<{ vat_rate: number }>();
       const s = await loadSettings(ownerId); const issue = today();
-      invoiceId = await createInvoice(ownerId, { clientId, clientName: String(client.company || client.name || ""), clientEmail: String(client.email || ""), issueDate: issue, dueDate: addDays(issue, s.paymentTermsDays), currency: String(client.currency || currency || "EUR"), items: [item], vatRate: Number(last?.vat_rate) || 0, notes: "AI & SEO data usage is billed at cost plus a service margin. A full usage report is available on request." });
+      invoiceId = await createInvoice(ownerId, { clientId, clientName: String(client.company || client.name || ""), clientEmail: String(client.email || ""), issueDate: issue, dueDate: addDays(issue, s.paymentTermsDays), currency: String(client.currency || currency || "EUR"), items: items.map((x) => x.item), vatRate: Number(last?.vat_rate) || 0, notes: "Usage (AI, messaging, calls, email and data) is billed at cost plus a service margin. A full usage report is available on request." });
     }
-    await db.prepare(`UPDATE usage_log SET invoice_id = ?4 WHERE owner_id = ?1 AND client_id = ?2 AND created_at >= ?3 AND created_at < ?5 AND invoice_id = '' AND kind IN (${kinds.map((_, i) => `?${i + 6}`).join(",")})`).bind(ownerId, clientId, start, invoiceId, end, ...kinds).run();
-    await audit(db, ownerId, "invoice-line-drafted", { month, invoiceId, amount, costUsd: Math.round((g.ai + g.seo) * 1e4) / 1e4, markupPct: markup, usdRate: b.settings.usdRate, calls: g.calls, reusedDraft: Boolean(draft) }, actor, clientId);
+    const billedKinds = items.map((x) => x.kind);
+    await db.prepare(`UPDATE usage_log SET invoice_id = ?4 WHERE owner_id = ?1 AND client_id = ?2 AND created_at >= ?3 AND created_at < ?5 AND invoice_id = '' AND kind IN (${billedKinds.map((_, i) => `?${i + 6}`).join(",")})`).bind(ownerId, clientId, start, invoiceId, end, ...billedKinds).run();
+    await audit(db, ownerId, "invoice-line-drafted", { month, invoiceId, amount: Math.round(total * 100) / 100, costUsd: Math.round(items.reduce((t, x) => t + x.cost, 0) * 1e4) / 1e4, markupPct: markupFor(b, clientId), usdRate: b.settings.usdRate, calls: items.reduce((t, x) => t + x.calls, 0), services: billedKinds, reusedDraft: Boolean(draft) }, actor, clientId);
     drafted++;
   }
   return { drafted };

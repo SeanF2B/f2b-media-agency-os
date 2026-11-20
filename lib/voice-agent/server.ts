@@ -1,3 +1,4 @@
+import { logUsageEvent } from "../usage-meter";
 // F2B Agency OS · AI phone agent: storage (D1), Twilio calls/numbers and posting calls into Conversations.
 import { env } from "cloudflare:workers";
 import { addMessage, getClientBot, loadSettings, saveClientBot, saveSettings, twilioCredentials, upsertThread, BLANK_BOT, type Channel } from "@/lib/conversations/core";
@@ -153,6 +154,12 @@ export async function updateCall(id: string, patch: Partial<Record<keyof CallRow
   const keys = Object.keys(patch).filter((k) => /^[a-z_]+$/.test(k));
   if (!keys.length) return;
   await db().prepare(`UPDATE voice_calls SET ${keys.map((k, i) => `${k}=?${i + 2}`).join(", ")} WHERE id=?1`).bind(id, ...keys.map((k) => (patch as any)[k])).run();
+  // Rebilling: call minutes (rounded up), one usage row per call, updated if the length changes.
+  const secs = Number(patch.duration_sec || 0);
+  if (secs > 0) {
+    const row = await db().prepare("SELECT client_id, direction FROM voice_calls WHERE id=?1").bind(id).first<{ client_id: string; direction: string }>().catch(() => null);
+    if (row) await logUsageEvent(db(), { id: `voice-${id}`, clientId: row.client_id, kind: "voice", units: Math.ceil(secs / 60), provider: "Twilio", feature: `Phone calls · ${row.direction}`, endpoint: "call" }).catch(() => undefined);
+  }
 }
 
 /** Looks up (or creates) the CRM contact for a phone number in this account. */

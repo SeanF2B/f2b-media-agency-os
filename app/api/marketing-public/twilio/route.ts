@@ -2,6 +2,7 @@
 // Every request is verified with Twilio's X-Twilio-Signature (HMAC-SHA1 with the saved Auth Token) before anything is stored.
 import { env } from "cloudflare:workers";
 import { detectMediaType, MEDIA_SCHEMA_SQL, newFileKey, publicMediaUrl } from "@/lib/media-library/core";
+import { logUsageEvent } from "@/lib/usage-meter";
 import { addMessage, botLinksFor, botReply, hasSchedulingLink, holdBotReply, leadToCrm, e164, findOwnerByNumber, loadSettings, twilioCredentials, upsertThread, verifyTwilio, type Channel } from "@/lib/conversations/core";
 
 export const dynamic = "force-dynamic";
@@ -55,6 +56,8 @@ export async function POST(request: Request) {
   const thread = await upsertThread(found.ownerId, { channel, ourNumber, contact, contactName: String(params.ProfileName || ""), clientId: found.config.clientId });
   const seen = await env.DB.prepare("SELECT COUNT(*) AS n FROM conv_messages WHERE thread_id=?1").bind(thread.id).first<{ n: number }>();
   await addMessage(found.ownerId, thread.id, { direction: "in", sender: "customer", body, sid });
+  // Rebilling: the message received is charged by Twilio (logged once per Twilio message id).
+  await logUsageEvent(env.DB, { clientId: found.config.clientId || "", kind: channel, units: channel === "sms" ? Math.max(1, Number(params.NumSegments) || 1) : 1, provider: "Twilio", feature: `Messages received · ${channel === "whatsapp" ? "WhatsApp" : "SMS"}`, endpoint: "inbound", id: sid ? `in-${sid}` : undefined }).catch(() => undefined);
   if (!seen?.n) await leadToCrm(found.ownerId, { clientId: found.config.clientId, channel, contact, name: String(params.ProfileName || ""), firstMessage: body });
   const { settings } = await loadSettings(found.ownerId);
   if (!settings.botEnabled || !thread.bot_on || thread.status === "handoff" || thread.status === "closed") return xml("");
@@ -68,5 +71,6 @@ export async function POST(request: Request) {
   if (hasSchedulingLink(reply.text, await botLinksFor(found.ownerId, found.config.clientId))) { await holdBotReply(found.ownerId, thread.id, reply.text, "AI wanted to send a booking link"); return xml(""); }
   await addMessage(found.ownerId, thread.id, { direction: "out", sender: "bot", body: reply.text });
   if (reply.handoff) await env.DB.prepare("UPDATE conv_threads SET bot_on=0, status='handoff' WHERE id=?1").bind(thread.id).run();
+  await logUsageEvent(env.DB, { clientId: found.config.clientId || "", kind: channel, units: channel === "sms" ? Math.max(1, Math.ceil(reply.text.length / 153)) : 1, provider: "Twilio", feature: `Conversation AI · ${channel}`, endpoint: "reply" }).catch(() => undefined);
   return xml(`<Message>${esc(reply.text)}</Message>`);
 }

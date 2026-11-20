@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { SERVICES, serviceOf, type ServiceKey } from "./usage-services";
 
 // AI & SEO-data usage metering for client rebilling.
 // Every outgoing call to OpenRouter / OpenAI (text AI) and DataForSEO (keyword research, rank checks, backlinks,
@@ -52,6 +53,16 @@ let dbRef: Db | null = null;
 const original = globalThis.fetch;
 const isAi = (u: URL) => (u.hostname === "openrouter.ai" && /\/api\/v1\/(responses|chat\/completions)$/.test(u.pathname)) || (u.hostname === "api.openai.com" && /\/v1\/(responses|chat\/completions)$/.test(u.pathname));
 const isSeoData = (u: URL) => u.hostname === "api.dataforseo.com" && u.pathname.startsWith("/v3/") && !/\/v3\/appendix\//.test(u.pathname);
+const formField = (init: RequestInit | undefined, key: string) => { const b = init?.body; if (b instanceof URLSearchParams) return b.get(key) || ""; if (typeof b === "string") { try { return new URLSearchParams(b).get(key) || ""; } catch { return ""; } } return ""; };
+/** Twilio / Resend calls that cost money: which service and how many units. */
+function unitCall(u: URL, init: RequestInit | undefined): { kind: ServiceKey; provider: string } | null {
+  const post = String(init?.method || "GET").toUpperCase() === "POST";
+  if (!post) return null;
+  if (u.hostname === "api.twilio.com" && /\/Messages\.json$/.test(u.pathname)) return { kind: /^whatsapp:/i.test(formField(init, "To")) ? "whatsapp" : "sms", provider: "Twilio" };
+  if (u.hostname === "api.twilio.com" && /\/IncomingPhoneNumbers\.json$/.test(u.pathname)) return { kind: "phone_number", provider: "Twilio" };
+  if (u.hostname === "api.resend.com" && /^\/emails(\/batch)?$/.test(u.pathname)) return { kind: "email", provider: "Resend" };
+  return null;
+}
 
 /** Patch fetch once per isolate. Safe to call on every request. */
 export function installUsageMeter(db: Db | undefined) {
@@ -63,7 +74,14 @@ export function installUsageMeter(db: Db | undefined) {
     try {
       const raw = typeof input === "string" ? input : input instanceof URL ? input.href : (input as Request).url;
       const u = new URL(raw);
-      const ai = isAi(u), seo = !ai && isSeoData(u);
+      const ai = isAi(u), seo = !ai && isSeoData(u), unit = !ai && !seo ? unitCall(u, init) : null;
+      if (unit && response.ok && dbRef) {
+        const ctx = store.getStore() || {};
+        let units = 1;
+        if (unit.kind === "email" && /batch$/.test(u.pathname)) { try { const b = typeof init?.body === "string" ? JSON.parse(init.body) : null; units = Array.isArray(b) ? b.length || 1 : 1; } catch { /* 1 */ } }
+        const job = (async () => { if (unit.kind === "sms") { try { const j = await response.clone().json() as { num_segments?: string }; units = Math.max(1, Number(j.num_segments) || 1); } catch { /* 1 */ } } await logUsageEvent(dbRef!, { clientId: ctx.clientId, kind: unit.kind, units, provider: unit.provider, endpoint: u.pathname.replace(/AC[0-9a-f]{32}/i, "AC…").slice(0, 120), feature: ctx.feature || (ctx.route ? featureFor(ctx.route) : "Background"), route: ctx.route, actor: ctx.actor }); })().catch((e) => console.error("usage meter", e));
+        if (ctx.waitUntil) ctx.waitUntil(job);
+      }
       if ((ai || seo) && response.ok && dbRef) {
         const ctx = store.getStore() || {};
         let model = "";
@@ -107,6 +125,9 @@ export function ensureUsageTables(db: Db) {
     db.prepare("CREATE TABLE IF NOT EXISTS usage_billing_clients (owner_id TEXT NOT NULL, client_id TEXT NOT NULL, markup_pct REAL, enabled INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL DEFAULT '', updated_by TEXT NOT NULL DEFAULT '', PRIMARY KEY (owner_id, client_id))"),
     db.prepare("CREATE TABLE IF NOT EXISTS usage_billing_audit (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, client_id TEXT NOT NULL DEFAULT '', action TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '{}', actor TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL)"),
     db.prepare("CREATE INDEX IF NOT EXISTS usage_billing_audit_time ON usage_billing_audit (owner_id, created_at)"),
+    db.prepare("CREATE TABLE IF NOT EXISTS usage_services (owner_id TEXT NOT NULL, service TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1, markup_pct REAL, unit_cost_usd REAL, updated_at TEXT NOT NULL DEFAULT '', updated_by TEXT NOT NULL DEFAULT '', PRIMARY KEY (owner_id, service))"),
+    db.prepare("CREATE TABLE IF NOT EXISTS usage_client_services (owner_id TEXT NOT NULL, client_id TEXT NOT NULL, service TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL DEFAULT '', updated_by TEXT NOT NULL DEFAULT '', PRIMARY KEY (owner_id, client_id, service))"),
+    db.prepare("CREATE INDEX IF NOT EXISTS usage_log_kind ON usage_log (owner_id, kind, created_at)"),
     db.prepare("CREATE TABLE IF NOT EXISTS usage_model_prices (model TEXT PRIMARY KEY, prompt REAL NOT NULL, completion REAL NOT NULL, fetched_at TEXT NOT NULL)"),
   ]).catch((e) => { ready = null; throw e; });
   return ready;
@@ -149,18 +170,54 @@ async function record(db: Db, ctx: UsageContext, call: { kind: "ai" | "seo_data"
     .bind(crypto.randomUUID(), await ownerId(db), String(ctx.clientId || ""), call.kind, call.provider, String(ctx.feature || (ctx.route ? featureFor(ctx.route) : "Background")).slice(0, 80), String(ctx.route || "").slice(0, 120), call.endpoint, model.slice(0, 120), u.input, u.output, Math.round(cost * 1e6) / 1e6, source, String(ctx.actor || "system").slice(0, 160), new Date().toISOString()).run();
 }
 
+// Unit costs per service, cached per isolate for 5 minutes (keeps D1 reads low).
+let unitCache: { owner: string; at: number; costs: Map<string, number> } | null = null;
+export function clearUnitCostCache() { unitCache = null; }
+async function unitCost(db: Db, owner: string, kind: ServiceKey) {
+  if (!unitCache || unitCache.owner !== owner || Date.now() - unitCache.at > 300_000) {
+    const rows = (await db.prepare("SELECT service, unit_cost_usd FROM usage_services WHERE owner_id = ?1").bind(owner).all<{ service: string; unit_cost_usd: number | null }>()).results || [];
+    unitCache = { owner, at: Date.now(), costs: new Map(rows.filter((r) => r.unit_cost_usd != null).map((r) => [r.service, Number(r.unit_cost_usd)])) };
+  }
+  return unitCache.costs.get(kind) ?? serviceOf(kind)?.defaultUnitUsd ?? 0;
+}
+
+/** Log a unit-priced event (WhatsApp/SMS message, call minutes, phone number, email). Pass `id` to make it idempotent (e.g. one row per call). */
+export async function logUsageEvent(db: Db, e: { clientId?: string; kind: ServiceKey; units: number; provider: string; feature?: string; endpoint?: string; route?: string; actor?: string; id?: string }) {
+  await ensureUsageTables(db);
+  const owner = await ownerId(db);
+  const units = Math.max(0, Math.round(e.units * 100) / 100);
+  const cost = Math.round(units * await unitCost(db, owner, e.kind) * 1e6) / 1e6;
+  const feature = String(e.feature || serviceOf(e.kind)?.label || e.kind).slice(0, 80);
+  await db.prepare("INSERT INTO usage_log (id, owner_id, client_id, kind, provider, feature, route, endpoint, model, input_tokens, output_tokens, cost_usd, cost_source, actor, created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,'',?9,0,?10,'unit-price',?11,?12) ON CONFLICT(id) DO UPDATE SET input_tokens=excluded.input_tokens, cost_usd=excluded.cost_usd WHERE usage_log.invoice_id = ''")
+    .bind(e.id || crypto.randomUUID(), owner, String(e.clientId || ""), e.kind, e.provider, feature, String(e.route || "").slice(0, 120), String(e.endpoint || "").slice(0, 120), units, cost, String(e.actor || "system").slice(0, 160), new Date().toISOString()).run();
+}
+
 // ---------- Billing maths (shared by the API, reports and monthly invoicing) ----------
 export type BillingSettings = { enabled: boolean; markupPct: number; usdRate: number; includeSeoData: boolean; minCharge: number; updatedAt: string; updatedBy: string };
-export async function loadBilling(db: Db, owner: string): Promise<{ settings: BillingSettings; clients: Map<string, { markupPct: number | null; enabled: boolean }> }> {
+export type ServiceSetting = { key: ServiceKey; enabled: boolean; markupPct: number | null; unitUsd: number | null };
+export type Billing = { settings: BillingSettings; clients: Map<string, { markupPct: number | null; enabled: boolean }>; services: Map<ServiceKey, ServiceSetting>; clientServices: Map<string, Map<string, boolean>> };
+export async function loadBilling(db: Db, owner: string): Promise<Billing> {
   await ensureUsageTables(db);
-  const s = await db.prepare("SELECT * FROM usage_billing_settings WHERE owner_id = ?1").bind(owner).first<any>();
-  const rows = (await db.prepare("SELECT client_id, markup_pct, enabled FROM usage_billing_clients WHERE owner_id = ?1").bind(owner).all<any>()).results || [];
+  const [s, rows, svc, cs] = await Promise.all([
+    db.prepare("SELECT * FROM usage_billing_settings WHERE owner_id = ?1").bind(owner).first<any>(),
+    db.prepare("SELECT client_id, markup_pct, enabled FROM usage_billing_clients WHERE owner_id = ?1").bind(owner).all<any>().then((r) => r.results || []),
+    db.prepare("SELECT service, enabled, markup_pct, unit_cost_usd FROM usage_services WHERE owner_id = ?1").bind(owner).all<any>().then((r) => r.results || []),
+    db.prepare("SELECT client_id, service, enabled FROM usage_client_services WHERE owner_id = ?1").bind(owner).all<any>().then((r) => r.results || []),
+  ]);
+  const includeSeoData = s ? Boolean(s.include_seo_data) : true;
+  const services = new Map<ServiceKey, ServiceSetting>(SERVICES.map((d) => { const r = svc.find((x: any) => x.service === d.key); return [d.key, { key: d.key, enabled: r ? Boolean(r.enabled) : d.key === "seo_data" ? includeSeoData : true, markupPct: r?.markup_pct == null ? null : Number(r.markup_pct), unitUsd: r?.unit_cost_usd == null ? null : Number(r.unit_cost_usd) }]; }));
+  const clientServices = new Map<string, Map<string, boolean>>();
+  for (const r of cs as any[]) { const m = clientServices.get(String(r.client_id)) || new Map(); m.set(String(r.service), Boolean(r.enabled)); clientServices.set(String(r.client_id), m); }
   return {
-    settings: { enabled: s ? Boolean(s.enabled) : true, markupPct: s ? Number(s.markup_pct) : 100, usdRate: s ? Number(s.usd_rate) || 0.92 : 0.92, includeSeoData: s ? Boolean(s.include_seo_data) : true, minCharge: s ? Number(s.min_charge) || 0 : 0, updatedAt: s?.updated_at || "", updatedBy: s?.updated_by || "" },
+    settings: { enabled: s ? Boolean(s.enabled) : true, markupPct: s ? Number(s.markup_pct) : 100, usdRate: s ? Number(s.usd_rate) || 0.92 : 0.92, includeSeoData: services.get("seo_data")!.enabled, minCharge: s ? Number(s.min_charge) || 0 : 0, updatedAt: s?.updated_at || "", updatedBy: s?.updated_by || "" },
     clients: new Map(rows.map((r: any) => [String(r.client_id), { markupPct: r.markup_pct == null ? null : Number(r.markup_pct), enabled: Boolean(r.enabled) }])),
+    services, clientServices,
   };
 }
-export const markupFor = (b: Awaited<ReturnType<typeof loadBilling>>, clientId: string) => b.clients.get(clientId)?.markupPct ?? b.settings.markupPct;
+/** Markup for a client and service: the client's own markup, else the service's, else the agency markup. */
+export const markupFor = (b: Billing, clientId: string, kind?: string) => b.clients.get(clientId)?.markupPct ?? (kind ? b.services.get(kind as ServiceKey)?.markupPct : null) ?? b.settings.markupPct;
+/** Is this service rebilled for this client? (agency switch, service switch, client switch, client-service switch) */
+export const serviceBilled = (b: Billing, clientId: string, kind: string) => b.settings.enabled && b.services.get(kind as ServiceKey)?.enabled !== false && b.clients.get(clientId)?.enabled !== false && b.clientServices.get(clientId)?.get(kind) !== false;
 export const billable = (costUsd: number, usdRate: number, markupPct: number) => Math.round(costUsd * usdRate * (1 + markupPct / 100) * 100) / 100;
 export async function audit(db: Db, owner: string, action: string, detail: Record<string, unknown>, actor: string, clientId = "") {
   await ensureUsageTables(db);
