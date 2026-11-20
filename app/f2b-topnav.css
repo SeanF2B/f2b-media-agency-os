@@ -2630,6 +2630,7 @@ html body .ai-chat-panel > header > .ai-emp-wrap { flex: 1 1 auto; min-width: 0;
 html body .ai-chat-panel > header .ai-emp-trigger { min-width: 0; justify-self: start; overflow: hidden; }
 html body .ai-chat-panel > header .ai-emp-wrap > small { overflow: hidden; text-overflow: ellipsis; }
 html body .ai-chat-panel > header .ai-chat-icon { width: 30px !important; height: 30px !important; flex: 0 0 30px !important; }
+html body .ai-chat-panel > header > .ai-emp-wrap { margin-right: 4px; }
 html body .ai-chat-panel > header .ai-emp-trigger > span svg { stroke: #fff !important; }
 
 /* Reports → Keywords: find → group → report, in the report card design */

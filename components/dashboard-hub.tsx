@@ -149,7 +149,7 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
   const upcoming = useMemo(() => tasks.filter((t) => inScope(t) && !/^done$/i.test(t.status) && (showAi || !bots.has(t.assigneeId))).sort((a, b) => (a.dueAt || a.due || "9999").localeCompare(b.dueAt || b.due || "9999")).slice(0, 6), [tasks, showAi, bots, scopeClientId]); // eslint-disable-line react-hooks/exhaustive-deps
   const completed = useMemo(() => tasks.filter((t) => inScope(t) && /^done$/i.test(t.status) && t.completedAt).sort((a, b) => (b.completedAt || "").localeCompare(a.completedAt || "")).slice(0, 6), [tasks, scopeClientId]); // eslint-disable-line react-hooks/exhaustive-deps
   // Approvals waiting on the signed-in person (the owner sees everything unassigned too).
-  const awaitingOwner = (t: HubTask) => t.approvalRequest?.status === "awaiting";
+  const awaitingOwner = (t: HubTask) => t.approvalRequest?.status === "awaiting" && t.status !== "Done" && t.status !== "Cancelled";
   const isBotTask = (t: HubTask) => Boolean(staff.find((p) => p.id === t.assigneeId)?.isBot);
   // Task-flow approval requests go to the owner/admins, so they count as "yours" for admins.
   const mineFor = (t: HubTask, approver?: string) => (awaitingOwner(t) && isAdmin) || !currentStaffId || approver === currentStaffId || (!approver && t.assigneeId === currentStaffId);
