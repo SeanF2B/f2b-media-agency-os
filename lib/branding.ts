@@ -1,7 +1,8 @@
 // White-label branding (Settings > Branding): two colours and a logo, applied across the whole OS.
 import { useSyncExternalStore } from "react";
 
-export type Branding = { primary: string; secondary: string; logo: string; name: string };
+// menu: optional menu/top-bar background (e.g. white when the logo sits on white). Empty = use the secondary colour.
+export type Branding = { primary: string; secondary: string; logo: string; name: string; menu?: string };
 export const DEFAULT_BRANDING: Branding = { primary: "#3b82f6", secondary: "#1e3a8a", logo: "", name: "" };
 
 let state: Branding = DEFAULT_BRANDING;
@@ -9,20 +10,20 @@ const listeners = new Set<() => void>();
 const hex = (value: unknown, fallback: string) => typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value.trim()) ? value.trim().toLowerCase() : fallback;
 
 export function normalizeBranding(raw: Partial<Branding> | undefined | null): Branding {
-  return { primary: hex(raw?.primary, DEFAULT_BRANDING.primary), secondary: hex(raw?.secondary, DEFAULT_BRANDING.secondary), logo: typeof raw?.logo === "string" && /^(data:image\/|https:\/\/|\/(?!\/))/.test(raw.logo) ? raw.logo : "", name: String(raw?.name || "").slice(0, 60) };
+  return { primary: hex(raw?.primary, DEFAULT_BRANDING.primary), secondary: hex(raw?.secondary, DEFAULT_BRANDING.secondary), logo: typeof raw?.logo === "string" && /^(data:image\/|https:\/\/|\/(?!\/))/.test(raw.logo) ? raw.logo : "", name: String(raw?.name || "").slice(0, 60), menu: hex(raw?.menu, "") };
 }
 export function applyBranding(raw: Partial<Branding> | undefined | null) {
   const next = normalizeBranding(raw);
-  if (next.primary === state.primary && next.secondary === state.secondary && next.logo === state.logo && next.name === state.name) return;
+  if (next.primary === state.primary && next.secondary === state.secondary && next.logo === state.logo && next.name === state.name && next.menu === state.menu) return;
   state = next;
   if (typeof document !== "undefined") {
     const root = document.documentElement.style;
     { const lin2 = (v: number) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }, lumOf = (r: number, g: number, b: number) => 0.2126 * lin2(r) + 0.7152 * lin2(g) + 0.0722 * lin2(b); let q = parseInt(next.primary.slice(1), 16), pr = (q >> 16) & 255, pg = (q >> 8) & 255, pb = q & 255, guard = 0; while (1.05 / (lumOf(pr, pg, pb) + 0.05) < 4.6 && guard++ < 40) { pr = Math.round(pr * 0.93); pg = Math.round(pg * 0.93); pb = Math.round(pb * 0.93); } root.setProperty("--brand-primary", "#" + [pr, pg, pb].map((v) => v.toString(16).padStart(2, "0")).join("")); } root.setProperty("--brand-secondary", next.secondary);
-    // sidebar colour: exactly the secondary colour. Light colours get dark text instead of being darkened.
-    const n = parseInt(next.secondary.slice(1), 16), r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255, lin = (v: number) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }, L = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b), light = L > 0.45, k = 1;
+    // sidebar colour: the menu colour if set, otherwise exactly the secondary colour. Light colours get dark text instead of being darkened.
+    const n = parseInt((next.menu || next.secondary).slice(1), 16), r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255, lin = (v: number) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }, L = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b), light = L > 0.45, k = 1;
     root.setProperty("--sb-fg", light ? "#1c2330" : "rgba(255,255,255,.92)"); root.setProperty("--sb-fg-strong", light ? "#0f1722" : "#fff"); root.setProperty("--sb-mix", light ? "#000" : "#fff"); root.setProperty("--sb-edge", light ? "rgba(0,0,0,.14)" : "rgba(255,255,255,.22)");
     { const q = parseInt(next.primary.slice(1), 16), f = (v: number) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }, PL = 0.2126 * f((q >> 16) & 255) + 0.7152 * f((q >> 8) & 255) + 0.0722 * f(q & 255); root.setProperty("--brand-primary-fg", "#fff"); }
-    { const lin3 = (v: number) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }, lm = (r: number, g: number, b: number) => 0.2126 * lin3(r) + 0.7152 * lin3(g) + 0.0722 * lin3(b); let sr = r, sg = g, sb2 = b, gd = 0; while (1.05 / (lm(sr, sg, sb2) + 0.05) < 4.6 && gd++ < 40) { sr = Math.round(sr * 0.92); sg = Math.round(sg * 0.92); sb2 = Math.round(sb2 * 0.92); } root.setProperty("--brand-secondary-ink", "#" + [sr, sg, sb2].map((v) => v.toString(16).padStart(2, "0")).join("")); let lr = r, lg = g, lb = b; gd = 0; while (lm(lr, lg, lb) < 0.3 && gd++ < 40) { lr = Math.min(255, Math.round(lr * 1.1 + 6)); lg = Math.min(255, Math.round(lg * 1.1 + 6)); lb = Math.min(255, Math.round(lb * 1.1 + 6)); } root.setProperty("--brand-secondary-ink-dark", "#" + [lr, lg, lb].map((v) => v.toString(16).padStart(2, "0")).join("")); }
+    { const lin3 = (v: number) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }, lm = (r: number, g: number, b: number) => 0.2126 * lin3(r) + 0.7152 * lin3(g) + 0.0722 * lin3(b); const sq = parseInt(next.secondary.slice(1), 16), s0r = (sq >> 16) & 255, s0g = (sq >> 8) & 255, s0b = sq & 255; let sr = s0r, sg = s0g, sb2 = s0b, gd = 0; while (1.05 / (lm(sr, sg, sb2) + 0.05) < 4.6 && gd++ < 40) { sr = Math.round(sr * 0.92); sg = Math.round(sg * 0.92); sb2 = Math.round(sb2 * 0.92); } root.setProperty("--brand-secondary-ink", "#" + [sr, sg, sb2].map((v) => v.toString(16).padStart(2, "0")).join("")); let lr = s0r, lg = s0g, lb = s0b; gd = 0; while (lm(lr, lg, lb) < 0.3 && gd++ < 40) { lr = Math.min(255, Math.round(lr * 1.1 + 6)); lg = Math.min(255, Math.round(lg * 1.1 + 6)); lb = Math.min(255, Math.round(lb * 1.1 + 6)); } root.setProperty("--brand-secondary-ink-dark", "#" + [lr, lg, lb].map((v) => v.toString(16).padStart(2, "0")).join("")); }
     root.setProperty("--brand-sidebar", "#" + [r, g, b].map((v) => Math.round(v * k).toString(16).padStart(2, "0")).join(""));
   }
   listeners.forEach((listener) => listener());
