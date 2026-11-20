@@ -2,7 +2,7 @@
 // Only erasable TypeScript syntax is used so `node --test` can load this file directly.
 
 export type TriggerType = "form_lead" | "tag_added" | "stage_changed" | "task_completed" | "schedule" | "appointment_booked" | "appointment_rescheduled" | "appointment_cancelled" | "appointment_no_show" | "appointment_completed" | "onboarding_started" | "audit_completed" | "guidance_requested" | "checkout_completed" | "payment_failed";
-export type ActionType = "send_email" | "set_value" | "add_tag" | "remove_tag" | "move_stage" | "create_task" | "notify" | "ai_call" | "wait" | "if_else";
+export type ActionType = "send_email" | "send_message" | "set_value" | "add_tag" | "remove_tag" | "move_stage" | "create_task" | "notify" | "ai_call" | "wait" | "if_else";
 export type NodeType = "trigger" | ActionType;
 export type Branch = "yes" | "no";
 
@@ -38,6 +38,7 @@ export const TRIGGERS: Array<{ type: TriggerType; label: string; help: string; i
 
 export const ACTIONS: Array<{ type: ActionType | "sms"; label: string; help: string; icon: string; comingSoon?: boolean }> = [
   { type: "send_email", label: "Send email", help: "Email the contact.", icon: "Mail" },
+  { type: "send_message", label: "Send WhatsApp / SMS", help: "Message the contact from the account's WhatsApp or SMS number.", icon: "MessageSquare" },
   { type: "set_value", label: "Update opportunity value", help: "Set the deal value from the form answers.", icon: "Euro" },
   { type: "add_tag", label: "Add tag", help: "Label the contact with a tag.", icon: "Tag" },
   { type: "remove_tag", label: "Remove tag", help: "Take a tag off the contact.", icon: "TagOff" },
@@ -47,7 +48,6 @@ export const ACTIONS: Array<{ type: ActionType | "sms"; label: string; help: str
   { type: "ai_call", label: "Make an AI call", help: "The account's AI phone agent rings the contact (phone or WhatsApp).", icon: "PhoneCall" },
   { type: "wait", label: "Wait", help: "Pause before the next step.", icon: "Hourglass" },
   { type: "if_else", label: "If / Else", help: "Split into two paths based on a rule.", icon: "GitBranch" },
-  { type: "sms", label: "Send SMS", help: "Text messages are coming soon.", icon: "MessageSquare", comingSoon: true },
 ];
 
 export const CONDITION_FIELDS: Array<{ value: string; label: string; kind: "text" | "tag" | "stage" }> = [
@@ -77,6 +77,13 @@ export const MERGE_FIELDS = [
   { token: "{{contact.company}}", label: "Company" },
   { token: "{{contact.notes}}", label: "Form answers" },
   { token: "{{contact.deal_value}}", label: "Deal value" },
+];
+/** Extra details for appointment automations (filled from the booking that started the run). */
+export const APPOINTMENT_MERGE_FIELDS = [
+  { token: "{{appointment.time}}", label: "Appointment time" },
+  { token: "{{appointment.calendar}}", label: "Service / calendar" },
+  { token: "{{appointment.rebook_link}}", label: "Rebooking link" },
+  { token: "{{business.name}}", label: "Business name" },
 ];
 
 export const MAX_NODES = 60;
@@ -187,6 +194,7 @@ export function readinessProblems(def: AutomationDefinition): string[] {
   for (const node of def.nodes) {
     const c = node.config || {}; const name = actionLabel(node.type);
     if (node.type === "send_email" && (!text(c.subject) || !text(c.body, 20000))) problems.push(`${name}: add a subject and a message.`);
+    if (node.type === "send_message" && !text(c.body, 1500)) problems.push(`${name}: write the message.`);
     if (node.type === "send_email" && c.to === "custom" && !parseEmailList(String(c.toEmails || "")).length) problems.push(`${name}: add the email address to send to.`);
     if (node.type === "set_value" && !parsePriceTable(String(c.table || "")).prices.length) problems.push(`${name}: add at least one price.`);
     if ((node.type === "add_tag" || node.type === "remove_tag") && !text(c.tag)) problems.push(`${name}: choose a tag.`);
@@ -226,6 +234,7 @@ export function nodeSummary(node: AutomationNode, lookup: Lookup = {}): string {
       if (typeof c.type === "string" && c.type.startsWith("appointment_")) return text(c.calendarName) ? `Calendar · ${text(c.calendarName)}` : "Any booking calendar";
       if (c.type === "schedule") return c.mode === "recurring" ? `Every ${c.repeat === "weekly" ? "week" : c.repeat === "monthly" ? "month" : "day"} at ${text(c.time) || "09:00"}` : text(c.at) ? `Once · ${text(c.at).replace("T", " at ")}` : "Choose a date and time";
       return "Click to choose what starts this automation";
+    case "send_message": return text(c.body) ? `${c.channel === "sms" ? "Text" : c.channel === "whatsapp" ? "WhatsApp" : "WhatsApp / SMS"} · ${text(c.body, 60)}` : "Write the message";
     case "send_email": return text(c.subject) ? `${c.to === "custom" && text(c.toEmails) ? `Email ${text(c.toEmails, 40)}` : "Send email"} · ${text(c.subject, 60)}` : "Write the email";
     case "set_value": { const n = parsePriceTable(String(c.table || "")).prices.length; return n ? `Set value from ${n} price${n === 1 ? "" : "s"}` : "Add prices"; }
     case "add_tag": return text(c.tag) ? `Add tag · ${text(c.tag)}` : "Choose a tag";
@@ -251,14 +260,14 @@ export function unitLabel(unit: string, amount: number) {
 }
 
 // ---------- pure runtime helpers ----------
-export function renderMerge(template: string, contact: Partial<ContactFacts>) {
+export function renderMerge(template: string, contact: Partial<ContactFacts>, extra: Record<string, string> = {}) {
   const fields: Record<string, string> = {
     first_name: contact.first_name || "", last_name: contact.last_name || "",
     full_name: [contact.first_name, contact.last_name].filter(Boolean).join(" "),
     email: contact.email || "", phone: contact.phone || "", company: contact.company || "",
     notes: contact.notes || "", deal_value: contact.deal_value ? `€${Math.round(contact.deal_value).toLocaleString("en-IE")}` : "",
   };
-  return String(template || "").replace(/\{\{\s*contact\.(\w+)\s*\}\}/g, (_match, key: string) => fields[key] ?? "");
+  return String(template || "").replace(/\{\{\s*(contact|appointment|business)\.(\w+)\s*\}\}/g, (_match, ns: string, key: string) => ns === "contact" ? fields[key] ?? "" : extra[`${ns}.${key}`] ?? "");
 }
 
 export function normalizeTag(value: unknown) { return text(value, 60).replace(/\s+/g, " ").toLowerCase(); }

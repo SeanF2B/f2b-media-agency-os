@@ -3,6 +3,7 @@
 
 export const DEFAULT_TZ = "Europe/Dublin";
 export const DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
+import { sanitizeFollowUps, type FollowUp, type FollowUpKind } from "./followups-model.ts";
 export type DayKey = (typeof DAYS)[number];
 export type Window = [string, string]; // ["09:00","17:00"] local time
 export type WeeklyHours = Partial<Record<DayKey, Window[]>>;
@@ -19,6 +20,8 @@ export type CalendarConfig = {
   stageId: string; confirmationMessage: string; redirectUrl: string; active: boolean; timezone: string;
   /** Service picture shown on booking pages (Media Library or https). */
   image: string;
+  /** Follow-up messages after a cancellation / no-show (each one is an automation). */
+  followUps: Partial<Record<FollowUpKind, FollowUp>>;
 };
 
 export type StaffAvailability = { staffId: string; timezone: string; weekly: WeeklyHours; blocked: string[]; dailyLimit: number };
@@ -96,6 +99,7 @@ export function sanitizeCalendar(input: Record<string, unknown>, base: Partial<C
     active: input.active === undefined ? true : Boolean(input.active),
     timezone: tz && isValidTimeZone(tz) ? tz : DEFAULT_TZ,
     image: /^(https:\/\/|\/api\/marketing-public\/media\?f=)/.test(text(input.image, 600)) ? text(input.image, 600) : "",
+    followUps: sanitizeFollowUps(input.followUps ?? base.followUps),
   };
 }
 

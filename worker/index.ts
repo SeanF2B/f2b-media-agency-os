@@ -183,6 +183,8 @@ const worker = {
           }
           await logSystemEmail(env.DB as never, { to: message.to, subject: message.subject, text: message.text || "" });
         } : undefined,
+        // "Send WhatsApp / SMS" step: from the account's own number, saved in Conversations.
+        sendMessage: async (m) => { const { sendAutomationMessage } = await import("../lib/conversations/core"); return sendAutomationMessage(m); },
         // "Make an AI call" step: queued on the account's AI phone agent (respects its switches, hours and DND).
         aiCall: async (call) => {
           const { queueOutboundCall } = await import("../lib/voice-agent/server");

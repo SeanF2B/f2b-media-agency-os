@@ -25,7 +25,8 @@ export type Stmt = {
 export type Db = { prepare(sql: string): Stmt; batch(statements: Stmt[]): Promise<unknown[]> };
 export type EmailMessage = { to: string; subject: string; text: string; html: string; idempotencyKey: string };
 export type AiCallRequest = { ownerId: string; scopeId: string; contactId: string; phone: string; name: string; purpose: string; channel: "phone" | "whatsapp"; dedupeKey: string };
-export type Effects = { sendEmail?: (message: EmailMessage) => Promise<void>; aiCall?: (request: AiCallRequest) => Promise<{ queued: boolean; reason?: string }> };
+export type MessageRequest = { ownerId: string; scopeId: string; phone: string; name: string; body: string; channel: "auto" | "whatsapp" | "sms"; idempotencyKey: string };
+export type Effects = { sendEmail?: (message: EmailMessage) => Promise<void>; aiCall?: (request: AiCallRequest) => Promise<{ queued: boolean; reason?: string }>; sendMessage?: (request: MessageRequest) => Promise<{ sent: boolean; channel?: string; reason?: string }> };
 
 type LiveAutomation = { id: string; owner_id: string; scope_id: string; trigger_type: string; definition: string; next_fire_at: string | null; parsed?: AutomationDefinition | null };
 type EventRow = { id: string; owner_id: string; scope_id: string; event_type: string; contact_id: string | null; payload: string; source_automation_id: string | null; created_at: string };
@@ -92,6 +93,26 @@ export function triggerMatches(automation: { id: string; scope_id: string; trigg
 }
 
 // ---------- contact facts ----------
+/** Appointment details for {{appointment.*}} / {{business.*}} merge fields, from the event that started the run. */
+const mergeCache = new Map<string, Record<string, string>>();
+async function runMerge(db: Db, run: RunRow): Promise<Record<string, string>> {
+  const hit = mergeCache.get(run.id); if (hit) return hit;
+  const out: Record<string, string> = {};
+  try {
+    const ev = await db.prepare("SELECT e.payload FROM crm_automation_runs r JOIN crm_automation_events e ON e.id = r.event_id WHERE r.id=?1").bind(run.id).first<{ payload: string }>();
+    const p = parse<Record<string, unknown>>(ev?.payload || "{}", {});
+    if (p.start) out["appointment.time"] = new Intl.DateTimeFormat("en-IE", { timeZone: "Europe/Dublin", weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }).format(new Date(String(p.start)));
+    if (p.calendarName) out["appointment.calendar"] = String(p.calendarName);
+    if (p.calendarId) { const cal = await db.prepare("SELECT slug FROM sched_calendars WHERE id=?1").bind(String(p.calendarId)).first<{ slug: string }>().catch(() => null); if (cal?.slug) out["appointment.rebook_link"] = `${APP_URL}/f/book/${cal.slug}`; }
+    const ws = await db.prepare("SELECT json_extract(value,'$.name') AS name FROM workspace_documents, json_each(data,'$.clients') WHERE id='f2b-agency' AND json_extract(value,'$.id')=?1").bind(run.scope_id || "").first<{ name: string }>().catch(() => null);
+    out["business.name"] = ws?.name || "us";
+  } catch { /* merges are best effort */ }
+  if (mergeCache.size > 500) mergeCache.clear();
+  mergeCache.set(run.id, out);
+  return out;
+}
+const APP_URL = "https://f2b-media-agency-os.f2b-media.workers.dev";
+
 export async function loadContactFacts(db: Db, ownerId: string, contactId: string): Promise<ContactFacts | null> {
   const contact = await db.prepare("SELECT id, client_id, first_name, last_name, email, phone, company, source, notes FROM crm_contacts WHERE id=?1 AND owner_id=?2").bind(contactId, ownerId).first<Record<string, string | null>>();
   if (!contact) return null;
@@ -155,7 +176,7 @@ async function logSentEmail(db: Db, ownerId: string, clientId: string, to: strin
 
 // ---------- step execution ----------
 type StepResult = { status: "done" | "skipped" | "waiting"; detail: string; branch?: Branch; resumeAt?: Date };
-type StepContext = { db: Db; run: RunRow; node: AutomationNode; contact: ContactFacts; now: Date; effects: Effects; dryRun: boolean; workspace: () => Promise<Workspace | null>; lookups: Lookups; events: AutomationEvent[] };
+type StepContext = { db: Db; run: RunRow; node: AutomationNode; contact: ContactFacts; now: Date; effects: Effects; dryRun: boolean; workspace: () => Promise<Workspace | null>; lookups: Lookups; events: AutomationEvent[]; merge?: Record<string, string> };
 type Lookups = { stageName: (id: string) => string; staffName: (id: string) => string };
 
 async function executeStep(ctx: StepContext): Promise<StepResult> {
@@ -165,10 +186,10 @@ async function executeStep(ctx: StepContext): Promise<StepResult> {
   switch (node.type) {
     case "send_email": {
       const custom = c.to === "custom";
-      const recipients = custom ? parseEmailList(renderMerge(String(c.toEmails || ""), contact)) : contact.email ? [contact.email] : [];
+      const recipients = custom ? parseEmailList(renderMerge(String(c.toEmails || ""), contact, ctx.merge)) : contact.email ? [contact.email] : [];
       if (!recipients.length) return { status: "skipped", detail: custom ? "Skipped: no valid email address to send to." : "Skipped: this contact has no email address." };
-      const subject = renderMerge(String(c.subject || ""), contact).slice(0, 200);
-      const body = renderMerge(String(c.body || ""), contact).slice(0, 20_000);
+      const subject = renderMerge(String(c.subject || ""), contact, ctx.merge).slice(0, 200);
+      const body = renderMerge(String(c.body || ""), contact, ctx.merge).slice(0, 20_000);
       if (dryRun) return { status: "done", detail: `Would email ${recipients.join(", ")}\nSubject: ${subject}\n\n${body.slice(0, 600)}${body.length > 600 ? "…" : ""}` };
       if (!effects.sendEmail) throw new Error("Email isn't set up yet. Add RESEND_API_KEY and TASK_NOTIFICATION_FROM to the Worker.");
       for (const [i, to] of recipients.entries()) {
@@ -176,6 +197,16 @@ async function executeStep(ctx: StepContext): Promise<StepResult> {
         await logSentEmail(db, run.owner_id, run.scope_id || contact.client_id || "", to, custom ? "" : contactName(contact), subject, body);
       }
       return { status: "done", detail: `Emailed ${recipients.join(", ")} · "${subject}"` };
+    }
+    case "send_message": {
+      if (!contact.phone) return { status: "skipped", detail: "Skipped: this contact has no phone number." };
+      const body = renderMerge(String(c.body || ""), contact, ctx.merge).slice(0, 1500);
+      const channel = c.channel === "sms" ? "sms" : c.channel === "whatsapp" ? "whatsapp" : "auto";
+      const how = channel === "sms" ? "text" : channel === "whatsapp" ? "WhatsApp" : "WhatsApp (or text if WhatsApp can't go)";
+      if (dryRun) return { status: "done", detail: `Would send ${contactName(contact)} a ${how}:\n${body.slice(0, 500)}` };
+      if (!effects.sendMessage) return { status: "skipped", detail: "Messaging isn't available here." };
+      const r = await effects.sendMessage({ ownerId: run.owner_id, scopeId: run.scope_id || contact.client_id || "", phone: contact.phone, name: contactName(contact), body, channel, idempotencyKey: key });
+      return r.sent ? { status: "done", detail: `Sent a ${r.channel === "sms" ? "text" : "WhatsApp"} to ${contactName(contact)}.` } : { status: "skipped", detail: r.reason || "Message not sent." };
     }
     case "set_value": {
       const deal = await db.prepare("SELECT id, value, source, notes FROM crm_opportunities WHERE owner_id=?1 AND contact_id=?2 ORDER BY updated_at DESC LIMIT 1").bind(run.owner_id, contact.id).first<{ id: string; value: number; source: string; notes: string }>();
@@ -236,10 +267,10 @@ async function executeStep(ctx: StepContext): Promise<StepResult> {
       const assignee = workspace?.staff?.find((member) => member.id === assigneeId);
       const days = Math.max(0, Math.min(365, Math.round(Number(c.dueInDays) || 0)));
       const due = dublinDate(new Date(now.getTime() + days * 86_400_000));
-      const title = renderMerge(String(c.title || ""), contact).slice(0, 200) || "Follow up";
+      const title = renderMerge(String(c.title || ""), contact, ctx.merge).slice(0, 200) || "Follow up";
       if (dryRun) return { status: "done", detail: `Would create task "${title}"${assignee ? ` for ${assignee.name}` : ""}, due ${due}.` };
       const taskId = `auto-${run.id.slice(-12)}-${node.id}`.slice(0, 80);
-      const notes = [renderMerge(String(c.notes || ""), contact), `Contact: ${contactName(contact)}${contact.email ? ` · ${contact.email}` : ""}${contact.phone ? ` · ${contact.phone}` : ""}`].filter(Boolean).join("\n\n").slice(0, 4000);
+      const notes = [renderMerge(String(c.notes || ""), contact, ctx.merge), `Contact: ${contactName(contact)}${contact.email ? ` · ${contact.email}` : ""}${contact.phone ? ` · ${contact.phone}` : ""}`].filter(Boolean).join("\n\n").slice(0, 4000);
       await updateWorkspace(db, (data) => {
         const tasks = Array.isArray(data.tasks) ? data.tasks : [];
         if (tasks.some((task) => task.id === taskId)) return null; // already created on an earlier attempt
@@ -249,7 +280,7 @@ async function executeStep(ctx: StepContext): Promise<StepResult> {
       return { status: "done", detail: `Created task "${title}"${assignee ? ` for ${assignee.name}` : ""}, due ${due}.` };
     }
     case "notify": {
-      const message = renderMerge(String(c.message || "Automation update for {{contact.full_name}}"), contact).slice(0, 500);
+      const message = renderMerge(String(c.message || "Automation update for {{contact.full_name}}"), contact, ctx.merge).slice(0, 500);
       const workspace = await ctx.workspace();
       const ids = Array.isArray(c.recipientIds) && c.recipientIds.length ? c.recipientIds.map(String) : [String(workspace?.ownerId || "")];
       const recipients = (workspace?.staff || []).filter((member) => !member.isBot && ids.includes(member.id) && member.email?.includes("@"));
@@ -269,7 +300,7 @@ async function executeStep(ctx: StepContext): Promise<StepResult> {
       return { status: "done", detail: `Alert sent: "${message}".${emailed}` };
     }
     case "ai_call": {
-      const purpose = renderMerge(String(c.purpose || "Follow up with {{contact.first_name}} and offer to book an appointment."), contact).slice(0, 600);
+      const purpose = renderMerge(String(c.purpose || "Follow up with {{contact.first_name}} and offer to book an appointment."), contact, ctx.merge).slice(0, 600);
       const channel = c.channel === "whatsapp" ? "whatsapp" : "phone";
       if (!contact.phone) return { status: "skipped", detail: "The contact has no phone number." };
       if (dryRun) return { status: "done", detail: `Would ring ${contactName(contact)} by ${channel === "whatsapp" ? "WhatsApp" : "phone"}: "${purpose}"` };
@@ -357,7 +388,7 @@ async function advanceRun(db: Db, run: RunRow, now: Date, effects: Effects, work
         await stepWrite(db, run, node, "done", result.detail, now, lookups).run();
       } else {
         await stepWrite(db, run, node, "started", "Working on it…", now, lookups).run();
-        result = await executeStep({ db, run, node, contact, now, effects, dryRun: false, workspace, lookups, events });
+        result = await executeStep({ db, run, node, contact, now, effects, dryRun: false, workspace, lookups, events, merge: await runMerge(db, run) });
         await stepWrite(db, run, node, result.status, result.detail, now, lookups).run();
       }
       if (result.status === "waiting" && result.resumeAt) {

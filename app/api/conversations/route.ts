@@ -42,6 +42,8 @@ export async function GET(request: Request) {
   const auth = await authorizeAdminOrSubAccount("open Conversations", "Conversations");
   if (auth.error) return auth.error;
   const allowed = auth.scope; // null = admin (everything); otherwise this person's own sub-account ids
+  // Staff (not admins or managers) only see the chats assigned to them — never other people's inboxes.
+  const ownOnly = Boolean(allowed && auth.staffId && !/manager|owner|admin/i.test(auth.role || ""));
   try {
     await ensureTables(); await ensureMetaTables();
     const url = new URL(request.url), view = url.searchParams.get("view") || "threads";
@@ -53,13 +55,13 @@ export async function GET(request: Request) {
     if (view === "held") {
       // AI approvals: bot replies held back (e.g. they contained a booking link), for the Dashboard and the inbox.
       const rows = (await env.DB!.prepare("SELECT m.id, m.thread_id, m.body, m.error, m.created_at, t.client_id, t.contact_name, t.contact, t.channel FROM conv_messages m JOIN conv_threads t ON t.id = m.thread_id WHERE m.owner_id=?1 AND m.status='held' ORDER BY m.created_at DESC LIMIT 100").bind(auth.ownerId).all<any>().catch(() => ({ results: [] }))).results || [];
-      const inView = rows.filter((r: any) => (!allowed || allowed.includes(String(r.client_id || ""))) && (scope === "agency" || r.client_id === scope));
+      const inView = ownOnly ? [] : rows.filter((r: any) => (!allowed || allowed.includes(String(r.client_id || ""))) && (scope === "agency" || r.client_id === scope));
       return respond({ held: inView.map((r: any) => ({ id: r.id, threadId: r.thread_id, body: r.body, reason: r.error, at: r.created_at, clientId: r.client_id, name: r.contact_name || r.contact, channel: r.channel })) });
     }
     if (view === "thread") {
       const id = url.searchParams.get("id") || "";
       const thread = await env.DB!.prepare("SELECT * FROM conv_threads WHERE id=?1 AND owner_id=?2").bind(id, auth.ownerId).first();
-      if (!thread || (allowed && !allowed.includes(String((thread as any).client_id || "")))) return respond({ error: "That conversation could not be found." }, 404);
+      if (!thread || (allowed && !allowed.includes(String((thread as any).client_id || ""))) || (ownOnly && String((thread as any).assigned_to || "") !== auth.staffId)) return respond({ error: "That conversation could not be found." }, 404);
       const messages = (await env.DB!.prepare("SELECT id, direction, sender, body, error, status, created_at FROM conv_messages WHERE thread_id=?1 ORDER BY created_at ASC LIMIT 300").bind(id).all()).results || [];
       await env.DB!.prepare("UPDATE conv_threads SET unread=0 WHERE id=?1").bind(id).run();
       return respond({ thread: { ...thread, unread: 0 }, messages, routes: await replyRoutes(auth.ownerId, thread as any, settings) });
@@ -68,6 +70,7 @@ export async function GET(request: Request) {
     const stmt = env.DB!.prepare(`SELECT * FROM conv_threads WHERE ${where} ORDER BY last_at DESC LIMIT 200`);
     let threads = (await (scope === "agency" ? stmt.bind(auth.ownerId) : stmt.bind(auth.ownerId, scope)).all()).results || [];
     // Sub-account staff only see the channels switched on for them (Team → Messaging). Admins see everything.
+    if (ownOnly) threads = threads.filter((t: any) => t.channel !== "email" && String(t.assigned_to || "") === auth.staffId);
     if (allowed && auth.staffId) { const mine = (await getStaffMessaging(auth.ownerId, [auth.staffId]))[auth.staffId]; if (mine) threads = threads.filter((t: any) => t.channel === "email" || (mine.channels as Record<string, boolean>)[String(t.channel)] !== false); }
     // WhatsApp numbers this person may start chats from (for the "New chat" button), limited to their own sub-accounts.
     const waNumbers = settings.numbers.filter((n) => n.channel === "whatsapp" && (!allowed || allowed.includes(n.clientId)) && (scope === "agency" || n.clientId === scope)).map((n) => ({ number: n.number, clientId: n.clientId, label: n.label }));
@@ -79,6 +82,7 @@ export async function POST(request: Request) {
   const auth = await authorizeAdminOrSubAccount("use Conversations", "Conversations");
   if (auth.error) return auth.error;
   const allowed = auth.scope;
+  const ownOnly = Boolean(allowed && auth.staffId && !/manager|owner|admin/i.test(auth.role || ""));
   let b: any; try { b = await request.json(); } catch { return respond({ error: "Send a valid request." }, 400); }
   try {
     await ensureTables(); await ensureMetaTables();
@@ -112,6 +116,7 @@ export async function POST(request: Request) {
       const from = settings.numbers.find((n) => n.channel === "whatsapp" && n.clientId === clientId && (!b.from || n.number === e164(String(b.from))));
       if (!from) return respond({ error: "This account has no WhatsApp number yet. Add one in Conversation settings." }, 400);
       const thread = await upsertThread(auth.ownerId, { channel: "whatsapp", ourNumber: from.number, contact: phone, contactName: String(b.name || "").trim(), clientId });
+      if (ownOnly && !thread.assigned_to) await env.DB!.prepare("UPDATE conv_threads SET assigned_to=?2 WHERE id=?1").bind(thread.id, auth.staffId).run();
       return respond({ id: thread.id });
     }
     if (action === "templates") {
@@ -121,7 +126,8 @@ export async function POST(request: Request) {
     }
     const id = String(b.id || "");
     const thread = id ? await env.DB!.prepare("SELECT * FROM conv_threads WHERE id=?1 AND owner_id=?2").bind(id, auth.ownerId).first<any>() : null;
-    if (!thread || (allowed && !allowed.includes(String(thread.client_id || "")))) return respond({ error: "That conversation could not be found." }, 404);
+    if (!thread || (allowed && !allowed.includes(String(thread.client_id || ""))) || (ownOnly && String(thread.assigned_to || "") !== auth.staffId)) return respond({ error: "That conversation could not be found." }, 404);
+    if (ownOnly && b.action === "assign" && String(b.staffId || "") !== auth.staffId) return respond({ error: "Only a manager can hand a chat to someone else." }, 403);
     if (action === "send" && thread.channel === "email") {
       // Email reply from the inbox: sent from the system sender, replies come back to the person who wrote it.
       const text = String(b.body || "").trim().slice(0, 10000);
@@ -198,11 +204,13 @@ export async function POST(request: Request) {
         const db = env.DB!, now = new Date().toISOString();
         let t2 = await db.prepare("SELECT id FROM conv_threads WHERE owner_id=?1 AND channel='email' AND our_number='email' AND contact=?2").bind(auth.ownerId, route.to.toLowerCase()).first<{ id: string }>();
         if (!t2) { const nid = crypto.randomUUID(); await db.prepare("INSERT INTO conv_threads (id, owner_id, client_id, channel, our_number, contact, contact_name, bot_on, status, unread, last_at, last_preview, created_at) VALUES (?1,?2,?3,'email','email',?4,?5,0,'open',0,?6,'',?6)").bind(nid, auth.ownerId, thread.client_id || "", route.to.toLowerCase(), String(thread.contact_name || "").slice(0, 80), now).run(); t2 = { id: nid }; }
+        if (ownOnly) await env.DB!.prepare("UPDATE conv_threads SET assigned_to=?2 WHERE id=?1 AND assigned_to=''").bind(t2.id, auth.staffId).run();
         return respond({ id: t2.id });
       }
       const from = settings.numbers.find((n) => n.channel === want && n.clientId === (thread.client_id || ""));
       if (!from) return respond({ error: "No number for that channel on this account." }, 400);
       const t2 = await upsertThread(auth.ownerId, { channel: want as "sms" | "whatsapp", ourNumber: from.number, contact: route.to, contactName: String(thread.contact_name || ""), clientId: thread.client_id || "" });
+      if (ownOnly && !t2.assigned_to) await env.DB!.prepare("UPDATE conv_threads SET assigned_to=?2 WHERE id=?1").bind(t2.id, auth.staffId).run();
       return respond({ id: t2.id, windowOpen: want !== "whatsapp" || windowState(t2.last_in_at).open });
     }
     if (action === "assign") {

@@ -10,13 +10,14 @@ import { ReportGeneratingAnimation, currencySymbolFor } from "./report-generatin
 import { computePayslip, maskPps, normalisePps, validPps, DEFAULT_PERSON, EMPTY_YTD, type PayrollEmployer, type PayrollPerson } from "@/lib/scheduling/payroll";
 import type { PayLine, PayslipRecord } from "@/lib/scheduling/payroll-store";
 import { uploadToMedia } from "@/lib/upload-media";
+import { DEFAULT_FOLLOW_UP, FOLLOW_UP_KINDS, type FollowUp, type FollowUpKind } from "@/lib/scheduling/followups-model";
 import { StaffConnectionIcons } from "./staff-messaging";
 import { buildPayslipPdf, bytesToBase64, type PdfLogo } from "@/lib/scheduling/payslip-pdf";
 
 type DayKey = "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
 type Window = [string, string];
 type Question = { id: string; label: string; required?: boolean; type?: "text" | "textarea" | "select"; options?: string[] };
-type Calendar = { id: string; clientId: string; name: string; slug: string; kind: "service" | "consultation"; description: string; durationMin: number; bufferBefore: number; bufferAfter: number; slotInterval: number; minNoticeMin: number; maxDaysAhead: number; dailyLimit: number; locationType: "onsite" | "phone" | "video" | "office"; locationDetail: string; price: number; currency: string; color: string; assignMode: "customer_pick" | "round_robin" | "collective"; staffIds: string[]; questions: Question[]; stageId: string; confirmationMessage: string; redirectUrl: string; active: boolean; timezone: string; image?: string };
+type Calendar = { id: string; clientId: string; name: string; slug: string; kind: "service" | "consultation"; description: string; durationMin: number; bufferBefore: number; bufferAfter: number; slotInterval: number; minNoticeMin: number; maxDaysAhead: number; dailyLimit: number; locationType: "onsite" | "phone" | "video" | "office"; locationDetail: string; price: number; currency: string; color: string; assignMode: "customer_pick" | "round_robin" | "collective"; staffIds: string[]; questions: Question[]; stageId: string; confirmationMessage: string; redirectUrl: string; active: boolean; timezone: string; image?: string; followUps?: Partial<Record<FollowUpKind, FollowUp>> };
 type BookingGroup = { id: string; clientId: string; slug: string; name: string; intro: string; calendarIds: string[]; images: Record<string, string>; active: boolean };
 type StaffReview = { id: string; author: string; rating: number; text: string; source: string; date: string };
 type StaffProfile = { showReviews: boolean; showPhotos: boolean; title: string; bio: string; reviews: StaffReview[]; photos: Array<{ url: string; caption: string }>; payType?: "none" | "hourly" | "commission" | "salary"; payRate?: number };
@@ -434,6 +435,19 @@ function CalendarEditor({ data, value, busy, onClose, onSave, onDelete }: { data
       <button type="button" className="iv-btn" onClick={() => set({ questions: [...questions, { id: `q${Date.now().toString(36)}`, label: "", required: false, type: "text" }] })}><Plus size={13} /> Add question</button></div>
     <h3 className="sch-h3">After booking</h3>
     <div className="iv-grid">
+      <div className="sch-fu" style={{ gridColumn: "1 / -1" }}>
+        <b>Follow-ups</b><small className="iv-small">Automatic messages after a cancellation or no-show, with a link to rebook. Each one becomes an automation you can also see and edit in Operations → Automations.</small>
+        {FOLLOW_UP_KINDS.map(({ kind, label, help }) => { const f: FollowUp = { ...DEFAULT_FOLLOW_UP, ...(c.followUps?.[kind] || {}) }; const setF = (p: Partial<FollowUp>) => set({ followUps: { ...(c.followUps || {}), [kind]: { ...f, ...p } } }); return <div key={kind} className={`sch-fu-row${f.on ? " on" : ""}`}>
+          <label className="iv-check"><input type="checkbox" checked={f.on} onChange={(e) => setF({ on: e.target.checked })} /> <b>{label}</b></label>
+          <small className="iv-small">{help}</small>
+          {f.on && <div className="sch-fu-opts">
+            <label>Send by<select value={f.channel} onChange={(e) => setF({ channel: e.target.value as FollowUp["channel"] })}><option value="both">Email + WhatsApp/SMS</option><option value="message">WhatsApp or SMS</option><option value="email">Email only</option></select></label>
+            <label>How many<select value={f.count} onChange={(e) => setF({ count: Number(e.target.value) })}>{[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n} message{n > 1 ? "s" : ""}</option>)}</select></label>
+            <label>First one<select value={f.firstDelayHours} onChange={(e) => setF({ firstDelayHours: Number(e.target.value) })}>{[[0, "Straight away"], [1, "After 1 hour"], [3, "After 3 hours"], [24, "Next day"], [48, "After 2 days"]].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+            {f.count > 1 && <label>Then every<select value={f.gapDays} onChange={(e) => setF({ gapDays: Number(e.target.value) })}>{[1, 2, 3, 5, 7, 14].map((d) => <option key={d} value={d}>{d} day{d > 1 ? "s" : ""}</option>)}</select></label>}
+          </div>}
+        </div>; })}
+      </div>
       <Field label="Confirmation message" hint="Shown on screen and in the confirmation email"><textarea rows={2} value={c.confirmationMessage || ""} onChange={(e) => set({ confirmationMessage: e.target.value })} maxLength={1000} placeholder="Thanks! We'll text you the day before." /></Field>
       <Field label="Thank-you page (optional)" hint="Send people to this https:// page so conversions can be tracked"><input value={c.redirectUrl || ""} onChange={(e) => set({ redirectUrl: e.target.value })} placeholder="https://client.ie/thank-you" maxLength={500} /></Field>
       <Field label="Status"><label className="iv-check"><input type="checkbox" checked={c.active !== false} onChange={(e) => set({ active: e.target.checked })} /> Taking bookings</label></Field>

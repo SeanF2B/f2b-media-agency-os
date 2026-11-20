@@ -629,3 +629,11 @@ html body .app-shell.dark-mode .sch-dash-panel-tools .sch-seg button.on{backgrou
 .sch-group-cal .iv-check{flex:1;min-width:200px;display:flex;align-items:center;gap:6px}.sch-dot{width:10px;height:10px;border-radius:50%;display:inline-block}
 .sch-group-order{display:inline-flex;gap:4px}
 .app-shell.dark-mode .sch-page-thumbs span{border-color:#22282e}
+
+/* Booking calendar → Follow-ups */
+.sch-fu{display:grid;gap:8px;border:1px solid var(--f2b-border,#e6e9ec);border-radius:14px;padding:12px 14px;margin:4px 0}
+.sch-fu>b{font-size:14px}
+.sch-fu-row{display:grid;gap:4px;padding:10px 12px;border-radius:12px;background:rgba(127,127,127,.05)}.sch-fu-row.on{background:color-mix(in srgb,var(--brand-primary,#1479b8) 7%,transparent)}
+.sch-fu-opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-top:6px}.sch-fu-opts label{display:grid;gap:4px;font-size:12px;font-weight:700}
+.sch-fu-opts select{height:36px;border:1px solid var(--f2b-border,#d9dee3);border-radius:10px;padding:0 8px;font:inherit;font-size:13px;background:transparent;color:inherit}
+@media (max-width:700px){.sch-fu-opts select{font-size:16px}}
