@@ -17,6 +17,8 @@ export type CalendarConfig = {
   minNoticeMin: number; maxDaysAhead: number; dailyLimit: number; locationType: LocationType; locationDetail: string;
   price: number; currency: string; color: string; assignMode: AssignMode; staffIds: string[]; questions: Question[];
   stageId: string; confirmationMessage: string; redirectUrl: string; active: boolean; timezone: string;
+  /** Service picture shown on booking pages (Media Library or https). */
+  image: string;
 };
 
 export type StaffAvailability = { staffId: string; timezone: string; weekly: WeeklyHours; blocked: string[]; dailyLimit: number };
@@ -93,6 +95,7 @@ export function sanitizeCalendar(input: Record<string, unknown>, base: Partial<C
     redirectUrl: /^https:\/\//.test(redirect) ? redirect : "",
     active: input.active === undefined ? true : Boolean(input.active),
     timezone: tz && isValidTimeZone(tz) ? tz : DEFAULT_TZ,
+    image: /^(https:\/\/|\/api\/marketing-public\/media\?f=)/.test(text(input.image, 600)) ? text(input.image, 600) : "",
   };
 }
 

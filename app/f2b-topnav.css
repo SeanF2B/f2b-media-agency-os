@@ -3579,3 +3579,12 @@ html body .app-shell .settings-billing-card { padding: 22px 24px !important; mar
 .sp-results { padding: 0 18px 14px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
 .sp-results p { margin: 0; } .sp-results .ok b { color: #15803d; } .sp-results .bad { color: #b42318; } .sp-results a { margin-left: 6px; }
 .sp-review { background: #fff7e6; color: #7c4a03; padding: 8px 10px; border-radius: 10px; }
+
+/* Phones: chat tool buttons (attach / booking link) keep their icons; reply bar wraps tools neatly */
+@media (max-width: 860px) {
+  html body .app-shell .cv-compose:not(.cv-email-compose) { flex-wrap: wrap; }
+  html body .app-shell .cv-compose:not(.cv-email-compose) > .cv-files { flex: 0 0 100%; order: -1; }
+  html body .app-shell .cv-compose:not(.cv-email-compose) > div > .cv-tools .cv-tool { width: 40px; height: 40px; font-size: inherit !important; border-radius: 50% !important; }
+  html body .app-shell .cv-compose:not(.cv-email-compose) > div > .cv-tools .cv-tool::before { content: none !important; }
+  html body .app-shell .cv-chat-actions .cv-invoice { font-size: 12px !important; }
+}

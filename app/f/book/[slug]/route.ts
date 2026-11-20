@@ -39,6 +39,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid color-mix(in srgb,var(
 .av.sm{width:46px;height:46px;margin:0;font-size:16px}.bio{margin:0;color:#334155;font-size:14px;line-height:1.5}
 .photos{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}.photos a{flex:0 0 auto}.photos img{width:120px;height:90px;object-fit:cover;border-radius:10px;display:block}
 .reviews{display:grid;gap:8px}.review{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px}.review>div{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.review small{color:var(--muted);font-size:11px}.review p{margin:6px 0 0;font-size:14px;line-height:1.5;color:#334155}
+.svc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}.svc{display:flex;flex-direction:column;text-align:left;border:1.5px solid var(--line);border-radius:18px;background:#fff;overflow:hidden;cursor:pointer;font:inherit;color:inherit;padding:0;text-decoration:none;transition:.15s}.svc:hover{border-color:var(--brand);transform:translateY(-2px);box-shadow:0 10px 26px color-mix(in srgb,var(--brand) 16%,transparent)}.svc-img{aspect-ratio:16/9;background:color-mix(in srgb,var(--brand) 12%,#fff);display:grid;place-items:center;font-size:30px;font-weight:800;color:var(--brand)}.svc-img img{width:100%;height:100%;object-fit:cover;display:block}.svc-body{padding:12px 14px 14px;display:grid;gap:6px}.svc-body b{font-size:16px}.svc-body p{margin:0;color:#475569;font-size:13.5px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}.svc-meta{display:flex;flex-wrap:wrap;gap:6px}.svc-meta span{font-size:12px;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 9px;color:#334155}.svc-team{display:flex;align-items:center;margin-top:2px}.svc-team i{width:26px;height:26px;border-radius:50%;border:2px solid #fff;margin-left:-6px;background:color-mix(in srgb,var(--brand) 16%,#fff);color:var(--brand);display:grid;place-items:center;font-style:normal;font-size:10px;font-weight:800;overflow:hidden}.svc-team i:first-child{margin-left:0}.svc-team img{width:100%;height:100%;object-fit:cover}.back{display:inline-block;margin:14px 22px 0;color:var(--brand);font-weight:700;font-size:14px;text-decoration:none}
 .stars{color:#f59e0b;letter-spacing:1px;font-size:13px}.more{border:0;background:none;color:var(--brand);font:inherit;font-weight:700;cursor:pointer;justify-self:start;padding:0}
 </style></head><body><div class="wrap"><div class="card" id="app"><div class="skeleton">Loading…</div></div><div class="foot">Secure booking · powered by F2B Media</div></div>
 <script>
@@ -60,7 +61,17 @@ function header(){var i=state.info,c=i.calendar,b=i.business;document.documentEl
  var top=h("div",{class:"top"},[b.logo?h("img",{src:b.logo,alt:b.name}):null,h("div",{},[h("div",{class:"biz",text:b.name}),h("div",{class:"title",text:c.name})])]);
  var meta=h("div",{class:"meta"},[h("span",{class:"pill",text:"⏱ "+c.durationMin+" min"}),c.location?h("span",{class:"pill",text:"📍 "+c.location}):null,c.price?h("span",{class:"pill",text:new Intl.NumberFormat("en-IE",{style:"currency",currency:c.currency||"EUR"}).format(c.price)}):h("span",{class:"pill",text:c.kind==="consultation"?"Free consultation":"No charge to book"})]);
  return [top,meta,c.description?h("div",{class:"desc",text:c.description}):null]}
-function render(){app.innerHTML="";var i=state.info;if(!i){app.appendChild(h("div",{class:"skeleton",text:state.error||"Loading…"}));return resize()}
+var BACK=(qs.get("back")||"").replace(/[^a-z0-9-]/g,"").slice(0,64);
+function keepQs(extra){var q=new URLSearchParams(location.search);q.delete("back");q.delete("t");if(extra)q.set("back",extra);var t=q.toString();return t?"?"+t:""}
+function money(n,c){try{return new Intl.NumberFormat("en-IE",{style:"currency",currency:c||"EUR",maximumFractionDigits:n%1?2:0}).format(n)}catch(e){return n+" "+(c||"")}}
+function renderGroup(){var g=state.group,b=g.business;document.documentElement.style.setProperty("--brand",b.color||"#2563eb");document.title=g.group.name+" · "+b.name;app.innerHTML="";
+ app.appendChild(h("div",{class:"top"},[b.logo?h("img",{src:b.logo,alt:b.name}):null,h("div",{},[h("div",{class:"biz",text:b.name}),h("div",{class:"title",text:g.group.name})])]));
+ if(g.group.intro)app.appendChild(h("div",{class:"desc",text:g.group.intro}));
+ var grid=h("div",{class:"svc-grid"},g.services.map(function(sv){var team=h("div",{class:"svc-team"},sv.staff.map(function(p){return h("i",{title:p.name},[p.avatar?h("img",{src:p.avatar,alt:p.name}):document.createTextNode(initials(p.name))])}));
+  return h("a",{class:"svc",href:"/f/book/"+encodeURIComponent(sv.slug)+keepQs(g.group.slug)},[h("div",{class:"svc-img"},[sv.image?h("img",{src:sv.image,alt:sv.name}):document.createTextNode(initials(sv.name))]),h("div",{class:"svc-body"},[h("b",{text:sv.name}),sv.description?h("p",{text:sv.description}):null,h("div",{class:"svc-meta"},[h("span",{text:"⏱ "+sv.durationMin+" min"}),sv.price>0?h("span",{text:money(sv.price,sv.currency)}):null,sv.location?h("span",{text:sv.location}):null]),sv.staff.length?team:null])])}));
+ app.appendChild(h("div",{class:"step"},[h("h2",{text:g.services.length?"1. Choose a service":"No services are open for booking right now."}),grid]));resize()}
+function render(){if(state.group&&!state.info)return renderGroup();app.innerHTML="";var i=state.info;if(!i){app.appendChild(h("div",{class:"skeleton",text:state.error||"Loading…"}));return resize()}
+ if(BACK&&!MANAGE)app.appendChild(h("a",{class:"back",href:"/f/book/"+BACK+keepQs(""),text:"← All services"}));
  if(state.done){return renderDone()}
  header().forEach(function(n){if(n)app.appendChild(n)});
  if(MANAGE&&state.booking&&!state.rescheduling){return renderManage()}
@@ -123,7 +134,10 @@ function loadSlots(){state.loading=true;render();var p="?cal="+encodeURIComponen
   if(!state.day||!by[state.day]||!by[state.day].length){state.day=Object.keys(by).filter(function(k){return by[k].length})[0]||""}render()})
  .catch(function(err){state.loading=false;state.error=err.message;render()})}
 var first=MANAGE?api("?manage="+encodeURIComponent(TOKEN)).then(function(r){if(!r.calendar||!r.business)throw new Error("This appointment can't be changed online. Please contact us.");state.booking=r.booking;return r}):api("?cal="+encodeURIComponent(SLUG));
-first.then(function(r){state.info=r;state.weekStart=localDate(new Date());if(!MANAGE)loadSlots();else render()}).catch(function(err){state.error=err.message;render()});
+first.then(function(r){state.info=r;state.weekStart=localDate(new Date());if(!MANAGE)loadSlots();else render()}).catch(function(err){
+ // Not a single calendar: maybe a booking page (several services under one link).
+ if(MANAGE){state.error=err.message;return render()}
+ api("?group="+encodeURIComponent(SLUG)).then(function(g){state.group=g;render()}).catch(function(){state.error=err.message;render()})});
 window.addEventListener("resize",resize);
 })();
 </script></body></html>`;

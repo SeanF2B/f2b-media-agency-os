@@ -9753,3 +9753,22 @@ html.f2b-dark .onb-admin, .dark-mode .onb-admin { background:#0f172a; color:#f8f
 .lp-msg-pages img{width:32px;height:32px;border-radius:50%;object-fit:cover}.lp-msg-pages span{display:flex;flex-direction:column}.lp-msg-pages small{display:inline-flex;align-items:center;gap:4px;opacity:.75}
 .app-shell.dark-mode .lp-msg-table,.app-shell.dark-mode .lp-msg-setup,.app-shell.dark-mode .lp-msg-copy button{background:#22282e;border-color:#3c4850;color:#f1f5f7}.app-shell.dark-mode .lp-msg-row{border-color:#3c4850}
 @media (max-width:820px){.lp-msg-row{grid-template-columns:1fr 1fr}.lp-msg-th{display:none}.lp-msg-account{grid-column:1/-1}.lp-msg-head{flex-direction:column;align-items:flex-start}.cv-staff-select{margin-left:0}}
+
+/* Chat box: attachments, booking link picker, Invoice button */
+.cv-compose{position:relative}
+.cv-files{display:flex;gap:6px;flex-wrap:wrap;padding:0 0 6px}
+.cv-file{display:inline-flex;align-items:center;gap:6px;max-width:220px;padding:4px 6px 4px 4px;border:1px solid #dce3e7;border-radius:10px;background:var(--f2b-white,#fff);font-size:12px}
+.cv-file img{width:32px;height:32px;object-fit:cover;border-radius:7px}.cv-file small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cv-file button{border:0;background:none;cursor:pointer;color:inherit;opacity:.6;padding:2px;display:grid;place-items:center}.cv-file button:hover{opacity:1}
+.cv-tools{position:relative;display:inline-flex;gap:6px;margin-right:auto}
+.cv-compose>div:last-child{display:flex;align-items:center;gap:8px}
+.cv-tool{width:40px;height:40px;padding:0!important;display:inline-grid!important;place-items:center;border-radius:12px}
+.cv-links{position:absolute;bottom:calc(100% + 8px);left:0;z-index:30;width:min(320px,80vw);max-height:300px;overflow:auto;background:var(--f2b-white,#fff);border:1px solid #dce3e7;border-radius:14px;box-shadow:0 16px 40px rgba(16,24,40,.16);padding:8px;display:grid;gap:4px}
+.cv-links>b{font-size:12px;padding:4px 6px;opacity:.7}.cv-links>small{padding:6px;opacity:.75}
+.cv-links button{display:flex;align-items:center;gap:8px;text-align:left;border:0;background:none;padding:8px;border-radius:10px;cursor:pointer;font:inherit;font-size:13.5px;color:inherit}
+.cv-links button:hover{background:rgba(127,127,127,.1)}
+.cv-links-tag{font-size:10.5px;font-weight:800;padding:2px 6px;border-radius:6px;background:var(--brand-primary,#1479b8);color:#fff}.cv-links-tag.cal{background:rgba(127,127,127,.18);color:inherit}
+.cv-invoice{display:inline-flex!important;align-items:center;gap:6px}
+.cv-notice{background:#ecfdf3;border:1px solid #abefc6;color:#067647;border-radius:12px;padding:10px 12px;margin:0 0 10px;font-size:13.5px;font-weight:600}
+.app-shell.dark-mode .cv-file,.app-shell.dark-mode .cv-links{background:#22282e;border-color:#3c4850;color:#f1f5f7}
+.app-shell.dark-mode .cv-notice{background:rgba(6,118,71,.18);border-color:rgba(6,118,71,.5);color:#a6f4c5}

@@ -77,7 +77,9 @@ export async function saveCalendar(db: Db, ownerId: string, input: Record<string
   let slug = cfg.slug;
   for (let n = 2; n < 50; n++) {
     const clash = await db.prepare("SELECT id FROM sched_calendars WHERE slug=?1").bind(slug).first<{ id: string }>();
-    if (!clash || clash.id === id) break;
+    // Booking pages (groups) share the /f/book/<slug> links, so their slugs count as taken too.
+    const pageClash = await db.prepare("SELECT id FROM sched_groups WHERE slug=?1").bind(slug).first<{ id: string }>().catch(() => null);
+    if ((!clash || clash.id === id) && !pageClash) break;
     slug = `${cfg.slug.slice(0, 54)}-${n}`;
   }
   cfg.slug = slug;

@@ -1,7 +1,7 @@
 // Facebook Login callback: swap the code for a long-lived token, then save the person's Pages as "pending"
 // for that sub-account. Launchpad then asks which Page(s) to connect.
 import { env } from "cloudflare:workers";
-import { authorizeAdmin } from "@/lib/settings-auth";
+import { authorizeAdminOrSubAccount } from "@/lib/settings-auth";
 import { configuredMetaApiVersion } from "@/lib/meta-ads-direct";
 import { savePendingPages } from "@/lib/conversations/meta";
 
@@ -13,12 +13,13 @@ const back = (request: Request, result: string, clientId = "") => {
 };
 
 export async function GET(request: Request) {
-  const auth = await authorizeAdmin("connect Facebook and Instagram messages");
+  const auth = await authorizeAdminOrSubAccount("connect Facebook and Instagram messages", "Conversations");
   if (auth.error) return back(request, "admin-required");
   const url = new URL(request.url);
   const cookie = request.headers.get("cookie")?.split(";").map((c) => c.trim()).find((c) => c.startsWith("f2b_meta_msg_state="))?.slice("f2b_meta_msg_state=".length) || "";
   const [savedState, rawClient = "agency"] = cookie.split(".");
   const clientId = rawClient === "agency" ? "" : rawClient;
+  if (auth.scope && !auth.scope.includes(clientId)) return back(request, "admin-required", clientId);
   if (url.searchParams.has("error")) return back(request, "cancelled", clientId);
   const code = url.searchParams.get("code") || "", state = url.searchParams.get("state") || "";
   if (!code || !state || state !== savedState || !env.META_APP_ID || !env.META_APP_SECRET) return back(request, "oauth-failed", clientId);

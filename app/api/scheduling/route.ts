@@ -11,6 +11,7 @@ import {
   SchedulingError, availableSlots, createBooking, deleteCalendar, getBooking, getCalendar, getStaffSettings, listBookings, listCalendars,
   saveCalendar, saveStaffSettings, staffFeedToken, updateBooking, getStaffProfiles, saveStaffProfile, reviewLinkToken,
 } from "@/lib/scheduling/server";
+import { deleteGroup, getGroup, listGroups, saveGroup } from "@/lib/scheduling/groups";
 import { getPayroll, savePayrollEmployer, savePayrollPerson, issuePayslip, deletePayslip, getPayslip, markPayslipEmailed } from "@/lib/scheduling/payroll-store";
 
 export const dynamic = "force-dynamic";
@@ -75,6 +76,12 @@ export async function GET(request: Request) {
       if (url.searchParams.get("debug") === "1") { siteCache.clear(); debugInfo.fetches = []; const out = await siteSampleFor(client, db); return json({ ...out, debug: debugInfo }); }
       return json(await siteSampleFor(client, db));
     }
+    if (view === "links") {
+      // For the chat box: booking pages and calendar links this person can send.
+      const base = `${schedulingDeps(request).baseUrl}/f/book/`;
+      const [cals, groups] = await Promise.all([listCalendars(db, ctx.ws.ownerId, ctx.scope), listGroups(db, ctx.ws.ownerId, ctx.scope).catch(() => [])]);
+      return json({ pages: groups.filter((g) => g.active).map((g) => ({ name: g.name, url: base + g.slug, clientId: g.clientId })), calendars: cals.filter((c) => c.active).map((c) => ({ name: c.name, url: base + c.slug, clientId: c.clientId, durationMin: c.durationMin })) });
+    }
     if (view === "calendars") return json({ calendars: (await listCalendars(db, ctx.ws.ownerId, ctx.scope)).map((c) => ({ id: c.id, name: c.name, clientId: c.clientId })) });
     if (view === "slots") {
       const cal = await getCalendar(db, ctx.ws.ownerId, str(url.searchParams.get("calendarId"), 80));
@@ -86,7 +93,7 @@ export async function GET(request: Request) {
     }
     const from = Date.parse(url.searchParams.get("from") || "") || Date.now() - 7 * 86_400_000;
     const to = Math.min(Date.parse(url.searchParams.get("to") || "") || Date.now() + 35 * 86_400_000, from + 120 * 86_400_000);
-    const [calendars, allBookings] = await Promise.all([listCalendars(db, ctx.ws.ownerId, ctx.scope), listBookings(db, ctx.ws.ownerId, ctx.scope, new Date(from).toISOString(), new Date(to).toISOString())]);
+    const [calendars, allBookings, groups] = await Promise.all([listCalendars(db, ctx.ws.ownerId, ctx.scope), listBookings(db, ctx.ws.ownerId, ctx.scope, new Date(from).toISOString(), new Date(to).toISOString()), listGroups(db, ctx.ws.ownerId, ctx.scope).catch(() => [])]);
     const bookings = ctx.ownOnly ? allBookings.filter((b) => b.staffIds.includes(ctx.me?.id || "")) : allBookings;
     const deps = schedulingDeps(request);
     const staffIds = ctx.staff.map((s) => s.id);
@@ -97,7 +104,7 @@ export async function GET(request: Request) {
       return { ...s, timezone: av?.timezone, weekly: av?.weekly, blocked: av?.blocked, dailyLimit: av?.dailyLimit || 0, google: google[s.id] || "", profile: profiles[s.id] || null, feedUrl: mine(s.id) && av?.icsToken ? `${deps.baseUrl}/api/marketing-public/scheduling?ics=${av.icsToken}` : "", canEdit: mine(s.id) };
     });
     const clients = (ctx.scope === null ? ctx.ws.clients : ctx.ws.clients.filter((c) => c.id === ctx.scope)).map((c) => ({ id: c.id, name: c.name, logo: c.logo || "" }));
-    return json({ calendars, bookings, staff, clients, scope: ctx.scope, canManage: ctx.canManage, ownOnly: ctx.ownOnly, isAdmin: ctx.admin, ownTeamIds: (ctx as { ownTeamIds?: string[] }).ownTeamIds || [], meId: ctx.me?.id || "", googleAvailable: googleSchedulingAvailable(), emailReady: Boolean(deps.sendEmail), publicBase: `${deps.baseUrl}/f/book/` });
+    return json({ calendars, groups, bookings, staff, clients, scope: ctx.scope, canManage: ctx.canManage, ownOnly: ctx.ownOnly, isAdmin: ctx.admin, ownTeamIds: (ctx as { ownTeamIds?: string[] }).ownTeamIds || [], meId: ctx.me?.id || "", googleAvailable: googleSchedulingAvailable(), emailReady: Boolean(deps.sendEmail), publicBase: `${deps.baseUrl}/f/book/` });
   } catch (error) {
     return fail(error instanceof Error ? error.message : "Scheduling could not load.", error instanceof SchedulingError ? error.status : 500);
   }
@@ -123,6 +130,22 @@ export async function POST(request: Request) {
         const allowedStaff = new Set(ctx.staff.map((s) => s.id));
         input.staffIds = Array.isArray(input.staffIds) ? (input.staffIds as unknown[]).map(String).filter((id) => allowedStaff.has(id)) : [];
         return json({ calendar: await saveCalendar(db, ownerId, input) });
+      }
+      case "saveGroup": {
+        if (!ctx.canManage) return fail("Only an admin or sub-account manager can change booking pages.", 403);
+        const input = (body.group || {}) as Record<string, unknown>;
+        if (input.id) { const existing = await getGroup(db, ownerId, str(input.id, 80)); if (!existing || !inScope(ctx, existing.clientId)) return fail("Booking page not found.", 404); input.clientId = existing.clientId; }
+        else input.clientId = ctx.scope !== null ? ctx.scope : (ctx.ws.clients.some((c) => c.id === input.clientId) ? input.clientId : "");
+        // Only calendars from the same account can go on one page.
+        const cals = await listCalendars(db, ownerId, String(input.clientId || ""));
+        try { return json({ group: await saveGroup(db, ownerId, input, cals.map((c) => c.id)) }); } catch (e) { return fail(e instanceof Error ? e.message : "Couldn't save the booking page."); }
+      }
+      case "deleteGroup": {
+        if (!ctx.canManage) return fail("Only an admin or sub-account manager can delete booking pages.", 403);
+        const g = await getGroup(db, ownerId, str(body.id, 80));
+        if (!g || !inScope(ctx, g.clientId)) return fail("Booking page not found.", 404);
+        await deleteGroup(db, ownerId, g.id);
+        return json({ ok: true });
       }
       case "deleteCalendar": {
         if (!ctx.canManage) return fail("Only an admin or sub-account manager can delete booking calendars.", 403);

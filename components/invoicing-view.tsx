@@ -112,7 +112,7 @@ function PreviewModal({ html, onClose, closeLabel = "Close", extra }: { html: st
     <p className="iv-small">This is exactly what your client will see. Drafts aren’t visible to anyone until you send them.</p>
     <iframe className="iv-preview" title="Invoice preview" srcDoc={html} sandbox="allow-scripts allow-modals" /></Modal>;
 }
-function InvoiceEditor({ draft, clients, terms, onClose, onSave }: { draft: Draft; clients: ClientInfo[]; terms: number; onClose: () => void; onSave: (d: Draft, send: boolean) => Promise<void> }) {
+function InvoiceEditor({ draft, clients, terms, onClose, onSave, onChatLink }: { draft: Draft; clients: ClientInfo[]; terms: number; onClose: () => void; onSave: (d: Draft, send: boolean) => Promise<void>; /** From a conversation: save and drop the invoice link into the chat instead of (or as well as) emailing. */ onChatLink?: (d: Draft) => Promise<void> }) {
   const [d, setD] = useState<Draft>(draft); const [busy, setBusy] = useState(false); const [err, setErr] = useState("");
   const pick = (id: string) => { const c = clients.find((x) => x.id === id); setD({ ...d, clientId: id, clientName: c?.name || d.clientName, clientEmail: c?.email || d.clientEmail, currency: c?.currency || d.currency }); };
   const client = clients.find((x) => x.id === d.clientId);
@@ -125,7 +125,7 @@ function InvoiceEditor({ draft, clients, terms, onClose, onSave }: { draft: Draf
   };
   const showPreview = async () => { setErr(""); try { setPreview((await call<{ html: string }>({ action: "preview", ...d })).html); } catch (e) { setErr(e instanceof Error ? e.message : "Could not load the preview."); } };
   if (preview !== null) return <PreviewModal html={preview} onClose={() => setPreview(null)} closeLabel="Back to editing" extra={<><button type="button" className="secondary-button" disabled={busy} onClick={() => void go(false)}>Save draft</button><button type="button" className="primary-button" disabled={busy} onClick={() => { setPreview(null); void go(true); }}>{busy ? "Working…" : "Save & send"}</button></>} />;
-  return <Modal title={d.id ? "Edit invoice" : "New invoice"} onClose={onClose} footer={<><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button type="button" className="secondary-button" disabled={busy} onClick={() => void showPreview()}>Preview</button><button type="button" className="secondary-button" disabled={busy} onClick={() => void go(false)}>Save draft</button><button type="button" className="primary-button" disabled={busy} onClick={() => void go(true)}>{busy ? "Working…" : "Save & send"}</button></>}>
+  return <Modal title={d.id ? "Edit invoice" : "New invoice"} onClose={onClose} footer={<><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button type="button" className="secondary-button" disabled={busy} onClick={() => void showPreview()}>Preview</button><button type="button" className="secondary-button" disabled={busy} onClick={() => void go(false)}>Save draft</button>{onChatLink && <button type="button" className="secondary-button" disabled={busy} onClick={async () => { setBusy(true); setErr(""); try { await onChatLink({ ...d, clientEmail: d.clientEmail.trim() }); } catch (e) { setErr(e instanceof Error ? e.message : "Could not save."); setBusy(false); } }}>Send link in chat</button>}<button type="button" className="primary-button" disabled={busy} onClick={() => void go(true)}>{busy ? "Working…" : onChatLink ? "Save & email" : "Save & send"}</button></>}>
     <div className="iv-grid"><label>Client<select value={d.clientId} onChange={(e) => pick(e.target.value)}><option value="">Someone else…</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
       <label>Name on invoice<input value={d.clientName} onChange={(e) => setD({ ...d, clientName: e.target.value })} /></label>
       <label>Email to send to<input type="email" value={d.clientEmail} onChange={(e) => setD({ ...d, clientEmail: e.target.value })} placeholder="client@example.com" className={missingOnFile && !d.clientEmail.trim() ? "iv-need" : undefined} />
@@ -161,3 +161,19 @@ function SettingsPanel({ settings, onSave }: { settings: Settings; onSave: (s: S
     <label>Footer note (optional)<input value={s.footerNote} onChange={(e) => set({ footerNote: e.target.value })} placeholder="Thanks for your business!" /></label>
     <div className="iv-foot">{msg && <span className="iv-ok">{msg}</span>}<button type="button" className="primary-button" disabled={busy} onClick={async () => { setBusy(true); try { await onSave(s); setMsg("Saved."); } catch (e) { setMsg(e instanceof Error ? e.message : "Could not save."); } finally { setBusy(false); } }}>{busy ? "Saving…" : "Save settings"}</button></div></div>;
 }
+
+/** Send invoice from a conversation: the normal invoice editor, pre-filled with the customer, for that account. */
+export function QuickInvoice({ scopeClientId, name, email, onClose, onLink, onDone }: { scopeClientId: string; name: string; email: string; onClose: () => void; onLink: (text: string) => void; onDone: (note: string) => void }) {
+  const [data, setData] = useState<Data | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => { void call<Data>(undefined, `?clientId=${encodeURIComponent(scopeClientId || "agency")}`).then(setData).catch((e) => setError(e instanceof Error ? e.message : "Could not load invoicing.")); }, [scopeClientId]);
+  if (!data) return <Modal title="Send invoice" onClose={onClose}><p className="iv-small">{error || "Loading…"}</p></Modal>;
+  const c = data.clients.find((x) => x.id === scopeClientId);
+  const draft: Draft = { clientId: scopeClientId, clientName: name, clientEmail: email, clientAddress: "", issueDate: iso(), dueDate: plus(iso(), data.settings.paymentTermsDays), items: [{ description: "", qty: 1, unit: 0 }], vatRate: 0, notes: "", currency: c?.currency || data.currency };
+  const save = async (d: Draft) => (await call<{ id: string }>({ action: "save-invoice", ...d, saveEmailToClient: false })).id;
+  return <InvoiceEditor draft={draft} clients={data.clients} terms={data.settings.paymentTermsDays}
+    onClose={onClose}
+    onSave={async (d, send) => { const id = await save(d); if (send) await call({ action: "send", id }); onDone(send ? `Invoice emailed to ${d.clientEmail}.` : "Invoice saved as a draft in Invoicing."); }}
+    onChatLink={async (d) => { const id = await save(d); const r = await call<{ link: string; number: string; total: number; currency: string }>({ action: "issue-link", id }); onLink(`Here's your invoice ${r.number} for ${fmt(r.total, r.currency)}: ${r.link}`); onDone("Invoice saved. The link is in your reply box, ready to send."); }} />;
+}
+

@@ -86,6 +86,14 @@ export async function POST(request: Request) {
       const id = await createInvoice(auth.ownerId, { clientId: String(b.clientId || ""), clientName: name, clientEmail: String(b.clientEmail || client?.email || ""), clientAddress: String(b.clientAddress || ""), issueDate: issue, dueDate: due, currency: String(b.currency || client?.currency || info.currency), items, vatRate: Number(b.vatRate) || 0, notes: String(b.notes || "") });
       return respond({ id });
     }
+    if (action === "issue-link") {
+      // Send in a chat instead of (or as well as) email: mark it sent and return its public link.
+      const inv = await env.DB!.prepare("SELECT * FROM inv_invoices WHERE id=?1 AND owner_id=?2").bind(b.id, auth.ownerId).first<any>();
+      if (!inv) return respond({ error: "Invoice not found." }, 404);
+      if (inv.status === "void") return respond({ error: "That invoice is void." }, 400);
+      await env.DB!.prepare("UPDATE inv_invoices SET status=CASE WHEN status='draft' THEN 'sent' ELSE status END, sent_at=CASE WHEN sent_at='' THEN ?2 ELSE sent_at END WHERE id=?1").bind(inv.id, now).run();
+      return respond({ link: `${origin}/api/marketing-public/invoice?token=${inv.public_token}`, number: inv.number, total: inv.total, currency: inv.currency });
+    }
     if (["send", "mark-paid", "void", "delete", "mark-unpaid"].includes(action)) {
       const inv = await env.DB!.prepare("SELECT * FROM inv_invoices WHERE id=?1 AND owner_id=?2").bind(b.id, auth.ownerId).first<any>();
       if (!inv) return respond({ error: "Invoice not found." }, 404);

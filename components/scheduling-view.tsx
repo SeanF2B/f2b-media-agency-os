@@ -9,17 +9,19 @@ import "./scheduling.css";
 import { ReportGeneratingAnimation, currencySymbolFor } from "./report-generating-animation";
 import { computePayslip, maskPps, normalisePps, validPps, DEFAULT_PERSON, EMPTY_YTD, type PayrollEmployer, type PayrollPerson } from "@/lib/scheduling/payroll";
 import type { PayLine, PayslipRecord } from "@/lib/scheduling/payroll-store";
+import { uploadToMedia } from "@/lib/upload-media";
 import { buildPayslipPdf, bytesToBase64, type PdfLogo } from "@/lib/scheduling/payslip-pdf";
 
 type DayKey = "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
 type Window = [string, string];
 type Question = { id: string; label: string; required?: boolean; type?: "text" | "textarea" | "select"; options?: string[] };
-type Calendar = { id: string; clientId: string; name: string; slug: string; kind: "service" | "consultation"; description: string; durationMin: number; bufferBefore: number; bufferAfter: number; slotInterval: number; minNoticeMin: number; maxDaysAhead: number; dailyLimit: number; locationType: "onsite" | "phone" | "video" | "office"; locationDetail: string; price: number; currency: string; color: string; assignMode: "customer_pick" | "round_robin" | "collective"; staffIds: string[]; questions: Question[]; stageId: string; confirmationMessage: string; redirectUrl: string; active: boolean; timezone: string };
+type Calendar = { id: string; clientId: string; name: string; slug: string; kind: "service" | "consultation"; description: string; durationMin: number; bufferBefore: number; bufferAfter: number; slotInterval: number; minNoticeMin: number; maxDaysAhead: number; dailyLimit: number; locationType: "onsite" | "phone" | "video" | "office"; locationDetail: string; price: number; currency: string; color: string; assignMode: "customer_pick" | "round_robin" | "collective"; staffIds: string[]; questions: Question[]; stageId: string; confirmationMessage: string; redirectUrl: string; active: boolean; timezone: string; image?: string };
+type BookingGroup = { id: string; clientId: string; slug: string; name: string; intro: string; calendarIds: string[]; images: Record<string, string>; active: boolean };
 type StaffReview = { id: string; author: string; rating: number; text: string; source: string; date: string };
 type StaffProfile = { showReviews: boolean; showPhotos: boolean; title: string; bio: string; reviews: StaffReview[]; photos: Array<{ url: string; caption: string }>; payType?: "none" | "hourly" | "commission" | "salary"; payRate?: number };
 type Staff = { id: string; name: string; email?: string; role?: string; avatar?: string; profile?: StaffProfile | null; timezone?: string; weekly?: Partial<Record<DayKey, Window[]>>; blocked?: string[]; dailyLimit: number; google: string; feedUrl: string; canEdit: boolean };
 type Booking = { id: string; clientId: string; calendarId: string; start: string; end: string; status: "booked" | "cancelled" | "completed" | "no_show"; staffIds: string[]; contactId: string | null; name: string; email: string; phone: string; answers: Array<{ label: string; value: string }>; notes: string; source: string; channel: string; meetLink: string; createdBy: string; createdAt: string };
-type Data = { calendars: Calendar[]; bookings: Booking[]; staff: Staff[]; clients: Array<{ id: string; name: string; logo: string }>; scope: string | null; canManage: boolean; isAdmin: boolean; ownTeamIds?: string[]; meId: string; googleAvailable: boolean; emailReady: boolean; publicBase: string };
+type Data = { calendars: Calendar[]; groups?: BookingGroup[]; bookings: Booking[]; staff: Staff[]; clients: Array<{ id: string; name: string; logo: string }>; scope: string | null; canManage: boolean; isAdmin: boolean; ownTeamIds?: string[]; meId: string; googleAvailable: boolean; emailReady: boolean; publicBase: string };
 type Slot = { start: string; end: string; staffIds: string[] };
 
 const DAY_LIST: Array<[DayKey, string]> = [["mon", "Monday"], ["tue", "Tuesday"], ["wed", "Wednesday"], ["thu", "Thursday"], ["fri", "Friday"], ["sat", "Saturday"], ["sun", "Sunday"]];
@@ -64,7 +66,7 @@ function Modal({ title, onClose, children, footer, wide }: { title: string; onCl
   </div>;
 }
 
-export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { scopeClientId: string; onAddStaff?: () => void; onEditStaff?: (staffId: string) => void }) {
+export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff, contentTab, initialTab }: { scopeClientId: string; onAddStaff?: () => void; onEditStaff?: (staffId: string) => void; /** Content scheduling (social calendar) shown as a Scheduling tab. */ contentTab?: ReactNode; initialTab?: string }) {
   // Stretch the day so 07:00–21:00 fills the window (calendar always in full view).
   const weekRef = useRef<HTMLDivElement>(null);
   const [PX_PER_MIN, setPpm] = useState(PX_DEFAULT);
@@ -81,13 +83,13 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
     const demo = sampleSchedule(realData, mondayOf(new Date()), sampleClientName, site);
     return { ...demo, canManage: realData.canManage, isAdmin: realData.isAdmin, meId: realData.meId, googleAvailable: realData.googleAvailable, bookings: demo.bookings.map((b) => sampleMoves[b.id] ? { ...b, start: sampleMoves[b.id], end: new Date(Date.parse(sampleMoves[b.id]) + Date.parse(b.end) - Date.parse(b.start)).toISOString() } : b) };
   }, [sample, realData, sampleClientName, site, sampleMoves]);
-  const [tab, setTab] = useState<"dashboard" | "calendar" | "appointments" | "calendars" | "availability">("calendar"); // Scheduling opens on the calendar
+  const [tab, setTab] = useState<"dashboard" | "calendar" | "appointments" | "calendars" | "availability" | "content">(initialTab === "content" && contentTab ? "content" : "calendar"); // Scheduling opens on the calendar
   // Phones: booking only — one day at a time, no drag-to-create or drag-to-move (it fights with scrolling).
   const [isPhone, setIsPhone] = useState(false);
   const [phoneDay, setPhoneDay] = useState(() => new Date());
   const [phoneView, setPhoneView] = useState<"day" | "week" | "month">("day");
   useEffect(() => { const mq = window.matchMedia("(max-width: 860px)"); const on = () => setIsPhone(mq.matches); on(); mq.addEventListener("change", on); return () => mq.removeEventListener("change", on); }, []);
-  useEffect(() => { if (isPhone && tab !== "calendar") setTab("calendar"); }, [isPhone]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (isPhone && tab !== "calendar" && tab !== "content") setTab("calendar"); }, [isPhone]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     // Fill the screen: the whole working day (07:00–21:00) fits inside the window on every device, no page scroll needed.
     const fit = () => { const el = weekRef.current; if (!el) return; const top = el.getBoundingClientRect().top + window.scrollY; const room = window.innerHeight - top - 52 - (isPhone ? 92 : 24); setPpm(Math.round(Math.max(0.42, Math.min(2.2, room / ((HOURS_TO - HOURS_FROM) * 60))) * 100) / 100); };
@@ -107,6 +109,7 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
   const [catchUpOpen, setCatchUpOpen] = useState(true);
   const [detail, setDetail] = useState<Booking | null>(null);
   const [editCal, setEditCal] = useState<Partial<Calendar> | null>(null);
+  const [editGroup, setEditGroup] = useState<Partial<BookingGroup> | null>(null);
   const [editAvail, setEditAvail] = useState<Staff | null>(null);
   const [editProfile, setEditProfile] = useState<Staff | null>(null);
   const [listMode, setListMode] = useState<"upcoming" | "past" | "cancelled">("upcoming");
@@ -177,12 +180,13 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
     {!isPhone && <AiBar scope={scopeClientId} data={data} onCalendar={(c) => setEditCal(c)} onCreateCalendar={async (c) => Boolean(await act({ action: "saveCalendar", calendar: c }, `“${c.name}” created. Copy its booking link from Booking calendars.`))} onAppointment={(a) => setNewAppt(a)} onHours={async (hours) => { for (const h of hours) { const person = data.staff.find((x) => x.id === h.staffId); await act({ action: "saveAvailability", staffId: h.staffId, weekly: h.weekly, blocked: [...new Set([...(person?.blocked || []), ...h.daysOff])], dailyLimit: h.dailyLimit || person?.dailyLimit || 0, timezone: person?.timezone || "Europe/Dublin" }); } setNote("Working hours updated."); setTab("availability"); }} />}
 
     <div className="sch-toolbar">
-      <div className="iv-tabs crm-tabs sch-tabs" role="tablist" aria-label="Scheduling sections">{([["dashboard", "Dashboard", LayoutDashboard], ["calendar", "Calendar", CalendarDays], ["appointments", "Appointments", ClipboardList], ["calendars", "Booking calendars", CalendarRange], ["availability", "Staff & availability", Users]] as const).map(([k, l, Icon]) => <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}><Icon size={16} strokeWidth={1.9} aria-hidden="true" />{l}</button>)}</div>
+      <div className="iv-tabs crm-tabs sch-tabs" role="tablist" aria-label="Scheduling sections">{([["dashboard", "Dashboard", LayoutDashboard], ["calendar", "Calendar", CalendarDays], ["appointments", "Appointments", ClipboardList], ["calendars", "Booking calendars", CalendarRange], ["availability", "Staff & availability", Users], ...(contentTab ? [["content", "Content", CalendarClock] as const] : [])] as const).map(([k, l, Icon]) => <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}><Icon size={16} strokeWidth={1.9} aria-hidden="true" />{l}</button>)}</div>
       {(tab === "calendar" || tab === "appointments") && <div className="sch-filters">
         <label className="sch-select"><Users size={14} /><select aria-label="Filter by staff member" value={staffFilter} onChange={(e) => setStaffFilter(e.target.value)}><option value="">Everyone</option>{data.staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
         <label className="sch-select"><CalendarDays size={14} /><select aria-label="Filter by booking calendar" value={calFilter} onChange={(e) => setCalFilter(e.target.value)}><option value="">All calendars</option>{data.calendars.map((c) => <option key={c.id} value={c.id}>{data.scope === null && c.clientId ? `${clientName(c.clientId)} · ` : ""}{c.name}</option>)}</select></label>
       </div>}
     </div>
+    {tab === "content" && contentTab && <div className="sch-content-tab">{contentTab}</div>}
     {tab === "dashboard" && <><section className="dh-approvals sch-appt-updates" aria-label="Appointment updates">{appt.card()}</section>{appt.list}</>}
     {tab === "dashboard" && <div className="iv-stats sch-stats-under"><div><small>Next 7 days</small><b>{stats.upcoming}</b></div><div><small>Booked this month</small><b>{stats.month}</b></div><div><small>Show-up rate</small><b>{stats.showRate === null ? "—" : `${stats.showRate}%`}</b></div><div className={stats.noShow ? "bad" : ""}><small>No-shows</small><b>{stats.noShow}</b></div>
       <div className="sch-perstaff"><small>This month by person</small>{stats.perStaff.length ? stats.perStaff.map(({ s, n }) => <span key={s.id}><Avatar person={s} size={20} /> {s.name.split(" ")[0]} <b>{n}</b></span>) : <span className="iv-small">No bookings yet</span>}</div></div>}
@@ -286,6 +290,14 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
           <span className={`iv-pill sch-status ${b.status}`}>{STATUS_LABEL[b.status]}</span></button>; })}</div> : <div className="iv-empty">No {listMode} appointments in this range.</div>; })()}
     </div>}
 
+    {tab === "calendars" && <section className="sch-pages" aria-label="Booking pages">
+      <div className="sch-pages-head"><div><h3>Booking pages</h3><p className="iv-small">Put several services under one link, like a menu: customers pick a service (with its picture), then a team member and a time. Embed it on any website.</p></div>{data.canManage && data.calendars.length > 0 && <button type="button" className="primary-button" onClick={() => setEditGroup({ name: "Book an appointment", slug: "", intro: "", calendarIds: data.calendars.filter((c) => c.active).map((c) => c.id), images: {}, active: true, clientId: data.scope ?? "" })}><Plus size={15} /> New booking page</button>}</div>
+      {(data.groups || []).length > 0 ? <div className="sch-pages-list">{(data.groups || []).map((g) => { const url = `${data.publicBase}${g.slug}`; const cals = g.calendarIds.map((id) => data.calendars.find((c) => c.id === id)).filter(Boolean) as Calendar[]; return <div key={g.id} className={`iv-card sch-page${g.active ? "" : " off"}`}>
+        <div className="sch-page-thumbs">{cals.slice(0, 4).map((c) => { const img = g.images[c.id] || c.image; return <span key={c.id} style={{ ["--c" as string]: c.color }}>{img ? <img src={img} alt="" /> : c.name.slice(0, 1)}</span>; })}</div>
+        <div className="sch-page-main"><b>{g.name}</b><small>{cals.length} service{cals.length === 1 ? "" : "s"}{data.scope === null ? ` · ${clientName(g.clientId)}` : ""}{g.active ? "" : " · Off"}</small><code>{url.replace(/^https?:\/\//, "")}</code></div>
+        <div className="iv-actions"><button type="button" className="iv-btn" onClick={() => { void navigator.clipboard?.writeText(url); setNote(`Booking page link copied: ${url}`); }}><Link2 size={13} /> Copy link</button><button type="button" className="iv-btn" onClick={() => { void navigator.clipboard?.writeText(embedCode(url)); setNote("Embed code copied. Paste it into the website where the booking page should appear."); }}><Copy size={13} /> Embed</button><a className="iv-btn" href={url} target="_blank" rel="noopener noreferrer">Preview</a>{data.canManage && <button type="button" className="iv-btn" onClick={() => setEditGroup(g)}><Settings2 size={13} /> Edit</button>}</div>
+      </div>; })}</div> : <p className="iv-small sch-pages-empty">No booking pages yet.{data.calendars.length ? " Group your calendars into one link with “New booking page”." : " Create a booking calendar first."}</p>}
+    </section>}
     {tab === "calendars" && <div className="sch-cal-grid">
       {data.calendars.map((c) => <div key={c.id} className={`iv-card sch-cal${c.active ? "" : " off"}`} style={{ ["--c" as string]: c.color }}>
         <div className="sch-cal-top"><span className="sch-cal-kind">{c.kind === "consultation" ? "Consultation" : "Service"}</span>{data.scope === null && <span className="iv-small">{clientName(c.clientId)}</span>}{!c.active && <span className="iv-pill">Off</span>}</div>
@@ -326,6 +338,7 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff }: { sco
     {newAppt && realData && <NewAppointment data={realData} scope={scopeClientId} initial={newAppt} onClose={() => setNewAppt(null)} onSaved={async (msg) => { setNewAppt(null); setNote(msg); await load(); }} onCalendarsChanged={() => void load()} />}
     {catchUpOpen && !detail && !newAppt && <CatchUp data={data} scope={scopeClientId} onClose={() => setCatchUpOpen(false)} onChanged={() => void load()} />}
     {detail && <AppointmentDetail key={detail.id} data={data} scope={scopeClientId} booking={detail} onClose={() => setDetail(null)} onSaved={async (msg) => { setDetail(null); setNote(msg); await load(); }} />}
+    {editGroup && <GroupEditor data={data} value={editGroup} busy={busy} clientName={clientName} onClose={() => setEditGroup(null)} onSave={async (g) => { const out = await act({ action: "saveGroup", group: g }, g.id ? "Booking page saved." : "Booking page created. Copy its link or embed code."); if (out) setEditGroup(null); }} onDelete={editGroup.id ? async () => { if (!(await appConfirm(`Delete the booking page “${editGroup.name}”? Its link will stop working (the calendars stay).`))) return; const out = await act({ action: "deleteGroup", id: editGroup.id }, "Booking page deleted."); if (out) setEditGroup(null); } : undefined} />}
     {editCal && <CalendarEditor data={data} value={editCal} busy={busy} onClose={() => setEditCal(null)} onSave={async (cal) => { const out = await act({ action: "saveCalendar", calendar: cal }, cal.id ? "Booking calendar saved." : "Booking calendar created. Copy its link or embed code to start taking bookings."); if (out) setEditCal(null); }} onDelete={editCal.id ? async () => { if (!(await appConfirm("Delete this booking calendar? Its booking link will stop working."))) return; const out = await act({ action: "deleteCalendar", id: editCal.id }, "Booking calendar deleted."); if (out) setEditCal(null); } : undefined} />}
     {editProfile && <Modal title={`${editProfile.name.split("|")[0].trim()}: booking profile`} wide onClose={() => { setEditProfile(null); void load(); }} footer={<button type="button" className="primary-button" onClick={() => { setEditProfile(null); void load(); }}>Done</button>}><StaffShowcaseEditor staffId={editProfile.id} scope={scopeClientId} staffName={editProfile.name} /></Modal>}
     {editAvail && <AvailabilityEditor staff={editAvail} busy={busy} onClose={() => setEditAvail(null)} onSave={async (v) => { const out = await act({ action: "saveAvailability", staffId: editAvail.id, ...v }, `${editAvail.name}'s availability saved.`); if (out) setEditAvail(null); }} />}
@@ -342,6 +355,43 @@ function blankCalendar(data: Data): Partial<Calendar> {
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) { return <label>{label}{children}{hint && <small className="iv-hint">{hint}</small>}</label>; }
 
+/** Picture picker: upload to the account's Media Library, or remove. */
+function ImagePick({ value, scope, onChange }: { value: string; scope: string; onChange: (url: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  const ref = useRef<HTMLInputElement>(null);
+  const pick = async (file?: File) => { if (!file) return; if (!file.type.startsWith("image/")) { void appAlert("Choose an image (JPG, PNG or WebP)."); return; } setBusy(true); try { onChange((await uploadToMedia(file, scope, "Booking pages")).url); } catch (e) { void appAlert(e instanceof Error ? e.message : "The upload failed."); } finally { setBusy(false); } };
+  return <span className="sch-img-pick">{value ? <img src={value} alt="" /> : <i><ImagePlus size={16} /></i>}<button type="button" className="iv-btn" disabled={busy} onClick={() => ref.current?.click()}>{busy ? "Uploading…" : value ? "Change" : "Upload"}</button>{value && <button type="button" className="iv-btn" onClick={() => onChange("")}>Remove</button>}<input ref={ref} type="file" accept="image/*" hidden onChange={(e) => { void pick(e.target.files?.[0]); e.target.value = ""; }} /></span>;
+}
+
+/** Booking page editor: name, own link, intro, which services (calendars) and a picture for each. */
+function GroupEditor({ data, value, busy, clientName, onClose, onSave, onDelete }: { data: Data; value: Partial<BookingGroup>; busy: boolean; clientName: (id: string) => string; onClose: () => void; onSave: (g: Partial<BookingGroup>) => void; onDelete?: () => void }) {
+  const [g, setG] = useState<Partial<BookingGroup>>(value);
+  const set = (p: Partial<BookingGroup>) => setG((x) => ({ ...x, ...p }));
+  const account = g.clientId ?? data.scope ?? "";
+  const pool = data.calendars.filter((c) => (c.clientId || "") === account);
+  const chosen = g.calendarIds || [];
+  const toggle = (id: string, on: boolean) => set({ calendarIds: on ? [...chosen, id] : chosen.filter((x) => x !== id) });
+  const move = (id: string, d: number) => { const i = chosen.indexOf(id), j = i + d; if (i < 0 || j < 0 || j >= chosen.length) return; const next = [...chosen]; [next[i], next[j]] = [next[j], next[i]]; set({ calendarIds: next }); };
+  const ordered = [...chosen.map((id) => pool.find((c) => c.id === id)).filter(Boolean) as Calendar[], ...pool.filter((c) => !chosen.includes(c.id))];
+  return <Modal title={g.id ? "Edit booking page" : "New booking page"} wide onClose={onClose} footer={<>{onDelete && <button type="button" className="iv-btn danger" onClick={onDelete}><Trash2 size={13} /> Delete</button>}<span style={{ flex: 1 }} /><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button type="button" className="primary-button" disabled={busy || !chosen.length || !(g.name || "").trim()} onClick={() => onSave(g)}>{busy ? "Saving…" : "Save booking page"}</button></>}>
+    <div className="iv-grid">
+      <Field label="Page title"><input value={g.name || ""} maxLength={120} onChange={(e) => set({ name: e.target.value })} placeholder="e.g. Book a roofing appointment" autoFocus /></Field>
+      <Field label="Link" hint="Pick your own, e.g. book-pro-roofers"><div className="sch-slug"><span>{data.publicBase.replace(/^https?:\/\//, "")}</span><input value={g.slug || ""} onChange={(e) => set({ slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, "-").slice(0, 60) })} placeholder="made from the title" /></div></Field>
+      {data.scope === null && !g.id && <Field label="Account"><select value={account} onChange={(e) => set({ clientId: e.target.value, calendarIds: data.calendars.filter((c) => (c.clientId || "") === e.target.value && c.active).map((c) => c.id) })}><option value="">Agency (F2B)</option>{data.clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>}
+      {g.id && data.scope === null && <Field label="Account"><input value={clientName(account)} disabled /></Field>}
+    </div>
+    <Field label="Intro (optional)"><textarea rows={2} maxLength={1500} value={g.intro || ""} onChange={(e) => set({ intro: e.target.value })} placeholder="A line above the services, e.g. Pick what you need and we'll confirm straight away." /></Field>
+    <div className="sch-group-cals"><b>Services on this page</b><small className="iv-small">Tick the calendars to show, in the order customers will see them. Each one keeps its own staff, hours and length.</small>
+      {ordered.map((c) => { const on = chosen.includes(c.id); return <div key={c.id} className={`sch-group-cal${on ? " on" : ""}`}>
+        <label className="iv-check"><input type="checkbox" checked={on} onChange={(e) => toggle(c.id, e.target.checked)} /> <span className="sch-dot" style={{ background: c.color }} /> <b>{c.name}</b> <small>{c.durationMin} min{c.active ? "" : " · off"}</small></label>
+        {on && <><ImagePick value={(g.images || {})[c.id] || c.image || ""} scope={account} onChange={(url) => set({ images: { ...(g.images || {}), [c.id]: url } })} /><span className="sch-group-order"><button type="button" className="iv-btn" aria-label="Move up" onClick={() => move(c.id, -1)}>↑</button><button type="button" className="iv-btn" aria-label="Move down" onClick={() => move(c.id, 1)}>↓</button></span></>}
+      </div>; })}
+      {!pool.length && <p className="iv-small">This account has no booking calendars yet.</p>}
+    </div>
+    <Field label="Status"><label className="iv-check"><input type="checkbox" checked={g.active !== false} onChange={(e) => set({ active: e.target.checked })} /> Taking bookings</label></Field>
+  </Modal>;
+}
+
 function CalendarEditor({ data, value, busy, onClose, onSave, onDelete }: { data: Data; value: Partial<Calendar>; busy: boolean; onClose: () => void; onSave: (c: Partial<Calendar>) => void; onDelete?: () => void }) {
   const [c, setC] = useState<Partial<Calendar>>(value);
   const set = (p: Partial<Calendar>) => setC((x) => ({ ...x, ...p }));
@@ -352,6 +402,10 @@ function CalendarEditor({ data, value, busy, onClose, onSave, onDelete }: { data
       <Field label="Name"><input value={c.name || ""} onChange={(e) => set({ name: e.target.value })} placeholder="e.g. Free roof survey" maxLength={120} autoFocus /></Field>
       <Field label="Type"><select value={c.kind} onChange={(e) => set({ kind: e.target.value as Calendar["kind"] })}><option value="service">Service appointment</option><option value="consultation">Consultation</option></select></Field>
       {data.scope === null && !c.id ? <Field label="Account"><select value={c.clientId || ""} onChange={(e) => set({ clientId: e.target.value })}><option value="">Agency (F2B)</option>{data.clients.map((cl) => <option key={cl.id} value={cl.id}>{cl.name}</option>)}</select></Field> : <Field label="Colour"><input type="color" value={c.color || "#2563eb"} onChange={(e) => set({ color: e.target.value })} /></Field>}
+    </div>
+    <div className="iv-grid">
+      <Field label="Booking link" hint="Your own link, e.g. free-roof-survey"><div className="sch-slug"><span>{data.publicBase.replace(/^https?:\/\//, "")}</span><input value={c.slug || ""} onChange={(e) => set({ slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, "-").slice(0, 60) })} placeholder="made from the name" /></div></Field>
+      <Field label="Service picture" hint="Shown on booking pages"><ImagePick value={c.image || ""} scope={c.clientId || data.scope || ""} onChange={(image) => set({ image })} /></Field>
     </div>
     <Field label="Description (shown on the booking page)"><textarea rows={2} value={c.description || ""} onChange={(e) => set({ description: e.target.value })} maxLength={1500} placeholder="What happens at this appointment?" /></Field>
     <h3 className="sch-h3">Timing</h3>
