@@ -3618,8 +3618,18 @@ html body .app-shell .cv-staff-select select { height: 32px !important; max-widt
 /* One clean border on hover/focus (no second ring), and kept clear of the list edge. */
 html body .app-shell .cv-staff-select { margin-right: 2px !important; }
 html body .app-shell .cv-staff-select select, html body .app-shell .cv-staff-select select:hover, html body .app-shell .cv-staff-select select:focus, html body .app-shell .cv-staff-select select:focus-visible { box-shadow: none !important; outline: none !important; transform: none !important; border-width: 1px !important; }
-html body .app-shell .cv-staff-select select:hover, html body .app-shell .cv-staff-select select:focus-visible { border-color: color-mix(in srgb, var(--brand-secondary-ink, #1e3a8a) 60%, transparent) !important; }
+@media (hover: hover) { html body .app-shell .cv-staff-select select:hover { border-color: color-mix(in srgb, var(--brand-secondary-ink, #1e3a8a) 60%, transparent) !important; } }
+html body .app-shell .cv-staff-select select:focus-visible { border-color: color-mix(in srgb, var(--brand-secondary-ink, #1e3a8a) 60%, transparent) !important; }
 html body .app-shell .cv-staff-select:focus-within { box-shadow: none !important; outline: none !important; }
+html body .app-shell .cv-staff-ico { display: none; }
+/* Phones: the staff filter is a compact icon button (the real select sits on top, invisible, so it still opens the native picker at 16px, no zoom). */
+@media (max-width: 820px) {
+  html body .app-shell .cv-staff-select { position: relative; display: inline-grid !important; place-items: center; width: 40px; height: 40px; flex: 0 0 40px !important; margin-left: auto !important; border: 1px solid #dce3e7; border-radius: 10px; background: var(--f2b-white, #fff); color: #3b3e43; }
+  html body .app-shell .cv-staff-select.is-on { background: var(--brand-primary, #3b82f6); border-color: var(--brand-primary, #3b82f6); color: #fff; }
+  html body .app-shell .cv-staff-ico { display: block; pointer-events: none; }
+  html body .app-shell label.cv-staff-select select { position: absolute !important; inset: 0; width: 100% !important; max-width: none !important; height: 100% !important; opacity: 0; font-size: 16px !important; cursor: pointer; border: 0 !important; }
+  html body .app-shell.dark-mode .cv-staff-select { background: #2a3238; border-color: #3c4850; color: #f1f5f7; }
+}
 @media (max-width: 860px) {
   html body .app-shell .cv-channel-bar > button { height: 34px !important; min-width: 34px; }
   html body .app-shell .cv-staff-select select { height: 34px !important; max-width: 104px; font-size: 16px !important; }
@@ -3654,6 +3664,8 @@ html body .app-shell .content-page .sp-dow { padding: 2px 4px; }
 html body .app-shell form.cv-compose.cv-compose2 { display: flex !important; flex-direction: column !important; align-items: stretch !important; gap: 8px !important; padding: 10px 12px !important; flex-wrap: nowrap !important; }
 html body .app-shell .cv-compose2 > .cv-toolrow { display: flex !important; align-items: center; gap: 6px !important; flex: none !important; overflow-x: auto; scrollbar-width: none; position: static; }
 html body .app-shell .cv-compose2 > .cv-toolrow::-webkit-scrollbar { display: none; }
+/* Room for the hover lift and ring, so they are not cut off by the scrolling row. */
+html body .app-shell form.cv-compose2 > .cv-toolrow { padding: 6px !important; margin: -6px !important; }
 html body .app-shell .cv-compose2 .cv-tools { display: inline-flex; gap: 6px; margin: 0; position: static; }
 html body .app-shell .cv-compose2 .cv-tool { flex: none; display: inline-flex !important; align-items: center; justify-content: center; gap: 6px; height: 36px; min-width: 36px; padding: 0 10px !important; border: 1px solid #dce3e7 !important; border-radius: 10px !important; background: var(--f2b-white, #fff) !important; color: inherit !important; font: inherit; font-size: 13px !important; font-weight: 700; cursor: pointer; width: auto !important; transition: transform .15s, border-color .15s; }
 html body .app-shell .cv-compose2 .cv-tool::before { content: none !important; }
@@ -3691,7 +3703,7 @@ html body .app-shell.dark-mode .cv-compose2 .cv-botswitch.on { background: rgba(
   html body .app-shell .cv-grid.has-thread > .cv-chat > .cv-msgs { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
   html body .app-shell .cv-compose2 { padding: 8px !important; gap: 6px !important; }
   html body .app-shell .cv-compose2 .cv-tool { height: 34px; min-width: 34px; padding: 0 8px !important; }
-  html body .app-shell .cv-compose2 .cv-tool-wide span { display: none; }
+  html body .app-shell .cv-compose2 .cv-tool-wide > span:not(.ai-eyes-icon) { display: none; }
   html body .app-shell .cv-compose2 .cv-writerow textarea { font-size: 16px !important; min-height: 42px !important; height: 42px; }
   html body .app-shell .cv-compose2 .cv-send { width: 42px !important; height: 42px; padding: 0 !important; justify-content: center; border-radius: 50% !important; }
   html body .app-shell .cv-compose2 .cv-send span { display: none; }

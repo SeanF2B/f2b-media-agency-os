@@ -44,3 +44,10 @@ export function NavIcon({ name, fallback, size = 17 }: { name: string; fallback?
   if (!Icon) return <>{fallback}</>;
   return <Icon className="lucide-nav-icon" size={size} strokeWidth={1.9} aria-hidden="true" />;
 }
+
+/** Receipt icon with the account's own currency sign (€ / £ / $), for invoice buttons. */
+export function CurrencyReceipt({ size = 16, currency }: { size?: number; currency?: string }) {
+  const c = (currency || getDisplayCurrency() || "").toUpperCase();
+  const Icon = c === "EUR" ? ReceiptEuro : c === "GBP" ? ReceiptPoundSterling : c === "USD" ? Receipt : ReceiptText;
+  return <Icon size={size} aria-hidden="true" />;
+}
