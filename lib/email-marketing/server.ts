@@ -209,7 +209,7 @@ export async function processEmailCampaigns(env: MailEnv, now = new Date()) {
       }
       sentByCampaign.set(row.campaign_id, tally);
     }
-    if (ok) for (const item of sendList.slice(0, 40)) await logSystemEmail(db as never, { ownerId: item.row.owner_id, clientId: campaigns.get(item.row.campaign_id)?.clientId || null, to: item.row.email, name: `${item.row.first_name} ${item.row.last_name}`.trim(), subject: item.subject, text: item.text.slice(0, 1500), kind: "Campaigns" });
+    if (ok) for (const item of sendList.slice(0, 40)) await logSystemEmail(db as never, { ownerId: item.row.owner_id, clientId: campaigns.get(item.row.campaign_id)?.clientId || null, to: item.row.email, name: `${item.row.first_name} ${item.row.last_name}`.trim(), subject: item.subject, text: item.text.slice(0, 1500), html: String(item.payload.html || ""), kind: "Campaigns" });
   }
   for (const [id, tally] of sentByCampaign) {
     const campaign = campaigns.get(id)!;

@@ -2,10 +2,11 @@
 
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { Mail, RefreshCw, Search } from "lucide-react";
+import { EmailFrame } from "@/components/email-frame";
 
 // Every email the OS sends by itself: chess invites, team invites, invoices, booking confirmations,
 // task notifications, campaign sends. Read-only log, newest first.
-type SystemEmail = { id: string; clientName: string; kind: string; to: string; toName: string; subject: string; body: string; createdAt: string };
+type SystemEmail = { id: string; clientName: string; kind: string; to: string; toName: string; subject: string; body: string; hasHtml?: boolean; createdAt: string };
 const KINDS = ["All", "Team invites", "Chess", "Scheduling", "Invoices", "Tasks", "Leads & forms", "Campaigns", "Reports", "Notifications", "Tests"];
 
 export function SystemEmailsView() {
@@ -49,7 +50,7 @@ export function SystemEmailsView() {
             <td><b>{email.toName || email.to}</b>{email.toName && <small className="em-sub">{email.to}</small>}{email.clientName && <small className="em-sub">{email.clientName}</small>}</td>
             <td>{email.subject}</td>
           </tr>
-          {open === email.id && <tr className="sysmail-body-row"><td colSpan={4}><pre className="sysmail-body">{email.body || "No text saved for this email."}</pre></td></tr>}
+          {open === email.id && <tr className="sysmail-body-row"><td colSpan={4}>{email.hasHtml ? <EmailFrame src={`/api/system-emails?html=1&id=${encodeURIComponent(email.id)}`} title={email.subject} /> : <pre className="sysmail-body">{email.body || "No text saved for this email."}</pre>}</td></tr>}
         </Fragment>)}</tbody>
       </table></div>}
     {next && <button type="button" className="secondary-button sysmail-more" onClick={() => void load(next)}>Load older</button>}

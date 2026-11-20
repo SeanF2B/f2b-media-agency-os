@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     });
     const result = await response.json().catch(() => null) as { id?: string; message?: string } | null;
     if (!response.ok || !result?.id) return Response.json({ error: `Email service returned HTTP ${response.status}: ${result?.message || "the email was not accepted"}` }, { status: 502 });
-    await logSystemEmail(env.DB as never, { to: recipient.email, name: String(recipient.name || ""), subject, text });
+    await logSystemEmail(env.DB as never, { to: recipient.email, name: String(recipient.name || ""), subject, text, html: html.replace(/cid:f2b-media-mark/g, "https://f2bmedia.com/favicon.svg") });
     return Response.json({ ok: true, accepted: true, email: recipient.email, providerId: result.id });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Could not send the team login email." }, { status: 500 });

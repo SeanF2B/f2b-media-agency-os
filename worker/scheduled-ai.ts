@@ -921,7 +921,7 @@ async function deliverGroupedTaskEmail(env: SchedulerEnv, client: any, recipient
     const body = await response.json().catch(() => null) as { id?: string; message?: string } | null;
     if (!response.ok || !body?.id) throw new Error(`Resend returned HTTP ${response.status}: ${body?.message || "email was not accepted"}`);
     await finishGroupedEmail(env, key, true, `Resend accepted ${body.id}`, now);
-    await logSystemEmail(env.DB as never, { clientId: String(client.id || ""), to: String(recipient.email), name: String(recipient.name || ""), subject, text: plain });
+    await logSystemEmail(env.DB as never, { clientId: String(client.id || ""), to: String(recipient.email), name: String(recipient.name || ""), subject, text: plain, html });
     return true;
   } catch (error) {
     const detail = error instanceof Error ? error.message : "Email provider request failed";
@@ -1925,7 +1925,7 @@ export async function sendTaskApprovalRequestEmail(env: SchedulerEnv, taskId: st
       const body = await response.json().catch(() => null) as { id?: string; message?: string } | null;
       if (!response.ok || !body?.id) throw new Error(`Resend returned HTTP ${response.status}: ${body?.message || "email was not accepted"}`);
       emailStatus = "sent"; emailDetail = `Sent to ${mail.to} · ${body.id}`;
-      await logSystemEmail(env.DB as never, { clientId: String(current.clientId || ""), to: mail.to, name: "Sean", subject: mail.subject, text: mail.text, kind: "task-approval" });
+      await logSystemEmail(env.DB as never, { clientId: String(current.clientId || ""), to: mail.to, name: "Sean", subject: mail.subject, text: mail.text, html: mail.html, kind: "task-approval" });
     } catch (error) {
       emailStatus = "failed"; emailDetail = error instanceof Error ? error.message.slice(0, 300) : "Email provider request failed";
     }

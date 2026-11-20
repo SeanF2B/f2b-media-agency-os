@@ -438,7 +438,7 @@ async function sendBookingEmails(deps: Deps, cal: CalendarConfig, row: BookingRo
     const textBody = [headline, "", ...rows.map(([k, v]) => `${k}: ${v}`), "", kind === "cancelled" ? `Book another time: ${deps.baseUrl}/f/book/${cal.slug}` : `Reschedule or cancel: ${manageUrl}`, "", business].join("\n");
     const subject = `${headline}: ${cal.name} – ${when}`;
     sends.push(() => deps.sendEmail!({ to: [row.email], subject, html, text: textBody, fromName: business, replyTo: client?.email || staff[0]?.email, idempotencyKey: `sched/${row.id}/${kind}/${reminderLabel || row.updated_at}/customer` })
-      .then(() => logSystemEmail(deps.db as never, { ownerId: row.owner_id, clientId: cal.clientId || null, to: row.email, name: row.name, subject, text: textBody })));
+      .then(() => logSystemEmail(deps.db as never, { ownerId: row.owner_id, clientId: cal.clientId || null, to: row.email, name: row.name, subject, text: textBody, html })));
   }
   const staffTo = staff.map((s) => s.email || "").filter((e) => /@/.test(e));
   if (staffTo.length && kind !== "reminder") {
@@ -448,7 +448,7 @@ async function sendBookingEmails(deps: Deps, cal: CalendarConfig, row: BookingRo
     const textBody = [title, "", ...rows.map(([k, v]) => `${k}: ${v}`), ...extra.map(([k, v]) => `${k}: ${v}`)].join("\n");
     const subject = `${title} – ${row.name} – ${when}`;
     sends.push(() => deps.sendEmail!({ to: staffTo, subject, html, text: textBody, fromName: `${business} bookings`, replyTo: row.email || undefined, idempotencyKey: `sched/${row.id}/${kind}/${row.updated_at}/staff` })
-      .then(() => logSystemEmail(deps.db as never, { ownerId: row.owner_id, clientId: cal.clientId || null, to: staffTo.join(", "), subject, text: textBody })));
+      .then(() => logSystemEmail(deps.db as never, { ownerId: row.owner_id, clientId: cal.clientId || null, to: staffTo.join(", "), subject, text: textBody, html })));
   }
   for (const send of sends) await send().catch((error) => console.error("Scheduling email failed", error instanceof Error ? error.message : error));
 }

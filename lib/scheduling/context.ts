@@ -41,7 +41,7 @@ export function schedulingDeps(request: Request): Deps {
       signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) { const d = await res.json().catch(() => null) as { message?: string } | null; throw new Error(`Email provider returned HTTP ${res.status}: ${d?.message || "not accepted"}`); }
-    for (const to of mail.to.slice(0, 5)) await logSystemEmail(env.DB as never, { to, subject: mail.subject, text: mail.text, kind: mail.kind || "Scheduling", conversation: false });
+    for (const to of mail.to.slice(0, 5)) await logSystemEmail(env.DB as never, { to, subject: mail.subject, text: mail.text, html: mail.html, kind: mail.kind || "Scheduling", conversation: false });
   } : undefined;
   return { db: env.DB as never, sendEmail, google: googleSchedulingAvailable() ? createGoogleOps() : undefined, baseUrl: new URL(request.url).origin };
 }

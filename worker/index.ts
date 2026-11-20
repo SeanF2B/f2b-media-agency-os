@@ -181,7 +181,7 @@ const worker = {
             const detail = await response.json().catch(() => null) as { message?: string } | null;
             throw new Error(`The email provider returned HTTP ${response.status}: ${detail?.message || "message was not accepted"}.`);
           }
-          await logSystemEmail(env.DB as never, { to: message.to, subject: message.subject, text: message.text || "" });
+          await logSystemEmail(env.DB as never, { to: message.to, subject: message.subject, text: message.text || "", html: message.html || "" });
         } : undefined,
         // "Make an AI call" step: queued on the account's AI phone agent (respects its switches, hours and DND).
         aiCall: async (call) => {

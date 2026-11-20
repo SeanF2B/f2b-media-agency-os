@@ -234,7 +234,7 @@ async function sendAlerts(findings: GuardFinding[], ownerId: string, alertEmail:
       signal: AbortSignal.timeout(15_000),
     }).then(async (response) => {
       if (!response.ok) throw new Error(`Resend HTTP ${response.status}`);
-      await logSystemEmail(database() as never, { ownerId, to: alertEmail, subject: email.subject, text: email.text, kind: "security" });
+      await logSystemEmail(database() as never, { ownerId, to: alertEmail, subject: email.subject, text: email.text, html: email.html, kind: "security" });
     }));
   }
   const results = await Promise.allSettled(jobs);

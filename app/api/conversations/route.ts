@@ -10,6 +10,7 @@ type Media = { url: string; mime: string; name: string };
 const mediaFrom = (raw: unknown, origin: string): Media[] => (Array.isArray(raw) ? raw : []).slice(0, 5).map((m: any) => ({ url: String(m?.url || ""), mime: String(m?.mime || "").slice(0, 80), name: String(m?.name || "File").replace(/[\r\n]/g, " ").slice(0, 80) })).filter((m) => /^\/api\/marketing-public\/media\?f=[A-Za-z0-9._%\/-]+$/.test(m.url)).map((m) => ({ ...m, url: origin + m.url }));
 const mediaLines = (media: Media[]) => media.map((m) => (m.mime.startsWith("image/") ? `📷 ${m.url}` : `📎 ${m.name} ${m.url}`));
 import { metaSendMode } from "@/lib/conversations/meta-rules";
+import { ensureConvMessageHtml, emailHtmlResponse } from "@/lib/email-log";
 
 export const dynamic = "force-dynamic";
 
@@ -56,11 +57,19 @@ export async function GET(request: Request) {
       const inView = rows.filter((r: any) => (!allowed || allowed.includes(String(r.client_id || ""))) && (scope === "agency" || r.client_id === scope));
       return respond({ held: inView.map((r: any) => ({ id: r.id, threadId: r.thread_id, body: r.body, reason: r.error, at: r.created_at, clientId: r.client_id, name: r.contact_name || r.contact, channel: r.channel })) });
     }
+    if (view === "email-html") {
+      // The exact designed email that went out, rendered in a sandboxed frame in the inbox.
+      await ensureConvMessageHtml(env.DB as never);
+      const row = await env.DB!.prepare("SELECT m.html, t.client_id FROM conv_messages m JOIN conv_threads t ON t.id=m.thread_id WHERE m.id=?1 AND m.owner_id=?2").bind(url.searchParams.get("messageId") || "", auth.ownerId).first<{ html: string; client_id: string }>();
+      if (!row || !row.html || (allowed && !allowed.includes(String(row.client_id || "")))) return new Response("Not found", { status: 404 });
+      return emailHtmlResponse(row.html);
+    }
     if (view === "thread") {
+      await ensureConvMessageHtml(env.DB as never);
       const id = url.searchParams.get("id") || "";
       const thread = await env.DB!.prepare("SELECT * FROM conv_threads WHERE id=?1 AND owner_id=?2").bind(id, auth.ownerId).first();
       if (!thread || (allowed && !allowed.includes(String((thread as any).client_id || "")))) return respond({ error: "That conversation could not be found." }, 404);
-      const messages = (await env.DB!.prepare("SELECT id, direction, sender, body, error, status, created_at FROM conv_messages WHERE thread_id=?1 ORDER BY created_at ASC LIMIT 300").bind(id).all()).results || [];
+      const messages = (await env.DB!.prepare("SELECT id, direction, sender, body, error, status, created_at, CASE WHEN html<>'' THEN 1 ELSE 0 END AS has_html FROM conv_messages WHERE thread_id=?1 ORDER BY created_at ASC LIMIT 300").bind(id).all()).results || [];
       await env.DB!.prepare("UPDATE conv_threads SET unread=0 WHERE id=?1").bind(id).run();
       return respond({ thread: { ...thread, unread: 0 }, messages, routes: await replyRoutes(auth.ownerId, thread as any, settings) });
     }

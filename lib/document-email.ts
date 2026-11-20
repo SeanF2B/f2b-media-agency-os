@@ -94,5 +94,5 @@ export async function sendDocumentEmail(db: Db, p: { ownerId: string; clientId?:
     const detail = await response.json().catch(() => ({})) as { message?: string };
     throw new Error(detail.message ? `Email couldn't be sent: ${detail.message}` : "Email couldn't be sent. Try again.");
   }
-  for (const email of p.to) await logSystemEmail(db as never, { ownerId: p.ownerId, clientId: p.clientId, to: email, name: p.toName, subject: p.subject, text: p.text, kind: "Reports" });
+  for (const email of p.to) await logSystemEmail(db as never, { ownerId: p.ownerId, clientId: p.clientId, to: email, name: p.toName, subject: p.subject, text: p.text, html: p.html, kind: "Reports" });
 }

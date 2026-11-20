@@ -25,8 +25,50 @@ const SITES: Record<string, SiteConfig> = {
     website: "https://proroofersgalway.ie",
     notify: ["proroofersgalway@gmail.com"],
   },
+  "aldo-handyman": {
+    clientId: "ed835385-b970-4488-86e7-4de67d5015cf",
+    siteKeyId: "site-aldo-handyman",
+    name: "Aldo Handyman",
+    brandColor: "#f5821f",
+    dark: "#13213f",
+    logoUrl: "https://aldohandyman.ie/img/icon-192.png",
+    phone: "083 885 8183",
+    website: "https://aldohandyman.ie",
+    notify: ["aldobraha7@gmail.com"],
+  },
 };
+
+// Any other client site (and every future one) can relay with ?client=<client id> or ?site=<client slug>.
+// Name, phone and colours come from the client's record; who gets the email comes from Operations → Forms
+// (notify list), then the client's own email, then the agency inbox so a lead is never sent nowhere.
+async function resolveSite(env: Env, url: URL): Promise<SiteConfig | null> {
+  const key = url.searchParams.get("site") || "";
+  if (SITES[key]) return SITES[key];
+  const db = env.DB; if (!db) return null;
+  const byId = url.searchParams.get("client") || "";
+  const acct = /^[0-9a-f-]{36}$/.test(byId)
+    ? await db.prepare("SELECT client_id, slug FROM client_accounts WHERE client_id=?1").bind(byId).first<{ client_id: string; slug: string }>()
+    : key ? await db.prepare("SELECT client_id, slug FROM client_accounts WHERE slug=?1").bind(key).first<{ client_id: string; slug: string }>() : null;
+  if (!acct) return null;
+  const known = Object.values(SITES).find((site) => site.clientId === acct.client_id);
+  if (known) return known;
+  const doc = await db.prepare("SELECT data FROM workspace_documents WHERE id='f2b-agency'").first<{ data: string }>();
+  const client = ((doc ? JSON.parse(doc.data) : {}).clients || []).find((c: { id?: string }) => c.id === acct.client_id) as { name?: string; email?: string; phone?: string; color?: string; website?: string; branding?: { primary?: string; accent?: string; secondary?: string } } | undefined;
+  const hex = (v?: string) => (v && /^#[0-9a-f]{6}$/i.test(v) ? v : "");
+  return {
+    clientId: acct.client_id,
+    siteKeyId: `site-${acct.slug}`,
+    name: client?.name || acct.slug,
+    brandColor: hex(client?.branding?.accent) || hex(client?.branding?.primary) || "#2563eb",
+    dark: hex(client?.branding?.secondary) || "#0f172a",
+    logoUrl: "",
+    phone: client?.phone || "",
+    website: client?.website || "",
+    notify: client?.email && /@/.test(client.email) ? [client.email] : [],
+  };
+}
 const TEST_INBOX = "sean@f2bmedia.com";
+const photoUrl = (key: string) => `${APP_URL}/api/marketing-public/lead-photo?key=${encodeURIComponent(key)}`;
 const APP_URL = "https://f2b-media-agency-os.f2b-media.workers.dev";
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
@@ -50,7 +92,7 @@ export async function handleSiteLeadRoutes(request: Request, env: Env, url: URL,
   if (!url.pathname.startsWith("/internal/site-lead")) return null;
   if (!internal) return new Response("Not found", { status: 404 });
   if (request.method !== "POST") return json({ ok: false, error: "method" }, 405);
-  const site = SITES[url.searchParams.get("site") || ""];
+  const site = await resolveSite(env, url);
   if (!site || !env.DB) return json({ ok: false, error: "unknown_site" }, 404);
   if (url.pathname === "/internal/site-lead/photo") return savePhoto(request, env, site);
   if (url.pathname === "/internal/site-lead") return saveLead(request, env, site);
@@ -69,7 +111,7 @@ async function savePhoto(request: Request, env: Env, site: SiteConfig) {
 }
 
 const JOB_LABELS: Record<string, string> = { leak: "Roof leak", "roof-repair": "Roof repair", "flat-roof": "Flat roof", "new-roof": "New roof / replacement", gutters: "Gutters", "fascia-soffit": "Fascia & soffit", cleaning: "Roof cleaning", "verge-ridge": "Dry verge / ridge", other: "Something else" };
-const URGENCY: Record<string, string> = { emergency: "🚨 Leaking now", urgent: "Urgent (this week)", soon: "Next few weeks", planning: "Planning / getting quotes" };
+const URGENCY: Record<string, string> = { emergency: "🚨 Leaking now", urgent: "Urgent (this week)", soon: "Next few weeks", planning: "Planning / getting quotes", asap: "As soon as possible", month: "Within the next month", week: "This week" };
 const PROPERTY: Record<string, string> = { detached: "Detached house", "semi-terraced": "Semi-detached / terraced", bungalow: "Bungalow", apartment: "Apartment / multi-unit", commercial: "Commercial / agricultural" };
 const QUESTION: Record<string, string> = { leaking: "Leaking now?", problem: "Problem", size: "Size", covering: "Covering", project: "Project", need: "Needs", roof: "Roof covering", part: "Part" };
 
@@ -89,8 +131,9 @@ async function saveLead(request: Request, env: Env, site: SiteConfig) {
   const kind = b.kind === "contact" ? "contact" : "quote";
   const name = cut(b.name, 120), email = cut(b.email, 160).toLowerCase(), phoneRaw = cut(b.phone, 40), phone = normPhone(phoneRaw);
   if (name.length < 2 || phone.replace(/\D/g, "").length < 7) return json({ ok: false, error: "validation" }, 400);
-  const jobType = cut(b.jobType, 40), job = JOB_LABELS[jobType] || (kind === "contact" ? "General enquiry" : "Website enquiry");
-  const town = cut(b.town, 80), urgency = URGENCY[cut(b.urgency, 20)] || "", property = PROPERTY[cut(b.propertyType, 20)] || "";
+  // Sites send their own readable labels (jobLabel / service / urgencyLabel); the roofing codes are the fallback.
+  const jobType = cut(b.jobType, 40), job = cut(b.jobLabel || b.service, 80) || JOB_LABELS[jobType] || (kind === "contact" ? "General enquiry" : "Website enquiry");
+  const town = cut(b.town, 80), urgency = cut(b.urgencyLabel, 80) || URGENCY[cut(b.urgency, 20)] || "", property = PROPERTY[cut(b.propertyType, 20)] || "";
   const details = cut(b.details || b.message, 2000), page = cut(b.page, 500);
   const answers = (b.answers && typeof b.answers === "object" && !Array.isArray(b.answers)) ? Object.entries(b.answers as Record<string, unknown>).slice(0, 10).map(([k, v]) => [QUESTION[k] || titleCase(k.replace(/[-_]/g, " ")), cut(v, 120)] as [string, string]).filter(([, v]) => v) : [];
   const photos = Array.isArray(b.photos) ? (b.photos as unknown[]).map((p) => String(p)).filter((p) => p.startsWith(`site-leads/${site.clientId}/`)).slice(0, 4) : [];
@@ -108,7 +151,7 @@ async function saveLead(request: Request, env: Env, site: SiteConfig) {
 
   // Settings saved in Operations → Forms (notify list, landing stage) override the built-in defaults.
   const formCfg = await formSettingsFor(db, owner, `site:${site.clientId}:${kind === "contact" ? "contact" : "quote"}`);
-  const notifyTo = formCfg?.notify?.length ? formCfg.notify : site.notify;
+  const notifyTo = formCfg?.notify?.length ? formCfg.notify : site.notify.length ? site.notify : [TEST_INBOX];
   const cfgStage = formCfg?.stageId ? await db.prepare("SELECT s.id, s.pipeline_id FROM crm_pipeline_stages s JOIN crm_pipelines p ON p.id=s.pipeline_id AND p.owner_id=s.owner_id WHERE s.owner_id=?1 AND s.id=?2 AND p.archived=0").bind(owner, formCfg.stageId).first<{ id: string; pipeline_id: string }>() : null;
   let stage = cfgStage || (keyRow ? await db.prepare("SELECT s.id, s.pipeline_id FROM crm_pipeline_stages s JOIN crm_pipelines p ON p.id=s.pipeline_id AND p.owner_id=s.owner_id WHERE s.owner_id=?1 AND s.id=?2 AND p.archived=0").bind(owner, keyRow.stage_id).first<{ id: string; pipeline_id: string }>() : null);
   if (!stage) {
@@ -143,7 +186,7 @@ async function saveLead(request: Request, env: Env, site: SiteConfig) {
     `Phone: ${prettyPhone(phone)}`,
     email && `Email: ${email}`,
     photos.length ? `Photos: ${photos.length} attached (see email / links below)` : "",
-    ...photos.map((k, i) => `  Photo ${i + 1}: ${APP_URL}/api/site-lead-photo?key=${encodeURIComponent(k)}`),
+    ...photos.map((k, i) => `  Photo ${i + 1}: ${photoUrl(k)}`),
     "",
     `Source: ${channel}${t("utm_campaign") ? ` · ${t("utm_campaign")}` : ""}`,
     page && `Page: ${page}`,
@@ -169,15 +212,7 @@ async function saveLead(request: Request, env: Env, site: SiteConfig) {
   let emailStatus = "not sent: email is not configured on the server";
   if (env.RESEND_API_KEY && env.TASK_NOTIFICATION_FROM) {
     try {
-      const attachments: { filename: string; content: string }[] = [];
-      for (const [i, key] of photos.entries()) {
-        const obj = await env.BUCKET?.get(key);
-        if (!obj) continue;
-        const bytes = new Uint8Array(await obj.arrayBuffer());
-        let bin = ""; for (let j = 0; j < bytes.length; j += 0x8000) bin += String.fromCharCode(...bytes.subarray(j, j + 0x8000));
-        attachments.push({ filename: `photo-${i + 1}.${key.split(".").pop()}`, content: btoa(bin) });
-      }
-      const mail = leadEmail(site, { kind, job, answers, urgency, property, town, details, name, phone, email, photos: attachments.length, channel, page, when: now });
+      const mail = leadEmail(site, { kind, job, answers, urgency, property, town, details, name, phone, email, photos, channel, page, when: now });
       // Test leads (flag set only by the edge Worker for an authorised test) go to the agency, not the client.
       const isTest = b.test === true;
       const to = isTest ? [TEST_INBOX] : notifyTo;
@@ -186,12 +221,12 @@ async function saveLead(request: Request, env: Env, site: SiteConfig) {
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json", "Idempotency-Key": `site-lead/${subKey}` },
-        body: JSON.stringify({ from: `${site.name} Website <${fromAddr}>`, to, subject: mail.subject, html: mail.html, text: mail.text, ...(email ? { reply_to: email } : {}), ...(attachments.length ? { attachments } : {}) }),
+        body: JSON.stringify({ from: `${site.name} Website <${fromAddr}>`, to, subject: mail.subject, html: mail.html, text: mail.text, ...(email ? { reply_to: email } : {}) }),
         signal: AbortSignal.timeout(20_000),
       });
       const out = await res.json().catch(() => null) as { id?: string; message?: string } | null;
       emailStatus = res.ok ? `sent to ${to.join(", ")} (${out?.id || "accepted"})` : `failed: HTTP ${res.status} ${out?.message || ""}`.trim();
-      if (res.ok) await logSystemEmail(db as never, { ownerId: owner, clientId: site.clientId, to: to.join(", "), subject: mail.subject, text: mail.text }).catch(() => undefined);
+      if (res.ok) await logSystemEmail(db as never, { ownerId: owner, clientId: site.clientId, to: to.join(", "), subject: mail.subject, text: mail.text, html: mail.html, kind: "Leads & forms" }).catch(() => undefined);
     } catch (e) { emailStatus = `failed: ${e instanceof Error ? e.message : "error"}`; }
   }
   if (stage) await db.prepare("INSERT INTO crm_activities (id, owner_id, opportunity_id, contact_id, activity_type, body, created_by, created_at) VALUES (?1,?2,?3,?4,'note',?5,?6,?7)")
@@ -199,9 +234,9 @@ async function saveLead(request: Request, env: Env, site: SiteConfig) {
   return json({ ok: true, id: oppId, contactId, delivered: true, email: emailStatus });
 }
 
-type MailIn = { kind: string; job: string; answers: [string, string][]; urgency: string; property: string; town: string; details: string; name: string; phone: string; email: string; photos: number; channel: string; page: string; when: string };
+type MailIn = { kind: string; job: string; answers: [string, string][]; urgency: string; property: string; town: string; details: string; name: string; phone: string; email: string; photos: string[]; channel: string; page: string; when: string };
 function leadEmail(site: SiteConfig, m: MailIn) {
-  const urgent = m.urgency.includes("Leaking");
+  const urgent = /leaking|as soon as possible|emergency|urgent/i.test(m.urgency);
   const subject = `${urgent ? "🚨 URGENT – " : ""}New ${m.kind === "contact" ? "enquiry" : "quote request"}: ${m.job}${m.town ? ` in ${m.town}` : ""} – ${m.name}`;
   const when = new Date(m.when).toLocaleString("en-IE", { timeZone: "Europe/Dublin", weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   const tel = m.phone.replace(/[^\d+]/g, "");
@@ -211,23 +246,24 @@ function leadEmail(site: SiteConfig, m: MailIn) {
   const btn = (href: string, label: string, bg: string) => `<a href="${href}" style="display:inline-block;background:${bg};color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:12px 20px;border-radius:999px;margin:0 8px 8px 0">${label}</a>`;
   const html = `<!doctype html><html><body style="margin:0;background:#f1f5f9;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
 <div style="max-width:560px;margin:0 auto;padding:24px 14px">
-<div style="background:${site.dark};border-radius:18px 18px 0 0;padding:20px 24px;color:#fff">
+<div style="background:${site.dark};border-radius:18px 18px 0 0;padding:20px 24px;color:#fff;border-bottom:4px solid ${site.brandColor}">
 <div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.75">${esc(site.name)} · Website</div>
 <div style="font-size:22px;font-weight:800;margin-top:6px">${urgent ? "🚨 " : ""}New ${m.kind === "contact" ? "enquiry" : "quote request"}</div>
 <div style="font-size:14px;opacity:.85;margin-top:4px">${esc(when)}</div></div>
-${urgent ? `<div style="background:#fef2f2;color:#b91c1c;font-weight:700;padding:12px 24px;border-left:4px solid ${site.brandColor}">Customer says it is leaking now – call back as soon as you can.</div>` : ""}
+${urgent ? `<div style="background:#fff7ed;color:#b45309;font-weight:700;padding:12px 24px;border-left:4px solid ${site.brandColor}">${/leaking/i.test(m.urgency) ? "Customer says it is leaking now – call back as soon as you can." : "Customer wants this done as soon as possible – a quick call back wins the job."}</div>` : ""}
 <div style="background:#fff;padding:22px 24px">
 <div style="font-size:20px;font-weight:800;color:#0f172a">${esc(m.name)}</div>
 <div style="font-size:16px;margin:4px 0 16px"><a href="tel:${esc(tel)}" style="color:${site.brandColor};font-weight:700;text-decoration:none">${esc(prettyPhone(m.phone))}</a>${m.email ? ` · <a href="mailto:${esc(m.email)}" style="color:#334155">${esc(m.email)}</a>` : ""}</div>
 ${btn(`tel:${esc(tel)}`, "📞 Call now", site.brandColor)}${btn(`https://wa.me/${esc(wa)}`, "WhatsApp", "#16a34a")}${m.email ? btn(`mailto:${esc(m.email)}?subject=${encodeURIComponent(`Your ${m.job.toLowerCase()} quote – ${site.name}`)}`, "Reply by email", "#334155") : ""}
 <div style="border-top:1px solid #e2e8f0;margin-top:14px;padding-top:6px"><table style="width:100%;border-collapse:collapse">${rows.map(row).join("")}</table></div>
 ${m.details ? `<div style="margin-top:12px;background:#f8fafc;border-radius:12px;padding:14px 16px;color:#0f172a;font-size:15px;line-height:1.55;white-space:pre-wrap">${esc(m.details)}</div>` : ""}
-${m.photos ? `<div style="margin-top:12px;color:#334155;font-size:14px">📷 ${m.photos} photo${m.photos > 1 ? "s" : ""} attached to this email.</div>` : ""}
+${m.photos.length ? `<div style="margin-top:14px"><div style="font-size:13px;color:#64748b;margin-bottom:8px">Photos from the customer (tap to open full size)</div>${m.photos.map((k) => `<a href="${esc(photoUrl(k))}"><img src="${esc(photoUrl(k))}" width="120" height="120" alt="Job photo" style="width:120px;height:120px;object-fit:cover;border-radius:10px;margin:0 6px 6px 0;border:0"></a>`).join("")}</div>` : ""}
 </div>
 <div style="background:#fff;border-top:1px solid #e2e8f0;border-radius:0 0 18px 18px;padding:14px 24px;color:#64748b;font-size:12px;line-height:1.6">
 Came from: <b style="color:#334155">${esc(m.channel)}</b>${m.page ? ` · <a href="${esc(m.page)}" style="color:#64748b">${esc(m.page.replace(/^https?:\/\/(www\.)?/, "").split("?")[0])}</a>` : ""}<br>
 Saved to your CRM as a new lead. Reply to this email to answer the customer directly.</div>
+<div style="text-align:center;color:#94a3b8;font-size:11px;padding:14px 0">Sent by your website${site.website ? ` · ${esc(site.website.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, ""))}` : ""}</div>
 </div></body></html>`;
-  const text = [subject, "", `${m.name} – ${prettyPhone(m.phone)}${m.email ? ` – ${m.email}` : ""}`, "", ...rows.map(([k, v]) => `${k}: ${v}`), m.details ? `\nDetails:\n${m.details}` : "", m.photos ? `\n${m.photos} photo(s) attached.` : "", "", `Came from: ${m.channel}${m.page ? ` (${m.page})` : ""}`].join("\n");
+  const text = [subject, "", `${m.name} – ${prettyPhone(m.phone)}${m.email ? ` – ${m.email}` : ""}`, "", ...rows.map(([k, v]) => `${k}: ${v}`), m.details ? `\nDetails:\n${m.details}` : "", m.photos.length ? `\nPhotos:\n${m.photos.map((k, i) => `Photo ${i + 1}: ${photoUrl(k)}`).join("\n")}` : "", "", `Came from: ${m.channel}${m.page ? ` (${m.page})` : ""}`].join("\n");
   return { subject, html, text };
 }

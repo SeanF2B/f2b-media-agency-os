@@ -112,7 +112,7 @@ export async function POST(request: Request) {
       const emailResponse = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json", "Idempotency-Key": `chess-sample/${actor.id}/${crypto.randomUUID()}` }, body: JSON.stringify({ from: env.TASK_NOTIFICATION_FROM, to: [recipient], ...sample }), signal: AbortSignal.timeout(15_000) });
       const responseBody = await emailResponse.json().catch(() => null) as { id?: string; message?: string } | null;
       if (!emailResponse.ok || !responseBody?.id) return Response.json({ error: `Resend returned HTTP ${emailResponse.status}: ${responseBody?.message || "sample email was not accepted"}` }, { status: 502 });
-      await logSystemEmail(env.DB as never, { to: String(recipient), name: actor.name, subject: String((sample as { subject?: string }).subject || "Chess invitation"), text: String((sample as { text?: string }).text || "") });
+      await logSystemEmail(env.DB as never, { to: String(recipient), name: actor.name, subject: String((sample as { subject?: string }).subject || "Chess invitation"), text: String((sample as { text?: string }).text || ""), html: String((sample as { html?: string }).html || "") });
       await recordChessEmailActivity(actor, "Chess sample email sent", "F2B branded chess invite sample", `Resend accepted sample ${responseBody.id} for ${recipient}.`);
       return Response.json({ ok: true, sampleEmail: { status: "sent", email: recipient, id: responseBody.id } });
     }
@@ -242,7 +242,7 @@ export async function POST(request: Request) {
           });
           const responseBody = await emailResponse.json().catch(() => null) as { id?: string; message?: string } | null;
           inviteStatus = emailResponse.ok && responseBody?.id ? "sent" : "failed";
-          if (inviteStatus === "sent") await logSystemEmail(env.DB as never, { to: String(invitee.email), name: String(invitee.name || ""), subject: String((email as { subject?: string }).subject || "Chess invitation"), text: String((email as { text?: string }).text || "") });
+          if (inviteStatus === "sent") await logSystemEmail(env.DB as never, { to: String(invitee.email), name: String(invitee.name || ""), subject: String((email as { subject?: string }).subject || "Chess invitation"), text: String((email as { text?: string }).text || ""), html: String((email as { html?: string }).html || "") });
           inviteDetail = inviteStatus === "sent" ? `Resend accepted invitation ${responseBody!.id} for ${invitee.email}.` : `Resend returned HTTP ${emailResponse.status}: ${responseBody?.message || "email was not accepted"}.`;
         } catch (emailError) { inviteDetail = emailError instanceof Error ? emailError.message : "Email provider request failed."; }
       }
