@@ -3770,3 +3770,23 @@ html body .app-shell.dark-mode .hd-text, html body.f2b-dark .app-shell .hd-text 
 html body .app-shell.dark-mode :is(.hd-link-btn, .hd-acts button:not(.hd-ok), .hd-menu) { background: #2a3238; border-color: #3c4850; color: #f1f5f7; }
 html body .app-shell.dark-mode .hd-menu > button { color: #f1f5f7; }
 @media (max-width: 700px) { html body .app-shell .hd-bar { display: grid; } html body .app-shell .hd-acts { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); } html body .app-shell .hd-acts button { padding: 0 6px; height: 36px; } html body .app-shell .hd-link-btn { width: 100%; justify-content: center; height: 36px; } }
+
+/* Phones: Opportunity value fits the screen — stage tiles wrap in a grid, enquiries are two tidy lines */
+@media (max-width: 700px) {
+  html body .app-shell .overview-pipeline-summary .overview-pipeline-values { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+  html body .app-shell .overview-pipeline-summary .overview-pipeline-values > div { padding: 10px 12px !important; min-width: 0; }
+  html body .app-shell .overview-pipeline-summary .overview-pipeline-values strong { font-size: 20px !important; }
+  html body .app-shell .overview-pipeline-summary .overview-pipeline-values span { font-size: 11px !important; line-height: 1.3; }
+  html body .app-shell .dh-chevrons { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px !important; overflow: visible !important; padding: 0 !important; }
+  html body .app-shell .dh-chevron, html body .app-shell .dh-chevron:first-child, html body .app-shell .dh-chevron:last-child { clip-path: none !important; border-radius: 12px !important; padding: 8px 4px !important; margin: 0 !important; min-height: 58px; min-width: 0; flex: none !important; }
+  html body .app-shell .dh-chevron span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; font-size: 11px !important; }
+  html body .app-shell .dh-chevron b { font-size: 18px !important; }
+  html body .app-shell .dh-recent-row { display: grid !important; grid-template-columns: minmax(0, 1fr) auto !important; grid-template-areas: "who stage" "src val" !important; row-gap: 2px !important; column-gap: 8px !important; padding: 9px 4px !important; }
+  html body .app-shell .dh-recent-row .dh-recent-who { grid-area: who; min-width: 0; }
+  html body .app-shell .dh-recent-row .dh-recent-stage { grid-area: stage; justify-self: end; display: inline-block !important; font-size: 11.5px !important; padding: 3px 9px !important; }
+  html body .app-shell .dh-recent-row .dh-recent-src { grid-area: src; display: inline-flex !important; align-items: center; gap: 4px; font-size: 11.5px !important; color: #667085; padding-left: 40px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  html body .app-shell .dh-recent-row .dh-recent-val { grid-area: val; display: block !important; justify-self: end; font-size: 12px !important; font-weight: 700; }
+  html body .app-shell .dh-recent-row .dh-recent-date { display: none !important; }
+  html body .app-shell .dh-recent-who b, html body .app-shell .dh-recent-who small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+}
+html body .app-shell .cv-appr-list { margin: 0 0 12px !important; }

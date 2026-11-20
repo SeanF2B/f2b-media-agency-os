@@ -4472,7 +4472,10 @@ function useLiveAdSpend(clients: Client[], start: string, end: string) {
 
 function Overview({ isAdmin = false, staffHours, payslips, onOpenTask, onReviewTask, currentStaffId = "", focusClientId = "", section = "dashboard", bookkeepingSettings, invoicing, initialBookTab = "books", scopeClientId = "", workspace, counts, onAddClient, onAddTask, onNavigate, onSelectClient, onAddFinance, onEditClientFee, onEditFinance, onEditRecurring, onDeleteFinance, onStopRecurring, onRecurringReceipt, showCrmSummary, showProjection = false, onSaveClient }: { isAdmin?: boolean; onOpenTask?: (taskId: string) => void; onReviewTask?: (taskId: string, action: "approve" | "request_changes") => void; currentStaffId?: string; section?: "dashboard" | "bookkeeping"; bookkeepingSettings?: ReactNode; invoicing?: ReactNode; initialBookTab?: "books" | "invoicing" | "settings" | "payslips"; payslips?: ReactNode; staffHours?: ReactNode; workspace: Workspace; counts: { activeTasks: number; tracked: number; retainer: number; labor: number; expenses: number; profit: number; teamMembers: number }; onAddClient: () => void; onAddTask: () => void; onNavigate: (x: string) => void; onSelectClient: (id: string) => void; onAddFinance: (kind: "Income" | "Expense") => void; onEditClientFee?: (client: Client, attach?: boolean) => void; onEditFinance: (record: FinanceRecord, attach?: boolean) => void; onEditRecurring: (schedule: FinanceRecurring, attach?: boolean) => void; onDeleteFinance: (id: string) => void; onStopRecurring: (id: string) => void; onRecurringReceipt?: (schedule: FinanceRecurring, file: File) => Promise<void>; showCrmSummary: boolean; showProjection?: boolean; focusClientId?: string; onSaveClient?: (client: Client, newFile?: ClientFile) => void }) {
   type OpportunitySummary = { open: Array<{ currency: string; count: number; value: number }>; won: Array<{ currency: string; count: number; value: number }>; stages?: Array<{ name: string; category: string; currency: string; count: number; value: number }>; sources?: Array<{ source: string; count: number; value: number; won: number; wonValue: number; open: number; pages?: Array<{ path: string; count: number }> }>; recent?: Array<{ id: string; title: string; contact: string; value: number; currency: string; source: string; createdAt: string; clientId: string; project: string; stage: string; category: string }> };
-  const [opportunitySummary, setOpportunitySummary] = useState<OpportunitySummary | null>(null);
+  const [realOpportunitySummary, setOpportunitySummary] = useState<OpportunitySummary | null>(null);
+  // "Sample data" on: a believable pipeline with leads in every stage for this account (nothing is saved).
+  const [sampleOverview] = useSampleData();
+  const opportunitySummary: OpportunitySummary | null = sampleOverview ? sampleOpportunitySummary(scopeClientId ? workspace.clients[0] : undefined, workspace.clients, realOpportunitySummary) : realOpportunitySummary;
   const [opportunitySummaryError, setOpportunitySummaryError] = useState(false);
   const [financePeriod, setFinancePeriod] = useState("this-month");
   const [bookTab, setBookTab] = useState<"books" | "invoicing" | "settings" | "payslips">((initialBookTab === "invoicing" && !invoicing) || (initialBookTab === "payslips" && !payslips) ? "books" : initialBookTab);
@@ -6147,4 +6150,25 @@ function TeamView({ workspace, scopeClientId = "", scopeClientName = "", onOpenS
       {member.isBot && !scopeClientId && <button type="button" className="team-remove-ai task-delete" title="Remove AI teammate" aria-label={`Remove AI teammate ${member.name}`} onClick={(event) => { event.stopPropagation(); onRemoveAi(member); }}><span aria-hidden="true">🗑</span> Delete</button>}
     </article>)}</div>
   </>;
+}
+
+/** Demo pipeline for the Dashboard when "Sample data" is on: leads spread across the account's own stages. */
+function sampleOpportunitySummary(client: { id: string; name: string; currency?: string } | undefined, clients: Array<{ id: string; name: string; currency?: string }>, real: { stages?: Array<{ name: string; category: string }> } | null) {
+  const name = client?.name || "";
+  const tattoo = /tattoo|ink|poppy|piercing/i.test(name), roof = /roof/i.test(name);
+  const currency = client?.currency || "EUR";
+  const open = (real?.stages || []).filter((x) => x.category === "open").map((x) => x.name);
+  const stageNames = open.length >= 3 ? open.slice(0, 5) : ["New lead", "Contacted", "Qualified", "Proposal sent", "Appt booked"];
+  const counts = [7, 5, 4, 3, 3], avg = tattoo ? 280 : roof ? 4200 : 1500;
+  const stages = [...stageNames.map((n, i) => ({ name: n, category: "open", currency, count: counts[i] ?? 2, value: Math.round((counts[i] ?? 2) * avg * (0.8 + i * 0.12)) })), { name: "Won", category: "won", currency, count: 6, value: avg * 6 }];
+  const people = tattoo ? [["Aoife Brennan", "Fine line floral · forearm"], ["Jade Murphy", "Helix piercing"], ["Ciarán Doyle", "Cover-up · shoulder"], ["Megan Walsh", "Lobe piercings"], ["Niamh Kelly", "Realism portrait"], ["Conor Byrne", "Blackwork sleeve"]] : roof ? [["Mary Burke", "Storm leak · kitchen"], ["John Doyle", "Gutter cleaning"], ["Sinéad Kelly", "New flat roof"], ["Tom Walsh", "Chimney repair"], ["Paul Ryan", "Full re-roof"], ["Áine Murphy", "Velux install"]] : [["Mary Burke", "New enquiry"], ["John Doyle", "Quote request"], ["Sinéad Kelly", "Follow-up visit"], ["Tom Walsh", "Callback"], ["Paul Ryan", "Price check"], ["Áine Murphy", "Consultation"]];
+  const sources = ["Website form", "Google Ads", "Instagram", "WhatsApp", "Google Business", "Referral"];
+  const ids = client ? [client.id] : clients.slice(0, 6).map((c) => c.id);
+  const recent = people.map(([contact, project], i) => { const st = stages[Math.min(i, stages.length - 2)]; return { id: `sample-opp-${i}`, title: project, contact, value: Math.round(avg * (0.6 + (i % 3) * 0.4)), currency, source: sources[i % sources.length], createdAt: new Date(Date.now() - (i * 26 + 3) * 3_600_000).toISOString(), clientId: ids[i % Math.max(1, ids.length)] || "", project, stage: st.name, category: "open" }; });
+  const openCount = stages.filter((x) => x.category === "open").reduce((n, x) => n + x.count, 0), openValue = stages.filter((x) => x.category === "open").reduce((n, x) => n + x.value, 0);
+  const srcRows = [["Website form", 9, 3], ["Google Ads", 8, 2], ["Instagram", 5, 1], ["Google Business", 3, 0], ["Referral", 3, 0]] as const;
+  return {
+    open: [{ currency, count: openCount, value: openValue }], won: [{ currency, count: 6, value: avg * 6 }], stages, recent,
+    sources: srcRows.map(([source, count, won]) => ({ source, count, value: Math.round(count * avg), won, wonValue: won * avg, open: count - won })),
+  };
 }
