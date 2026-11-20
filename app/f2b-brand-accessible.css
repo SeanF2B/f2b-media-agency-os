@@ -9772,3 +9772,6 @@ html.f2b-dark .onb-admin, .dark-mode .onb-admin { background:#0f172a; color:#f8f
 .cv-notice{background:#ecfdf3;border:1px solid #abefc6;color:#067647;border-radius:12px;padding:10px 12px;margin:0 0 10px;font-size:13.5px;font-weight:600}
 .app-shell.dark-mode .cv-file,.app-shell.dark-mode .cv-links{background:#22282e;border-color:#3c4850;color:#f1f5f7}
 .app-shell.dark-mode .cv-notice{background:rgba(6,118,71,.18);border-color:rgba(6,118,71,.5);color:#a6f4c5}
+.cv-links-ico{flex:none;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:color-mix(in srgb,var(--brand-primary,#1479b8) 12%,transparent);color:var(--brand-primary,#1479b8)}
+.cv-links-ico.page{background:var(--brand-primary,#1479b8);color:#fff}
+.cv-links-name{display:flex;flex-direction:column;min-width:0}.cv-links-name small{font-size:11.5px;opacity:.65}
