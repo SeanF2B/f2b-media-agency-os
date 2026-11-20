@@ -3,7 +3,7 @@
 // It never loads the agency app shell, so no agency data is ever sent to a client browser.
 export const PAUSED_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Login paused</title>
 <style>body{font-family:Inter,system-ui,sans-serif;background:#f4f6f5;display:grid;place-items:center;min-height:100vh;margin:0;color:#1f2a25}.c{background:#fff;border:1px solid #dfe4e8;border-radius:16px;padding:28px 32px;max-width:420px;text-align:center}a{color:#173f35;font-weight:700}</style></head>
-<body><div class="c"><h1 style="font-size:20px">Your login is paused</h1><p>Please contact F2B Media if you need access to your website editor again.</p><p><a href="/cdn-cgi/access/logout">Sign out</a></p></div></body></html>`;
+<body><div class="c"><h1 style="font-size:20px">Your login is paused</h1><p>Please contact F2B Media if you need access to your website editor again.</p><p><a href="/logout">Sign out</a></p></div></body></html>`;
 
 export const PORTAL_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
 <title>Your website · F2B Media</title>
@@ -35,8 +35,8 @@ h1{font-size:24px;margin:0 0 4px}.lead{color:#5d6b64;margin:0 0 16px}
 <body><div class="app"><aside aria-label="Navigation"><div class="brand"><span class="ini" id="logo">F2B</span><span>F2B Media</span></div>
 <div class="acct"><small>YOUR WEBSITE</small><b id="cname">…</b></div>
 <h6>MENU</h6><nav><a href="/client-portal" class="on">📣 Marketing</a><a href="/client-portal" class="sub on" aria-current="page" style="background:#23262a">🌐 Website &amp; SEO</a></nav>
-<div class="foot">Signed in as<br><b id="who"></b><br><a href="/cdn-cgi/access/logout">Sign out</a></div></aside>
-<div><header class="top"><span class="crumb"><span id="cname2"></span> / <b>Website &amp; SEO</b></span><span class="r"><span>Need help? Contact F2B Media</span><a href="/cdn-cgi/access/logout">Sign out</a></span></header>
+<div class="foot">Signed in as<br><b id="who"></b><br><a href="/logout">Sign out</a></div></aside>
+<div><header class="top"><span class="crumb"><span id="cname2"></span> / <b>Website &amp; SEO</b></span><span class="r"><span>Need help? Contact F2B Media</span><a href="/logout">Sign out</a></span></header>
 <main class="page"><h1>Your website</h1><p class="lead">Edit your pages, photos and Google listing text. Changes go to your preview site first and F2B Media checks every change before it goes live.</p>
 <section class="f2b-cs-web" id="web"><div>Loading…</div></section></main></div></div>
 <script>

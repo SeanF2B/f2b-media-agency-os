@@ -1,8 +1,7 @@
 import { env } from "cloudflare:workers";
 import { logSystemEmail } from "@/lib/email-log";
 import { getChatGPTUser } from "../../chatgpt-auth";
-import { F2B_MEDIA_MARK_EMAIL_BASE64 } from "@/lib/f2b-media-mark-email";
-import { ensureStaffHasWorkspaceAccess } from "@/lib/cloudflare-access-staff";
+import { createToken, ensureAuthSchema, authEmailHtml } from "@/lib/auth/password-auth.js";
 
 export const dynamic = "force-dynamic";
 type StaffRecord = { id: string; name?: string; email: string; role: string; isBot?: boolean };
@@ -38,31 +37,36 @@ export async function POST(request: Request) {
     if (typeof recipient.email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient.email)) {
       return Response.json({ error: "Add a valid email address to this saved staff profile first." }, { status: 400 });
     }
-    const access = await ensureStaffHasWorkspaceAccess(recipient.email);
-    if (!access.ok) return Response.json({ error: `The invitation was not sent because workspace access could not be confirmed. ${access.error}`, accessConfigured: access.configured }, { status: access.configured ? 502 : 503 });
     if (!env.RESEND_API_KEY || !env.TASK_NOTIFICATION_FROM) return Response.json({ error: "Email sending is not configured. RESEND_API_KEY and TASK_NOTIFICATION_FROM are required." }, { status: 503 });
 
     const appUrl = env.TASK_APP_URL || new URL(request.url).origin;
     const joinUrl = new URL(appUrl);
     if (joinUrl.protocol !== "https:" && joinUrl.protocol !== "http:") return Response.json({ error: "The workspace join link is not a valid web address." }, { status: 503 });
-    const safeJoinUrl = joinUrl.toString();
+    const siteUrl = new URL("/", joinUrl).toString();
+    // Own login: a single-use "set your password" link (7 days). Someone who already has a password gets the sign-in page.
+    await ensureAuthSchema(env.DB as never);
+    const inviteeEmail = recipient.email.trim().toLowerCase();
+    const hasPassword = await env.DB.prepare("SELECT 1 AS ok FROM auth_users WHERE email = ?1").bind(inviteeEmail).first();
+    const safeJoinUrl = hasPassword ? new URL("/login", joinUrl).toString() : new URL(`/set-password?token=${await createToken(env.DB as never, inviteeEmail, "invite")}`, joinUrl).toString();
+    const buttonLabel = hasPassword ? "Sign in" : "Set your password";
     const senderName = senderProfile?.name || user.displayName || "F2B Media";
     const resolved = message
       .replaceAll("{{name}}", String(recipient.name || "there"))
       .replaceAll("{{email}}", recipient.email)
-      .replaceAll("{{appUrl}}", safeJoinUrl)
+      .replaceAll("{{appUrl}}", siteUrl)
       .replaceAll("{{sender}}", senderName);
-    const text = `${resolved}\n\nJoin now: ${safeJoinUrl}`;
-    const html = `<div style="margin:0;background:#eef2f6;padding:32px 12px;font-family:Arial,Helvetica,sans-serif;color:#222124"><div style="display:none;max-height:0;overflow:hidden;opacity:0">You’ve been invited to join the F2B Media workspace. Open your invitation to sign in.</div><table role="presentation" align="center" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background:#fff;border:1px solid #d9dfe5;border-radius:14px;overflow:hidden"><tr><td style="padding:18px 24px;background:#222124"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="vertical-align:middle;padding-right:13px"><img src="cid:f2b-media-mark" width="54" height="50" alt="F2B Media logo" style="display:block;width:54px;height:50px;object-fit:contain;border:0;background:#fff;border-radius:9px" /></td><td style="vertical-align:middle"><div style="font-size:20px;line-height:1.2;font-weight:700;color:#fff">F2B Media</div><div style="margin-top:4px;font-size:11px;letter-spacing:1.4px;font-weight:700;color:#b7dafa">TEAM WORKSPACE</div></td></tr></table></td></tr><tr><td height="5" style="height:5px;background:#287cac;font-size:1px;line-height:1px">&nbsp;</td></tr><tr><td align="center" style="padding:32px 28px 10px"><div style="display:inline-block;padding:9px 15px;border-radius:30px;background:#e8f2fc;color:#24628b;font-size:12px;line-height:1.2;font-weight:700;letter-spacing:1px">✦ &nbsp; YOUR TEAM INVITATION</div><h1 style="margin:18px 0 8px;color:#222124;font-size:27px;line-height:1.2">You’re invited to join</h1><div style="font-size:21px;line-height:1.25;font-weight:700;color:#287cac">F2B Media</div></td></tr><tr><td style="padding:16px 32px 4px;color:#303942;font-size:15px;line-height:1.7">${escapeHtml(resolved).replace(/\n/g, "<br>")}</td></tr><tr><td align="center" style="padding:24px 24px 14px"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td align="center" bgcolor="#287cac" style="border-radius:8px"><a href="${escapeHtml(safeJoinUrl)}" target="_blank" style="display:inline-block;padding:15px 34px;border:1px solid #287cac;border-radius:8px;background:#287cac;color:#fff;text-decoration:none;font-size:16px;line-height:1.2;font-weight:700">Join now&nbsp; →</a></td></tr></table></td></tr><tr><td align="center" style="padding:0 28px 26px;color:#68737d;font-size:12px;line-height:1.6">Use your own verified email to sign in. If the button doesn’t work, copy this link into your browser:<br /><a href="${escapeHtml(safeJoinUrl)}" style="color:#24628b;word-break:break-all">${escapeHtml(safeJoinUrl)}</a></td></tr><tr><td align="center" style="padding:15px 20px;border-top:1px solid #e5e9ed;background:#f8fafc;color:#77818a;font-size:11px;line-height:1.5">F2B Media · Private team workspace</td></tr></table></div>`;
+    const text = `${resolved}\n\n${buttonLabel}: ${safeJoinUrl}\n\nWorkspace: ${siteUrl}\nOn your phone: open the workspace link, sign in, then Share → Add to Home Screen (iPhone) or ⋮ → Install app (Android).`;
+    const esc = (v: string) => escapeHtml(String(v));
+    const html = authEmailHtml({ heading: `You’re invited to join F2B Media`, intro: resolved, buttonLabel, link: safeJoinUrl, appUrl: siteUrl, esc });
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json", "Idempotency-Key": `staff-invite/${staffId}/${crypto.randomUUID()}` },
-      body: JSON.stringify({ from: env.TASK_NOTIFICATION_FROM, to: [recipient.email], subject, text, html, attachments: [{ filename: "f2b-media-mark.png", content: F2B_MEDIA_MARK_EMAIL_BASE64, content_id: "f2b-media-mark", content_type: "image/png" }] }),
+      body: JSON.stringify({ from: env.TASK_NOTIFICATION_FROM, to: [recipient.email], subject, text, html }),
       signal: AbortSignal.timeout(15_000),
     });
     const result = await response.json().catch(() => null) as { id?: string; message?: string } | null;
     if (!response.ok || !result?.id) return Response.json({ error: `Email service returned HTTP ${response.status}: ${result?.message || "the email was not accepted"}` }, { status: 502 });
-    await logSystemEmail(env.DB as never, { to: recipient.email, name: String(recipient.name || ""), subject, text, html: html.replace(/cid:f2b-media-mark/g, "https://f2bmedia.com/favicon.svg") });
+    await logSystemEmail(env.DB as never, { to: recipient.email, name: String(recipient.name || ""), subject, text: text.replace(/token=[\w-]+/g, "token=•••"), html: html.replace(/token=[\w-]+/g, "token=•••") });
     return Response.json({ ok: true, accepted: true, email: recipient.email, providerId: result.id });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Could not send the team login email." }, { status: 500 });

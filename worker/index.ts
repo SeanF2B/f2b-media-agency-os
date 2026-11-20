@@ -298,10 +298,15 @@ const worker = {
         env.F2B_ACCESS_TEAM_DOMAIN,
         env.F2B_ACCESS_AUD,
       ));
-    if (identity?.email) {
+    // Own email + password login (lib/auth/password-auth.js). A password session wins over an Access identity so the
+    // owner's "Log in as" works; Access stays accepted while it is being retired.
+    const auth = await import("../lib/auth/password-auth.js");
+    const session = env.DB ? await auth.sessionIdentity(env.DB, request.headers.get("cookie")).catch(() => null) : null;
+    const signedInEmail: string | undefined = session?.email || identity?.email || undefined;
+    if (signedInEmail) {
       authenticatedHeaders.set(
         "cf-access-authenticated-user-email",
-        identity.email,
+        signedInEmail,
       );
     }
     const authenticatedRequest = new Request(request, {
@@ -309,8 +314,19 @@ const worker = {
     });
 
     const incomingUrl = new URL(authenticatedRequest.url);
+    const authIdentity = signedInEmail ? { email: signedInEmail, impersonatedBy: session?.impersonatedBy || null, viaSession: Boolean(session) } : null;
+    const authResponse = await auth.handleAuthRoute(request, env, incomingUrl, authIdentity);
+    if (authResponse) return withSecurityHeaders(authResponse, incomingUrl.pathname);
+    // Sign-in gate: every outside request needs a signed-in user except the login pages and a few public files.
+    // Service-binding calls from our other workers carry no request.cf and pass through as before.
+    const external = Boolean((request as Request & { cf?: unknown }).cf);
+    if (!import.meta.env.DEV && external && !signedInEmail && !auth.isPublicPath(incomingUrl.pathname) && !incomingUrl.pathname.startsWith("/_next/") && !incomingUrl.pathname.startsWith("/assets/")) {
+      const wantsPage = (request.method === "GET" || request.method === "HEAD") && !incomingUrl.pathname.startsWith("/api/") && /text\/html|\*\/\*/.test(request.headers.get("accept") || "text/html");
+      if (wantsPage) return withSecurityHeaders(new Response(null, { status: 302, headers: { location: `/login?next=${encodeURIComponent(auth.safeNext(incomingUrl.pathname + incomingUrl.search))}`, "cache-control": "no-store" } }), "/login");
+      return withSecurityHeaders(Response.json({ error: "Sign in to continue." }, { status: 401, headers: { "cache-control": "no-store" } }), incomingUrl.pathname);
+    }
     if (incomingUrl.pathname.startsWith("/internal/site-lead") || incomingUrl.pathname === "/api/site-lead-photo") {
-      const leadResponse = await handleSiteLeadRoutes(authenticatedRequest, env as never, incomingUrl, identity?.email, isInternalCall(request));
+      const leadResponse = await handleSiteLeadRoutes(authenticatedRequest, env as never, incomingUrl, signedInEmail, isInternalCall(request));
       if (leadResponse) return leadResponse;
     }
     let appRequest = authenticatedRequest;
@@ -326,14 +342,14 @@ const worker = {
     }
 
     // Settings → Audit log: record staff sign-ins when the app itself is opened.
-    if (identity?.email && env.DB && appRequest.method === "GET" && new URL(appRequest.url).pathname === "/" && /text\/html/.test(appRequest.headers.get("accept") || "")) {
-      ctx.waitUntil(import("../lib/activity-log").then(({ recordLogin }) => recordLogin(env.DB!, identity.email!, appRequest)).catch(() => undefined));
+    if (signedInEmail && env.DB && appRequest.method === "GET" && new URL(appRequest.url).pathname === "/" && /text\/html/.test(appRequest.headers.get("accept") || "")) {
+      ctx.waitUntil(import("../lib/activity-log").then(({ recordLogin }) => recordLogin(env.DB!, signedInEmail!, appRequest)).catch(() => undefined));
     }
     // AI & SEO-data usage metering (client rebilling): tag this request with its client and feature.
     installUsageMeter(env.DB);
     const usagePath = new URL(appRequest.url).pathname;
     const usageAction = usagePath.startsWith("/api/") ? await actionFromRequest(appRequest).catch(() => "") : "";
-    const usage = usagePath.startsWith("/api/") ? { clientId: await clientIdFromRequest(appRequest).catch(() => ""), route: usagePath, feature: `${featureFor(usagePath)}${usageAction ? ` · ${usageAction}` : ""}`.slice(0, 80), actor: identity?.email || "", waitUntil: (p: Promise<unknown>) => ctx.waitUntil(p) } : { waitUntil: (p: Promise<unknown>) => ctx.waitUntil(p) };
+    const usage = usagePath.startsWith("/api/") ? { clientId: await clientIdFromRequest(appRequest).catch(() => ""), route: usagePath, feature: `${featureFor(usagePath)}${usageAction ? ` · ${usageAction}` : ""}`.slice(0, 80), actor: signedInEmail || "", waitUntil: (p: Promise<unknown>) => ctx.waitUntil(p) } : { waitUntil: (p: Promise<unknown>) => ctx.waitUntil(p) };
     // Settings → Audit log → Activity: every saving action (who, what, where, when, result). Secrets never stored.
     // The body is read from a copy taken before the app consumes the request.
     const { shouldLogRequest } = await import("../lib/action-log");
@@ -343,7 +359,7 @@ const worker = {
       handler.fetch(appRequest, env, ctx),
     ));
     if (logThis) {
-      const actor = identity?.email || "", ip = appRequest.headers.get("cf-connecting-ip") || "", clientId = (usage as { clientId?: string }).clientId || "";
+      const actor = signedInEmail || "", ip = appRequest.headers.get("cf-connecting-ip") || "", clientId = (usage as { clientId?: string }).clientId || "";
       ctx.waitUntil(logBody.then(async (body) => { const { logAction } = await import("../lib/action-log"); await logAction(env.DB!, { actor, method: appRequest.method, path: usagePath, status: response.status, clientId, body, ip }); }).catch((e) => console.error("action log", e)));
     }
     return withSecurityHeaders(response, appRequest === authenticatedRequest ? incomingUrl.pathname : "/f/");
