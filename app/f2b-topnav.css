@@ -3730,11 +3730,15 @@ html body .app-shell:not(#_a):not(#_b) .ai-task-tabs.workflow-review-tabs>button
 html body .app-shell:not(#_a):not(#_b) .ai-task-tabs.workflow-review-tabs>button>span:last-child{min-width:18px!important;height:18px!important;padding:0 5px!important;font-size:11px!important;line-height:18px!important;margin:0!important}
 }
 
-/* Conversations: AI approvals strip above the filters (same look as the Dashboard card) */
-html body .app-shell .cv-appr-bar { display:flex; align-items:center; gap:10px; margin:8px 8px 0; padding:8px 10px; border:1px solid #e0a100; border-radius:12px; background:#fff7e0; color:#101828; text-align:left; cursor:pointer; font:inherit; }
-html body .app-shell .cv-appr-bar-ico { width:30px; height:30px; flex:none; border-radius:9px; background:#fff; color:#b7791f; display:grid; place-items:center; }
-html body .app-shell .cv-appr-bar > span:nth-child(2) { flex:1; min-width:0; display:grid; }
-html body .app-shell .cv-appr-bar b { font-size:13.5px; } html body .app-shell .cv-appr-bar small { font-size:12px; color:#667085; }
-html body .app-shell .cv-appr-bar em { font-style:normal; min-width:26px; height:26px; padding:0 6px; border-radius:13px; background:#e0a100; color:#fff; font-weight:800; font-size:12.5px; display:grid; place-items:center; }
-html body .app-shell.dark-mode .cv-appr-bar { background:rgba(224,161,0,.14); border-color:rgba(224,161,0,.6); color:#f1f5f7; }
-html body .app-shell.dark-mode .cv-appr-bar-ico { background:rgba(255,255,255,.08); color:#fcd34d; } html body .app-shell.dark-mode .cv-appr-bar small { color:#c5ced6; }
+/* Status cards (AI approvals, Appointment updates) in page headings, beside the title text */
+html body .app-shell .dh-approvals.head-status { display: block !important; flex: 0 1 340px; min-width: 240px; margin: 0 auto 0 8px !important; align-self: center; grid-template-columns: none !important; }
+html body .app-shell .dh-approvals.head-status .dh-approval { width: 100%; }
+html body .app-shell .head-status-slot { display: contents; }
+html body .app-shell .crm-heading > div:first-child, html body .app-shell .iv-head > div:first-child { flex: 0 1 auto; }
+@media (max-width: 860px) {
+  html body .app-shell .dh-approvals.head-status { flex: 1 1 100%; order: 3; min-width: 0; margin: 4px 0 0 !important; }
+  html body .app-shell .dh-approvals.head-status .dh-approval-text small { display: block !important; }
+  html body .app-shell .crm-heading, html body .app-shell .sch.is-phone .iv-head { flex-wrap: wrap !important; }
+}
+html body .app-shell .cv-head-status-fallback { padding: 8px 8px 0; }
+html body .app-shell .cv-head-status-fallback .dh-approvals.head-status { margin: 0 !important; max-width: none; flex: none; }
