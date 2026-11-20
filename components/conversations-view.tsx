@@ -122,9 +122,10 @@ export function ConversationsView({ scopeClientId, clients, staff = [], currentS
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [linksOpen, setLinksOpen] = useState(false);
-  const [links, setLinks] = useState<null | { pages: Array<{ name: string; url: string; clientId: string }>; calendars: Array<{ name: string; url: string; clientId: string; durationMin: number }> }>(null);
+  const [links, setLinks] = useState<null | { pages: Array<{ name: string; url: string; clientId: string }>; calendars: Array<{ name: string; url: string; clientId: string; durationMin: number }>; staff?: Array<{ id: string; name: string }>; canCreate?: boolean }>(null);
+  const [custom, setCustom] = useState<null | { name: string; minutes: number; who: string; busy: boolean }>(null);
   const [invoiceFor, setInvoiceFor] = useState<null | { clientId: string; name: string; email: string }>(null);
-  useEffect(() => { setFiles([]); setLinksOpen(false); }, [activeId]);
+  useEffect(() => { setFiles([]); setLinksOpen(false); setCustom(null); setLinks(null); }, [activeId]);
   const addFiles = async (list: FileList | null) => {
     if (!list?.length || !active) return; setUploading(true); setError("");
     try { const up: UploadedMedia[] = []; for (const f of [...list].slice(0, 5 - files.length)) up.push(await uploadToMedia(f, active.client_id || "agency", "Conversation attachments")); setFiles((x) => [...x, ...up].slice(0, 5)); }
@@ -134,6 +135,21 @@ export function ConversationsView({ scopeClientId, clients, staff = [], currentS
     setLinksOpen((o) => !o);
     if (links) return;
     try { const r = await call<NonNullable<typeof links>>(`/api/scheduling?view=links&clientId=${encodeURIComponent(active?.client_id || scopeClientId || "agency")}`); setLinks(r); } catch (e) { setLinks({ pages: [], calendars: [] }); setError(e instanceof Error ? e.message : "Couldn't load booking links."); }
+  };
+  const createCustom = async () => {
+    if (!custom || !active) return;
+    const team = (links?.staff || []).map((p) => p.id);
+    const staffIds = custom.who === "anyone" ? team : [custom.who];
+    if (!staffIds.length) { setError("This account has no team members who can take bookings yet. Add one in Team (with an email)."); return; }
+    setCustom({ ...custom, busy: true }); setError("");
+    try {
+      const scope = active.client_id || scopeClientId || "agency";
+      const r = await call<{ calendar: { slug: string; name: string; durationMin: number } }>(`/api/scheduling?clientId=${encodeURIComponent(scope)}`, { action: "saveCalendar", calendar: { name: custom.name.trim() || "Appointment", durationMin: custom.minutes, kind: "service", staffIds, assignMode: staffIds.length > 1 ? "round_robin" : "customer_pick", clientId: active.client_id || "" } });
+      const url = `${window.location.origin}/f/book/${r.calendar.slug}`;
+      insertText(`Book your ${r.calendar.name.toLowerCase()} here: ${url}`);
+      setLinks((l) => l ? { ...l, calendars: [{ name: r.calendar.name, url, clientId: active.client_id, durationMin: r.calendar.durationMin }, ...l.calendars] } : l);
+      setCustom(null); setLinksOpen(false); setNotice("Booking link created and added to your reply. You can fine-tune it in Scheduling → Booking calendars.");
+    } catch (e) { setError(e instanceof Error ? e.message : "Couldn't create the booking link."); setCustom((c) => c && { ...c, busy: false }); }
   };
   const insertText = (line: string) => setText((t) => (t.trim() ? `${t.trim()}\n${line}` : line));
   const send = async () => { const body = text.trim(); if ((!body && !files.length) || !active) return; setText(""); if (active.channel === "email") { const last = [...messages].reverse().find((m) => /^Subject: /m.test(m.body)); const prev = last ? ((last.body.match(/^Subject: (.*)$/m) || [])[1] || "") : ""; await act({ action: "send", id: active.id, body, media: files, staffId: currentStaffId, subject: subject.trim() || (prev ? (prev.startsWith("Re:") ? prev : `Re: ${prev}`) : "") }); setSubject(""); setFiles([]); return; } await act({ action: "send", id: active.id, body, media: files }); setFiles([]); };
@@ -179,7 +195,14 @@ export function ConversationsView({ scopeClientId, clients, staff = [], currentS
           <textarea value={text} rows={2} maxLength={1500} placeholder="Write a reply…" title="Enter to send, Shift+Enter for a new line" onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }} />
           {files.length > 0 && <div className="cv-files">{files.map((f, i) => <span key={f.url} className="cv-file">{f.mime.startsWith("image/") ? <img src={f.url} alt="" /> : <Paperclip size={14} />}<small>{f.name}</small><button type="button" aria-label={`Remove ${f.name}`} onClick={() => setFiles((x) => x.filter((_, j) => j !== i))}><X size={12} /></button></span>)}</div>}
           <div><span className="cv-tools"><button type="button" className="secondary-button cv-tool" title="Attach photos or files" aria-label="Attach photos or files" disabled={busy || uploading || files.length >= 5} onClick={() => fileRef.current?.click()}>{uploading ? "…" : <Paperclip size={16} />}</button><button type="button" className="secondary-button cv-tool" title="Send a booking link" aria-label="Send a booking link" disabled={busy} onClick={() => void openLinks()}><CalendarPlus size={16} /></button><input ref={fileRef} type="file" multiple hidden accept="image/*,video/*,audio/*,application/pdf,.doc,.docx,.xls,.xlsx" onChange={(e) => { void addFiles(e.target.files); e.target.value = ""; }} />
-            {linksOpen && <div className="cv-links" role="menu"><b>Send a booking link</b>{!links ? <small>Loading…</small> : <>{links.pages.map((l) => <button key={l.url} type="button" role="menuitem" onClick={() => { insertText(`Book here: ${l.url}`); setLinksOpen(false); }}><span className="cv-links-ico page"><LayoutGrid size={15} /></span><span className="cv-links-name">{l.name}<small>Booking page · all services</small></span></button>)}{links.calendars.map((l) => <button key={l.url} type="button" role="menuitem" onClick={() => { insertText(`Book your ${l.name.toLowerCase()} here: ${l.url}`); setLinksOpen(false); }}><span className="cv-links-ico"><CalendarDays size={15} /></span><span className="cv-links-name">{l.name}<small>Calendar · {l.durationMin} min</small></span></button>)}{!links.pages.length && !links.calendars.length && <small>No booking calendars for this account yet. Create one in Scheduling.</small>}</>}</div>}</span>
+            {linksOpen && <div className="cv-links" role="menu"><b>Send a booking link</b>{!links ? <small>Loading…</small> : <>{links.pages.map((l) => <button key={l.url} type="button" role="menuitem" onClick={() => { insertText(`Book here: ${l.url}`); setLinksOpen(false); }}><span className="cv-links-ico page"><LayoutGrid size={15} /></span><span className="cv-links-name">{l.name}<small>Booking page · all services</small></span></button>)}{links.calendars.map((l) => <button key={l.url} type="button" role="menuitem" onClick={() => { insertText(`Book your ${l.name.toLowerCase()} here: ${l.url}`); setLinksOpen(false); }}><span className="cv-links-ico"><CalendarDays size={15} /></span><span className="cv-links-name">{l.name}<small>Calendar · {l.durationMin} min</small></span></button>)}{!links.pages.length && !links.calendars.length && !custom && <small>No booking calendars for this account yet.</small>}
+              {links.canCreate && !custom && <button type="button" role="menuitem" className="cv-links-new" onClick={() => setCustom({ name: active.contact_name ? `Appointment for ${active.contact_name.split(" ")[0]}` : "Appointment", minutes: 30, who: "anyone", busy: false })}><span className="cv-links-ico new">＋</span><span className="cv-links-name">Create a custom link<small>Pick a length and who it's with</small></span></button>}
+              {custom && <form className="cv-links-form" onSubmit={(e) => { e.preventDefault(); void createCustom(); }}>
+                <label>Name<input value={custom.name} maxLength={120} autoFocus onChange={(e) => setCustom({ ...custom, name: e.target.value })} /></label>
+                <div className="cv-links-row"><label>Length<select value={custom.minutes} onChange={(e) => setCustom({ ...custom, minutes: Number(e.target.value) })}>{[15, 20, 30, 45, 60, 90, 120, 180, 240].map((m) => <option key={m} value={m}>{m < 60 ? `${m} min` : `${m / 60} hr${m > 60 ? "s" : ""}`}</option>)}</select></label>
+                <label>With<select value={custom.who} onChange={(e) => setCustom({ ...custom, who: e.target.value })}><option value="anyone">Anyone available</option>{(links.staff || []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label></div>
+                <div className="cv-links-row"><button type="button" className="secondary-button" onClick={() => setCustom(null)}>Back</button><button type="submit" className="primary-button" disabled={custom.busy}>{custom.busy ? "Creating…" : "Create & add link"}</button></div>
+              </form>}</>}</div>}</span>
             <button type="button" className="secondary-button" disabled={busy} onClick={() => void draft()}>✨ Draft with AI</button><button type="submit" className="primary-button" disabled={busy || uploading || (!text.trim() && !files.length)}>Send</button></div>
         </form>
         <p className="cv-note">Sending a reply turns the bot off for this customer so you don’t talk over each other.</p></>}</>}
