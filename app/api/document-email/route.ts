@@ -3,10 +3,11 @@ import { getChatGPTUser } from "../../chatgpt-auth";
 import { fullTeamPermissions, getTeamPermissions, type TeamPermissions } from "@/lib/access-permissions";
 import { ensureReportArchive } from "@/lib/client-report-archive";
 import { getProposal, shareProposal, proposalContext, ProposalError } from "@/lib/proposals/server";
+import { ContractError, contractContext, contractEmailInfo, markSent } from "@/lib/contracts/server";
 import { agencyBrand, emailList, rememberCompanyEmail, renderDocumentEmail, reportShareToken, savedCompanyEmail, sendDocumentEmail } from "@/lib/document-email";
 
 // Send a generated report / audit / keyword report / proposal by email.
-// GET  ?kind=report&clientId=&archiveId=  |  ?kind=proposal&id=   → draft (to, cc, subject, message)
+// GET  ?kind=report&clientId=&archiveId=  |  ?kind=proposal&id=  |  ?kind=contract&id=   → draft (to, cc, subject, message)
 // POST { kind, ..., to, cc, subject, message, theme, mode: "preview" | "send", rememberCc } → { html } or { ok }
 export const dynamic = "force-dynamic";
 const reply = (body: Record<string, unknown>, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -38,7 +39,12 @@ type Ctx = Exclude<Awaited<ReturnType<typeof load>>, { error: Response }>;
 
 /** Everything about the document needed for the draft and the email card. */
 async function describe(ctx: Ctx, input: Record<string, unknown>, origin: string, theme: "dark" | "light", createLink: boolean) {
-  const kind = input.kind === "proposal" ? "proposal" : "report";
+  const kind = input.kind === "proposal" ? "proposal" : input.kind === "contract" ? "contract" : "report";
+  if (kind === "contract") {
+    const cctx = await contractContext({ userId: ctx.user.userId, email: ctx.user.email });
+    const info = await contractEmailInfo(cctx, String(input.id || "").slice(0, 80), origin, createLink);
+    return { kind, ...info, noun: "contract" };
+  }
   if (kind === "report") {
     const clientId = String(input.clientId || "").slice(0, 80), archiveId = String(input.archiveId || "").slice(0, 80);
     const client = (ctx.ws.clients || []).find((item) => item.id === clientId);
@@ -86,7 +92,7 @@ export async function GET(request: Request) {
     const doc = await describe(ctx, input, url.origin, "dark", false);
     const brand = agencyBrand(ctx.ws, url.origin, await savedCompanyEmail(env.DB as never, ctx.ownerId).catch(() => ""));
     return reply({ to: doc.to, toName: doc.toName, cc: brand.email, subject: doc.subject, message: draftMessage(doc, ctx.senderName, brand.name), docTitle: doc.docTitle, brandName: brand.name });
-  } catch (error) { return reply({ error: error instanceof Error ? error.message : "Couldn't prepare the email." }, error instanceof ProposalError ? error.status : 500); }
+  } catch (error) { return reply({ error: error instanceof Error ? error.message : "Couldn't prepare the email." }, error instanceof ProposalError || error instanceof ContractError ? error.status : 500); }
 }
 
 export async function POST(request: Request) {
@@ -108,8 +114,9 @@ export async function POST(request: Request) {
     const to = emailList(body.to), cc = emailList(body.cc);
     if (!to.length) return reply({ error: "Add the recipient's email address." }, 400);
     await sendDocumentEmail(env.DB as never, { ownerId: ctx.ownerId, clientId: doc.clientId, brand, to, cc, subject, html, text: `${message}\n\n${doc.buttonLabel}: ${doc.link}`, toName: doc.toName, idempotencyKey: `document-email/${doc.kind}/${String(body.archiveId || body.id)}/${to.join(",")}/${Date.now()}` });
+    if (doc.kind === "contract") await markSent(await contractContext({ userId: ctx.user.userId, email: ctx.user.email }), String(body.id || "")).catch(() => undefined);
     // Remember the company CC address for next time.
     if (body.rememberCc && cc[0] && ctx.admin && cc[0] !== brand.email) await rememberCompanyEmail(env.DB as never, ctx.ownerId, cc[0]).catch(() => undefined);
     return reply({ ok: true, link: doc.link, sentTo: to, cc });
-  } catch (error) { return reply({ error: error instanceof Error ? error.message : "Couldn't send the email." }, error instanceof ProposalError ? error.status : 500); }
+  } catch (error) { return reply({ error: error instanceof Error ? error.message : "Couldn't send the email." }, error instanceof ProposalError || error instanceof ContractError ? error.status : 500); }
 }
