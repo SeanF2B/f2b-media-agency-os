@@ -12,6 +12,7 @@ import {
   saveCalendar, saveStaffSettings, staffFeedToken, updateBooking, getStaffProfiles, saveStaffProfile, reviewLinkToken,
 } from "@/lib/scheduling/server";
 import { deleteGroup, getGroup, listGroups, saveGroup } from "@/lib/scheduling/groups";
+import { syncFollowUps } from "@/lib/scheduling/followups";
 import { getPayroll, savePayrollEmployer, savePayrollPerson, issuePayslip, deletePayslip, getPayslip, markPayslipEmailed } from "@/lib/scheduling/payroll-store";
 
 export const dynamic = "force-dynamic";
@@ -126,10 +127,19 @@ export async function POST(request: Request) {
         const input = (body.calendar || {}) as Record<string, unknown>;
         if (ctx.scope !== null) input.clientId = ctx.scope;
         else if (input.clientId && !ctx.ws.clients.some((c) => c.id === input.clientId)) input.clientId = "";
-        if (input.id) { const existing = await getCalendar(db, ownerId, str(input.id, 80)); if (!existing || !inScope(ctx, existing.clientId)) return fail("Booking calendar not found.", 404); }
+        let before: Awaited<ReturnType<typeof getCalendar>> = null;
+        if (input.id) { before = await getCalendar(db, ownerId, str(input.id, 80)); if (!before || !inScope(ctx, before.clientId)) return fail("Booking calendar not found.", 404); }
         const allowedStaff = new Set(ctx.staff.map((s) => s.id));
         input.staffIds = Array.isArray(input.staffIds) ? (input.staffIds as unknown[]).map(String).filter((id) => allowedStaff.has(id)) : [];
-        return json({ calendar: await saveCalendar(db, ownerId, input) });
+        let saved = await saveCalendar(db, ownerId, input);
+        // Follow-ups (cancellation / no-show) live as automations; keep them in step with the calendar's settings.
+        if (Object.keys(saved.followUps || {}).length) {
+          try {
+            const synced = await syncFollowUps(db as never, ownerId, saved, saved.followUps, before?.followUps || {});
+            saved = await saveCalendar(db, ownerId, { ...saved, followUps: synced });
+          } catch (e) { console.error("follow-ups", e); return json({ calendar: saved, warning: "Saved, but the follow-up automations couldn't be updated. Try saving again." }); }
+        }
+        return json({ calendar: saved });
       }
       case "saveGroup": {
         if (!ctx.canManage) return fail("Only an admin or sub-account manager can change booking pages.", 403);

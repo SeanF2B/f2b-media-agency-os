@@ -7,7 +7,7 @@ import {
   Mail, Maximize, MessageSquare, Minus, Plus, Search, Tag, Trash2, X, Zap,
 } from "lucide-react";
 import {
-  ACTIONS, CONDITION_FIELDS, MERGE_FIELDS, STAGE_OPS, TAG_OPS, TEXT_OPS, TRIGGERS,
+  ACTIONS, APPOINTMENT_MERGE_FIELDS, CONDITION_FIELDS, MERGE_FIELDS, STAGE_OPS, TAG_OPS, TEXT_OPS, TRIGGERS,
   type AutomationDefinition, type AutomationNode, type Branch, type ConditionRule, type ConditionSet,
   duplicateNode, insertNode, newId, nodeById, nodeSummary, nodeTitle, outgoing, readinessProblems, removeNode,
 } from "@/lib/crm-automations/model";
@@ -331,7 +331,15 @@ function StepPanel({ node, options, onSave, onCancel, onDelete, onDuplicate }: {
       {config.to === "custom" && <Field label="Email address" hint="Separate several with commas."><input value={str("toEmails")} onChange={(event) => set({ toEmails: event.target.value })} placeholder="e.g. hello@yourclient.ie" maxLength={500} /></Field>}
       <Field label="Subject"><input value={str("subject")} onChange={(event) => set({ subject: event.target.value })} placeholder="e.g. Thanks for getting in touch, {{contact.first_name}}" maxLength={200} /></Field>
       <Field label="Message" hint="Plain text. Leave a blank line between paragraphs."><textarea ref={bodyRef} rows={9} value={str("body")} onChange={(event) => set({ body: event.target.value })} placeholder={"Hi {{contact.first_name}},\n\nThanks for your enquiry. We'll be in touch shortly.\n\nThe F2B Media team"} /></Field>
-      <div className="ca-chips" aria-label="Insert a personal detail">{MERGE_FIELDS.map((field) => <button key={field.token} type="button" onClick={() => insertMerge(field.token)}>+ {field.label}</button>)}</div>
+      <div className="ca-chips" aria-label="Insert a personal detail">{[...MERGE_FIELDS, ...APPOINTMENT_MERGE_FIELDS].map((field) => <button key={field.token} type="button" onClick={() => insertMerge(field.token)}>+ {field.label}</button>)}</div>
+      <p className="ca-note">Appointment details (time, service, rebooking link) fill in when the automation starts from an appointment trigger.</p>
+    </>;
+  } else if (node.type === "send_message") {
+    body = <>
+      <Field label="Send by"><select value={str("channel") || "auto"} onChange={(event) => set({ channel: event.target.value })}><option value="auto">WhatsApp, or text if WhatsApp can&apos;t go</option><option value="whatsapp">WhatsApp only</option><option value="sms">Text (SMS) only</option></select></Field>
+      <Field label="Message" hint="Keep it short and friendly."><textarea ref={bodyRef} rows={6} value={str("body")} onChange={(event) => set({ body: event.target.value })} placeholder={"Hi {{contact.first_name}}, sorry we missed you today! Would you like to pick a new time? {{appointment.rebook_link}}"} maxLength={1500} /></Field>
+      <div className="ca-chips" aria-label="Insert a personal detail">{[...MERGE_FIELDS.filter((f) => !/notes|deal_value/.test(f.token)), ...APPOINTMENT_MERGE_FIELDS].map((field) => <button key={field.token} type="button" onClick={() => insertMerge(field.token)}>+ {field.label}</button>)}</div>
+      <p className="ca-note">Sent from this account&apos;s WhatsApp or SMS number and saved in Conversations. WhatsApp only allows free messages within 24 hours of the customer&apos;s last message, so “WhatsApp, or text” falls back to SMS outside that window.</p>
     </>;
   } else if (node.type === "set_value") {
     body = <>

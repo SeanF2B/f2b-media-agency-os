@@ -255,3 +255,35 @@ export async function leadToCrm(ownerId: string, t: { clientId: string; channel:
     await db.prepare("INSERT INTO crm_opportunities (id, owner_id, pipeline_id, stage_id, contact_id, client_id, title, value, currency, source, notes, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,0,'EUR',?8,?9,?10,?10)").bind(crypto.randomUUID(), ownerId, pipeline.id, stage.id, contact.id, t.clientId || null, `${t.channel === "sms" ? "Text" : label} enquiry · ${t.name || (social ? label + " contact" : t.contact)}`, label, t.firstMessage.slice(0, 500), now).run();
   } catch (e) { console.error("leadToCrm", e); }
 }
+
+/** Automation "Send WhatsApp / SMS" step: send from the account's number and save it in Conversations.
+ *  auto = WhatsApp when the 24-hour window is open (free reply allowed), otherwise SMS. */
+export async function sendAutomationMessage(p: { ownerId: string; scopeId: string; phone: string; name: string; body: string; channel: "auto" | "whatsapp" | "sms"; idempotencyKey: string }): Promise<{ sent: boolean; channel?: string; reason?: string }> {
+  await ensureTables();
+  const to = e164(p.phone);
+  if (!/^\+\d{7,15}$/.test(to)) return { sent: false, reason: "The contact's phone number isn't in international format." };
+  const creds = await twilioCredentials(p.ownerId);
+  if (!creds) return { sent: false, reason: "WhatsApp / SMS isn't set up yet (Conversation settings)." };
+  const db = env.DB!;
+  await db.prepare("CREATE TABLE IF NOT EXISTS conv_auto_sent (key TEXT PRIMARY KEY, created_at TEXT NOT NULL)").run();
+  const claim = await db.prepare("INSERT OR IGNORE INTO conv_auto_sent (key, created_at) VALUES (?1, ?2)").bind(p.idempotencyKey.slice(0, 300), new Date().toISOString()).run();
+  if (!(claim as { meta?: { changes?: number } }).meta?.changes) return { sent: true, reason: "Already sent." };
+  const wa = creds.settings.numbers.find((n) => n.channel === "whatsapp" && n.clientId === p.scopeId);
+  const sms = creds.settings.numbers.find((n) => n.channel === "sms" && n.clientId === p.scopeId);
+  let use: NumberConfig | undefined;
+  if (p.channel !== "sms" && wa) {
+    const t = await db.prepare("SELECT last_in_at FROM conv_threads WHERE owner_id=?1 AND our_number=?2 AND contact=?3 AND channel='whatsapp'").bind(p.ownerId, wa.number, to).first<{ last_in_at: string }>().catch(() => null);
+    const open = t?.last_in_at && Date.now() - Date.parse(t.last_in_at) < 24 * 3_600_000;
+    if (open) use = wa;
+    else if (p.channel === "whatsapp") return { sent: false, reason: "Their WhatsApp 24-hour window is closed, so WhatsApp needs an approved template. Use “WhatsApp or text” to fall back to SMS." };
+  }
+  if (!use && p.channel !== "whatsapp") use = sms;
+  if (!use) return { sent: false, reason: p.channel === "sms" ? "This account has no SMS number." : "This account has no WhatsApp or SMS number." };
+  const thread = await upsertThread(p.ownerId, { channel: use.channel, ourNumber: use.number, contact: to, contactName: p.name, clientId: p.scopeId });
+  let sid = "", error = "";
+  try { sid = await sendTwilio(creds, { from: use.number, to, channel: use.channel, body: p.body }); } catch (e) { error = e instanceof Error ? e.message : "Could not send."; }
+  await addMessage(p.ownerId, thread.id, { direction: "out", sender: "bot", body: p.body, sid, error: error || "", status: error ? "failed" : "sent" });
+  // A failed send can be retried by the automation (release the claim).
+  if (error) await db.prepare("DELETE FROM conv_auto_sent WHERE key=?1").bind(p.idempotencyKey.slice(0, 300)).run().catch(() => undefined);
+  return error ? { sent: false, reason: error } : { sent: true, channel: use.channel };
+}
