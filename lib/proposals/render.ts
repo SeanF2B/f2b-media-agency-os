@@ -162,8 +162,6 @@ export function renderProposalHtml(deck: ProposalDeck, brand: ProposalBrand, opt
     const visual = serviceVisual(String(slide.data.serviceKey || ""));
     switch (visual) {
       case "search": return desktop(searchScreen(slide), "big a d2");
-      case "maps": return `<div class="mapwrap a d2"><div class="map"><svg class="map-svg" viewBox="0 0 400 260" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="400" height="260" fill="#eef1f4"/><path d="M290 0 C 300 70 360 90 400 110 L400 0Z" fill="#cfe3f7"/><rect x="40" y="150" width="90" height="60" rx="14" fill="#d7ecd9"/><rect x="250" y="170" width="70" height="50" rx="12" fill="#d7ecd9"/><g stroke="#fff" stroke-linecap="round" fill="none"><path d="M-10 120 C 100 100 200 140 410 90" stroke-width="12"/><path d="M150 -10 C 160 80 140 180 175 270" stroke-width="10"/><path d="M-10 40 L 410 60" stroke-width="5"/><path d="M-10 200 L 410 230" stroke-width="5"/><path d="M60 -10 L 90 270" stroke-width="5"/><path d="M240 -10 L 230 270" stroke-width="5"/><path d="M320 -10 L 350 270" stroke-width="5"/></g><g stroke="#f8d77a" stroke-linecap="round" fill="none"><path d="M-10 120 C 100 100 200 140 410 90" stroke-width="3"/></g></svg>${[18, 42, 66, 30, 78, 55].map((x, index) => `<i class="pin${index === 2 ? " me" : ""}" style="left:${x}%;top:${[30, 62, 38, 22, 55, 75][index]}%">${icon("pin")}</i>`).join("")}</div><div class="listing"><span class="listing-top"><i class="ad-av">${logoMark()}</i><b>${esc(name)}</b></span><small>${esc(tc(services[0] || "Local business"))}${area ? ` · ${esc(area)}` : ""}</small><span class="listing-btns"><em>Call</em><em>Directions</em><em>Website</em></span></div></div>`;
-      case "ai": return `<div class="aiq a d2"><div class="aiq-ask">${icon("chat")}<span>Who's the best for ${esc((services[0] || "this service").toLowerCase())}${area ? ` in ${esc(area)}` : " near me"}?</span></div><div class="aiq-ans"><span class="aiq-ico">${icon("spark")}</span><p><b>${esc(name)}</b> is a strong option${area ? ` in ${esc(area)}` : ""}. ${esc(String(brand.description || "They're a well-reviewed local business.").split(/(?<=[.!])\s/)[0].slice(0, 140))}</p><div class="aiq-src"><span>${logoMark()}</span><span>${esc(domain)}</span></div></div></div>`;
       case "social": case "retarget": return `<div class="feed a d2">${[0, 1, 2].map((index) => `${index ? `<span class="arrow">→</span>` : ""}${phone(adPost(slide, index), "sm")}`).join("")}</div>`;
       case "email": return `<div class="duo a d2">${phone(`<div class="mail"><div class="mail-head">${logoMark()}</div><h4>${esc(slide.data.cardTitle || "Your latest news")}</h4>${photo(slide, "images.0", photoAt(0), "mail-img")}<p></p><p></p><span class="mail-btn">Book a consultation</span><div class="mail-cards">${[1, 2].map((index) => `<span>${photo(slide, `images.${index}`, photoAt(index))}<b>${esc(tc(services[index - 1] || (index === 1 ? "Latest work" : "Customer stories")))}</b></span>`).join("")}</div></div>`, "solo")}</div>`;
       case "whatsapp": return `<div class="feed a d2">${phone(`<div class="formui"><div class="mail-head">${logoMark()}</div><b>Tell us about your project</b><i></i><i></i><i></i><i class="tall"></i><span>Request a quote →</span></div>`, "sm")}<span class="arrow">→</span>${phone(`<div class="chatui"><div class="chat-top"><i class="ad-av">${logoMark()}</i>${esc(name)}</div><p class="in">Hi! Thanks for your enquiry — when suits you for a quick call?</p><p class="out">Tomorrow afternoon would be perfect</p><p class="in">Great — you're booked in for 2pm ✓</p></div>`, "sm")}</div>`;
@@ -175,7 +173,47 @@ export function renderProposalHtml(deck: ProposalDeck, brand: ProposalBrand, opt
         <div class="hand-grid">${[["globe", "Domain & email", "Moved safely"], ["chart", "Google Analytics (GA4)", "Set up and connected"], ["target", "Call & form tracking", "Every enquiry counted"], ["star", "Your Google rankings", "All SEO work kept"]].map(([ic, title, sub], index) => `<div class="hand-tile" style="--d:${index + 2}"><span class="hand-ico">${icon(ic)}</span><div><b>${title}</b><small>${sub}</small></div><i class="hand-ok">${icon("check")}</i></div>`).join("")}</div>
         <div class="hand-badge">${icon("check")} No downtime · No lost rankings · Done fast</div></div>`;
       case "landing": return `<div class="duo a d2">${desktop(browser(landing(slide, "images.0", "d", services[0] || "Our services", 0)), "big")}${phone(landing(slide, "images.1", "m", services[1] || services[0] || "Our services", 1), "front")}</div>`;
-      case "seo": return `<div class="duo a d2">${desktop(browser(`<div class="slot site-slot"${slotAttr(slide, "images.0")}>${siteMock("d", (valueAt(slide, "images.0") === "none" ? "" : img(valueAt(slide, "images.0")) || photoAt(2)), `${tc(services[1] || services[0] || name)}${area ? ` in ${area}` : ""}`)}</div>`), "big")}${phone(site(slide, "brand.screenshotMobile", "m", 1), "front")}</div>`;
+      case "seo": {
+        const kws = (Array.isArray(slide.data.keywords) && slide.data.keywords.filter(Boolean).length ? slide.data.keywords : keywordsFallback).slice(0, 4);
+        const moves: Array<[number, number]> = [[18, 2], [24, 1], [31, 4], [14, 3]];
+        const svc0 = (services[0] || "this service").toLowerCase();
+        const where = area ? ` in ${area}` : "";
+        const line = (pts: number[], h: number) => pts.map((v, i) => `${(i * 100 / (pts.length - 1)).toFixed(1)},${(h - v * h / 100).toFixed(1)}`).join(" ");
+        const clicks = [8, 12, 11, 18, 22, 21, 30, 36, 41, 50, 58, 70], impr = [20, 24, 26, 31, 35, 40, 44, 52, 58, 66, 74, 86];
+        return `<div class="seod a d2"><span class="ex-tag">Example of your monthly report</span>
+        <div class="sd-card sd-gsc"><div class="sd-h"><span class="sd-g"><i></i><i></i><i></i><i></i></span><b>Google Search Console</b><em>Last 12 months</em></div>
+          <div class="sd-kpis">${[["Clicks", "1,284", "+162%", "c"], ["Impressions", "48.2K", "+118%", "i"], ["Avg. position", "4.3", "↑ from 19", ""], ["CTR", "2.7%", "+0.9", ""]].map(([k, v, d, c]) => `<span class="${c}"><small>${k}</small><b>${v}</b><em>${d}</em></span>`).join("")}</div>
+          <svg class="sd-chart" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"><polyline points="${line(impr, 40)}" fill="none" stroke="#7c3aed" stroke-width="1.2" vector-effect="non-scaling-stroke"/><polyline points="${line(clicks, 40)}" fill="none" stroke="#1a73e8" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg></div>
+        <div class="sd-card sd-rank"><div class="sd-h">${icon("search")}<b>Your Google rankings</b></div>
+          ${kws.map((kw: string, i: number) => `<div class="sd-kw"><span>${esc(kw)}</span><s>#${moves[i][0]}</s><b class="${moves[i][1] <= 3 ? "top" : ""}">#${moves[i][1]}</b></div>`).join("")}</div>
+        <div class="sd-card sd-ga"><div class="sd-h"><span class="sd-ga-ico"><i></i><i></i><i></i></span><b>Google Analytics</b></div>
+          <div class="sd-mini">${[["Visitors", "3,910"], ["Enquiries", "86"], ["From Google", "71%"]].map(([k, v]) => `<span><small>${k}</small><b>${v}</b></span>`).join("")}</div>
+          <div class="sd-bars">${[22, 30, 28, 40, 46, 52, 61, 70, 78, 88].map((h) => `<i style="height:${h}%"></i>`).join("")}</div>
+          <div class="sd-tech">${[["96", "Speed"], ["100", "SEO"], ["98", "Mobile"]].map(([v, k]) => `<span><em style="--p:${v}">${v}</em><small>${k}</small></span>`).join("")}</div></div>
+        <div class="sd-card sd-post"><div class="sd-h">${icon("mail")}<b>Advice posts on your website</b></div>
+          <div class="sd-art">${photo(slide, "images.0", photoAt(2), "sd-art-img")}<div><small>Advice · ${esc(domain)}</small><b>${esc(`How much does ${svc0} cost${where}?`)}</b><span class="sd-by">${logoMark()}<i>By ${esc(name)} · Updated this month</i></span></div></div>
+          <ul class="sd-qs">${[`What affects the price of ${svc0}?`, `How long does ${svc0} take?`].map((q) => `<li>${icon("check")}${esc(q)}</li>`).join("")}</ul></div>
+        <div class="sd-card sd-ai"><div class="sd-h">${icon("spark")}<b>AI search (AEO &amp; GEO)</b></div>
+          <div class="sd-ask">${icon("chat")}<span>${esc(`Best ${svc0}${area ? ` in ${area}` : " near me"}?`)}</span></div>
+          ${[["ChatGPT", "#1", "Recommended"], ["Google AI Overview", "✓", "Cited as a source"], ["Gemini", "#2", "Recommended"], ["Perplexity", "#1", "Recommended"]].map(([e, p, s]) => `<div class="sd-eng"><span>${e}</span><i>${s}</i><b>${p}</b></div>`).join("")}</div>
+      </div>`;
+      }
+      case "maps": {
+        const svc0 = tc(services[0] || "Our services");
+        return `<div class="gbpd a d2"><span class="ex-tag">Example of your Google profile</span>
+        <div class="gbp-stats">${[["Profile views", "3,240", "+84%"], ["Calls", "148", "+61%"], ["Directions", "96", "+47%"], ["Website clicks", "212", "+70%"]].map(([k, v, d]) => `<span><small>${k}</small><b>${v}</b><em>${d}</em></span>`).join("")}</div>
+        <div class="gbp-main"><div class="mapwrap"><div class="map"><svg class="map-svg" viewBox="0 0 400 260" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="400" height="260" fill="#eef1f4"/><path d="M290 0 C 300 70 360 90 400 110 L400 0Z" fill="#cfe3f7"/><rect x="40" y="150" width="90" height="60" rx="14" fill="#d7ecd9"/><rect x="250" y="170" width="70" height="50" rx="12" fill="#d7ecd9"/><g stroke="#fff" stroke-linecap="round" fill="none"><path d="M-10 120 C 100 100 200 140 410 90" stroke-width="12"/><path d="M150 -10 C 160 80 140 180 175 270" stroke-width="10"/><path d="M-10 40 L 410 60" stroke-width="5"/><path d="M-10 200 L 410 230" stroke-width="5"/><path d="M60 -10 L 90 270" stroke-width="5"/><path d="M240 -10 L 230 270" stroke-width="5"/><path d="M320 -10 L 350 270" stroke-width="5"/></g><g stroke="#f8d77a" stroke-linecap="round" fill="none"><path d="M-10 120 C 100 100 200 140 410 90" stroke-width="3"/></g></svg>${[18, 42, 66, 30, 78, 55].map((x, index) => `<i class="pin${index === 2 ? " me" : ""}" style="left:${x}%;top:${[30, 62, 38, 22, 55, 75][index]}%">${icon("pin")}</i>`).join("")}</div>
+          <div class="listing"><span class="listing-top"><i class="ad-av">${logoMark()}</i><b>${esc(name)}</b></span><span class="gbp-rate"><b>4.9</b><span>${[0, 1, 2, 3, 4].map(() => icon("star")).join("")}</span><small>(127)</small></span><small>${esc(svc0)}${area ? ` · ${esc(area)}` : ""} · <em class="open">Open now</em></small><span class="listing-btns"><em>Call</em><em>Directions</em><em>Website</em></span></div>
+          <div class="gbp-review"><span class="gbp-rv-top"><i>SK</i><span><b>Sarah K.</b><span class="gbp-stars">${[0, 1, 2, 3, 4].map(() => icon("star")).join("")}</span></span><small>1 week ago</small></span><p>${esc(`Brilliant from start to finish. Really professional and great value — would highly recommend ${name}.`)}</p><div class="gbp-reply"><b>Reply from the owner</b><p>Thanks so much, Sarah! Delighted it all went well. 😊</p></div></div></div>
+          <div class="gbp-post"><div class="gbp-post-top"><i class="ad-av">${logoMark()}</i><span><b>${esc(name)}</b><small>Update · 2 days ago</small></span></div>${photo(slide, "images.0", photoAt(0), "gbp-post-img")}<p>${esc(`Now booking ${svc0.toLowerCase()} for next month${area ? ` across ${area}` : ""}. Free, no-obligation quotes — get in touch this week to secure your spot.`)}</p><span class="gbp-post-btn">Book online</span><span class="gbp-post-meta">${icon("like")} 312 views this week</span></div></div>
+      </div>`;
+      }
+      case "ai": {
+        const svc0 = (services[0] || "this service").toLowerCase();
+        return `<div class="aid a d2"><span class="ex-tag">Example</span><div class="aiq"><div class="aiq-ask">${icon("chat")}<span>Who's the best for ${esc(svc0)}${area ? ` in ${esc(area)}` : " near me"}?</span></div><div class="aiq-ans"><span class="aiq-ico">${icon("spark")}</span><p><b>${esc(name)}</b> is a strong option${area ? ` in ${esc(area)}` : ""}. ${esc(String(brand.description || "They're a well-reviewed local business.").split(/(?<=[.!])\s/)[0].slice(0, 140))}</p><div class="aiq-src"><span>${logoMark()}</span><span>${esc(domain)}</span></div></div></div>
+        <div class="aid-row"><div class="sd-card"><div class="sd-h">${icon("spark")}<b>Where AI recommends you</b></div>${[["ChatGPT", "#1"], ["Google AI Overview", "Cited"], ["Gemini", "#2"], ["Perplexity", "#1"]].map(([e, p]) => `<div class="sd-eng"><span>${e}</span><b>${p}</b></div>`).join("")}</div>
+          <div class="sd-card"><div class="sd-h">${icon("chat")}<b>Questions we answer for you</b></div><ul class="sd-qs">${[`How much does ${svc0} cost?`, `How long does ${svc0} take?`, `Who's recommended${area ? ` in ${area}` : " near me"}?`, `What should I ask before booking?`].map((q) => `<li>${icon("check")}${esc(q)}</li>`).join("")}</ul></div></div></div>`;
+      }
       default: return `<div class="duo a d2">${desktop(browser(site(slide, "brand.screenshotDesktop", "d")), "big")}${phone(site(slide, "brand.screenshotMobile", "m", 1), "front")}</div>`;
     }
   };
@@ -670,4 +708,50 @@ h1,h2,b{font-weight:800}
 .print-btn{position:fixed;top:16px;right:16px;padding:12px 20px;border:0;border-radius:12px;background:var(--accent);color:#fff;font:700 15px Poppins,system-ui;cursor:pointer;z-index:9;box-shadow:0 10px 30px rgba(20,99,255,.4)}
 @page{size:297mm 215.3mm;margin:0}
 @media print{html,body{background:#fff;padding:0;display:block}.slide{width:297mm;border-radius:0;box-shadow:none;page-break-after:always;break-after:page}.slide[data-hidden]{display:none}.no-print{display:none}.a,.notif,.serp-row,.rank i,.seg,.node,.chatui p{opacity:1!important;transform:none!important;transition:none!important}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+/* SEO, Google Business Profile and AI search example dashboards */
+.ex-tag{position:absolute;right:0;top:-34u;font-size:13u;font-weight:600;color:#9aa3b2;letter-spacing:.04em;text-transform:uppercase}
+.seod,.gbpd,.aid{position:relative;width:100%}
+.sd-card{background:#fff;border-radius:18u;padding:16u 18u;box-shadow:0 14u 40u rgba(15,23,42,.12),0 0 0 1px #eef0f3;min-width:0;overflow:hidden}
+.sd-h{display:flex;align-items:center;gap:9u;margin-bottom:10u}.sd-h b{font-size:15u;font-weight:700}.sd-h em{margin-left:auto;font-style:normal;font-size:12u;color:#9aa3b2}.sd-h>svg{width:18u;height:18u;color:var(--accent)}
+.seod{display:grid;grid-template-columns:1fr 1fr;gap:16u}
+.sd-gsc{grid-column:1/-1}
+.sd-g{display:grid;grid-template-columns:1fr 1fr;gap:2u;width:18u;height:18u}.sd-g i{border-radius:2u}.sd-g i:nth-child(1){background:#4285f4}.sd-g i:nth-child(2){background:#ea4335}.sd-g i:nth-child(3){background:#fbbc04}.sd-g i:nth-child(4){background:#34a853}
+.sd-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10u}.sd-kpis span{border-radius:12u;padding:8u 12u;background:#f6f8fb;display:grid}.sd-kpis span.c{background:#1a73e8;color:#fff}.sd-kpis span.i{background:#7c3aed;color:#fff}
+.sd-kpis small{font-size:12u;opacity:.8}.sd-kpis b{font-size:24u;line-height:1.2}.sd-kpis em{font-style:normal;font-size:12u;font-weight:600;color:#16a34a}.sd-kpis .c em,.sd-kpis .i em{color:#d1fae5}
+.sd-chart{width:100%;height:90u;margin-top:10u;background:repeating-linear-gradient(#fff 0 22u,#eef0f3 22u 23u)}
+.sd-kw{display:grid;grid-template-columns:1fr auto auto;gap:10u;align-items:center;padding:7u 0;border-top:1px solid #f1f3f6;font-size:13.5u}.sd-kw span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sd-kw s{color:#9aa3b2;font-size:12u}.sd-kw b{min-width:44u;text-align:center;border-radius:99px;padding:2u 8u;background:#e8f0fe;color:#1a73e8;font-size:13u}.sd-kw b.top{background:#16a34a;color:#fff}
+.sd-ga-ico{display:flex;align-items:flex-end;gap:2u;height:18u}.sd-ga-ico i{width:5u;border-radius:3u;background:#f9ab00}.sd-ga-ico i:nth-child(1){height:40%;background:#e37400}.sd-ga-ico i:nth-child(2){height:70%}.sd-ga-ico i:nth-child(3){height:100%}
+.sd-mini{display:grid;grid-template-columns:repeat(3,1fr);gap:8u}.sd-mini span{display:grid}.sd-mini small{font-size:11.5u;color:#6b7280}.sd-mini b{font-size:19u}
+.sd-bars{display:flex;align-items:flex-end;gap:5u;height:52u;margin:8u 0}.sd-bars i{flex:1;border-radius:4u 4u 0 0;background:linear-gradient(#f9ab00,#e37400)}
+.sd-tech{display:flex;justify-content:space-around;border-top:1px solid #f1f3f6;padding-top:8u}.sd-tech span{display:grid;justify-items:center;gap:3u}.sd-tech small{font-size:11u;color:#6b7280}
+.sd-tech em{font-style:normal;font-weight:700;font-size:13u;color:#0f9d58;width:40u;height:40u;border-radius:50%;display:grid;place-items:center;background:radial-gradient(closest-side,#fff 76%,transparent 78%),conic-gradient(#0f9d58 calc(var(--p)*1%),#e6f4ea 0)}
+.sd-art{display:grid;grid-template-columns:110u 1fr;gap:12u;align-items:center}.sd-art .slot{position:relative;height:80u;border-radius:10u;overflow:hidden}.sd-art .slot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.sd-art small{font-size:11u;color:#6b7280}.sd-art b{display:block;font-size:14.5u;line-height:1.3;margin:2u 0 6u}
+.sd-by{display:flex;align-items:center;gap:6u}.sd-by .lg{height:18u;max-width:60u;object-fit:contain}.sd-by .lg-t{font-size:11u;color:var(--brand)}.sd-by i{font-style:normal;font-size:11u;color:#6b7280}
+.sd-qs{list-style:none;display:grid;gap:5u;margin-top:10u}.sd-qs li{display:flex;gap:7u;align-items:center;font-size:12.5u;color:#374151}.sd-qs svg{width:15u;height:15u;flex:none;color:#fff;background:#16a34a;border-radius:50%;padding:2u}
+.sd-ask{display:flex;gap:8u;align-items:center;background:#0b0d12;color:#fff;border-radius:12u;padding:8u 12u;font-size:13u;margin-bottom:6u}.sd-ask svg{width:16u;height:16u;flex:none}
+.sd-eng{display:grid;grid-template-columns:1fr auto auto;gap:8u;align-items:center;padding:6u 0;border-top:1px solid #f1f3f6;font-size:13.5u}.sd-eng i{font-style:normal;font-size:11.5u;color:#6b7280}.sd-eng b{min-width:44u;text-align:center;border-radius:99px;padding:2u 8u;background:#16a34a;color:#fff;font-size:12.5u}
+.gbpd{display:grid;gap:16u}
+.gbp-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12u}.gbp-stats span{background:#fff;border-radius:14u;padding:10u 14u;box-shadow:0 10u 30u rgba(15,23,42,.1),0 0 0 1px #eef0f3;display:grid}
+.gbp-stats small{font-size:12u;color:#6b7280}.gbp-stats b{font-size:24u;line-height:1.2}.gbp-stats em{font-style:normal;font-size:12u;font-weight:600;color:#16a34a}
+.gbp-main{display:grid;grid-template-columns:1fr 300u;gap:16u}
+.gbpd .mapwrap{height:600u}
+.gbpd .listing{left:20u;bottom:20u;width:360u}
+.gbp-rate{display:flex;align-items:center;gap:6u}.gbp-rate b{font-size:15u}.gbp-rate span,.gbp-stars{display:flex;color:#fbbc04}.gbp-rate svg,.gbp-stars svg{width:15u;height:15u}.gbp-rate small{font-size:13u;color:#6b7280}
+.listing .open{font-style:normal;color:#16a34a;font-weight:600}
+.gbp-review{position:absolute;left:20u;top:20u;width:330u;background:#fff;border-radius:16u;padding:14u 16u;box-shadow:0 16u 40u rgba(0,0,0,.18)}
+.gbp-rv-top{display:flex;align-items:center;gap:9u}.gbp-rv-top>i{width:34u;height:34u;border-radius:50%;background:#7c3aed;color:#fff;font-style:normal;font-size:13u;font-weight:700;display:grid;place-items:center}.gbp-rv-top b{font-size:13.5u;display:block}.gbp-rv-top small{margin-left:auto;font-size:11u;color:#9aa3b2}
+.gbp-review>p{font-size:12.5u;line-height:1.5;color:#374151;margin:8u 0}
+.gbp-reply{border-left:3u solid var(--accent);background:#f6f8fb;border-radius:0 10u 10u 0;padding:7u 10u}.gbp-reply b{font-size:11.5u}.gbp-reply p{font-size:12u;color:#4b5563}
+.gbp-post{background:#fff;border-radius:18u;padding:14u;box-shadow:0 16u 40u rgba(15,23,42,.14),0 0 0 1px #eef0f3;display:flex;flex-direction:column;gap:10u}
+.gbp-post-top{display:flex;align-items:center;gap:9u}.gbp-post-top .ad-av{width:36u;height:36u}.gbp-post-top b{font-size:14u;display:block}.gbp-post-top small{font-size:11.5u;color:#6b7280}
+.gbp-post .slot{position:relative;height:300u;border-radius:12u;overflow:hidden}.gbp-post .slot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.gbp-post p{font-size:13u;line-height:1.5;color:#1f2937}
+.gbp-post-btn{align-self:flex-start;background:#1a73e8;color:#fff;font-size:13u;font-weight:600;border-radius:99px;padding:7u 16u}
+.gbp-post-meta{display:flex;gap:6u;align-items:center;font-size:11.5u;color:#6b7280;margin-top:auto}.gbp-post-meta svg{width:14u;height:14u}
+.aid{display:grid;gap:22u}.aid .aiq{max-width:none}
+.aid-row{display:grid;grid-template-columns:1fr 1fr;gap:16u}
+.sd-art .tile .lg-t,.gbp-post .tile .lg-t{font-size:14u}.sd-art .tile .lg{max-width:80%;max-height:60%}
+.gbpd .listing-top>b{font-size:20u}
 `;

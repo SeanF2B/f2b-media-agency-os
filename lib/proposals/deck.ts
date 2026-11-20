@@ -268,8 +268,15 @@ export function sanitizeDeck(value: unknown): ProposalDeck | null {
   };
   const slides = raw.slides.slice(0, 40).filter((slide) => slide && kinds.has(slide.kind as SlideKind) && !(slide.kind === "service" && (slide.data as Record<string, unknown>)?.serviceKey === "landing")).map((slide) => ({ id: String(slide.id || sid()).slice(0, 20), kind: slide.kind as SlideKind, hidden: Boolean(slide.hidden), data: (clip(slide.data) || {}) as Record<string, any> }));
   const current = catalogueByKey(SERVICE_CATALOGUE);
+  // Copy that was the default before the latest catalogue update (upgraded automatically if untouched).
+  const PREV_COPY: Record<string, { summary: string; deliverables: string[] }> = { seo: { summary: "We help your website climb Google's free results for the searches your customers make, so new enquiries keep coming in without paying for every click.", deliverables: ["Climb Google's free results", "A page for each of your services", "Website fixes so Google loves it", "Monthly ranking updates"] } };
   for (const slide of slides) {
     const key = String(slide.data.serviceKey || "");
+    const prev = PREV_COPY[key], next = current.get(key);
+    if (slide.kind === "service" && prev && next) {
+      if (slide.data.cardBody === prev.summary) slide.data.cardBody = next.summary;
+      if (Array.isArray(slide.data.bullets) && slide.data.bullets.every((item: unknown) => prev.deliverables.includes(String(item)))) slide.data.bullets = next.deliverables.slice(0, 4);
+    }
     const old = LEGACY_COPY[key], now = current.get(key);
     if (slide.kind !== "service" || !old || !now) continue;
     if (slide.data.cardBody === old.summary) slide.data.cardBody = now.summary;
