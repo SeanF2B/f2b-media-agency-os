@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { cloudflareToken } from "@/lib/outreach/server/store";
 
 type AccessRule = Record<string, unknown>;
 type AccessPolicy = {
@@ -13,6 +14,8 @@ type AccessPolicy = {
   purpose_justification_prompt?: string;
   approval_required?: boolean;
   approval_groups?: unknown[];
+  reusable?: boolean;
+  precedence?: number;
   [key: string]: unknown;
 };
 
@@ -33,14 +36,46 @@ function apiError(envelope: ApiEnvelope<unknown>, fallback: string) {
   return envelope.errors?.map((error) => error.message).filter(Boolean).join("; ") || fallback;
 }
 
-/** Add one saved staff email to the configured app's existing exact-email allow policy. */
+export const STAFF_POLICY_NAME = "F2B staff (synced from Team)";
+const CF_API = "https://api.cloudflare.com/client/v4";
+
+async function workspaceOwnerId(): Promise<string> {
+  try {
+    const row = await (env.DB as D1Database).prepare("SELECT owner_id FROM workspace_documents WHERE id = ?1").bind("f2b-agency").first<{ owner_id: string }>();
+    return row?.owner_id || "";
+  } catch { return ""; }
+}
+
+/**
+ * The policy staff emails live in: a dedicated, app-only allow policy. The shared, reusable
+ * "Workers Preview URLs" policy (Cloudflare account members) is never edited. Created once if missing.
+ */
+async function staffPolicyId(accountId: string, appId: string, headers: Record<string, string>, configured: string, email: string): Promise<{ id: string; created: boolean } | { error: string; status: number }> {
+  const base = `${CF_API}/accounts/${encodeURIComponent(accountId)}/access/apps/${encodeURIComponent(appId)}/policies`;
+  const listResponse = await fetch(base, { headers, signal: AbortSignal.timeout(12_000) });
+  const list = await listResponse.json().catch(() => null) as ApiEnvelope<AccessPolicy[]> | null;
+  if (!listResponse.ok || !list?.success || !Array.isArray(list.result)) return { status: listResponse.status, error: list ? apiError(list, "Could not list the workspace Access policies.") : "Could not list the workspace Access policies." };
+  const policies = list.result;
+  const named = policies.find((policy) => policy.name === STAFF_POLICY_NAME && policy.decision === "allow");
+  if (named?.id) return { id: named.id, created: false };
+  const pinned = policies.find((policy) => policy.id === configured && policy.decision === "allow" && !policy.reusable && Array.isArray(policy.include) && policy.include.every((rule) => "email" in rule));
+  if (pinned?.id) return { id: pinned.id, created: false };
+  const precedence = Math.max(0, ...policies.map((policy) => Number(policy.precedence) || 0)) + 1;
+  const createResponse = await fetch(base, { method: "POST", headers, body: JSON.stringify({ name: STAFF_POLICY_NAME, decision: "allow", precedence, include: [{ email: { email } }], exclude: [], require: [], session_duration: "24h" }), signal: AbortSignal.timeout(12_000) });
+  const created = await createResponse.json().catch(() => null) as ApiEnvelope<AccessPolicy> | null;
+  if (!createResponse.ok || !created?.success || !created.result?.id) return { status: createResponse.status, error: created ? apiError(created, "Could not create the staff Access policy.") : "Could not create the staff Access policy." };
+  return { id: created.result.id, created: true };
+}
+
+const permissionHint = "The Cloudflare token needs the account permission Access: Apps and Policies Edit. Add it to the token saved in Settings → Domains & DNS (or set CLOUDFLARE_ACCESS_API_TOKEN); staff profiles are still saved.";
+
+/** Add one saved staff email to the workspace's dedicated staff allow policy (created if missing). */
 export async function ensureStaffHasWorkspaceAccess(emailValue: string, previousEmailValue?: string) {
   const accountId = env.F2B_CF_ACCOUNT_ID?.trim();
   const appId = env.F2B_CF_ACCESS_APP_ID?.trim();
-  const policyId = env.F2B_CF_ACCESS_POLICY_ID?.trim();
-  const token = env.CLOUDFLARE_ACCESS_API_TOKEN?.trim();
-  if (!accountId || !appId || !policyId || !token) {
-    return { ok: false as const, configured: false as const, error: "One-time setup is needed to connect staff access. Add the Cloudflare Access API token and the workspace app and allow-policy IDs; staff profiles are still saved." };
+  const token = env.CLOUDFLARE_ACCESS_API_TOKEN?.trim() || await cloudflareToken(await workspaceOwnerId()).catch(() => null) || "";
+  if (!accountId || !appId || !token) {
+    return { ok: false as const, configured: false as const, error: "Staff access isn't connected yet: no Cloudflare token is saved. Add one in Settings → Domains & DNS with Access: Apps and Policies Edit; staff profiles are still saved." };
   }
 
   const email = normalizedEmail(emailValue);
@@ -49,8 +84,12 @@ export async function ensureStaffHasWorkspaceAccess(emailValue: string, previous
     return { ok: false as const, configured: true as const, error: "Enter a valid email address on the saved staff profile before syncing workspace access." };
   }
 
-  const endpoint = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/access/apps/${encodeURIComponent(appId)}/policies/${encodeURIComponent(policyId)}`;
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+  const target = await staffPolicyId(accountId, appId, headers, env.F2B_CF_ACCESS_POLICY_ID?.trim() || "", email);
+  if ("error" in target) return { ok: false as const, configured: true as const, error: `${target.error} (HTTP ${target.status}). ${target.status === 401 || target.status === 403 ? permissionHint : ""}`.trim() };
+  if (target.created) return { ok: true as const, configured: true as const, email, changed: true };
+  const policyId = target.id;
+  const endpoint = `${CF_API}/accounts/${encodeURIComponent(accountId)}/access/apps/${encodeURIComponent(appId)}/policies/${encodeURIComponent(policyId)}`;
   const readResponse = await fetch(endpoint, { headers, signal: AbortSignal.timeout(12_000) });
   const currentEnvelope = await readResponse.json().catch(() => null) as ApiEnvelope<AccessPolicy> | null;
   if (!readResponse.ok || !currentEnvelope?.success || !currentEnvelope.result) {
@@ -88,7 +127,7 @@ export async function ensureStaffHasWorkspaceAccess(emailValue: string, previous
   const writeResponse = await fetch(endpoint, { method: "PUT", headers, body: JSON.stringify(update), signal: AbortSignal.timeout(12_000) });
   const writeEnvelope = await writeResponse.json().catch(() => null) as ApiEnvelope<AccessPolicy> | null;
   if (!writeResponse.ok || !writeEnvelope?.success) {
-    return { ok: false as const, configured: true as const, error: `Cloudflare did not update the staff access rule (HTTP ${writeResponse.status}). ${writeEnvelope ? apiError(writeEnvelope, "Check that the token has account-scoped Access Apps and Policies Read and Edit permissions.") : "Check the API token permissions."}` };
+    return { ok: false as const, configured: true as const, error: `Cloudflare did not update the staff access rule (HTTP ${writeResponse.status}). ${writeEnvelope ? apiError(writeEnvelope, permissionHint) : "Check the API token permissions."}` };
   }
 
   const verifyResponse = await fetch(endpoint, { headers, signal: AbortSignal.timeout(12_000) });

@@ -44,3 +44,22 @@ test("unknown page names fail closed while valid delegated pages follow permissi
   assert.equal(canOpenPage("Report Studio", permissions, false), false);
   assert.equal(canOpenPage("Hidden admin page", permissions, true), false);
 });
+
+test("sub-account staff never open agency pages, even with a forged permission; Sub-account Admin is not an agency admin", async () => {
+  const { SUB_ACCOUNT_ROLES, CRM_ROLES } = await import("../lib/access-permissions.ts");
+  assert.ok(SUB_ACCOUNT_ROLES.includes("Sub-account Admin"));
+  assert.ok(CRM_ROLES.includes("Sub-account Admin"));
+  const forged = getTeamPermissions("Sub-account Admin", { reports: true, vault: true, finance: true, allActivity: true });
+  assert.equal(forged.vault, false);
+  assert.equal(forged.finance, false);
+  assert.equal(forged.allActivity, false);
+  for (const page of ["Proposal Studio", "Report Studio", "SEO", "Google Ads", "Operations", "Clients", "Settings", "Bookkeeping"]) {
+    assert.equal(canOpenPage(page, forged, false, true, "Sub-account Admin"), false, page);
+    assert.equal(canOpenPage(page, getTeamPermissions("Sub-account Manager"), false, true, "Sub-account Manager"), false, page);
+  }
+  for (const page of ["CRM", "Conversations", "Content", "Scheduling", "Tasks", "Team", "AI Assistant"]) {
+    assert.equal(canOpenPage(page, forged, false, true, "Sub-account Admin"), true, page);
+  }
+  // Agency staff keep their existing access.
+  assert.equal(canOpenPage("Report Studio", getTeamPermissions("Admin"), true, false, "Admin"), true);
+});

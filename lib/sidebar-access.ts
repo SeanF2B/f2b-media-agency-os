@@ -1,6 +1,7 @@
-import { CRM_ROLES, type TeamPermissions } from "./access-permissions";
+import { AGENCY_ONLY_PAGES, CRM_ROLES, isSubAccountRole, type TeamPermissions } from "./access-permissions";
 
 export function canOpenPage(page: string, permissions: TeamPermissions, isAdmin: boolean, hasClientScope = false, role = "") {
+  if (!isAdmin && isSubAccountRole(role) && (AGENCY_ONLY_PAGES as readonly string[]).includes(page)) return false;
   return page === "Overview" ? permissions.overview || isAdmin
     : page === "Activity" || page === "Activity & Time" ? permissions.overview || permissions.timesheets || permissions.clientActivity || permissions.allActivity
     : page === "Clients" ? permissions.clients || hasClientScope

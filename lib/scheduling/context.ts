@@ -46,5 +46,5 @@ export function schedulingDeps(request: Request): Deps {
   return { db: env.DB as never, sendEmail, google: googleSchedulingAvailable() ? createGoogleOps() : undefined, baseUrl: new URL(request.url).origin };
 }
 
-export const SCHED_MANAGER_ROLES = ["Sub-account Manager"];
-export const SCHED_ROLES = ["Sub-account Manager", "Sub-account User"];
+export const SCHED_MANAGER_ROLES = ["Sub-account Admin", "Sub-account Manager"];
+export const SCHED_ROLES = ["Sub-account Admin", "Sub-account Manager", "Sub-account User"];
