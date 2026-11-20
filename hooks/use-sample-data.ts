@@ -14,7 +14,7 @@ export function useSampleData(): [boolean, (on: boolean) => void] {
     return () => { window.removeEventListener(EVENT, sync); window.removeEventListener("storage", sync); };
   }, []);
   const set = useCallback((next: boolean) => {
-    try { localStorage.setItem(KEY, next ? "1" : "0"); } catch { /* storage unavailable */ }
+    try { localStorage.setItem(KEY, next ? "1" : "0"); if (next) localStorage.removeItem("f2b-sample-held-done"); } catch { /* storage unavailable */ }
     setOn(next); window.dispatchEvent(new Event(EVENT));
   }, []);
   return [on, set];

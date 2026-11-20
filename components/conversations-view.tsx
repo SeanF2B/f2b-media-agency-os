@@ -1,7 +1,7 @@
 "use client";
 import { AiEyesIcon } from "./ai-eyes-icon";
 
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { pendingView, readViewCache, writeViewCache } from "@/lib/view-cache";
 import { conversationsCacheKey, conversationsUrl } from "@/lib/view-prefetch";
 import { useSampleData } from "@/hooks/use-sample-data";
@@ -11,6 +11,7 @@ import { uploadToMedia, type UploadedMedia } from "@/lib/upload-media";
 import { CalendarDays, CalendarPlus, ChevronDown, LayoutGrid, Paperclip, Receipt, SendHorizontal, Sparkles, X } from "lucide-react";
 import { renderTemplate, windowState, type WaTemplate } from "@/lib/conversations/whatsapp";
 import { EmailFrame } from "@/components/email-frame";
+import { sampleHeldReplies, takeOpenThread, useSampleHeldDone } from "@/lib/conversations/sample-held";
 const QuickInvoice = lazy(() => import("./invoicing-view").then((m) => ({ default: m.QuickInvoice })));
 const QuickBook = lazy(() => import("./scheduling-view").then((m) => ({ default: m.QuickBook })));
 const VoiceNote = lazy(() => import("./ai-agent-panel").then((m) => ({ default: m.VoiceNote })));
@@ -45,11 +46,12 @@ function sampleInbox(clientId: string, clientName: string, gallery: string[]): {
   const pic = (i: number) => gallery.length ? gallery[i % gallery.length] : "";
   const at = (mins: number) => new Date(Date.now() - mins * 60_000).toISOString();
   const chats: Array<{ name: string; contact: string; channel: Thread["channel"]; lines: Array<[Msg["direction"], Msg["sender"], string, number]>; unread: number; status: Thread["status"] }> = tattoo ? [
-    { name: "Aoife Brennan", contact: "+353871234567", channel: "whatsapp", unread: 2, status: "open", lines: [["in", "customer", "Hi! I'd love a fine line floral piece on my forearm, about palm size 🌸", 52], ["out", "bot", "Hi Aoife! That sounds lovely. Do you have a reference photo? And any day that suits best?", 51], ["in", "customer", `Here's the idea ${pic(0)}`.trim(), 14], ["in", "customer", `And this one for the shading ${pic(1)}`.trim(), 12]] },
+    { name: "Aoife Brennan", contact: "+353871234567", channel: "whatsapp", unread: 2, status: "open", lines: [["in", "customer", "Hi! I'd love a fine line floral piece on my forearm, about palm size 🌸", 52], ["out", "bot", "Hi Aoife! That sounds lovely. Do you have a reference photo? And any day that suits best?", 51], ["in", "customer", `Here's the idea ${pic(0)}`.trim(), 14], ["in", "customer", `And this one for the shading ${pic(1)}`.trim(), 12], ["in", "customer", "When could I come in to chat about it?", 10]] },
     { name: "Ciarán Doyle", contact: "+353861112223", channel: "sms", unread: 0, status: "handoff", lines: [["in", "customer", "How much would a cover-up on my shoulder be? Old tribal piece", 300], ["out", "bot", "Cover-ups depend on size and the old ink. One of the artists will take a look and come back to you.", 299], ["in", "customer", "[[voice:sample-call-1]] 📞 Incoming AI call · 1:48 · Booked\nCiarán rang about the cover-up; the AI booked a free consultation for Thursday at 2pm.", 295], ["in", "customer", `Photo of it ${pic(2)}`.trim(), 290]] },
     { name: "Megan Walsh", contact: "+353879998887", channel: "whatsapp", unread: 0, status: "open", lines: [["in", "customer", "Can I book a piercing for Saturday afternoon?", 1500], ["out", "staff", "Yes! We have 2pm or 3:30pm free on Saturday.", 1490], ["in", "customer", "2pm please 🙌", 1480]] },
+    { name: "Jade Murphy", contact: "jade.murphy.ink", channel: "instagram", unread: 1, status: "open", lines: [["in", "customer", "Hey! Love your piercing work 😍", 30], ["in", "customer", "Can I book a helix piercing this week?", 28]] },
   ] : [
-    { name: "Mary Burke", contact: "+353871234567", channel: "whatsapp", unread: 2, status: "open", lines: [["in", "customer", roof ? "Hi, we've a leak coming in over the kitchen after the storm" : "Hi, I'd like a quote please", 52], ["out", "bot", "Sorry to hear that Mary! Could you send a photo and your Eircode? We'll get someone out.", 51], ["in", "customer", `Here it is ${pic(0)}`.trim(), 14], ["in", "customer", "H91 X2Y3", 12]] },
+    { name: "Mary Burke", contact: "+353871234567", channel: "whatsapp", unread: 2, status: "open", lines: [["in", "customer", roof ? "Hi, we've a leak coming in over the kitchen after the storm" : "Hi, I'd like a quote please", 52], ["out", "bot", "Sorry to hear that Mary! Could you send a photo and your Eircode? We'll get someone out.", 51], ["in", "customer", `Here it is ${pic(0)}`.trim(), 14], ["in", "customer", "H91 X2Y3", 12], ["in", "customer", "When could someone come out to look at it?", 10]] },
     { name: "John Doyle", contact: "+353861112223", channel: "sms", unread: 0, status: "handoff", lines: [["in", "customer", roof ? "How much for gutter cleaning on a semi-d?" : "What are your prices?", 300], ["out", "bot", "It depends on the job. Someone from the team will come back to you shortly.", 299], ["in", "customer", "[[voice:sample-call-2]] 📞 Incoming AI call · 2:05 · Booked\nJohn rang about gutter cleaning on a semi-d; the AI booked a free quote visit for Thursday at 10am.", 280]] },
     { name: "Sinéad Kelly", contact: "+353879998887", channel: "whatsapp", unread: 0, status: "open", lines: [["in", "customer", "Are you free Thursday morning for a look?", 1500], ["out", "staff", "Thursday at 10 works, see you then!", 1490]] },
   ];
@@ -111,6 +113,26 @@ export function ConversationsView({ scopeClientId, clients, staff = [], currentS
     if (scopeClientId) fetch(`/api/scheduling?clientId=${encodeURIComponent(scopeClientId)}&view=site`).then((r) => r.ok ? r.json() : {}).then((v: { gallery?: string[]; work?: Record<string, string[]> }) => build([...(Object.values(v.work || {}).flat()), ...(v.gallery || [])].slice(0, 12))).catch(() => undefined);
     return () => { live = false; };
   }, [sample, scopeClientId]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Sample AI approvals: the AI held back replies with a scheduling link. Approving or dismissing here
+  // (or on the Dashboard) clears them in both places.
+  const heldDone = useSampleHeldDone();
+  const demoLive = useMemo(() => {
+    if (!demo) return null;
+    const held = sampleHeldReplies(scopeClientId, clientName(scopeClientId) || clients[0]?.name || "");
+    const messages: Record<string, Msg[]> = { ...demo.messages };
+    const threads = demo.threads.map((t) => {
+      const h = held.find((x) => x.threadId === t.id); if (!h) return t;
+      const d = heldDone.get(scopeClientId, h.id);
+      if (d?.outcome === "dismissed") return t;
+      const at = d ? d.at : new Date(Date.now() - h.minsAgo * 60_000).toISOString();
+      const msg: Msg = d ? { id: `${h.id}-sent`, direction: "out", sender: "bot", body: d.body || h.body, status: "read", created_at: at } : { id: h.id, direction: "out", sender: "bot", body: h.body, status: "held", error: h.reason, created_at: at };
+      messages[t.id] = [...(messages[t.id] || []), msg];
+      return d ? { ...t, last_at: at, last_preview: (d.body || h.body).slice(0, 80) } : { ...t, status: "handoff" as const, bot_on: 0 };
+    });
+    return { threads, messages };
+  }, [demo, heldDone.get, scopeClientId]); // eslint-disable-line react-hooks/exhaustive-deps
+  // "Open chat" from the Dashboard's AI approvals opens that conversation straight away.
+  useEffect(() => { const id = takeOpenThread(); if (id) setActiveId(id); }, [scopeClientId]);
 
   const loadThreads = useCallback(async () => {
     try { const key = conversationsCacheKey(scopeClientId); const r = (await pendingView<ThreadsPayload>(key)) || await call<ThreadsPayload>(conversationsUrl(scopeClientId)); writeViewCache(key, r); setThreads(r.threads); setConfigured(r.configured); setEmailFrom(r.emailFrom || ""); setWaNumbers(r.waNumbers || []); setError(""); }
@@ -130,10 +152,10 @@ export function ConversationsView({ scopeClientId, clients, staff = [], currentS
     else { const t = threads.find((x) => x.id === activeId); if (t) setActive(t); setMessages([]); }
     void loadThread(activeId);
   }, [activeId, loadThread]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (demo && activeId.startsWith("sample-thread-")) { setActive(demo.threads.find((t) => t.id === activeId) || null); setMessages(demo.messages[activeId] || []); } }, [activeId, demo]);
+  useEffect(() => { if (demoLive && activeId.startsWith("sample-thread-")) { setActive(demoLive.threads.find((t) => t.id === activeId) || null); setMessages(demoLive.messages[activeId] || []); } }, [activeId, demoLive]);
   useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [messages.length, activeId]);
 
-  const act = async (body: Record<string, unknown>) => { if (activeId.startsWith("sample-thread-")) { if (body.action === "send") setMessages((m) => [...m, { id: `local-${Date.now()}`, direction: "out", sender: "staff", body: String(body.body || ""), created_at: new Date().toISOString() }]); return; } setBusy(true); setError(""); try { await call("/api/conversations", body); await loadThreads(); if (activeId) await loadThread(activeId); } catch (e) { setError(e instanceof Error ? e.message : "Something went wrong."); } finally { setBusy(false); } };
+  const act = async (body: Record<string, unknown>) => { if (activeId.startsWith("sample-thread-")) { if (body.action === "held-approve" || body.action === "held-discard") { heldDone.mark(scopeClientId, String(body.messageId || ""), body.action === "held-approve" ? "sent" : "dismissed", String(body.body || "")); setNotice(body.action === "held-approve" ? "Reply sent (sample)" : "Draft dismissed (sample)"); return; } if (body.action === "send") setMessages((m) => [...m, { id: `local-${Date.now()}`, direction: "out", sender: "staff", body: String(body.body || ""), created_at: new Date().toISOString() }]); return; } setBusy(true); setError(""); try { await call("/api/conversations", body); await loadThreads(); if (activeId) await loadThread(activeId); } catch (e) { setError(e instanceof Error ? e.message : "Something went wrong."); } finally { setBusy(false); } };
   const [subject, setSubject] = useState("");
   const [files, setFiles] = useState<UploadedMedia[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -200,7 +222,7 @@ export function ConversationsView({ scopeClientId, clients, staff = [], currentS
   const draft = async () => { if (!active) return; setBusy(true); setError(""); try { const r = await call<{ draft: string }>("/api/conversations", { action: "draft", id: active.id }); setText(r.draft); } catch (e) { setError(e instanceof Error ? e.message : "No draft."); } finally { setBusy(false); } };
 
   // Emails the system sends (lead alerts, invoices, task emails…) live under Notifications, not mixed into live chats.
-  const allThreads = demo ? [...demo.threads, ...threads] : threads;
+  const allThreads = demoLive ? [...demoLive.threads, ...threads] : threads;
   const byStatus = channelFilter === "email" ? allThreads.filter((t) => t.channel === "email") : allThreads.filter((t) => filter === "notifications" ? t.channel === "email" : filter === "all" ? t.status !== "closed" && t.channel !== "email" : filter === "unread" ? t.unread > 0 : t.status === "handoff");
   const me = currentStaffId;
   const shown = byStatus.filter((t) => (channelFilter === "all" || t.channel === channelFilter) && (staffFilter === "all" || (staffFilter === "unassigned" ? !t.assigned_to : staffFilter === "me" ? t.assigned_to === me : t.assigned_to === staffFilter)));

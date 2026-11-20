@@ -1,5 +1,6 @@
 "use client";
 import { useSampleData } from "@/hooks/use-sample-data";
+import { requestOpenThread, sampleHeldReplies, useSampleHeldDone } from "@/lib/conversations/sample-held";
 import { useAppointmentUpdates } from "@/components/appointment-updates";
 import { useEffect, useMemo, useState, type ReactNode, lazy, Suspense } from "react";
 import { BarChart3, BookOpen, CalendarCheck, CalendarPlus, CheckCircle2, ClipboardList, Workflow, Image as ImageIcon, Mail, MessageSquare, MousePointerClick, Phone, Sparkles, TrendingUp, UserPlus, Users } from "lucide-react";
@@ -155,8 +156,26 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
   const aiList = tasks.filter((t) => inScope(t) && ((t.aiApprovals || []).some((a) => a.status === "pending") || t.aiRunState === "needs_review" || (awaitingOwner(t) && isBotTask(t))));
   const humanList = tasks.filter((t) => inScope(t) && (t.reviewStatus === "submitted" || (awaitingOwner(t) && !isBotTask(t))));
   // Chat replies the AI held back for approval (it never sends booking links itself) count as AI approvals too.
-  const [heldReplies, setHeldReplies] = useState<Array<{ id: string; threadId: string; body: string; name: string; channel: string; clientId: string }>>([]);
-  useEffect(() => { let live = true; fetch(`/api/conversations?view=held&clientId=${encodeURIComponent(scopeClientId || "agency")}`, { cache: "no-store" }).then((r) => r.ok ? r.json() : { held: [] }).then((j: { held?: typeof heldReplies }) => { if (live) setHeldReplies(j.held || []); }).catch(() => undefined); return () => { live = false; }; }, [scopeClientId]);
+  type Held = { id: string; threadId: string; body: string; name: string; channel: string; clientId: string; reason?: string; ask?: string; demo?: boolean };
+  const [realHeld, setRealHeld] = useState<Held[]>([]);
+  useEffect(() => { let live = true; fetch(`/api/conversations?view=held&clientId=${encodeURIComponent(scopeClientId || "agency")}`, { cache: "no-store" }).then((r) => r.ok ? r.json() : { held: [] }).then((j: { held?: Held[] }) => { if (live) setRealHeld(j.held || []); }).catch(() => undefined); return () => { live = false; }; }, [scopeClientId]);
+  // With Sample data on, the account shows demo scheduling-link requests (same ones as its sample inbox).
+  const heldDone = useSampleHeldDone();
+  const heldReplies: Held[] = sample ? sampleHeldReplies(scopeClientId, clients.find((c) => c.id === scopeClientId)?.name || clients[0]?.name || "").filter((h) => !heldDone.get(scopeClientId, h.id)).map((h) => ({ ...h, demo: true })) : realHeld;
+  const [heldBusy, setHeldBusy] = useState("");
+  const [heldError, setHeldError] = useState("");
+  const resolveHeld = async (h: Held, approve: boolean) => {
+    setHeldError("");
+    if (h.demo) { heldDone.mark(scopeClientId, h.id, approve ? "sent" : "dismissed", h.body); return; }
+    setHeldBusy(h.id);
+    try {
+      const res = await fetch("/api/conversations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: approve ? "held-approve" : "held-discard", id: h.threadId, messageId: h.id, body: h.body }) });
+      const j = await res.json().catch(() => ({})) as { error?: string };
+      if (!res.ok && res.status !== 404) throw new Error(j.error || "Couldn't do that. Try again.");
+      setRealHeld((list) => list.filter((x) => x.id !== h.id));
+    } catch (e) { setHeldError(e instanceof Error ? e.message : "Couldn't do that. Try again."); } finally { setHeldBusy(""); }
+  };
+  const openChat = (h: Held) => { requestOpenThread(h.threadId); onNavigate("Conversations"); };
   const aiPending = aiList.length + heldReplies.length, humanPending = humanList.length;
   const aiMine = [...aiList.filter((t) => mineFor(t)), ...(isAdmin ? heldReplies : [])], humanMine = humanList.filter((t) => mineFor(t, t.reviewApproverId));
   const oldestHours = (list: HubTask[]) => list.reduce((h, t) => { const at = Date.parse(t.approvalRequest?.requestedAt || ""); return at ? Math.max(h, (Date.now() - at) / 3_600_000) : h; }, 0);
@@ -222,7 +241,9 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
       {list.length ? list.map((t) => { const mine = mineFor(t, apprOpen === "human" ? t.reviewApproverId : undefined); return <div key={t.id} className={`dh-appr-item ${mine ? "mine" : ""}`}><span className="dh-appr-dot" /><span className="dh-appr-main"><b>{t.title}</b><small>{apprOpen === "human" ? `Submitted by ${who(t.assigneeId) || "the team"}${t.reviewApproverId ? ` · approver ${who(t.reviewApproverId)}` : ""}` : `${who(t.assigneeId) || "AI"} · ${t.service || "Task"}`}{mine ? " · needs you" : ""}</small></span>
         <span className="dh-appr-acts">{apprOpen === "human" && onReviewTask && mine && <><button type="button" className="dh-appr-ok" onClick={() => onReviewTask(t.id, "approve")}>Approve</button><button type="button" className="dh-appr-no" onClick={() => onReviewTask(t.id, "request_changes")}>Changes</button></>}{onOpenTask && <button type="button" className="dh-appr-open" onClick={() => onOpenTask(t.id)}>Open</button>}</span></div>; })
         : heldReplies.length && apprOpen === "ai" ? null : <p className="dh-muted">Nothing waiting. 🎉</p>}
-      {apprOpen === "ai" && heldReplies.map((h) => <div key={h.id} className="dh-appr-item mine"><span className="dh-appr-dot" /><span className="dh-appr-main"><b>Reply to {h.name}</b><small>{h.channel === "whatsapp" ? "WhatsApp" : h.channel === "instagram" ? "Instagram" : h.channel === "messenger" ? "Facebook" : "SMS"}{!scopeClientId && clientOf(h.clientId) ? ` · ${clientOf(h.clientId)!.name}` : ""} · AI wants to send a booking link</small></span><span className="dh-appr-acts"><button type="button" className="dh-appr-open" onClick={() => onNavigate("Conversations")}>Open</button></span></div>)}
+      {apprOpen === "ai" && heldReplies.map((h) => <div key={h.id} className="dh-appr-item mine dh-held"><span className="dh-appr-dot" /><span className="dh-appr-main"><b>Send {h.name} a scheduling link?</b><small>{h.channel === "whatsapp" ? "WhatsApp" : h.channel === "instagram" ? "Instagram" : h.channel === "messenger" ? "Facebook" : "SMS"}{!scopeClientId && clientOf(h.clientId) ? ` · ${clientOf(h.clientId)!.name}` : ""}{h.ask ? ` · “${h.ask}”` : " · AI wants to send a booking link"}</small><span className="dh-held-draft">{h.body}</span></span>
+        <span className="dh-appr-acts"><button type="button" className="dh-appr-ok" disabled={heldBusy === h.id} onClick={() => void resolveHeld(h, true)}>{heldBusy === h.id ? "Sending…" : "Approve & send"}</button><button type="button" className="dh-appr-open" onClick={() => openChat(h)}>Open chat</button><button type="button" className="dh-appr-no" disabled={heldBusy === h.id} onClick={() => void resolveHeld(h, false)}>Dismiss</button></span></div>)}
+      {apprOpen === "ai" && heldError && <p className="dh-held-err" role="alert">{heldError}</p>}
     </section>; })()}
     {appt.list}
     {showAppts && <Suspense fallback={null}><AppointmentsDashboard key={scopeClientId || "agency"} showStaffHours scopeClientId={scopeClientId} sample={sample} clientName={clients.find((c) => c.id === scopeClientId)?.name || ""} periodStart={periodStart} periodEnd={periodEnd} periodLabel={periodLabel} onOpen={() => onNavigate("Scheduling")} /></Suspense>}
