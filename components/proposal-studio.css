@@ -191,3 +191,14 @@
 .ps-calc-onboard small { font-size:11.5px; color:var(--ps-muted); } .ps-calc-onboard .ps-err { color:#c62828; }
 @media (max-width: 900px) { .ps-svc-layout { grid-template-columns:1fr; } .ps-calc { position:static; } }
 .dark-mode .ps-svc-cs, .dark-mode .ps-calc-row select { background:#252c33; border-color:#3a444d; color:#cfd8e0; }
+
+.ps-was { flex-basis:100%; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.ps-was small { font-weight:500; font-size:11px; }
+.ps-strike { color:var(--ps-muted); font-weight:500; margin-right:6px; text-decoration-color:#ef4444; text-decoration-thickness:2px; }
+.ps-calc-row.save b { color:#16a34a; font-size:12.5px; }
+.ps-calc-ai { display:grid; gap:4px; padding-top:8px; border-top:1px solid var(--ps-line); font-size:13px; }
+.ps-calc-ai span { font-weight:600; color:var(--ps-muted); } .ps-calc-ai span small { font-weight:500; font-size:11px; }
+.ps-calc-ai input { font:inherit; font-size:13px; padding:6px 8px; border:1px solid #d5dce6; border-radius:8px; background:#fff; color:#141a24; }
+.ps-calc-ai > small { font-size:11px; color:var(--ps-muted); }
+.ps-strike-btn s { text-decoration-thickness:2px; text-decoration-color:#ef4444; font-weight:800; }
+.dark-mode .ps-calc-ai input { background:#252c33; color:#edf2f6; border-color:#3a444d; }

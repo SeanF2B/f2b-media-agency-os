@@ -20,8 +20,23 @@ export type ProposalUpload = { id: string; name: string; kind: string; size: num
 export type ProposalInputs = {
   goal: string; audience: string; discoveryNotes: string; requirements: string; instructions: string;
   startMonth: string; currency: string; terms: string; sources: ProposalSource[];
+  /** Monthly AI credits estimate shown on the Investment slide, e.g. "€20–€40". Empty = worked out from the services. */
+  aiCredits?: string;
 };
-export type SelectedService = { key: string; setupFee: number; monthlyFee: number; addon: boolean };
+/** wasSetupFee / wasMonthlyFee: the original price, shown struck through when it's higher than the price offered (a discount). */
+export type SelectedService = { key: string; setupFee: number; monthlyFee: number; addon: boolean; wasSetupFee?: number; wasMonthlyFee?: number };
+/** Rough monthly AI usage (credits) for the services picked, as a low–high range in the agency currency. */
+export function estimateAiCredits(keys: string[]): [number, number] {
+  const per: Record<string, number> = { whatsapp: 20, "ai-calls": 40, seo: 10, geo: 5, aeo: 5, social: 10, email: 5, reviews: 5, "google-ads": 5, crm: 5 };
+  const low = 10 + keys.reduce((sum, key) => sum + (per[key] || 0), 0);
+  const round = (value: number) => Math.round(value / 5) * 5;
+  return [round(low), round(low * 2)];
+}
+/** "~~€597~~ €497" when discounted, otherwise "€497". ~~text~~ renders as struck-through text on the slides. */
+export function priceWithWas(now: number, was: number | undefined, currency: string) {
+  const fmt = (value: number) => money(value, currency);
+  return was && was > now ? `~~${fmt(was)}~~ ${fmt(now)}` : fmt(now);
+}
 
 export const SLIDE_KINDS: Array<{ kind: SlideKind; label: string; hint: string }> = [
   { kind: "cover", label: "Cover", hint: "Welcome slide with their website on a desktop" },
@@ -164,14 +179,16 @@ export function buildDeck(input: {
   add("investment", {
     heading: "Investment",
     packageName: "Client Acquisition System",
-    setupLabel: `Initial setup: ${money(setup, currency)} / one time`,
-    setupItems: core.filter((item) => item.setupFee > 0).map((item) => `${item.def.name} setup`),
-    monthlyLabel: `Ongoing: ${money(monthly, currency)} / month`,
-    monthlyItems: core.map((item) => `${item.def.name} — ${item.monthlyFee || item.setupFee ? money(item.monthlyFee, currency) : "included"}`),
+    setupLabel: `Initial setup: ${priceWithWas(setup, core.reduce((sum, item) => sum + Math.max(item.setupFee, item.wasSetupFee || 0), 0), currency)} / one time`,
+    setupItems: core.filter((item) => item.setupFee > 0 || (item.wasSetupFee || 0) > 0).map((item) => (item.wasSetupFee || 0) > item.setupFee ? `${item.def.name} setup — ${priceWithWas(item.setupFee, item.wasSetupFee, currency)}` : `${item.def.name} setup`),
+    monthlyLabel: `Ongoing: ${priceWithWas(monthly, core.reduce((sum, item) => sum + Math.max(item.monthlyFee, item.wasMonthlyFee || 0), 0), currency)} / month`,
+    monthlyItems: core.map((item) => `${item.def.name} — ${item.monthlyFee || item.setupFee || item.wasMonthlyFee ? priceWithWas(item.monthlyFee, item.wasMonthlyFee, currency) : "included"}`),
+    aiLabel: "AI credits",
+    aiItems: [`Additional AI credits are billed monthly, based on usage — estimated ${inputs.aiCredits?.trim() || (() => { const [low, high] = estimateAiCredits(picked.map((item) => item.key)); return `${money(low, currency)}–${money(high, currency)}`; })()} / month`],
     mediaLabel: core.some((item) => item.def.mediaNote) ? "Ad spend" : "",
     mediaItems: core.map((item) => item.def.mediaNote).filter(Boolean),
     addonsLabel: addons.length ? "Optional add-ons (see below)" : "",
-    addonItems: addons.map((item) => `${item.def.name} — ${money(item.monthlyFee, currency)}/month`),
+    addonItems: addons.map((item) => `${item.def.name} — ${priceWithWas(item.monthlyFee, item.wasMonthlyFee, currency)}/month`),
     terms: first(inputs.terms, "3-month minimum. Onboarding begins once the setup fee is received. Monthly fee billed every 30 days thereafter."),
     note: "Additional website pages, SEO or larger development work are scoped separately.",
   });

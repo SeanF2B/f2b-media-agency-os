@@ -150,7 +150,7 @@ function cleanInputs(input: Partial<ProposalInputs> | undefined, base: ProposalI
   const src = { ...base, ...(input || {}) };
   return {
     goal: clip(src.goal, 1500), audience: clip(src.audience, 600), discoveryNotes: clip(src.discoveryNotes, 8000), requirements: clip(src.requirements, 4000), instructions: clip(src.instructions, 3000),
-    startMonth: /^\d{4}-\d{2}$/.test(String(src.startMonth || "")) ? String(src.startMonth) : "", currency: ["EUR", "GBP", "USD"].includes(String(src.currency)) ? String(src.currency) : "EUR", terms: clip(src.terms, 600),
+    startMonth: /^\d{4}-\d{2}$/.test(String(src.startMonth || "")) ? String(src.startMonth) : "", currency: ["EUR", "GBP", "USD"].includes(String(src.currency)) ? String(src.currency) : "EUR", terms: clip(src.terms, 600), aiCredits: clip(src.aiCredits, 60),
     sources: (Array.isArray(src.sources) ? src.sources : []).slice(0, 12).map((item: ProposalSource) => ({ id: clip(item.id, 80), label: clip(item.label, 160), kind: (["audit", "report", "notes", "crm", "upload"].includes(item.kind) ? item.kind : "notes") as ProposalSource["kind"], text: clip(item.text, 6000) })).filter((item) => item.text),
   };
 }
@@ -162,7 +162,8 @@ function cleanServices(input: unknown, catalogue: CatalogueService[]): SelectedS
     if (!def || seen.has(def.key)) return null;
     seen.add(def.key);
     const num = (value: unknown, fallback: number) => Number.isFinite(Number(value)) && value !== "" && value !== null ? Math.max(0, Math.round(Number(value))) : fallback;
-    return { key: def.key, setupFee: num(raw.setupFee, def.setupFee), monthlyFee: num(raw.monthlyFee, def.monthlyFee), addon: typeof raw.addon === "boolean" ? raw.addon : Boolean(def.addon) };
+    const was = (value: unknown) => { const n = num(value, 0); return n > 0 ? n : undefined; };
+    return { key: def.key, setupFee: num(raw.setupFee, def.setupFee), monthlyFee: num(raw.monthlyFee, def.monthlyFee), addon: typeof raw.addon === "boolean" ? raw.addon : Boolean(def.addon), wasSetupFee: was(raw.wasSetupFee), wasMonthlyFee: was(raw.wasMonthlyFee) };
   }).filter((item): item is SelectedService => Boolean(item)).slice(0, 20);
 }
 

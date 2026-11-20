@@ -33,10 +33,12 @@ export function renderProposalHtml(deck: ProposalDeck, brand: ProposalBrand, opt
     if (/^https:\/\//i.test(value) || /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(value) || value.startsWith("/")) return value;
     return "";
   };
+  /** ~~text~~ → struck-through text (e.g. an original price before a discount). While editing, the ~~ markers stay as faint text so editing keeps them. */
+  const strike = (html: string) => html.includes("~~") ? html.replace(/~~([^~]+)~~/g, (_m, inner) => edit ? `<span class="sk">~~</span><s class="was">${inner}</s><span class="sk">~~</span>` : `<s class="was">${inner}</s>`) : html;
   /** Editable text node. */
   const t = (slide: Slide, path: string, tag = "span", cls = "") => {
     const value = path.split(".").reduce<any>((node, key) => (node == null ? node : node[key]), slide.data);
-    return `<${tag}${cls ? ` class="${cls}"` : ""}${edit ? ` data-e="${attr(slide.id)}|${attr(path)}" contenteditable="plaintext-only" spellcheck="true"` : ""}>${esc(value)}</${tag}>`;
+    return `<${tag}${cls ? ` class="${cls}"` : ""}${edit ? ` data-e="${attr(slide.id)}|${attr(path)}" contenteditable="plaintext-only" spellcheck="true"` : ""}>${strike(esc(value))}</${tag}>`;
   };
   const logo = img(brand.logo);
   const agencyLogo = opts.agencyLogo || "";
@@ -303,6 +305,7 @@ export function renderProposalHtml(deck: ProposalDeck, brand: ProposalBrand, opt
           <div class="inv-body"><div class="inv-block">${t(slide, "setupLabel", "b")}<ul>${(d.setupItems || []).map((_: string, i: number) => `<li>${t(slide, `setupItems.${i}`)}</li>`).join("")}</ul></div>
           <div class="inv-block">${t(slide, "monthlyLabel", "b")}<ul>${(d.monthlyItems || []).map((_: string, i: number) => `<li>${t(slide, `monthlyItems.${i}`)}</li>`).join("")}</ul></div>
           ${d.mediaLabel ? `<div class="inv-block">${t(slide, "mediaLabel", "b")}<ul>${(d.mediaItems || []).map((_: string, i: number) => `<li>${t(slide, `mediaItems.${i}`)}</li>`).join("")}</ul></div>` : ""}
+          ${d.aiLabel ? `<div class="inv-block inv-ai">${t(slide, "aiLabel", "b")}<ul>${(d.aiItems || []).map((_: string, i: number) => `<li>${t(slide, `aiItems.${i}`)}</li>`).join("")}</ul></div>` : ""}
           ${d.addonsLabel ? `<div class="inv-block">${t(slide, "addonsLabel", "b")}<ul>${(d.addonItems || []).map((_: string, i: number) => `<li>${t(slide, `addonItems.${i}`)}</li>`).join("")}</ul></div>` : ""}
           <div class="inv-block terms"><b>Terms</b>${t(slide, "terms", "p")}</div>${t(slide, "note", "p", "inv-note")}</div>
           ${agencyLogo ? `<img class="agency sm" src="${attr(agencyLogo)}" alt="F2B Media">` : ""}</div>${n}</div></section>`;
@@ -322,6 +325,8 @@ export function renderProposalHtml(deck: ProposalDeck, brand: ProposalBrand, opt
 window.addEventListener("beforeprint",function(){document.querySelectorAll(".slide").forEach(function(s){s.classList.add("on")})});
 ${opts.focusSlide ? `var f=document.getElementById(${JSON.stringify(`s-${opts.focusSlide}`)});if(f){f.scrollIntoView({block:"start"});f.classList.add("on")}` : ""}
 ${edit ? `document.addEventListener("input",function(e){var el=e.target.closest("[data-e]");if(!el)return;var p=el.dataset.e.split("|");parent.postMessage({type:"f2b-proposal-edit",slide:p[0],path:p[1],value:el.innerText},"*")});
+var lastRange=null;document.addEventListener("selectionchange",function(){var s=getSelection();if(s&&s.rangeCount&&!s.isCollapsed&&s.anchorNode&&s.anchorNode.parentElement&&s.anchorNode.parentElement.closest("[data-e]"))lastRange=s.getRangeAt(0).cloneRange()});
+window.addEventListener("message",function(e){if(!e.data||e.data.type!=="f2b-proposal-strike")return;var n=lastRange&&lastRange.startContainer;var el=n&&(n.nodeType===1?n:n.parentElement).closest("[data-e]");if(!el){parent.postMessage({type:"f2b-proposal-strike-none"},"*");return}el.focus();var s=getSelection();s.removeAllRanges();s.addRange(lastRange);var t=s.toString();var out=t.slice(0,2)==="~~"&&t.slice(-2)==="~~"?t.slice(2,-2):"~~"+t+"~~";document.execCommand("insertText",false,out);lastRange=null});
 document.querySelectorAll("[data-img]").forEach(function(el){if(el.tagName==="IMG")return;var t=document.createElement("span");t.className="img-tools";t.innerHTML='<b data-act="replace">Replace</b><b data-act="delete" title="Remove image">×</b><em>Drop image here</em>';el.appendChild(t)});
 function slotOf(e){return e.target.closest&&e.target.closest("[data-img]")}
 document.addEventListener("dragover",function(e){var s=slotOf(e);if(s){e.preventDefault();s.classList.add("drop")}});
@@ -771,4 +776,6 @@ h1,h2,b{font-weight:800}
 .call-end{margin-top:auto;width:52u;height:52u;border-radius:50%;background:#ef4444;display:grid;place-items:center}.call-end svg{width:24u;height:24u;transform:rotate(135deg)}
 .call-card{width:360u}.call-row{display:flex;justify-content:space-between;gap:10u;padding:7u 0;border-top:1px solid #f1f3f6;font-size:13u}.call-row span{color:#6b7280}
 .call-rec{display:flex;align-items:center;gap:8u;background:#f6f8fb;border-radius:10u;padding:8u 10u;margin:8u 0}.call-rec svg{width:16u;height:16u;color:var(--accent)}.call-rec i{flex:1;height:6u;border-radius:99px;background:linear-gradient(90deg,var(--accent) 35%,#dbe3ee 0)}.call-rec small{font-size:11.5u;color:#6b7280}
+.was{text-decoration:line-through;text-decoration-thickness:2.5u;text-decoration-color:#ef4444;color:#9aa3b2;font-weight:500;margin-right:4u}.sk{font-size:.55em;opacity:.35}
+.inv-ai li{color:#4b5563}
 `;

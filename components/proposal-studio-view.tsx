@@ -10,7 +10,7 @@ import "./proposal-studio.css";
 import { ReportGeneratingAnimation } from "./report-generating-animation";
 import { MailIcon, SendDocumentEmail, type DocumentEmailTarget } from "./send-document-email";
 import { SERVICE_CATALOGUE, type CatalogueService } from "@/lib/proposals/catalogue";
-import { SLIDE_KINDS, blankSlide, renumberPhases, type ProposalBrand, type ProposalDeck, type ProposalInputs, type ProposalSource, type ProposalUpload, type SelectedService, type Slide, type SlideKind } from "@/lib/proposals/deck";
+import { SLIDE_KINDS, blankSlide, estimateAiCredits, renumberPhases, type ProposalBrand, type ProposalDeck, type ProposalInputs, type ProposalSource, type ProposalUpload, type SelectedService, type Slide, type SlideKind } from "@/lib/proposals/deck";
 import { renderProposalHtml } from "@/lib/proposals/render";
 
 type StudioClient = { id: string; name: string; logo?: string; status?: string };
@@ -304,6 +304,8 @@ function Brief({ proposal, catalogue, clients, onOnboard, sources, busy, change,
   const total = { setup: core.reduce((sum, s) => sum + s.setupFee, 0), monthly: core.reduce((sum, s) => sum + s.monthlyFee, 0) };
   const addonTotal = { setup: proposal.services.filter((s) => s.addon).reduce((sum, s) => sum + s.setupFee, 0), monthly: proposal.services.filter((s) => s.addon).reduce((sum, s) => sum + s.monthlyFee, 0) };
   const fmt = (value: number) => `${symbol}${value.toLocaleString("en-IE")}`;
+  const was = { setup: core.reduce((sum, s) => sum + Math.max(s.setupFee, s.wasSetupFee || 0), 0), monthly: core.reduce((sum, s) => sum + Math.max(s.monthlyFee, s.wasMonthlyFee || 0), 0) };
+  const aiEst = estimateAiCredits(proposal.services.map((s) => s.key));
   const shots = [["Desktop screenshot", brand.screenshotDesktop], ["Phone screenshot", brand.screenshotMobile]] as const;
   return <div className="ps-brief" data-no-ai>
     <section className="ps-card-sec">
@@ -355,15 +357,19 @@ function Brief({ proposal, catalogue, clients, onOnboard, sources, busy, change,
       <div className="ps-svc-layout">
         <div className="ps-svc-list">{groups.map((group) => <div key={group} className="ps-svc-group"><span className="ps-label">{group}</span><div className="ps-svcs">{catalogue.filter((item) => item.group === group).map((item) => { const on = selected.get(item.key); return <div key={item.key} className={`ps-svc ${on ? "on" : ""}`}>
           <button type="button" className="ps-svc-main" aria-pressed={Boolean(on)} onClick={() => toggle(item)}><i>{on ? "✓" : "+"}</i><span><b>{item.name}</b><small>{item.tagline}</small></span><em className="ps-svc-cs" title="Client service it becomes">{item.clientService ? `${item.clientService}${item.clientCampaign && /ads$/i.test(item.clientService) ? ` · ${item.clientCampaign}` : ""}` : "One-off"}</em></button>
-          {on ? <div className="ps-svc-price"><label>Setup {symbol}<input type="number" min={0} value={on.setupFee} onChange={(event) => patchService(item.key, { setupFee: Number(event.target.value) || 0 })} /></label><label>Monthly {symbol}<input type="number" min={0} value={on.monthlyFee} onChange={(event) => patchService(item.key, { monthlyFee: Number(event.target.value) || 0 })} /></label><label className="ps-check"><input type="checkbox" checked={on.addon} onChange={(event) => patchService(item.key, { addon: event.target.checked })} />Optional add-on</label>{item.mediaNote && <small className="ps-media">{item.mediaNote}</small>}</div>
+          {on ? <div className="ps-svc-price"><label>Setup {symbol}<input type="number" min={0} value={on.setupFee} onChange={(event) => patchService(item.key, { setupFee: Number(event.target.value) || 0 })} /></label><label>Monthly {symbol}<input type="number" min={0} value={on.monthlyFee} onChange={(event) => patchService(item.key, { monthlyFee: Number(event.target.value) || 0 })} /></label><label className="ps-check"><input type="checkbox" checked={on.addon} onChange={(event) => patchService(item.key, { addon: event.target.checked })} />Optional add-on</label><label className="ps-check" title="Show the original price struck through, with your price beside it"><input type="checkbox" checked={on.wasSetupFee !== undefined || on.wasMonthlyFee !== undefined} onChange={(event) => patchService(item.key, event.target.checked ? { wasSetupFee: on.setupFee || undefined, wasMonthlyFee: on.monthlyFee || item.monthlyFee } : { wasSetupFee: undefined, wasMonthlyFee: undefined })} />Discount</label>
+            {(on.wasSetupFee !== undefined || on.wasMonthlyFee !== undefined) && <span className="ps-was"><label>Was setup {symbol}<input type="number" min={0} value={on.wasSetupFee ?? ""} onChange={(event) => patchService(item.key, { wasSetupFee: Number(event.target.value) || undefined })} /></label><label>Was monthly {symbol}<input type="number" min={0} value={on.wasMonthlyFee ?? ""} onChange={(event) => patchService(item.key, { wasMonthlyFee: Number(event.target.value) || undefined })} /></label><small>Shown struck through on the proposal</small></span>}
+            {item.mediaNote && <small className="ps-media">{item.mediaNote}</small>}</div>
             : <small className="ps-svc-from">{item.setupFee ? `${fmt(item.setupFee)} setup · ` : ""}{item.monthlyFee ? `${fmt(item.monthlyFee)}/mo` : "Included"}</small>}
         </div>; })}</div></div>)}</div>
         <aside className="ps-calc" aria-label="Price calculator">
           <h4>Price calculator</h4>
           {proposal.services.length ? <>
-            <ul>{proposal.services.map((s) => { const def = defs.get(s.key); return <li key={s.key} className={s.addon ? "addon" : ""}><span>{def?.name || s.key}{s.addon && <em>add-on</em>}</span><b>{s.monthlyFee ? `${fmt(s.monthlyFee)}/mo` : ""}{s.setupFee ? <small>{fmt(s.setupFee)} setup</small> : null}</b></li>; })}</ul>
-            <div className="ps-calc-row"><span>One-off setup</span><b>{fmt(total.setup)}</b></div>
-            <div className="ps-calc-row big"><span>Monthly</span><b>{fmt(total.monthly)}<small>/mo</small></b></div>
+            <ul>{proposal.services.map((s) => { const def = defs.get(s.key); return <li key={s.key} className={s.addon ? "addon" : ""}><span>{def?.name || s.key}{s.addon && <em>add-on</em>}</span><b>{(s.wasMonthlyFee || 0) > s.monthlyFee && <s className="ps-strike">{fmt(s.wasMonthlyFee || 0)}</s>}{s.monthlyFee ? `${fmt(s.monthlyFee)}/mo` : ""}{s.setupFee || s.wasSetupFee ? <small>{(s.wasSetupFee || 0) > s.setupFee && <s className="ps-strike">{fmt(s.wasSetupFee || 0)}</s>}{fmt(s.setupFee)} setup</small> : null}</b></li>; })}</ul>
+            <div className="ps-calc-row"><span>One-off setup</span><b>{was.setup > total.setup && <s className="ps-strike">{fmt(was.setup)}</s>}{fmt(total.setup)}</b></div>
+            <div className="ps-calc-row big"><span>Monthly</span><b>{was.monthly > total.monthly && <s className="ps-strike">{fmt(was.monthly)}</s>}{fmt(total.monthly)}<small>/mo</small></b></div>
+            {was.monthly + was.setup > total.monthly + total.setup && <div className="ps-calc-row save"><span>Client saves</span><b>{was.setup > total.setup ? `${fmt(was.setup - total.setup)} setup` : ""}{was.setup > total.setup && was.monthly > total.monthly ? " · " : ""}{was.monthly > total.monthly ? `${fmt(was.monthly - total.monthly)}/mo` : ""}</b></div>}
+            <label className="ps-calc-ai"><span>AI credits <small>billed monthly on usage</small></span><input value={inputs.aiCredits || ""} placeholder={`${fmt(aiEst[0])}–${fmt(aiEst[1])}`} onChange={(event) => setInputs({ aiCredits: event.target.value })} aria-label="Estimated monthly AI credits" /><small>Shown on the Investment slide as an estimate. Leave blank to use {fmt(aiEst[0])}–{fmt(aiEst[1])}.</small></label>
             {addonTotal.monthly + addonTotal.setup > 0 && <div className="ps-calc-row muted"><span>Optional add-ons</span><b>+{fmt(addonTotal.monthly)}/mo{addonTotal.setup ? ` · ${fmt(addonTotal.setup)} setup` : ""}</b></div>}
             <div className="ps-calc-row"><span>First invoice</span><b>{fmt(total.setup + total.monthly)}</b></div>
             <div className="ps-calc-row"><span>Contract value <select value={term} onChange={(event) => setTerm(Number(event.target.value))} aria-label="Contract length">{[1, 3, 6, 12, 24].map((m) => <option key={m} value={m}>{m} month{m === 1 ? "" : "s"}</option>)}</select></span><b>{fmt(total.setup + total.monthly * term)}</b></div>
@@ -413,6 +419,7 @@ function Editor({ proposal, change, flush, setProposal, onUpload, uploadOne, onR
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       if (event.source !== frame.current?.contentWindow) return;
+      if (event.data?.type === "f2b-proposal-strike-none") { window.alert("Select the text on a slide first (e.g. the original price), then press Strike."); return; }
       const data = event.data as { type?: string; slide?: string; path?: string; value?: string; key?: string };
       if (data.type === "f2b-proposal-edit" && data.slide && data.path) {
         const slide = deckRef.current.slides.find((item) => item.id === data.slide);
@@ -465,7 +472,8 @@ function Editor({ proposal, change, flush, setProposal, onUpload, uploadOne, onR
   return <div className="ps-editor">
     <SendDocumentEmail target={emailTarget} onClose={() => setEmailTarget(null)} onSent={() => { void fetch(`/api/proposals?id=${encodeURIComponent(proposal.id)}`, { cache: "no-store" }).then((response) => response.ok ? response.json() : null).then((payload: { proposal?: Proposal } | null) => { if (payload?.proposal) setProposal(payload.proposal); }).catch(() => undefined); }} />
     <div className="ps-toolbar">
-      <span className="ps-hint">Click any text on a slide to edit it · click an image to swap it</span>
+      <span className="ps-hint">Click any text on a slide to edit it · click an image to swap it · select a price and press Strike for a discount</span>
+      <button type="button" className="secondary-button ps-strike-btn" title="Select text on a slide (e.g. the original price), then press this to strike it through. Press again to remove." onMouseDown={(event) => event.preventDefault()} onClick={() => frame.current?.contentWindow?.postMessage({ type: "f2b-proposal-strike" }, "*")}><s>S</s> Strike</button>
       <label className="ps-accent" title="Accent colour">Accent<input type="color" value={deck.accent} onChange={(event) => setDeck({ ...deck, accent: event.target.value })} /></label>
       <button type="button" className="secondary-button" onClick={onRegenerate}><SparkIcon /> Regenerate</button>
       <button type="button" className="secondary-button" onClick={() => void openWindow(false)}>Full screen</button>
