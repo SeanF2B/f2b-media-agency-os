@@ -19,7 +19,7 @@ const AREAS: Array<[RegExp, string]> = [
   [/^\/api\/tasks|^\/api\/task-suggestions/, "Tasks"], [/^\/api\/invoicing/, "Invoicing"], [/^\/api\/bookkeeping|^\/api\/filing/, "Books"], [/^\/api\/client-site|^\/api\/sites/, "Websites"],
   [/^\/api\/site-forms|^\/api\/form-submissions/, "Forms"], [/^\/api\/seo/, "SEO"], [/^\/api\/google-ads/, "Google Ads"], [/^\/api\/meta-ads/, "Meta Ads"], [/^\/api\/settings/, "Settings"],
   [/^\/api\/usage-billing/, "AI billing"], [/^\/api\/staff-access|^\/api\/staff-invite|^\/api\/client-accounts/, "Team & access"], [/^\/api\/outreach/, "Outreach"], [/^\/api\/email-marketing/, "Email marketing"],
-  [/^\/api\/proposals/, "Proposals"], [/^\/api\/client-reports/, "Reports"], [/^\/api\/client-files|^\/api\/media-library/, "Files & media"], [/^\/api\/voice-agent|^\/api\/marketing-public\/voice/, "Phone agent"],
+  [/^\/api\/proposals/, "Proposals"], [/^\/api\/contracts/, "Contracts"], [/^\/api\/client-reports/, "Reports"], [/^\/api\/client-files|^\/api\/media-library/, "Files & media"], [/^\/api\/voice-agent|^\/api\/marketing-public\/voice/, "Phone agent"],
   [/^\/api\/integrations|^\/api\/oauth/, "Integrations"], [/^\/api\/onboarding/, "Onboarding"], [/^\/api\/social-posts/, "Social posts"], [/^\/api\/assistant|^\/api\/ai-/, "AI assistant"],
   [/^\/api\/setup-drafts|^\/api\/setup-workflows/, "Setup wizards"], [/^\/api\/clock/, "Clock in"], [/^\/api\/chess/, "Chess"], [/^\/api\/operating-world/, "Operating World"], [/^\/api\/workspace/, "Workspace"],
 ];

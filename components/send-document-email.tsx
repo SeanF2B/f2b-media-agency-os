@@ -5,7 +5,7 @@ import "./send-document-email.css";
 
 // Pop-up used by Reports, Audits, Keyword reports and Proposals: edit the email, see exactly what the
 // client will get (branded), CC the company email, then send. Nothing goes out until "Send email".
-export type DocumentEmailTarget = { kind: "report"; clientId: string; archiveId: string; theme?: "dark" | "light" } | { kind: "proposal"; id: string };
+export type DocumentEmailTarget = { kind: "report"; clientId: string; archiveId: string; theme?: "dark" | "light" } | { kind: "proposal"; id: string } | { kind: "contract"; id: string };
 
 type Draft = { to: string; toName: string; cc: string; subject: string; message: string; docTitle: string; brandName: string };
 
@@ -31,7 +31,7 @@ export function SendDocumentEmail({ target, onClose, onSent, prepare }: { target
       try {
         const ready = prepareRef.current ? await prepareRef.current() : target;
         if (!ready) throw new Error("Generate the report first.");
-        const query = new URLSearchParams(ready.kind === "report" ? { kind: "report", clientId: ready.clientId, archiveId: ready.archiveId } : { kind: "proposal", id: ready.id });
+        const query = new URLSearchParams(ready.kind === "report" ? { kind: "report", clientId: ready.clientId, archiveId: ready.archiveId } : { kind: ready.kind, id: ready.id });
         const response = await fetch(`/api/document-email?${query}`, { cache: "no-store" });
         const payload = await response.json() as Draft & { error?: string };
         if (!response.ok) throw new Error(payload.error || "Couldn't prepare the email.");
@@ -106,7 +106,7 @@ export function SendDocumentEmail({ target, onClose, onSent, prepare }: { target
             {cc.trim() && cc.trim().toLowerCase() !== originalCc.current && <label className="sde-check"><input type="checkbox" checked={rememberCc} onChange={(event) => setRememberCc(event.target.checked)} /> Always CC this address</label>}
             <label><span>Subject</span><input type="text" value={subject} maxLength={200} onChange={(event) => setSubject(event.target.value)} data-no-ai /></label>
             <label className="sde-message"><span>Message</span><textarea value={message} rows={10} maxLength={6000} onChange={(event) => setMessage(event.target.value)} /></label>
-            <small className="sde-note">A branded button linking to the {target.kind === "proposal" ? "proposal" : "report"} is added under your message. Replies go to your company email.</small>
+            <small className="sde-note">A branded button linking to the {target.kind === "report" ? "report" : target.kind} is added under your message. Replies go to your company email.</small>
           </div>
           <div className="sde-preview" aria-label="Email preview">
             <div className="sde-mail-meta">
