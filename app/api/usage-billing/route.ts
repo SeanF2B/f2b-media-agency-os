@@ -2,7 +2,23 @@ import { env } from "cloudflare:workers";
 import { authorizeAdmin, authorizeAdminOrSubAccount, respond } from "@/lib/settings-auth";
 import { getChatGPTUser } from "../../chatgpt-auth";
 import { audit, billable, clearUnitCostCache, ensureUsageTables, loadBilling, markupFor, serviceBilled } from "@/lib/usage-meter";
-import { SERVICES, isServiceKey } from "@/lib/usage-services";
+import { SERVICES, isServiceKey, serviceOf } from "@/lib/usage-services";
+import { runWithUsage } from "@/lib/usage-meter";
+import { addCredit, cancellationEndDate, cancellations, creditBalance, creditHistory, ensureCreditTables } from "@/lib/usage-credits";
+import { addDays, createInvoice, loadSettings, today } from "@/lib/invoicing/core";
+
+async function workspaceInfo() {
+  const row = await env.DB!.prepare("SELECT data FROM workspace_documents WHERE id='f2b-agency'").first<{ data: string }>();
+  let ws: any = {}; try { ws = JSON.parse(row?.data || "{}"); } catch { /* empty */ }
+  return { clients: (ws.clients || []) as any[], currency: String(ws.settings?.currency || "EUR"), adminEmail: String(ws.settings?.adminEmail || "sean@f2bmedia.com") };
+}
+/** Credit balance, history, cancellation requests and services for one client (shared by the client and agency views). */
+async function accountFor(ownerId: string, clientId: string) {
+  const info = await workspaceInfo();
+  const client = info.clients.find((c) => String(c.id) === clientId);
+  const [balance, history, cancels] = await Promise.all([creditBalance(env.DB!, ownerId, clientId), creditHistory(env.DB!, ownerId, clientId), cancellations(env.DB!, ownerId, clientId)]);
+  return { currency: String(client?.currency || info.currency || "EUR"), credit: { balance, history }, cancellations: cancels, ourServices: ((client?.services || []) as any[]).map((x) => String(x.name || "")).filter(Boolean), noticeEnd: cancellationEndDate(new Date(), String(client?.startDate || client?.createdAt || "")) };
+}
 import { draftUsageInvoices, previousMonth } from "@/lib/usage-billing";
 
 // AI & SEO-data usage rebilling.
@@ -26,19 +42,21 @@ export async function GET(request: Request) {
   const b = await loadBilling(env.DB, auth.ownerId);
   const service = url.searchParams.get("service") || "";
   const allOn = SERVICES.map((d) => d.key).filter((k) => b.services.get(k)?.enabled !== false);
-  const kinds = isServiceKey(service) ? [service] : auth.scope ? allOn : SERVICES.map((d) => d.key);
+  const kinds = isServiceKey(service) ? [service] : auth.scope || url.searchParams.get("as") === "client" ? allOn : SERVICES.map((d) => d.key);
   const inKinds = kinds.map((_, i) => `?${i + 4}`).join(",");
 
   // Sub-account view: only their own client, only billable amounts.
-  if (auth.scope) {
-    if (!clientId || !auth.scope.includes(clientId)) return respond({ error: "Choose your sub-account." }, 403);
+  if (auth.scope || url.searchParams.get("as") === "client") {
+    if (!clientId || (auth.scope && !auth.scope.includes(clientId))) return respond({ error: "Choose your sub-account." }, 403);
     const mk = markupFor(b, clientId);
     kinds.splice(0, kinds.length, ...kinds.filter((k) => serviceBilled(b, clientId, k)));
-    if (!kinds.length) return respond({ view: "client", period: { start, end }, enabled: false, total: 0, calls: 0, features: [], days: [] });
+    if (!kinds.length) return respond({ ...(await accountFor(auth.ownerId, clientId)), services: [], view: "client", period: { start, end }, enabled: false, total: 0, calls: 0, features: [], days: [] });
     const feats = (await env.DB.prepare(`SELECT feature, COUNT(*) AS calls, SUM(cost_usd) AS cost FROM usage_log WHERE owner_id = ?1 AND client_id = ?2 AND created_at >= ?3 AND created_at < ?${kinds.length + 4} AND kind IN (${kinds.map((_, i) => `?${i + 4}`).join(",")}) GROUP BY feature ORDER BY cost DESC`).bind(auth.ownerId, clientId, from, ...kinds, to).all<any>()).results || [];
     const days = (await env.DB.prepare(`SELECT substr(created_at,1,10) AS day, COUNT(*) AS calls, SUM(cost_usd) AS cost FROM usage_log WHERE owner_id = ?1 AND client_id = ?2 AND created_at >= ?3 AND created_at < ?${kinds.length + 4} AND kind IN (${kinds.map((_, i) => `?${i + 4}`).join(",")}) GROUP BY day ORDER BY day`).bind(auth.ownerId, clientId, from, ...kinds, to).all<any>()).results || [];
     const price = (c: number) => billable(c, b.settings.usdRate, mk);
-    return respond({ view: "client", period: { start, end }, enabled: b.settings.enabled && b.clients.get(clientId)?.enabled !== false, total: r2(feats.reduce((t: number, f: any) => t + price(Number(f.cost) || 0), 0)), calls: feats.reduce((t: number, f: any) => t + Number(f.calls), 0), features: feats.map((f: any) => ({ feature: f.feature, calls: Number(f.calls), amount: price(Number(f.cost) || 0) })), days: days.map((d: any) => ({ day: d.day, calls: Number(d.calls), amount: price(Number(d.cost) || 0) })) });
+    const perKind = (await env.DB.prepare(`SELECT kind, COUNT(*) AS calls, SUM(input_tokens) AS units, SUM(cost_usd) AS cost FROM usage_log WHERE owner_id = ?1 AND client_id = ?2 AND created_at >= ?3 AND created_at < ?${kinds.length + 4} AND kind IN (${kinds.map((_, i) => `?${i + 4}`).join(",")}) GROUP BY kind`).bind(auth.ownerId, clientId, from, ...kinds, to).all<any>()).results || [];
+    const account = await accountFor(auth.ownerId, clientId);
+    return respond({ ...account, services: perKind.map((r: any) => { const d = serviceOf(r.kind); return { key: r.kind, label: d?.label.split(" (")[0] || r.kind, unit: d?.unit || "request", qty: d?.pricing === "unit" ? Number(r.units) || 0 : Number(r.calls), amount: billable(Number(r.cost) || 0, b.settings.usdRate, markupFor(b, clientId, r.kind)) }; }), view: "client", period: { start, end }, enabled: b.settings.enabled && b.clients.get(clientId)?.enabled !== false, total: r2(feats.reduce((t: number, f: any) => t + price(Number(f.cost) || 0), 0)), calls: feats.reduce((t: number, f: any) => t + Number(f.calls), 0), features: feats.map((f: any) => ({ feature: f.feature, calls: Number(f.calls), amount: price(Number(f.cost) || 0) })), days: days.map((d: any) => ({ day: d.day, calls: Number(d.calls), amount: price(Number(d.cost) || 0) })) });
   }
 
   // Agency view.
@@ -63,6 +81,7 @@ export async function GET(request: Request) {
   }
   const kindRows = (byKind.results || []) as any[];
   return respond({
+    ...(clientId ? { account: await accountFor(auth.ownerId, clientId) } : {}),
     services: SERVICES.map((d) => { const st = b.services.get(d.key)!; const r = kindRows.find((x) => x.kind === d.key); return { ...d, enabled: st.enabled, markupPct: st.markupPct, unitUsd: st.unitUsd, calls: Number(r?.calls) || 0, units: Number(r?.units) || 0, costUsd: Number(r?.cost) || 0, active: st.enabled && (Number(r?.calls) > 0 || d.key === "ai" || d.key === "seo_data") }; }),
     clientServices: [...b.clientServices.entries()].map(([clientId, m]) => ({ clientId, services: Object.fromEntries(m) })),
     view: "agency", period: { start, end }, settings: b.settings,
@@ -78,6 +97,48 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  if (!env.DB) return respond({ error: "The workspace database is unavailable." }, 503);
+  let raw: Record<string, unknown> = {};
+  try { raw = await request.clone().json() as Record<string, unknown>; } catch { return respond({ error: "Send valid JSON." }, 400); }
+  // Actions a client's own sub-account staff can take (and agency admins on their behalf).
+  if (raw.action === "credit-buy" || raw.action === "cancel-request" || raw.action === "cancel-withdraw") {
+    const who = await authorizeAdminOrSubAccount("manage account billing", "CRM");
+    if (who.error) return who.error;
+    const clientId = String(raw.clientId || "");
+    if (!/^[\w-]{4,80}$/.test(clientId) || (who.scope && !who.scope.includes(clientId))) return respond({ error: "Choose your account." }, 403);
+    const user = await getChatGPTUser(); const actor = user?.email || "client";
+    await ensureCreditTables(env.DB); await ensureUsageTables(env.DB);
+    const info = await workspaceInfo(); const client = info.clients.find((c) => String(c.id) === clientId);
+    if (!client) return respond({ error: "Account not found." }, 404);
+    const name = String(client.company || client.name || "Client");
+    if (raw.action === "credit-buy") {
+      const amount = Math.round(Number(raw.amount) * 100) / 100;
+      if (!(amount >= 5 && amount <= 5000)) return respond({ error: "Choose an amount between 5 and 5,000." }, 400);
+      const s = await loadSettings(who.ownerId); const issue = today(); const currency = String(client.currency || info.currency || "EUR");
+      const invoiceId = await createInvoice(who.ownerId, { clientId, clientName: name, clientEmail: String(client.email || ""), issueDate: issue, dueDate: addDays(issue, Math.min(7, s.paymentTermsDays || 7)), currency, items: [{ description: "Account credit top-up (AI, messaging, calls and email usage)", qty: 1, unit: amount }], vatRate: 0, notes: "Credit is added to your account as soon as this invoice is paid." });
+      const inv = await env.DB.prepare("SELECT public_token, number FROM inv_invoices WHERE id=?1").bind(invoiceId).first<{ public_token: string; number: string }>();
+      await env.DB.prepare("UPDATE inv_invoices SET status='sent', sent_at=?2 WHERE id=?1 AND status='draft'").bind(invoiceId, new Date().toISOString()).run();
+      await addCredit(env.DB, who.ownerId, clientId, { amount, kind: "topup", note: `Top-up · invoice ${inv?.number || ""}`.trim(), invoiceId, status: "pending", actor });
+      await audit(env.DB, who.ownerId, "credit-requested", { amount, invoiceId }, actor, clientId);
+      const origin = new URL(request.url).origin;
+      return respond({ ok: true, link: inv?.public_token ? `${origin}/api/marketing-public/invoice?token=${inv.public_token}` : "", number: inv?.number || "" });
+    }
+    if (raw.action === "cancel-request") {
+      const services = (Array.isArray(raw.services) ? raw.services : []).map(String).filter((x) => ((client.services || []) as any[]).some((s) => String(s.name) === x)).slice(0, 20);
+      if (!services.length) return respond({ error: "Pick the services to cancel." }, 400);
+      const endDate = cancellationEndDate(new Date(), String(client.startDate || client.createdAt || ""));
+      const id = crypto.randomUUID(), now = new Date().toISOString(), reason = String(raw.reason || "").slice(0, 1000);
+      await env.DB.prepare("INSERT INTO service_cancellations (id, owner_id, client_id, services, reason, end_date, status, requested_by, created_at) VALUES (?1,?2,?3,?4,?5,?6,'requested',?7,?8)").bind(id, who.ownerId, clientId, JSON.stringify(services), reason, endDate, actor, now).run();
+      await audit(env.DB, who.ownerId, "cancellation-requested", { services, endDate, reason }, actor, clientId);
+      // Tell the agency (not billed to the client).
+      if (env.RESEND_API_KEY && env.TASK_NOTIFICATION_FROM) await runWithUsage({ clientId: "" }, () => fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ from: env.TASK_NOTIFICATION_FROM, to: [info.adminEmail], subject: `Cancellation request · ${name}`, text: `${name} asked to cancel: ${services.join(", ")}.\nServices end on ${endDate} (30 days' notice, after the 90-day minimum term).\nRequested by ${actor}.${reason ? `\nReason: ${reason}` : ""}\n\nOpen the client in the OS to confirm or withdraw it.` }) })).catch(() => undefined);
+      return respond({ ok: true, endDate });
+    }
+    const id = String(raw.id || "");
+    await env.DB.prepare("UPDATE service_cancellations SET status='withdrawn', decided_by=?3, decided_at=?4 WHERE id=?1 AND client_id=?2 AND owner_id=?5 AND status='requested'").bind(id, clientId, actor, new Date().toISOString(), who.ownerId).run();
+    await audit(env.DB, who.ownerId, "cancellation-withdrawn", { id }, actor, clientId);
+    return respond({ ok: true });
+  }
   const auth = await authorizeAdmin("manage AI rebilling");
   if (auth.error) return auth.error;
   const user = await getChatGPTUser();
@@ -137,6 +198,21 @@ export async function POST(request: Request) {
     await db.prepare("INSERT INTO usage_client_services (owner_id, client_id, service, enabled, updated_at, updated_by) VALUES (?1,?2,?3,?4,?5,?6) ON CONFLICT(owner_id, client_id, service) DO UPDATE SET enabled=excluded.enabled, updated_at=excluded.updated_at, updated_by=excluded.updated_by")
       .bind(auth.ownerId, clientId, key, enabled ? 1 : 0, now, actor).run();
     await audit(db, auth.ownerId, "client-service-changed", { service: key, enabled }, actor, clientId);
+    return respond({ ok: true });
+  }
+  if (body.action === "credit-add") {
+    const clientId = String(body.clientId || ""), amount = Math.round(Number(body.amount) * 100) / 100;
+    if (!/^[\w-]{4,80}$/.test(clientId) || !amount || Math.abs(amount) > 100000) return respond({ error: "Enter an amount." }, 400);
+    await addCredit(db, auth.ownerId, clientId, { amount, kind: amount > 0 ? "topup" : "adjustment", note: String(body.note || (amount > 0 ? "Credit added by the agency" : "Adjustment")).slice(0, 300), actor });
+    await audit(db, auth.ownerId, "credit-added", { amount, note: body.note || "" }, actor, clientId);
+    return respond({ ok: true });
+  }
+  if (body.action === "cancel-decide") {
+    const id = String(body.id || ""), status = body.status === "confirmed" ? "confirmed" : "withdrawn";
+    const row = await db.prepare("SELECT client_id FROM service_cancellations WHERE id=?1 AND owner_id=?2").bind(id, auth.ownerId).first<{ client_id: string }>();
+    if (!row) return respond({ error: "Request not found." }, 404);
+    await db.prepare("UPDATE service_cancellations SET status=?2, decided_by=?3, decided_at=?4 WHERE id=?1").bind(id, status, actor, now).run();
+    await audit(db, auth.ownerId, `cancellation-${status}`, { id }, actor, row.client_id);
     return respond({ ok: true });
   }
   if (body.action === "draft-invoices") {

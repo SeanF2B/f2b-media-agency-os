@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import { addDays, cleanItems, createInvoice, ensureTables, loadSettings, totals, today } from "@/lib/invoicing/core";
 import { audit, billable, ensureUsageTables, loadBilling, markupFor, serviceBilled } from "@/lib/usage-meter";
 import { SERVICES, serviceOf } from "@/lib/usage-services";
+import { addCredit, creditBalance } from "@/lib/usage-credits";
 
 // Monthly AI & SEO-data rebilling: on the 1st–3rd of each month, last month's unbilled usage for every client
 // becomes ONE line on that client's draft invoice (an existing draft is reused, otherwise a new draft is made).
@@ -43,6 +44,19 @@ export async function draftUsageInvoices(month: string, actor = "system") {
     }).filter((x) => x.amount > 0);
     const total = items.reduce((t, x) => t + x.amount, 0);
     if (!items.length || total < b.settings.minCharge) continue;
+    // Prepaid account credit is used first; anything it doesn't cover goes on the draft invoice.
+    const balance = await creditBalance(db, ownerId, clientId);
+    const fromCredit = Math.round(Math.min(Math.max(0, balance), total) * 100) / 100;
+    const billedKindsAll = items.map((x) => x.kind);
+    if (fromCredit > 0) {
+      const ledgerId = await addCredit(db, ownerId, clientId, { amount: -fromCredit, kind: "usage", note: `Usage · ${monthLabel(month)}`, actor });
+      if (fromCredit >= total) {
+        await db.prepare(`UPDATE usage_log SET invoice_id = ?4 WHERE owner_id = ?1 AND client_id = ?2 AND created_at >= ?3 AND created_at < ?5 AND invoice_id = '' AND kind IN (${billedKindsAll.map((_, i) => `?${i + 6}`).join(",")})`).bind(ownerId, clientId, start, `credit:${ledgerId}`, end, ...billedKindsAll).run();
+        await audit(db, ownerId, "usage-paid-from-credit", { month, amount: fromCredit, services: billedKindsAll }, actor, clientId);
+        drafted++; continue;
+      }
+      items.push({ kind: "credit", amount: -fromCredit, cost: 0, calls: 0, item: { description: `Paid from account credit`, qty: 1, unit: -fromCredit } });
+    }
     const draft = await db.prepare("SELECT id, items, vat_rate FROM inv_invoices WHERE owner_id = ?1 AND client_id = ?2 AND status = 'draft' ORDER BY created_at DESC LIMIT 1").bind(ownerId, clientId).first<{ id: string; items: string; vat_rate: number }>();
     let invoiceId = "";
     if (draft) {
@@ -54,7 +68,7 @@ export async function draftUsageInvoices(month: string, actor = "system") {
       const s = await loadSettings(ownerId); const issue = today();
       invoiceId = await createInvoice(ownerId, { clientId, clientName: String(client.company || client.name || ""), clientEmail: String(client.email || ""), issueDate: issue, dueDate: addDays(issue, s.paymentTermsDays), currency: String(client.currency || currency || "EUR"), items: items.map((x) => x.item), vatRate: Number(last?.vat_rate) || 0, notes: "Usage (AI, messaging, calls, email and data) is billed at cost plus a service margin. A full usage report is available on request." });
     }
-    const billedKinds = items.map((x) => x.kind);
+    const billedKinds = billedKindsAll;
     await db.prepare(`UPDATE usage_log SET invoice_id = ?4 WHERE owner_id = ?1 AND client_id = ?2 AND created_at >= ?3 AND created_at < ?5 AND invoice_id = '' AND kind IN (${billedKinds.map((_, i) => `?${i + 6}`).join(",")})`).bind(ownerId, clientId, start, invoiceId, end, ...billedKinds).run();
     await audit(db, ownerId, "invoice-line-drafted", { month, invoiceId, amount: Math.round(total * 100) / 100, costUsd: Math.round(items.reduce((t, x) => t + x.cost, 0) * 1e4) / 1e4, markupPct: markupFor(b, clientId), usdRate: b.settings.usdRate, calls: items.reduce((t, x) => t + x.calls, 0), services: billedKinds, reusedDraft: Boolean(draft) }, actor, clientId);
     drafted++;

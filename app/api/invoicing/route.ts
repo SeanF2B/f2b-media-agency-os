@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { settleCreditInvoice } from "@/lib/usage-credits";
 import { authorizeAdmin, respond } from "@/lib/settings-auth";
 import { addDays, addInterval, cleanItems, createInvoice, ensureTables, invoiceHtml, loadSettings, runRecurring, saveSettings, sendInvoiceEmail, today, totals, type Interval } from "@/lib/invoicing/core";
 
@@ -98,8 +99,8 @@ export async function POST(request: Request) {
       const inv = await env.DB!.prepare("SELECT * FROM inv_invoices WHERE id=?1 AND owner_id=?2").bind(b.id, auth.ownerId).first<any>();
       if (!inv) return respond({ error: "Invoice not found." }, 404);
       if (action === "send") { await sendInvoiceEmail(inv, await loadSettings(auth.ownerId), origin, info.adminEmail); await env.DB!.prepare("UPDATE inv_invoices SET status=CASE WHEN status='draft' THEN 'sent' ELSE status END, sent_at=?2 WHERE id=?1").bind(inv.id, now).run(); }
-      if (action === "mark-paid") await env.DB!.prepare("UPDATE inv_invoices SET status='paid', paid_at=?2 WHERE id=?1").bind(inv.id, date(b.paidAt, today())).run();
-      if (action === "mark-unpaid") await env.DB!.prepare("UPDATE inv_invoices SET status=CASE WHEN sent_at<>'' THEN 'sent' ELSE 'draft' END, paid_at='' WHERE id=?1").bind(inv.id).run();
+      if (action === "mark-paid") { await env.DB!.prepare("UPDATE inv_invoices SET status='paid', paid_at=?2 WHERE id=?1").bind(inv.id, date(b.paidAt, today())).run(); await settleCreditInvoice(env.DB!, inv.id, true); }
+      if (action === "mark-unpaid") { await env.DB!.prepare("UPDATE inv_invoices SET status=CASE WHEN sent_at<>'' THEN 'sent' ELSE 'draft' END, paid_at='' WHERE id=?1").bind(inv.id).run(); await settleCreditInvoice(env.DB!, inv.id, false); }
       if (action === "void") await env.DB!.prepare("UPDATE inv_invoices SET status='void' WHERE id=?1").bind(inv.id).run();
       if (action === "delete") { if (inv.status !== "draft") return respond({ error: "Only drafts can be deleted. Void it instead." }, 400); await env.DB!.prepare("DELETE FROM inv_invoices WHERE id=?1").bind(inv.id).run(); }
       return respond({ ok: true });

@@ -8,8 +8,9 @@ import { SERVICES, serviceOf } from "@/lib/usage-services";
 type Settings = { enabled: boolean; markupPct: number; usdRate: number; includeSeoData: boolean; minCharge: number; updatedAt: string; updatedBy: string };
 type ClientRow = { clientId: string; calls: number; inputTokens: number; outputTokens: number; costUsd: number; aiUsd: number; seoUsd: number; markupPct: number; billable: number; invoicedUsd: number; byService?: Record<string, number> };
 type ServiceRow = (typeof SERVICES)[number] & { enabled: boolean; markupPct: number | null; unitUsd: number | null; calls: number; units: number; costUsd: number; active: boolean };
-type Agency = { view: "agency"; services: ServiceRow[]; clientServices: Array<{ clientId: string; services: Record<string, boolean> }>; period: { start: string; end: string }; settings: Settings; overrides: Array<{ clientId: string; markupPct: number | null; enabled: boolean }>; clients: ClientRow[]; features: Array<{ feature: string; kind: string; calls: number; costUsd: number }>; days: Array<{ day: string; calls: number; costUsd: number }>; log: Array<{ id: string; clientId: string; kind: string; provider: string; feature: string; model: string; inputTokens: number; outputTokens: number; costUsd: number; costSource: string; actor: string; at: string; invoiceId: string }>; audit: Array<{ clientId: string; action: string; detail: Record<string, any>; actor: string; at: string }>; unattributed: { calls: number; costUsd: number }; lastMonth: string };
-type ClientView = { view: "client"; period: { start: string; end: string }; enabled: boolean; total: number; calls: number; features: Array<{ feature: string; calls: number; amount: number }>; days: Array<{ day: string; calls: number; amount: number }> };
+type Agency = { account?: Account; view: "agency"; services: ServiceRow[]; clientServices: Array<{ clientId: string; services: Record<string, boolean> }>; period: { start: string; end: string }; settings: Settings; overrides: Array<{ clientId: string; markupPct: number | null; enabled: boolean }>; clients: ClientRow[]; features: Array<{ feature: string; kind: string; calls: number; costUsd: number }>; days: Array<{ day: string; calls: number; costUsd: number }>; log: Array<{ id: string; clientId: string; kind: string; provider: string; feature: string; model: string; inputTokens: number; outputTokens: number; costUsd: number; costSource: string; actor: string; at: string; invoiceId: string }>; audit: Array<{ clientId: string; action: string; detail: Record<string, any>; actor: string; at: string }>; unattributed: { calls: number; costUsd: number }; lastMonth: string };
+type Account = { currency: string; credit: { balance: number; history: Array<{ id: string; amount: number; kind: string; note: string; invoiceId: string; status: string; actor: string; at: string }> }; cancellations: Array<{ id: string; services: string[]; reason: string; endDate: string; status: string; requestedBy: string; at: string }>; ourServices: string[]; noticeEnd: string };
+type ClientView = Account & { services: Array<{ key: string; label: string; unit: string; qty: number; amount: number }>; view: "client"; period: { start: string; end: string }; enabled: boolean; total: number; calls: number; features: Array<{ feature: string; calls: number; amount: number }>; days: Array<{ day: string; calls: number; amount: number }> };
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 const PERIODS: Array<[string, string, () => { start: string; end: string }]> = [
@@ -147,6 +148,60 @@ export function UsageBillingPanel({ clients, currency = "EUR", scopeClientId = "
   </section>;
 }
 
+/** Sub-account Settings → Billing: the client's own usage (at the billed price), prepaid credit and cancelling services. */
+export function ClientAccountBilling({ clientId, clientName }: { clientId: string; clientName: string }) {
+  const [period, setPeriod] = useState("this");
+  const [data, setData] = useState<ClientView | null>(null);
+  const [err, setErr] = useState("");
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [custom, setCustom] = useState("");
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [reason, setReason] = useState("");
+  const [sure, setSure] = useState(false);
+  const load = useCallback(async () => {
+    const range = PERIODS.find((p) => p[0] === period)![2]();
+    try { const r = await fetch(`/api/usage-billing?${new URLSearchParams({ clientId, as: "client", ...range })}`, { cache: "no-store" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || "Couldn’t load usage."); setData(j as ClientView); setErr(""); }
+    catch (e) { setErr(e instanceof Error ? e.message : "Couldn’t load usage."); }
+  }, [clientId, period]);
+  useEffect(() => { void load(); }, [load]);
+  const money = useMemo(() => new Intl.NumberFormat("en-IE", { style: "currency", currency: data?.currency || "EUR" }), [data?.currency]);
+  const post = async (body: Record<string, unknown>) => { setBusy(true); setMsg(""); try { const r = await fetch("/api/usage-billing", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clientId, ...body }) }); const j = await r.json(); if (!r.ok) throw new Error(j.error || "Couldn’t save."); await load(); return j; } catch (e) { setMsg(e instanceof Error ? e.message : "Couldn’t save."); return null; } finally { setBusy(false); } };
+  const buy = async (amount: number) => { const j = await post({ action: "credit-buy", amount }); if (j?.link) { setMsg(`Invoice ${j.number} created for ${money.format(amount)}. Credit is added as soon as it’s paid.`); window.open(j.link, "_blank", "noopener"); } };
+  if (err) return <section className="panel ubp"><style>{CSS}</style><p className="ubp-muted">{err}</p></section>;
+  if (!data) return <section className="panel ubp"><style>{CSS}</style><p className="ubp-muted">Loading usage…</p></section>;
+  const pending = data.credit.history.filter((h) => h.status === "pending").reduce((t, h) => t + h.amount, 0);
+  const open = data.cancellations.filter((c) => c.status === "requested" || c.status === "confirmed");
+  const total = (data.services || []).reduce((t, v) => t + v.amount, 0);
+  const left = data.credit.balance - total;
+  return <section className="panel ubp ubp-account" aria-label="Usage and credit">
+    <style>{CSS}</style>
+    <div className="ubp-head"><div><h2>💳 Usage &amp; credit</h2><p className="ubp-sub">What {clientName} has used (AI, WhatsApp, SMS, calls, emails and data) and your prepaid credit. Usage is taken from credit first; anything left goes on your monthly invoice.</p></div></div>
+    <div className="ubp-kpis">
+      <div className={left < 0 ? "warn" : "good"}><small>Credit balance</small><b>{money.format(data.credit.balance)}</b>{total > 0 && data.credit.balance > 0 && <small>{left >= 0 ? `≈ ${money.format(left)} after this month’s usage` : `This month’s usage is ${money.format(-left)} more than your credit`}</small>}{pending > 0 && <small>{money.format(pending)} waiting for payment</small>}</div>
+      <div><small>Used {period === "this" ? "this month" : period === "last" ? "last month" : "in 90 days"}</small><b>{money.format(total)}</b></div>
+    </div>
+    <div className="ubp-topup"><b>Top up credit</b>{[25, 50, 100, 250].map((a) => <button key={a} type="button" className="secondary-button" disabled={busy} onClick={() => void buy(a)}>{money.format(a)}</button>)}<span className="ubp-inline"><input className="ubp-mk" type="number" min={5} max={5000} step={5} placeholder="Other" value={custom} onChange={(e) => setCustom(e.target.value)} /><button type="button" className="primary-button" disabled={busy || !(Number(custom) >= 5)} onClick={() => { void buy(Number(custom)); setCustom(""); }}>Top up</button></span></div>
+    <div className="ubp-bar"><div className="ubp-seg">{PERIODS.map(([k, l]) => <button key={k} type="button" className={period === k ? "on" : ""} onClick={() => setPeriod(k)}>{l}</button>)}</div></div>
+    <div className="ubp-table-wrap"><table className="ubp-table"><thead><tr><th>Service</th><th>Used</th><th>Amount</th></tr></thead><tbody>
+      {(data.services || []).map((v) => <tr key={v.key}><td>{v.label}</td><td>{n0(Math.round(v.qty * 100) / 100)} {v.unit}{v.qty === 1 ? "" : "s"}</td><td>{money.format(v.amount)}</td></tr>)}
+      {!(data.services || []).length && <tr><td colSpan={3} className="ubp-muted">No usage in this period.</td></tr>}
+    </tbody></table></div>
+    {data.credit.history.length > 0 && <details className="ubp-history"><summary>Credit history</summary><div className="ubp-table-wrap"><table className="ubp-table"><tbody>{data.credit.history.map((h) => <tr key={h.id}><td>{when(h.at)}</td><td>{h.note || h.kind}{h.status === "pending" ? <small>Waiting for payment</small> : null}</td><td className={h.amount >= 0 ? "good" : ""}>{h.amount >= 0 ? "+" : ""}{money.format(h.amount)}</td></tr>)}</tbody></table></div></details>}
+    <div className="ubp-cancel">
+      <div className="ubp-svc-head"><b>Cancel services</b><small>30 days’ notice, and not before the 90-day minimum term ends. Services cancelled today would end on <b>{new Date(`${data.noticeEnd}T12:00:00Z`).toLocaleDateString("en-IE", { day: "numeric", month: "long", year: "numeric" })}</b>.</small></div>
+      {open.map((c) => <div key={c.id} className="ubp-notice"><span><b>{c.status === "confirmed" ? "Cancellation confirmed" : "Cancellation requested"}</b> · {c.services.join(", ")} · ends {new Date(`${c.endDate}T12:00:00Z`).toLocaleDateString("en-IE", { day: "numeric", month: "short", year: "numeric" })}</span>{c.status === "requested" && <button type="button" className="ubp-link" disabled={busy} onClick={() => void post({ action: "cancel-withdraw", id: c.id })}>Withdraw</button>}</div>)}
+      {!cancelOpen ? (data.ourServices.length ? <button type="button" className="secondary-button" onClick={() => { setCancelOpen(true); setSure(false); }}>Cancel a service…</button> : <small className="ubp-muted">No active services.</small>) : <div className="ubp-cancel-form">
+        <div className="ubp-chips">{data.ourServices.map((n) => <label key={n} className={`ubp-chip ${picked.includes(n) ? "on" : ""}`}><input type="checkbox" checked={picked.includes(n)} onChange={(e) => setPicked(e.target.checked ? [...picked, n] : picked.filter((x) => x !== n))} />{n}</label>)}</div>
+        <textarea rows={2} placeholder="Anything we could do better? (optional)" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={1000} />
+        <div className="ubp-actions">{!sure ? <button type="button" className="secondary-button danger" disabled={!picked.length} onClick={() => setSure(true)}>Request cancellation</button> : <button type="button" className="primary-button danger" disabled={busy} onClick={async () => { const j = await post({ action: "cancel-request", services: picked, reason }); if (j) { setMsg(`Request sent. ${picked.join(", ")} will end on ${new Date(`${j.endDate}T12:00:00Z`).toLocaleDateString("en-IE", { day: "numeric", month: "long" })}.`); setCancelOpen(false); setPicked([]); setReason(""); } }}>Yes, cancel {picked.length} service{picked.length === 1 ? "" : "s"}</button>}<button type="button" className="ubp-link" onClick={() => setCancelOpen(false)}>Keep my services</button></div>
+      </div>}
+    </div>
+    {msg && <small className="ubp-muted">{msg}</small>}
+  </section>;
+}
+
 /** Client profile: rebilling on/off, the client's own markup and which paid services are rebilled (agency admins). */
 export function ClientRebillingCard({ clientId, clientName }: { clientId: string; clientName: string }) {
   const [data, setData] = useState<Agency | null>(null);
@@ -167,6 +222,10 @@ export function ClientRebillingCard({ clientId, clientName }: { clientId: string
       <label className="ubp-toggle" title={`Rebill ${clientName}`}><input type="checkbox" checked={on} onChange={(e) => void post({ action: "client", clientId, enabled: e.target.checked }, e.target.checked ? "Rebilling on." : "Rebilling off.")} aria-label={`Rebill ${clientName}`} /><i /></label></div>
     {on && <><div className="ubp-chips">{data.services.filter((v) => v.enabled).map((v) => <label key={v.key} className={`ubp-chip ${svcOn(v.key) ? "on" : ""}`} title={v.note}><input type="checkbox" checked={svcOn(v.key)} onChange={(e) => void post({ action: "client-service", clientId, service: v.key, enabled: e.target.checked }, `${v.label.split(" (")[0]} ${e.target.checked ? "on" : "off"}.`)} />{v.label.split(" (")[0]}</label>)}</div>
     <label className="ubp-inline">Markup for {clientName}<input className="ubp-mk" type="number" min={0} max={1000} step={5} placeholder="auto" defaultValue={o?.markupPct ?? ""} onBlur={(e) => { const v = e.target.value.trim(); if ((v === "" ? null : Number(v)) !== (o?.markupPct ?? null)) void post({ action: "client", clientId, markupPct: v === "" ? null : Number(v) }, "Markup saved."); }} />% <small>Empty = each service’s markup</small></label></>}
+    {data.account && <div className="ubp-credit-admin">
+      <span className="ubp-inline"><b>Credit {new Intl.NumberFormat("en-IE", { style: "currency", currency: data.account.currency }).format(data.account.credit.balance)}</b><input className="ubp-mk" type="number" step="5" placeholder="±" id={`cr-${clientId}`} /><button type="button" className="ubp-link" onClick={() => { const el = document.getElementById(`cr-${clientId}`) as HTMLInputElement | null; const v = Number(el?.value); if (v) { void post({ action: "credit-add", clientId, amount: v }, v > 0 ? "Credit added." : "Credit adjusted."); if (el) el.value = ""; } }}>Add / adjust</button></span>
+      {data.account.cancellations.filter((c) => c.status === "requested").map((c) => <div key={c.id} className="ubp-notice"><span><b>Cancellation requested</b> · {c.services.join(", ")} · ends {c.endDate}{c.reason ? ` · “${c.reason}”` : ""}</span><span><button type="button" className="ubp-link" onClick={() => void post({ action: "cancel-decide", id: c.id, status: "confirmed" }, "Cancellation confirmed.")}>Confirm</button> <button type="button" className="ubp-link" onClick={() => void post({ action: "cancel-decide", id: c.id, status: "withdrawn" }, "Cancellation withdrawn.")}>Withdraw</button></span></div>)}
+    </div>}
     {msg && <small className="ubp-muted">{msg}</small>}
   </section>;
 }
@@ -240,5 +299,13 @@ const CSS = `
 .ubp .ubp-chip:hover{transform:translateY(-1px);border-color:var(--brand-secondary,#8b5cf6)}.ubp .ubp-chip.on{border-color:var(--brand-primary,#1677c8);background:color-mix(in srgb,var(--brand-primary,#1677c8) 10%,transparent)}
 .ubp.ubp-profile{padding:12px 14px !important;border:1px solid rgba(127,127,127,.16);border-radius:14px;margin-top:12px;gap:10px}.ubp.ubp-profile h3{margin:0;font-size:15px}
 .ubp .ubp-inline{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;flex-wrap:wrap}.ubp .ubp-inline small{font-weight:500;opacity:.65}
+.ubp .ubp-kpis>div.warn{background:#fff6e5;color:#8a5a00}.ubp .ubp-kpis>div small+small{margin-top:2px}
+.ubp .ubp-topup{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ubp .ubp-cancel{display:grid;gap:8px;border-top:1px solid rgba(127,127,127,.16);padding-top:12px}
+.ubp .ubp-cancel-form{display:grid;gap:8px}.ubp .ubp-cancel-form textarea{border:1px solid rgba(127,127,127,.28);border-radius:10px;padding:8px 10px;font:inherit;background:transparent;color:inherit}
+.ubp .ubp-notice{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;padding:8px 10px;border-radius:10px;background:#fff6e5;color:#6b4700;font-size:13px}
+.ubp .danger{border-color:#d92d20 !important;color:#d92d20}.ubp .primary-button.danger{background:#d92d20 !important;color:#fff}
+.ubp .ubp-history summary{cursor:pointer;font-weight:700;font-size:13px}
+.ubp .ubp-credit-admin{display:grid;gap:6px}
 @media (max-width:900px){.ubp .ubp-settings{grid-template-columns:1fr}.ubp .ubp-fields{grid-template-columns:1fr}}
 `;
