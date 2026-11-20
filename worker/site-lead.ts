@@ -132,7 +132,7 @@ async function saveLead(request: Request, env: Env, site: SiteConfig) {
   const name = cut(b.name, 120), email = cut(b.email, 160).toLowerCase(), phoneRaw = cut(b.phone, 40), phone = normPhone(phoneRaw);
   if (name.length < 2 || phone.replace(/\D/g, "").length < 7) return json({ ok: false, error: "validation" }, 400);
   // Sites send their own readable labels (jobLabel / service / urgencyLabel); the roofing codes are the fallback.
-  const jobType = cut(b.jobType, 40), job = cut(b.jobLabel || b.service, 80) || JOB_LABELS[jobType] || (kind === "contact" ? "General enquiry" : "Website enquiry");
+  const jobType = cut(b.jobType, 40), job = cut(b.jobLabel || b.service, 80) || JOB_LABELS[jobType] || (jobType && jobType !== "other" ? titleCase(jobType.replace(/[-_]+/g, " ").replace(/\b(cork|dublin|galway)\b/gi, "").trim()) : "") || (kind === "contact" ? "General enquiry" : "Website enquiry");
   const town = cut(b.town, 80), urgency = cut(b.urgencyLabel, 80) || URGENCY[cut(b.urgency, 20)] || "", property = PROPERTY[cut(b.propertyType, 20)] || "";
   const details = cut(b.details || b.message, 2000), page = cut(b.page, 500);
   const answers = (b.answers && typeof b.answers === "object" && !Array.isArray(b.answers)) ? Object.entries(b.answers as Record<string, unknown>).slice(0, 10).map(([k, v]) => [QUESTION[k] || titleCase(k.replace(/[-_]/g, " ")), cut(v, 120)] as [string, string]).filter(([, v]) => v) : [];
@@ -209,33 +209,38 @@ async function saveLead(request: Request, env: Env, site: SiteConfig) {
   await logFormSubmission(db, { id: `site-${submissionId}`, ownerId: owner, clientId: site.clientId, source: "site-form", formKey: `site:${site.clientId}:${kind === "contact" ? "contact" : "quote"}`, formName: kind === "contact" ? "Contact form" : "Free quote form", pageUrl: page, name, email, phone, message: notes, contactId, touch: { gclid: t("gclid"), gbraid: t("gbraid"), wbraid: t("wbraid"), utm_source: t("utm_source"), utm_medium: t("utm_medium"), utm_campaign: t("utm_campaign"), referrer: t("referrer") }, createdAt: now });
 
   // Email the business. The lead is already saved, so an email failure never loses it.
-  let emailStatus = "not sent: email is not configured on the server";
-  // A site that already emailed the business itself (e.g. while the CRM was unreachable) sets skipEmail on the retry.
-  if (b.skipEmail === true) emailStatus = "not sent: the website already emailed this lead";
-  else if (env.RESEND_API_KEY && env.TASK_NOTIFICATION_FROM) {
-    try {
-      const mail = leadEmail(site, { kind, job, answers, urgency, property, town, details, name, phone, email, photos, channel, page, when: now });
-      // Test leads (flag set only by the edge Worker for an authorised test) go to the agency, not the client.
-      const isTest = b.test === true;
-      const to = isTest ? [TEST_INBOX] : notifyTo;
-      if (isTest) mail.subject = `TEST – ${mail.subject}`;
-      const fromAddr = (env.TASK_NOTIFICATION_FROM.match(/<([^>]+)>/)?.[1] || env.TASK_NOTIFICATION_FROM).trim();
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json", "Idempotency-Key": `site-lead/${subKey}` },
-        body: JSON.stringify({ from: `${site.name} Website <${fromAddr}>`, to, subject: mail.subject, html: mail.html, text: mail.text, ...(email ? { reply_to: email } : {}) }),
-        signal: AbortSignal.timeout(20_000),
-      });
-      const out = await res.json().catch(() => null) as { id?: string; message?: string } | null;
-      emailStatus = res.ok ? `sent to ${to.join(", ")} (${out?.id || "accepted"})` : `failed: HTTP ${res.status} ${out?.message || ""}`.trim();
-      if (res.ok) await logSystemEmail(db as never, { ownerId: owner, clientId: site.clientId, to: to.join(", "), subject: mail.subject, text: mail.text, html: mail.html, kind: "Leads & forms" }).catch(() => undefined);
-    } catch (e) { emailStatus = `failed: ${e instanceof Error ? e.message : "error"}`; }
-  }
+  const emailStatus = b.skipEmail === true ? "not sent: the website already emailed this lead"
+    : await emailBusiness(env, site, { ownerId: owner, to: notifyTo, test: b.test === true, idempotencyKey: `site-lead/${subKey}`, replyTo: email, mail: { kind, job, answers, urgency, property, town, details, name, phone, email, photos, channel, page, when: now } });
   if (stage) await db.prepare("INSERT INTO crm_activities (id, owner_id, opportunity_id, contact_id, activity_type, body, created_by, created_at) VALUES (?1,?2,?3,?4,'note',?5,?6,?7)")
     .bind(crypto.randomUUID(), owner, oppId, contactId, `✉️ Lead email ${emailStatus}`, `${site.name} website`, new Date().toISOString()).run().catch(() => undefined);
   return json({ ok: true, id: oppId, contactId, delivered: true, email: emailStatus });
 }
 
+/** Sends the branded lead email to the business and copies the exact email into System emails + Conversations. */
+export async function emailBusiness(env: Env, site: SiteConfig, o: { ownerId: string; to: string[]; test?: boolean; idempotencyKey: string; replyTo?: string; mail: MailIn }) {
+  if (!env.RESEND_API_KEY || !env.TASK_NOTIFICATION_FROM) return "not sent: email is not configured on the server";
+  try {
+    const mail = leadEmail(site, o.mail);
+    // Test leads (flag set only by an authorised edge-Worker test) go to the agency, not the client.
+    const to = o.test ? [TEST_INBOX] : o.to.length ? o.to : [TEST_INBOX];
+    if (o.test) mail.subject = `TEST – ${mail.subject}`;
+    const fromAddr = (env.TASK_NOTIFICATION_FROM.match(/<([^>]+)>/)?.[1] || env.TASK_NOTIFICATION_FROM).trim();
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json", "Idempotency-Key": o.idempotencyKey },
+      body: JSON.stringify({ from: `${site.name.replace(/[<>"]/g, "")} Website <${fromAddr}>`, to, subject: mail.subject, html: mail.html, text: mail.text, ...(o.replyTo ? { reply_to: o.replyTo } : {}) }),
+      signal: AbortSignal.timeout(20_000),
+    });
+    const out = await res.json().catch(() => null) as { id?: string; message?: string } | null;
+    if (res.ok && env.DB) await logSystemEmail(env.DB as never, { ownerId: o.ownerId, clientId: site.clientId, to: to.join(", "), subject: mail.subject, text: mail.text, html: mail.html, kind: "Leads & forms" }).catch(() => undefined);
+    return res.ok ? `sent to ${to.join(", ")} (${out?.id || "accepted"})` : `failed: HTTP ${res.status} ${out?.message || ""}`.trim();
+  } catch (e) { return `failed: ${e instanceof Error ? e.message : "error"}`; }
+}
+/** Site settings for a client by id (any client, including future ones). */
+export function siteForClient(env: Env, clientId: string) {
+  return resolveSite(env, new URL(`https://x/?client=${encodeURIComponent(clientId)}`));
+}
+export type { MailIn as SiteLeadMail };
 type MailIn = { kind: string; job: string; answers: [string, string][]; urgency: string; property: string; town: string; details: string; name: string; phone: string; email: string; photos: string[]; channel: string; page: string; when: string };
 function leadEmail(site: SiteConfig, m: MailIn) {
   const urgent = /leaking|as soon as possible|emergency|urgent/i.test(m.urgency);

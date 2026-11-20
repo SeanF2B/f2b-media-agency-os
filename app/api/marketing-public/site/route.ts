@@ -7,6 +7,8 @@ import { leadToCrm } from "@/lib/conversations/core";
 import { consumeMarketingSubmissionRateLimit } from "@/lib/marketing-public-rate-limit";
 import { logFormSubmission } from "@/lib/form-submission-log";
 import { readSubmittedTouch } from "@/lib/lead-attribution";
+import { formSettingsFor } from "@/lib/site-forms";
+import { emailBusiness, siteForClient } from "../../../../worker/site-lead";
 
 export const dynamic = "force-dynamic";
 const CLIENT_RE = /^[\w-]{6,80}$/;
@@ -93,7 +95,17 @@ async function siteFormLead(request: Request, c: string) {
     const formSlug = (s("form", 80) || s("form_name", 80) || line("Form") || "book-a-consultation").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     const formName = s("form_name", 120) || formSlug.replace(/-/g, " ").replace(/^./, (char) => char.toUpperCase());
     const cleanAnswers = blob.split(/^Pages viewed/mi)[0].split("\n").filter((row) => !/^(Form|Booked from|Page|Ref):/i.test(row.trim())).join("\n").trim();
-    await logFormSubmission(db, { id: crypto.randomUUID(), ownerId, clientId: c, source: "site-form", formKey: `site:${c}:${formSlug}`, formName, pageUrl: page || line("Booked from") || line("Page") || request.headers.get("referer") || "", name, email, phone, message: cleanAnswers, contactId, touch: readSubmittedTouch((key) => String(form.get(key) || "")), createdAt: now });
+    const touch = readSubmittedTouch((key) => String(form.get(key) || ""));
+    await logFormSubmission(db, { id: crypto.randomUUID(), ownerId, clientId: c, source: "site-form", formKey: `site:${c}:${formSlug}`, formName, pageUrl: page || line("Booked from") || line("Page") || request.headers.get("referer") || "", name, email, phone, message: cleanAnswers, contactId, touch, createdAt: now });
+    // Same branded email as every other client site, sent to the business and copied into System emails / Conversations.
+    const site = await siteForClient(env as never, c);
+    if (site) {
+      const cfg = await formSettingsFor(db, ownerId, `site:${c}:${formSlug}`).catch(() => null);
+      const answerRows = cleanAnswers.split("\n").map((row) => row.trim()).filter((row) => /[?:]\s*\S/.test(row) && !/^notes\b/i.test(row)).slice(0, 10).map((row) => { const at = row.search(/[?:]/); return [row.slice(0, at + 1).replace(/:$/, "").trim(), row.slice(at + 1).trim()] as [string, string]; });
+      const t = (k: keyof typeof touch) => String(touch[k] || "");
+      const channel = t("gclid") || t("gbraid") || t("wbraid") || /cpc|ppc|paid/i.test(t("utm_medium")) ? "Google Ads" : /google|bing|duckduckgo/i.test(t("referrer")) ? "Google search" : t("utm_source") || (t("referrer") ? "Referral" : "Direct");
+      await emailBusiness(env as never, site, { ownerId, to: cfg?.notify?.length ? cfg.notify : site.notify, idempotencyKey: `site-form/${c}/${contactId}/${now}`, replyTo: email, mail: { kind: "quote", job: projectType || formName, answers: answerRows, urgency: "", property: "", town: projectLocation, details: message, name, phone, email, photos: [], channel, page: page || line("Booked from") || "", when: now } });
+    }
   }
   return ok();
 }
