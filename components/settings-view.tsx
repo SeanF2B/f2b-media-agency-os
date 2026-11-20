@@ -54,6 +54,32 @@ function Popup({ title, onClose, children }: { title: ReactNode; onClose: () => 
   </div>, document.body);
 }
 
+type ServiceStatus = { group: string; name: string; domain: string; use: string; source: string; status: "connected" | "missing" | "partial" | "via"; detail: string; manage: string };
+const STATUS_LABEL: Record<ServiceStatus["status"], string> = { connected: "Connected", via: "Via OpenRouter", partial: "Partly set up", missing: "Not set" };
+
+/** Every API / integration the OS uses, where its key lives and whether it's set (agency admins). */
+function AllServices() {
+  const [rows, setRows] = useState<ServiceStatus[] | null>(null);
+  const [err, setErr] = useState("");
+  const [filter, setFilter] = useState<"all" | "missing">("all");
+  useEffect(() => { fetch("/api/settings/services-status", { cache: "no-store" }).then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error || "Couldn’t load services."); setRows(j.rows); }).catch((e) => setErr(e instanceof Error ? e.message : "Couldn’t load services.")); }, []);
+  const groups = useMemo(() => { const g = new Map<string, ServiceStatus[]>(); for (const r of rows || []) { if (filter === "missing" && (r.status === "connected" || r.status === "via")) continue; g.set(r.group, [...(g.get(r.group) || []), r]); } return [...g.entries()]; }, [rows, filter]);
+  const ok = (rows || []).filter((r) => r.status === "connected" || r.status === "via").length;
+  return <section className="apis-card apis-all" aria-labelledby="apis-all">
+    <style>{`.apis-all .apis-all-bar{display:flex;gap:6px;align-items:center}.apis-all .apis-all-bar button{border:1px solid rgba(127,127,127,.25);background:transparent;border-radius:999px;padding:4px 10px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;color:inherit}.apis-all .apis-all-bar button.on{background:var(--brand-primary,#1677c8);border-color:transparent;color:#fff}
+.apis-all h4{margin:14px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;opacity:.6}
+.apis-all .apis-pill{font-size:11.5px;font-weight:800;padding:3px 9px;border-radius:999px;white-space:nowrap}.apis-pill.connected{background:#16a34a;color:#fff}.apis-pill.via{background:#e0f2fe;color:#075985}.apis-pill.partial{background:#fef3c7;color:#92400e}.apis-pill.missing{background:rgba(127,127,127,.15);color:inherit}
+.apis-all .apis-row-text small em{font-style:normal;opacity:.75}.apis-all .apis-manage{font-size:12px;opacity:.65;white-space:nowrap}`}</style>
+    <div className="apis-card-head"><h2 id="apis-all">Every service the OS uses</h2><div className="apis-all-bar"><small>{rows ? `${ok} of ${rows.length} ready` : ""}</small><button type="button" className={filter === "all" ? "on" : ""} onClick={() => setFilter("all")}>All</button><button type="button" className={filter === "missing" ? "on" : ""} onClick={() => setFilter("missing")}>Not set</button></div></div>
+    {err ? <p className="apis-status error">{err}</p> : !rows ? <p className="apis-empty">Loading…</p> : groups.map(([group, list]) => <div key={group}><h4>{group}</h4><ul className="apis-list">{list.map((r) => <li key={r.group + r.name} className="apis-row">
+      <Logo domain={r.domain} label={r.name} />
+      <span className="apis-row-text"><b>{r.name}</b><small>{r.use}<br /><em>{r.source}{r.detail ? ` · ${r.detail}` : ""}</em></small></span>
+      <span className="apis-row-actions"><span className={`apis-pill ${r.status}`}>{STATUS_LABEL[r.status]}</span><span className="apis-manage" title="Where to manage it">{r.manage}</span></span>
+    </li>)}</ul></div>)}
+    {!err && rows && !groups.length && <p className="apis-empty">Everything is set up.</p>}
+  </section>;
+}
+
 export function SettingsView() {
   // ---- AI provider (OpenRouter) ----
   const [ai, setAi] = useState<ApiKeyState | null>(null);
@@ -207,6 +233,8 @@ export function SettingsView() {
         </li>; })}</ul>}
       {!keysReady && <p className="apis-status error" role="alert">Secure storage needs a one-time server setup before keys can be saved.</p>}
     </section>
+
+    <AllServices />
 
     <p className="apis-foot"><Lock size={13} /> Keys are verified where possible, encrypted before storage and never shown again. Rotate any key you’ve pasted into a chat.</p>
 

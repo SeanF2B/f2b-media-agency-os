@@ -52,7 +52,7 @@ export function AccountSetupPanel({ setup, reload, clients, compact = false }: {
   };
   const row = (item: Item) => <li key={item.id} className={item.linked ? "on" : !item.available ? "off" : ""}>
     <span className="asp-ico" aria-hidden="true">{item.section === "messaging" ? <ChannelIcon channel={item.id === "msg-whatsapp" ? "whatsapp" : item.id === "msg-instagram" ? "instagram" : "messenger"} size={18} /> : ICONS[item.id] || "🔗"}</span>
-    <div className="asp-txt"><b>{item.name}{item.required && !item.linked && <em>Required</em>}</b><small>{item.detail}</small></div>
+    <div className="asp-txt"><b>{item.name}{item.required && !item.linked && <em>Recommended</em>}</b><small>{item.detail}</small></div>
     <div className="asp-act">
       {item.linked ? <span className="asp-ok">✓ Linked</span> : <>
         {item.href && <a className="asp-btn" href={item.href}>{item.id === "calendar" ? "Google Calendar" : "Connect"}</a>}
@@ -78,7 +78,7 @@ export function AccountSetupPanel({ setup, reload, clients, compact = false }: {
   return <section className="asp" aria-label="Your setup">
     <style>{CSS}</style>
     <div className="asp-head">
-      <div><p className="eyebrow">YOUR SETUP</p><h2>{left ? `Hi ${setup.name.split(" ")[0] || "there"}, link ${left === 1 ? "this" : "these"} to unlock the workspace` : "You’re all set up"}</h2><p className="muted">{left ? (setup.isOwner ? "Your staff have to finish theirs before the rest of the workspace opens. You can carry on." : "The rest of the workspace opens as soon as the required ones are linked.") : "Come back here any time to add or change a connection."}</p></div>
+      <div><p className="eyebrow">YOUR SETUP</p><h2>{left ? `Hi ${setup.name.split(" ")[0] || "there"}, finish your setup` : "You’re all set up"}</h2><p className="muted">{left ? "Link these when you’re ready so bookings and messages land in the right place. Everything else works in the meantime." : "Come back here any time to add or change a connection."}</p></div>
       <div className="asp-meter"><b>{pct}%</b><span>{left ? `${left} left` : "done"}</span></div>
     </div>
     <div className="asp-bar"><i style={{ width: `${pct}%` }} /></div>
