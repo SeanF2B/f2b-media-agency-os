@@ -210,7 +210,9 @@ async function saveLead(request: Request, env: Env, site: SiteConfig) {
 
   // Email the business. The lead is already saved, so an email failure never loses it.
   let emailStatus = "not sent: email is not configured on the server";
-  if (env.RESEND_API_KEY && env.TASK_NOTIFICATION_FROM) {
+  // A site that already emailed the business itself (e.g. while the CRM was unreachable) sets skipEmail on the retry.
+  if (b.skipEmail === true) emailStatus = "not sent: the website already emailed this lead";
+  else if (env.RESEND_API_KEY && env.TASK_NOTIFICATION_FROM) {
     try {
       const mail = leadEmail(site, { kind, job, answers, urgency, property, town, details, name, phone, email, photos, channel, page, when: now });
       // Test leads (flag set only by the edge Worker for an authorised test) go to the agency, not the client.
