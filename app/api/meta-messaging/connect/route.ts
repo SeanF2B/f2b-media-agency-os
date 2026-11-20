@@ -1,6 +1,6 @@
 // Facebook Login for one sub-account's Messenger + Instagram DMs (Launchpad → Messaging → Connect). Admins only.
 import { env } from "cloudflare:workers";
-import { authorizeAdmin } from "@/lib/settings-auth";
+import { authorizeAdminOrSubAccount } from "@/lib/settings-auth";
 import { configuredMetaApiVersion } from "@/lib/meta-ads-direct";
 import { META_MESSAGING_SCOPES, META_POSTING_SCOPES } from "@/lib/conversations/meta-rules";
 
@@ -12,10 +12,12 @@ const back = (request: Request, result: string, clientId = "") => {
 };
 
 export async function GET(request: Request) {
-  const auth = await authorizeAdmin("connect Facebook and Instagram messages");
+  const auth = await authorizeAdminOrSubAccount("connect Facebook and Instagram messages", "Conversations");
   if (auth.error) return auth.error;
   const url = new URL(request.url);
   const clientId = (url.searchParams.get("clientId") || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 100);
+  // Sub-account staff can only connect their own business's Page; admins can connect any account.
+  if (auth.scope && !auth.scope.includes(clientId)) return back(request, "admin-required", clientId);
   if (!env.META_APP_ID || !env.META_APP_SECRET || !env.META_TOKEN_ENCRYPTION_KEY) return back(request, "not-configured", clientId);
   let version: string; try { version = configuredMetaApiVersion(); } catch { return back(request, "version-not-configured", clientId); }
   const state = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");

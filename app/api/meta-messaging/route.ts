@@ -33,6 +33,14 @@ export async function GET(request: Request) {
       return respond({ channels: scoped, staff: staffMessaging, defaults: DEFAULT_STAFF_MESSAGING, google: Object.fromEntries(google.map((g) => [g.staff_id, g.account_email || "connected"])), feeds: feeds.map((f) => f.staff_id), emailReady: Boolean(env.RESEND_API_KEY && env.TASK_NOTIFICATION_FROM), canEdit: !auth.scope });
     } catch (e) { console.error("meta-messaging staff", e); return respond({ error: "Could not load team connections." }, 503); }
   }
+  if (view === "pending") {
+    // After Facebook login: the Pages waiting to be picked for one account (that account's own staff or an admin).
+    const me = await authorizeAdminOrSubAccount("connect Facebook and Instagram messages", "Conversations");
+    if (me.error) return me.error;
+    const clientId = clientKey(url.searchParams.get("clientId"));
+    if (me.scope && !me.scope.includes(clientId)) return respond({ error: "You can only connect your own business's Page." }, 403);
+    return respond({ pages: (await listMetaPages(me.ownerId, clientId)).filter((p) => p.status === "pending") });
+  }
   const auth = await authorizeAdmin("manage messaging connections");
   if (auth.error) return auth.error;
   try {
@@ -48,14 +56,29 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   let b: Record<string, unknown>; try { b = await request.json(); } catch { return respond({ error: "Send a valid request." }, 400); }
   const action = String(b.action || "");
+  if (action === "staff-self" || action === "pick") {
+    // A teammate's own email reply-to / name, and a sub-account picking its own Page after Facebook login.
+    const me = await authorizeAdminOrSubAccount("update your messaging", "Conversations");
+    if (me.error) return me.error;
+    try {
+      if (action === "pick") {
+        const clientId = clientKey(b.clientId);
+        if (me.scope && !me.scope.includes(clientId)) return respond({ error: "You can only connect your own business's Page." }, 403);
+        const ids = (Array.isArray(b.pageIds) ? b.pageIds : []).map((x) => String(x).replace(/\D/g, "")).filter(Boolean).slice(0, 20);
+        if (!ids.length) return respond({ error: "Pick at least one Page." }, 400);
+        return respond(await connectPages(me.ownerId, clientId, ids));
+      }
+      const staffId = me.staffId || String(b.staffId || "").slice(0, 100);
+      if (!staffId) return respond({ error: "We couldn't tell who you are. Sign in again." }, 400);
+      const current = (await getStaffMessaging(me.ownerId, [staffId]))[staffId] || DEFAULT_STAFF_MESSAGING;
+      const patch = sanitizeStaffMessaging({ ...current, emailName: (b.data as any)?.emailName ?? current.emailName, emailReplyTo: (b.data as any)?.emailReplyTo ?? current.emailReplyTo, signature: (b.data as any)?.signature ?? current.signature });
+      await saveStaffMessaging(me.ownerId, staffId, { ...patch, channels: current.channels }); // channels stay as the admin set them
+      return respond({ data: patch });
+    } catch (e) { return respond({ error: e instanceof Error ? e.message : "That didn't work." }, 400); }
+  }
   const auth = await authorizeAdmin("manage messaging connections");
   if (auth.error) return auth.error;
   try {
-    if (action === "pick") {
-      const ids = (Array.isArray(b.pageIds) ? b.pageIds : []).map((x) => String(x).replace(/\D/g, "")).filter(Boolean).slice(0, 20);
-      if (!ids.length) return respond({ error: "Pick at least one Page." }, 400);
-      return respond(await connectPages(auth.ownerId, clientKey(b.clientId), ids));
-    }
     if (action === "disconnect") { await disconnectPage(auth.ownerId, clientKey(b.clientId), String(b.pageId || "").replace(/\D/g, "")); return respond({ ok: true }); }
     if (action === "staff-save") {
       const staffId = String(b.staffId || "").slice(0, 100);

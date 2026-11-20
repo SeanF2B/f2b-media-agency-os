@@ -7,6 +7,7 @@
 import { env } from "cloudflare:workers";
 import { loadSchedulingWorkspace, schedulingDeps } from "@/lib/scheduling/context";
 import { SchedulingError, getStaffProfiles, publicProfile, reviewLinkOwner, addCollectedReview, availableSlots, cancelBooking, createBooking, getBookingByToken, getCalendar, getCalendarBySlug, icsFeed, updateBooking, bookingView } from "@/lib/scheduling/server";
+import { getGroupBySlug } from "@/lib/scheduling/groups";
 import { chooseStaff, locationLabel, utcToLocal } from "@/lib/scheduling/core";
 
 export const dynamic = "force-dynamic";
@@ -77,6 +78,22 @@ export async function GET(request: Request) {
       const ws = info?.ws || await loadSchedulingWorkspace();
       const b = bookingView(row);
       return json({ booking: { status: b.status, start: b.start, end: b.end, name: b.name, staff: b.staffIds.map((id) => ws?.staff.find((s) => s.id === id)?.name).filter(Boolean), meetLink: b.meetLink, canChange: b.status === "booked" && Date.parse(b.start) > Date.now() + 60 * 60_000 }, ...(info ? await publicCalendar(info) : { calendar: cal ? { slug: cal.slug, name: cal.name, timezone: cal.timezone } : null }) });
+    }
+    const groupSlug = str(url.searchParams.get("group"), 64);
+    if (groupSlug) {
+      // Booking page: the services on it (active calendars only), each with picture, length, price and team.
+      const g = /^[a-z0-9-]{1,64}$/.test(groupSlug) ? await getGroupBySlug(env.DB as never, groupSlug) : null;
+      if (!g || !g.active) return fail("This booking page isn't available.", 404);
+      const ws = await loadSchedulingWorkspace();
+      const client = ws?.clients.find((c) => c.id === g.clientId) as (NonNullable<typeof ws>["clients"][number] & { status?: string }) | undefined;
+      if (!ws || (client && /inactive/i.test(String(client.status || "")))) return fail("This booking page isn't available.", 404);
+      const cals = (await Promise.all(g.calendarIds.map((id) => getCalendar(env.DB as never, g.ownerId, id)))).filter((c): c is NonNullable<typeof c> => Boolean(c && c.active));
+      const avatar = (u?: string) => /^(https:|data:image\/|\/media\/)/.test(u || "") ? u : "";
+      return json({
+        group: { slug: g.slug, name: g.name, intro: g.intro },
+        business: { name: client?.name || ws.agencyName || "F2B Media", logo: client?.logo && /^(https:|data:image\/)/.test(client.logo) ? client.logo : "", color: client?.branding?.primary && /^#[0-9a-f]{6}$/i.test(client.branding.primary) ? client.branding.primary : (cals[0]?.color || "#2563eb") },
+        services: cals.map((c) => ({ slug: c.slug, name: c.name, description: c.description, durationMin: c.durationMin, price: c.price, currency: c.currency, color: c.color, location: locationLabel(c.locationType, c.locationType === "onsite" ? "" : c.locationDetail), image: g.images[c.id] || c.image || "", staff: ws.staff.filter((s) => c.staffIds.includes(s.id)).slice(0, 6).map((s) => ({ name: s.name.split("|")[0].trim(), avatar: avatar(s.avatar) })) })),
+      });
     }
     const info = await publicInfo(str(url.searchParams.get("cal"), 64));
     if (!info) return fail("This booking page isn't available.", 404);

@@ -97,25 +97,11 @@ type Overview = { configured: boolean; webhook: { url: string; verifyToken: stri
 export function MessagingLaunchpad({ clients, onOpenWhatsApp }: { clients: Client[]; onOpenWhatsApp?: (clientId: string) => void }) {
   const [data, setData] = useState<Overview | null>(null);
   const [error, setError] = useState("");
-  const [pickFor, setPickFor] = useState<string | null>(null);
-  const [picked, setPicked] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [showSetup, setShowSetup] = useState(false);
   const load = useCallback(async () => { try { const d = await call<Overview>("/api/meta-messaging"); setData(d); setError(""); return d; } catch (e) { setError(e instanceof Error ? e.message : "Couldn't load."); return null; } }, []);
-  useEffect(() => {
-    void load().then((d) => {
-      const q = new URLSearchParams(window.location.search), result = q.get("metaMessaging");
-      if (!result) return;
-      const cid = q.get("clientId") || "";
-      if (result === "pick" && d) { setPickFor(cid); setPicked(d.pages.filter((p) => p.clientId === cid && p.status === "pending").map((p) => p.pageId).slice(0, 1)); }
-      else if (result !== "pick") setError(({ "not-configured": "The Meta app isn't set up on the server yet (see the setup steps below).", "version-not-configured": "Set META_MARKETING_API_VERSION on the server first.", cancelled: "Facebook connection was cancelled.", "no-pages": "That Facebook login doesn't manage any Pages. Log in with an account that's an admin of the business's Page.", "admin-required": "Only an admin can connect messaging." } as Record<string, string>)[result] || "Facebook connection didn't finish. Try again.");
-      q.delete("metaMessaging"); q.delete("clientId");
-      window.history.replaceState(null, "", `${window.location.pathname}${q.toString() ? `?${q}` : ""}${window.location.hash}`);
-    });
-  }, [load]);
+  useEffect(() => { void load(); const again = () => void load(); window.addEventListener("f2b-messaging-changed", again); return () => window.removeEventListener("f2b-messaging-changed", again); }, [load]);
   const rows = [{ id: "", name: "F2B Media (agency)" }, ...clients];
-  const pending = data?.pages.filter((p) => p.clientId === (pickFor ?? "") && p.status === "pending") || [];
-  const pick = async () => { setBusy(true); try { const r = await call<{ errors: string[] }>("/api/meta-messaging", { action: "pick", clientId: pickFor || "agency", pageIds: picked }); setPickFor(null); if (r.errors.length) setError(r.errors.join(" ")); await load(); } catch (e) { setError(e instanceof Error ? e.message : "Couldn't connect."); } finally { setBusy(false); } };
   const disconnect = async (p: Page) => { if (!(await appConfirm(`Disconnect ${p.pageName}${p.igUsername ? ` and @${p.igUsername}` : ""}? New messages will stop coming into Conversations.`))) return; setBusy(true); try { await call("/api/meta-messaging", { action: "disconnect", clientId: p.clientId || "agency", pageId: p.pageId }); await load(); } catch (e) { setError(e instanceof Error ? e.message : "Couldn't disconnect."); } finally { setBusy(false); } };
   const connectHref = (clientId: string) => `/api/meta-messaging/connect?clientId=${encodeURIComponent(clientId || "agency")}`;
   const badge = (on: boolean, label: string) => on ? <span className="lp-msg-badge on">Connected</span> : <span className="lp-msg-badge">{label}</span>;
@@ -134,8 +120,30 @@ export function MessagingLaunchpad({ clients, onOpenWhatsApp }: { clients: Clien
           <span>{badge(data.emailReady, "Not set up")}{data.emailReady && <small>Replies from {data.emailFrom.replace(/^.*</, "").replace(/>$/, "")}</small>}</span>
         </div>; })}
     </div>}
-    {pickFor !== null && <div className="cv-modal" role="dialog" aria-modal="true" aria-label="Choose Facebook Pages" onMouseDown={(e) => { if (e.target === e.currentTarget) setPickFor(null); }}><div className="cv-dialog lp-msg-pick"><h3>Which Page is {rows.find((r) => r.id === pickFor)?.name || "this account"}'s?</h3><p className="muted">Messages to the Page (and its linked Instagram) will come into this account's Conversations.</p>
-      <div className="lp-msg-pages">{pending.map((p) => <label key={p.pageId} className={picked.includes(p.pageId) ? "on" : ""}><input type="checkbox" checked={picked.includes(p.pageId)} onChange={(e) => setPicked(e.target.checked ? [...picked, p.pageId] : picked.filter((x) => x !== p.pageId))} />{p.picture ? <img src={p.picture} alt="" /> : <ChannelIcon channel="messenger" size={28} />}<span><b>{p.pageName}</b><small>{p.igUsername ? <><ChannelIcon channel="instagram" size={12} /> @{p.igUsername}</> : "No Instagram linked"}</small></span></label>)}{!pending.length && <p className="iv-small">No Pages waiting. Connect again.</p>}</div>
-      <div className="iv-actions"><button type="button" className="secondary-button" onClick={() => setPickFor(null)}>Cancel</button><button type="button" className="primary-button" disabled={busy || !picked.length} onClick={() => void pick()}>{busy ? "Connecting…" : `Connect ${picked.length || ""}`}</button></div></div></div>}
   </section>;
 }
+
+/** After Facebook login (any page, any account): pick which Page belongs to the account, or show why it didn't work. */
+export function MetaPickPrompt({ clients }: { clients: Client[] }) {
+  const [state, setState] = useState<{ clientId: string; pages: Page[]; picked: string[]; error: string; busy: boolean } | null>(null);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search), result = q.get("metaMessaging");
+    if (!result) return;
+    const clientId = q.get("clientId") || "";
+    q.delete("metaMessaging"); q.delete("clientId");
+    window.history.replaceState(null, "", `${window.location.pathname}${q.toString() ? `?${q}` : ""}${window.location.hash}`);
+    if (result !== "pick") { setState({ clientId, pages: [], picked: [], busy: false, error: ({ "not-configured": "Facebook messaging isn't switched on for this workspace yet. Ask your agency to finish the Meta app setup.", "version-not-configured": "Facebook messaging isn't fully set up on the server yet.", cancelled: "Facebook connection was cancelled.", "no-pages": "That Facebook login doesn't manage any Pages. Log in with an account that's an admin of the business's Page.", "admin-required": "You can only connect your own business's Page." } as Record<string, string>)[result] || "Facebook connection didn't finish. Try again." }); return; }
+    void call<{ pages: Page[] }>(`/api/meta-messaging?view=pending&clientId=${encodeURIComponent(clientId || "agency")}`).then((r) => setState({ clientId, pages: r.pages, picked: r.pages.slice(0, 1).map((p) => p.pageId), busy: false, error: "" })).catch((e) => setState({ clientId, pages: [], picked: [], busy: false, error: e instanceof Error ? e.message : "Couldn't load your Pages." }));
+  }, []);
+  if (!state) return null;
+  const name = clients.find((c) => c.id === state.clientId)?.name || (state.clientId ? "this account" : "the agency");
+  const pick = async () => { setState({ ...state, busy: true, error: "" }); try { const r = await call<{ errors: string[] }>("/api/meta-messaging", { action: "pick", clientId: state.clientId || "agency", pageIds: state.picked }); void loadTeam(true); window.dispatchEvent(new Event("f2b-messaging-changed")); if (r.errors.length) setState({ ...state, busy: false, pages: [], error: r.errors.join(" ") }); else setState(null); } catch (e) { setState({ ...state, busy: false, error: e instanceof Error ? e.message : "Couldn't connect." }); } };
+  return <div className="cv-modal" role="dialog" aria-modal="true" aria-label="Connect Facebook and Instagram" onMouseDown={(e) => { if (e.target === e.currentTarget) setState(null); }}><div className="cv-dialog lp-msg-pick">
+    <h3>{state.pages.length ? `Which Page is ${name}'s?` : "Facebook & Instagram"}</h3>
+    {state.error && <div className="cv-error" role="alert">{state.error}</div>}
+    {state.pages.length > 0 && <><p className="muted">Messages to the Page (and its linked Instagram) will come into Conversations for {name}.</p>
+      <div className="lp-msg-pages">{state.pages.map((p) => <label key={p.pageId} className={state.picked.includes(p.pageId) ? "on" : ""}><input type="checkbox" checked={state.picked.includes(p.pageId)} onChange={(e) => setState({ ...state, picked: e.target.checked ? [...state.picked, p.pageId] : state.picked.filter((x) => x !== p.pageId) })} />{p.picture ? <img src={p.picture} alt="" /> : <ChannelIcon channel="messenger" size={28} />}<span><b>{p.pageName}</b><small>{p.igUsername ? <><ChannelIcon channel="instagram" size={12} /> @{p.igUsername}</> : "No Instagram linked"}</small></span></label>)}</div></>}
+    <div className="iv-actions"><button type="button" className="secondary-button" onClick={() => setState(null)}>{state.pages.length ? "Cancel" : "Close"}</button>{state.pages.length > 0 && <button type="button" className="primary-button" disabled={state.busy || !state.picked.length} onClick={() => void pick()}>{state.busy ? "Connecting…" : `Connect ${state.picked.length || ""}`}</button>}</div>
+  </div></div>;
+}
+

@@ -150,3 +150,15 @@ export async function saveStaffMessaging(ownerId: string, staffId: string, data:
   await ensureMetaTables();
   await env.DB!.prepare("INSERT INTO conv_staff_messaging (owner_id, staff_id, data, updated_at) VALUES (?1,?2,?3,?4) ON CONFLICT(owner_id, staff_id) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at").bind(ownerId, staffId, JSON.stringify(data), new Date().toISOString()).run();
 }
+
+/** Send a photo / video / audio / file by link through the Page (Messenger + Instagram). */
+export async function sendMetaAttachment(ownerId: string, p: { accountId: string; contactId: string; url: string; mime: string; tag?: "HUMAN_AGENT" }) {
+  const t = await pageTokenFor(ownerId, p.accountId);
+  if (!t) throw new Error("This Facebook Page is no longer connected. Reconnect it in Launchpad → Messaging.");
+  const type = p.mime.startsWith("image/") ? "image" : p.mime.startsWith("video/") ? "video" : p.mime.startsWith("audio/") ? "audio" : "file";
+  const body: Record<string, unknown> = { recipient: { id: p.contactId }, message: { attachment: { type, payload: { url: p.url, is_reusable: false } } }, messaging_type: p.tag ? "MESSAGE_TAG" : "RESPONSE" };
+  if (p.tag) body.tag = p.tag;
+  const r = await graph<{ message_id?: string }>("POST", `${t.pageId}/messages`, t.token, {}, body);
+  return String(r.message_id || "");
+}
+

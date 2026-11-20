@@ -3,7 +3,12 @@ import { authorizeAdminOrSubAccount, respond } from "@/lib/settings-auth";
 import { aiCredentialStorageReady } from "@/lib/ai-credentials";
 import { addMessage, botReply, e164, ensureTables, getClientBot, listTwilioTemplates, sanitizeBot, saveClientBot, BLANK_BOT, loadSettings, saveSettings, sendTwilio, twilioCredentials, upsertThread, type NumberConfig } from "@/lib/conversations/core";
 import { renderTemplate, windowState } from "@/lib/conversations/whatsapp";
-import { ensureMetaTables, getStaffMessaging, sendMeta } from "@/lib/conversations/meta";
+import { ensureMetaTables, getStaffMessaging, sendMeta, sendMetaAttachment } from "@/lib/conversations/meta";
+
+// Attachments: only files already in this workspace's Media Library (uploaded from the chat box).
+type Media = { url: string; mime: string; name: string };
+const mediaFrom = (raw: unknown, origin: string): Media[] => (Array.isArray(raw) ? raw : []).slice(0, 5).map((m: any) => ({ url: String(m?.url || ""), mime: String(m?.mime || "").slice(0, 80), name: String(m?.name || "File").replace(/[\r\n]/g, " ").slice(0, 80) })).filter((m) => /^\/api\/marketing-public\/media\?f=[A-Za-z0-9._%\/-]+$/.test(m.url)).map((m) => ({ ...m, url: origin + m.url }));
+const mediaLines = (media: Media[]) => media.map((m) => (m.mime.startsWith("image/") ? `📷 ${m.url}` : `📎 ${m.name} ${m.url}`));
 import { metaSendMode } from "@/lib/conversations/meta-rules";
 
 export const dynamic = "force-dynamic";
@@ -90,7 +95,8 @@ export async function POST(request: Request) {
       // Email reply from the inbox: sent from the system sender, replies come back to the person who wrote it.
       const text = String(b.body || "").trim().slice(0, 10000);
       const subject = String(b.subject || "").trim().slice(0, 200) || "Re: your enquiry";
-      if (!text) return respond({ error: "Write your email first." }, 400);
+      const media = mediaFrom(b.media, new URL(request.url).origin);
+      if (!text && !media.length) return respond({ error: "Write your email first." }, 400);
       if (!env.RESEND_API_KEY || !env.TASK_NOTIFICATION_FROM) return respond({ error: "Email sending isn't set up on the server yet." }, 503);
       // The person replying: their own name, reply-to address and signature (Team → Messaging), sent from the verified system address.
       const senderId = auth.staffId || String(b.staffId || "").slice(0, 100);
@@ -102,21 +108,25 @@ export async function POST(request: Request) {
       const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#22272b">${signed.split(/\n{2,}/).map((p) => `<p style="margin:0 0 14px">${p.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" } as Record<string, string>)[c]).replace(/\n/g, "<br>")}</p>`).join("")}</div>`;
       let error = "";
       try {
-        const r = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json", "Idempotency-Key": `conv-email/${id}/${crypto.randomUUID()}` }, body: JSON.stringify({ from, to: [thread.contact], subject, text: signed, html, ...(/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(replyTo) ? { reply_to: replyTo } : {}) }), signal: AbortSignal.timeout(15_000) });
+        const r = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json", "Idempotency-Key": `conv-email/${id}/${crypto.randomUUID()}` }, body: JSON.stringify({ from, to: [thread.contact], subject, text: signed, html, ...(media.length ? { attachments: media.map((m) => ({ path: m.url, filename: m.name })) } : {}), ...(/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(replyTo) ? { reply_to: replyTo } : {}) }), signal: AbortSignal.timeout(15_000) });
         if (!r.ok) error = `The email service returned HTTP ${r.status}.`;
       } catch (e) { error = e instanceof Error ? e.message : "Could not send."; }
-      const m = await addMessage(auth.ownerId, id, { direction: "out", sender: "staff", body: `Subject: ${subject}\n\n${signed}`, error });
+      const m = await addMessage(auth.ownerId, id, { direction: "out", sender: "staff", body: [`Subject: ${subject}\n\n${signed}`, ...mediaLines(media)].join("\n"), error });
       if (error) return respond({ error, messageId: m.id }, 502);
       return respond({ ok: true, messageId: m.id });
     }
     if (action === "send" && (thread.channel === "messenger" || thread.channel === "instagram")) {
       const text = String(b.body || "").trim().slice(0, 1900);
-      if (!text) return respond({ error: "Type a message first." }, 400);
+      const media = mediaFrom(b.media, new URL(request.url).origin);
+      if (!text && !media.length) return respond({ error: "Type a message first." }, 400);
       const mode = metaSendMode(thread.last_in_at, true);
       if (!mode.ok) return respond({ error: mode.reason, code: "window_closed" }, 409);
       let sid = "", error = "";
-      try { sid = await sendMeta(auth.ownerId, { accountId: thread.our_number, contactId: thread.contact, text, tag: mode.tag }); } catch (e) { error = e instanceof Error ? e.message : "Could not send."; }
-      const m = await addMessage(auth.ownerId, id, { direction: "out", sender: "staff", body: text, sid, error });
+      try {
+        if (text) sid = await sendMeta(auth.ownerId, { accountId: thread.our_number, contactId: thread.contact, text, tag: mode.tag });
+        for (const f of media) { const s2 = await sendMetaAttachment(auth.ownerId, { accountId: thread.our_number, contactId: thread.contact, url: f.url, mime: f.mime, tag: mode.tag }); sid ||= s2; }
+      } catch (e) { error = e instanceof Error ? e.message : "Could not send."; }
+      const m = await addMessage(auth.ownerId, id, { direction: "out", sender: "staff", body: [text, ...mediaLines(media)].filter(Boolean).join("\n"), sid, error });
       await env.DB!.prepare("UPDATE conv_threads SET bot_on=0, status=CASE WHEN status='closed' THEN 'open' ELSE status END WHERE id=?1").bind(id).run();
       if (error) return respond({ error, messageId: m.id }, 502);
       return respond({ ok: true, messageId: m.id });
@@ -128,13 +138,18 @@ export async function POST(request: Request) {
     }
     if (action === "send") {
       const text = String(b.body || "").trim().slice(0, 1500);
-      if (!text) return respond({ error: "Type a message first." }, 400);
+      const media = mediaFrom(b.media, new URL(request.url).origin);
+      if (!text && !media.length) return respond({ error: "Type a message first." }, 400);
       if (thread.channel === "whatsapp" && !windowState(thread.last_in_at).open) return respond({ error: "The 24-hour WhatsApp window is closed. Send an approved template to restart the chat.", code: "window_closed" }, 409);
       const creds = await twilioCredentials(auth.ownerId);
       if (!creds) return respond({ error: "Add your Twilio details in Conversation settings first." }, 400);
       let sid = "", error = "";
-      try { sid = await sendTwilio(creds, { from: thread.our_number, to: thread.contact, body: text, channel: thread.channel, statusCallback }); } catch (e) { error = e instanceof Error ? e.message : "Could not send."; }
-      const m = await addMessage(auth.ownerId, id, { direction: "out", sender: "staff", body: text, sid, error });
+      try {
+        // WhatsApp takes one file per message: the first carries the text as its caption, the rest follow on their own.
+        if (!media.length) sid = await sendTwilio(creds, { from: thread.our_number, to: thread.contact, body: text, channel: thread.channel, statusCallback });
+        for (const [i, f] of media.entries()) { const s2 = await sendTwilio(creds, { from: thread.our_number, to: thread.contact, body: i === 0 ? text : "", mediaUrl: f.url, channel: thread.channel, statusCallback }); sid ||= s2; }
+      } catch (e) { error = e instanceof Error ? e.message : "Could not send."; }
+      const m = await addMessage(auth.ownerId, id, { direction: "out", sender: "staff", body: [text, ...mediaLines(media)].filter(Boolean).join("\n"), sid, error });
       await env.DB!.prepare("UPDATE conv_threads SET bot_on=0, status=CASE WHEN status='closed' THEN 'open' ELSE status END WHERE id=?1").bind(id).run();
       if (error) return respond({ error, messageId: m.id }, 502);
       return respond({ ok: true, messageId: m.id });
