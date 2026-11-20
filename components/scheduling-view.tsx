@@ -5,6 +5,8 @@ import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ImagePlus, Sparkles, CalendarDays, ChevronLeft, ChevronRight, Clock, Copy, Link2, MapPin, Plus, RefreshCw, Settings2, Trash2, UserRound, Users, Video, Phone, Building2, LayoutDashboard, ClipboardList, CalendarRange, CalendarClock, History, CircleX, ChevronDown, ChevronUp } from "lucide-react";
 import { useAppointmentUpdates } from "@/components/appointment-updates";
+import { pendingView, readViewCache, writeViewCache } from "@/lib/view-cache";
+import { schedulingCacheKey, schedulingUrl } from "@/lib/view-prefetch";
 import "./scheduling.css";
 import { ReportGeneratingAnimation, currencySymbolFor } from "./report-generating-animation";
 import { computePayslip, maskPps, normalisePps, validPps, DEFAULT_PERSON, EMPTY_YTD, type PayrollEmployer, type PayrollPerson } from "@/lib/scheduling/payroll";
@@ -71,7 +73,8 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff, content
   // Stretch the day so 07:00–21:00 fills the window (calendar always in full view).
   const weekRef = useRef<HTMLDivElement>(null);
   const [PX_PER_MIN, setPpm] = useState(PX_DEFAULT);
-  const [realData, setData] = useState<Data | null>(null);
+  // Show the last calendar for this account instantly, then refresh in the background.
+  const [realData, setData] = useState<Data | null>(() => readViewCache<Data>(schedulingCacheKey(scopeClientId, mondayOf(new Date())) ) || null);
   const [sample] = useSampleData();
   // Same "Appointment updates" card as the Dashboard (mark finished appointments)
   const appt = useAppointmentUpdates({ scopeClientId, sample, enabled: true });
@@ -130,8 +133,13 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff, content
 
   const load = useCallback(async () => {
     try {
-      const from = addDays(week, -35), to = addDays(week, 70);
-      setData(await api<Data>(scopeClientId, undefined, `&from=${from.toISOString()}&to=${to.toISOString()}`));
+      const key = schedulingCacheKey(scopeClientId, week);
+      const hit = readViewCache<Data>(key);
+      if (hit) setData(hit);
+      const pending = await pendingView<Data>(key);
+      const next = pending || await (async () => { const res = await fetch(schedulingUrl(scopeClientId, week), { cache: "no-store" }); const json = await res.json().catch(() => ({})) as Data & { error?: string }; if (!res.ok) throw new Error(json.error || "Something went wrong."); return json; })();
+      writeViewCache(key, next);
+      setData(next);
       setError("");
     } catch (e) { setError(errText(e, "Scheduling could not load.")); }
   }, [scopeClientId, week]);
