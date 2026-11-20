@@ -85,10 +85,10 @@ export async function extractLogoColours(src: string): Promise<{ primary: string
     const ranked = [...bins.values()].sort((x, y) => y.n - x.n).map((v) => ({ n: v.n, r: v.r / v.c, g: v.g / v.c, b: v.b / v.c }));
     let result: { primary: string; secondary: string; menu?: string } | null = null;
     if (bg && ranked.length && bgLight >= 0.75) {
-      // light (usually white) logo background -> the menu stays that colour; the darker accent is the secondary, the other the primary
+      // light (usually white) logo background -> the menu stays that colour; buttons and highlights use the logo's darker colour (e.g. ProClean blue, not its green)
       const first = ranked[0], other = ranked.find((c) => dist(c, first) > 90), lum = (c: { r: number; g: number; b: number }) => 0.299 * c.r + 0.587 * c.g + 0.114 * c.b;
       const [dark, lightAccent] = other ? (lum(other) < lum(first) ? [other, first] : [first, other]) : [first, first];
-      result = { primary: toHex(lightAccent.r, lightAccent.g, lightAccent.b), secondary: toHex(dark.r, dark.g, dark.b) };
+      void lightAccent; result = { primary: toHex(dark.r, dark.g, dark.b), secondary: toHex(dark.r, dark.g, dark.b) };
     } else if (bg && ranked.length) {
       // dark/coloured logo background -> sidebar (secondary); the logo's accent -> buttons (primary)
       result = { primary: toHex(ranked[0].r, ranked[0].g, ranked[0].b), secondary: toHex(bg.r, bg.g, bg.b) };
@@ -111,7 +111,7 @@ export async function extractLogoColours(src: string): Promise<{ primary: string
     if (result) {
       if (bg) result.menu = toHex(bg.r, bg.g, bg.b);
       else if (!opaqueEdge || opaqueEdge <= edgeTotal * 0.5) { let sum = 0, n = 0; for (let i = 0; i < data.length; i += 4) { if (data[i + 3] < 128) continue; sum += 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]; n++; } if (n && sum / n < 170) result.menu = "#ffffff"; }
-      if (result.menu === "#ffffff" || (bg && bgLight >= 0.75)) { const lum = (h: string) => { const q = parseInt(h.slice(1), 16); return 0.299 * ((q >> 16) & 255) + 0.587 * ((q >> 8) & 255) + 0.114 * (q & 255); }; if (!bg && ranked.length > 1) { const a = ranked[0], o = ranked.find((c) => dist(c, a) > 90); if (o) { const ah = toHex(a.r, a.g, a.b), oh = toHex(o.r, o.g, o.b); result.primary = lum(ah) < lum(oh) ? oh : ah; result.secondary = lum(ah) < lum(oh) ? ah : oh; } } }
+      if (result.menu === "#ffffff" || (bg && bgLight >= 0.75)) { const lum = (h: string) => { const q = parseInt(h.slice(1), 16); return 0.299 * ((q >> 16) & 255) + 0.587 * ((q >> 8) & 255) + 0.114 * (q & 255); }; if (!bg && ranked.length > 1) { const a = ranked[0], o = ranked.find((c) => dist(c, a) > 90); if (o) { const ah = toHex(a.r, a.g, a.b), oh = toHex(o.r, o.g, o.b); result.primary = result.secondary = lum(ah) < lum(oh) ? ah : oh; } } }
     }
     colourCache.set(src, result); return result;
   } catch (e) { (globalThis as any).__lastErr = String(e); colourCache.set(src, null); return null; }
