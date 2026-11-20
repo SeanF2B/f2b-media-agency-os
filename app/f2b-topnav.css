@@ -3742,3 +3742,31 @@ html body .app-shell .crm-heading > div:first-child, html body .app-shell .iv-he
 }
 html body .app-shell .cv-head-status-fallback { padding: 8px 8px 0; }
 html body .app-shell .cv-head-status-fallback .dh-approvals.head-status { margin: 0 !important; max-width: none; flex: none; }
+
+/* AI approval draft editor (Dashboard + Conversations): click to edit, booking link picker, actions */
+html body .app-shell .hd-edit { display: grid; gap: 8px; margin-top: 6px; min-width: 0; }
+html body .app-shell .hd-text { display: block; width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 10px; border: 1px solid transparent; background: #f6f8f9; color: #344054; font: inherit; font-size: 13px; line-height: 1.45; text-align: left; white-space: pre-wrap; overflow-wrap: anywhere; resize: vertical; }
+html body .app-shell .hd-text-view { cursor: text; }
+html body .app-shell .hd-text-view:hover { border-color: color-mix(in srgb, var(--brand-secondary-ink, #1e3a8a) 40%, transparent) !important; transform: none !important; box-shadow: none !important; }
+html body .app-shell textarea.hd-text { border-color: var(--brand-primary, #1479b8); background: #fff; min-height: 76px; }
+html body .app-shell .hd-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+html body .app-shell .hd-linkpick { position: relative; }
+html body .app-shell .hd-link-btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border-radius: 9px; border: 1px solid #dce3e7; background: #fff; color: #101828; font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+html body .app-shell .hd-scrim { position: fixed; inset: 0; z-index: 60; background: transparent; border: 0; }
+html body .app-shell .hd-menu { position: absolute; z-index: 61; left: 0; top: calc(100% + 6px); width: min(310px, 86vw); background: #fff; border: 1px solid #dce3e7; border-radius: 14px; box-shadow: 0 16px 40px rgba(16,24,40,.18); padding: 8px; display: grid; gap: 2px; }
+html body .app-shell .hd-menu > b { font-size: 12px; opacity: .65; padding: 4px 8px; }
+html body .app-shell .hd-menu > small { padding: 6px 8px; font-size: 12.5px; color: #667085; }
+html body .app-shell .hd-menu > button { display: flex; align-items: center; gap: 10px; border: 0; background: none; padding: 8px; border-radius: 10px; font: inherit; font-size: 13.5px; color: #101828; text-align: left; cursor: pointer; }
+html body .app-shell .hd-menu > button > span:last-child { display: flex; flex-direction: column; min-width: 0; } html body .app-shell .hd-menu > button small { font-size: 11.5px; color: #667085; }
+html body .app-shell .hd-menu > button:hover, html body .app-shell .hd-menu > button.on { background: color-mix(in srgb, var(--brand-primary, #1479b8) 9%, transparent); transform: none !important; box-shadow: none !important; }
+html body .app-shell .hd-ico { width: 28px; height: 28px; flex: none; border-radius: 8px; display: grid; place-items: center; background: #f2f4f7; color: #344054; } html body .app-shell .hd-ico.new { background: color-mix(in srgb, var(--brand-primary, #1479b8) 12%, #fff); color: var(--brand-primary, #1479b8); }
+html body .app-shell .hd-form { display: grid; gap: 8px; padding: 6px 4px 2px; } html body .app-shell .hd-form label { display: grid; gap: 4px; font-size: 12px; font-weight: 600; flex: 1; } html body .app-shell .hd-form input, html body .app-shell .hd-form select { height: 36px; font-size: 14px; }
+html body .app-shell .hd-row { display: flex; gap: 8px; } html body .app-shell .hd-row > button { flex: 1; height: 36px; }
+html body .app-shell .hd-acts { display: flex; gap: 6px; flex-wrap: wrap; }
+html body .app-shell .hd-acts button { height: 32px; padding: 0 12px; border-radius: 9px; font-size: 12.5px; font-weight: 700; cursor: pointer; border: 1px solid #dce3e7; background: #fff; color: #101828; }
+html body .app-shell .hd-acts .hd-ok { background: #1f8a4c; border-color: #1f8a4c; color: #fff; } html body .app-shell .hd-acts .hd-no { color: #b42318; } html body .app-shell .hd-acts button:disabled { opacity: .6; cursor: default; }
+html body .app-shell .dh-held { grid-template-columns: 10px minmax(0,1fr) !important; } html body .app-shell .dh-held .dh-appr-main { min-width: 0; }
+html body .app-shell.dark-mode .hd-text, html body.f2b-dark .app-shell .hd-text { background: rgba(255,255,255,.06); color: #d0d5dd; }
+html body .app-shell.dark-mode :is(.hd-link-btn, .hd-acts button:not(.hd-ok), .hd-menu) { background: #2a3238; border-color: #3c4850; color: #f1f5f7; }
+html body .app-shell.dark-mode .hd-menu > button { color: #f1f5f7; }
+@media (max-width: 700px) { html body .app-shell .hd-bar { display: grid; } html body .app-shell .hd-acts { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); } html body .app-shell .hd-acts button { padding: 0 6px; height: 36px; } html body .app-shell .hd-link-btn { width: 100%; justify-content: center; height: 36px; } }

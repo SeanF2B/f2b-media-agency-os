@@ -14,7 +14,8 @@ export function isTattooClient(clientName: string) { return /tattoo|ink|poppy|pi
 
 /** The held replies for this account. threadId matches the sample inbox thread it belongs to. */
 export function sampleHeldReplies(clientId: string, clientName: string): SampleHeld[] {
-  const base = `/f/book/${slug(clientName || "your-business")}`;
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const base = `${origin}/f/book/${slug(clientName || "your-business")}`;
   const first = (clientName || "the studio").trim();
   if (isTattooClient(clientName)) return [
     { id: "sample-held-0", threadId: "sample-thread-0", name: "Aoife Brennan", channel: "whatsapp", clientId, ask: "When could I come in to chat about it?", minsAgo: 9,
