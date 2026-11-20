@@ -144,12 +144,15 @@ type Observation = GuardObservation & { publicNs: string[] | null; postureChecke
 async function observe(token: string, zone: ZoneInfo, registrar: RegistrarInfo, missing: Set<string>, baseline: Observation | null, now: Date): Promise<Observation> {
   const postureDue = !baseline?.postureCheckedAt || now.getTime() - new Date(baseline.postureCheckedAt).getTime() >= CACHE_MS;
   const skip = Promise.resolve({ ok: false, status: -1, result: null });
+  const dnsRequest = cf<Array<{ type: string; name: string; content: string; priority?: number; proxied?: boolean }>>(token, `/zones/${zone.id}/dns_records?per_page=500`);
+  // Email-only domains (e.g. outreach sending domains) have no website: skip the site check for them.
+  const hasWebsite = dnsRequest.then((r) => !r.ok || !r.result || r.result.some((rec) => /^(A|AAAA|CNAME)$/.test(rec.type) && (rec.name === zone.name || rec.name === `www.${zone.name}`)));
   const [dns, settings, dnssec, publicNs, site] = await Promise.all([
-    cf<Array<{ type: string; name: string; content: string; priority?: number; proxied?: boolean }>>(token, `/zones/${zone.id}/dns_records?per_page=500`),
+    dnsRequest,
     postureDue ? cf<Array<{ id: string; value: unknown }>>(token, `/zones/${zone.id}/settings`) : skip as Promise<{ ok: boolean; status: number; result: Array<{ id: string; value: unknown }> | null }>,
     postureDue ? cf<{ status?: string }>(token, `/zones/${zone.id}/dnssec`) : skip as Promise<{ ok: boolean; status: number; result: { status?: string } | null }>,
     publicNameServers(zone.name),
-    checkSite(zone.name),
+    hasWebsite.then((web) => (web ? checkSite(zone.name) : null)),
   ]);
   if (dns.status === 403) missing.add("DNS Read");
   if (settings.status === 403) missing.add("Zone Settings Read");
@@ -301,7 +304,7 @@ export async function processDomainGuard(now = new Date(), options: { limit?: nu
     let baseline: Observation | null = null;
     try { baseline = state?.baseline_json ? JSON.parse(state.baseline_json) as Observation : null; } catch { baseline = null; }
     const observation = await observe(token, zone, registrar, missing, baseline, now);
-    const failCount = observation.site?.ok ? 0 : (state?.fail_count || 0) + 1;
+    const failCount = !observation.site || observation.site.ok ? 0 : (state?.fail_count || 0) + 1;
     const secured = await autoSecure(token, zone, observation, missing);
     const findings = evaluate({ ...observation, failCount }, baseline, now);
     if (secured) findings.push(secured);
