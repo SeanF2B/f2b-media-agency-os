@@ -2,6 +2,8 @@
 import { AiEyesIcon } from "./ai-eyes-icon";
 
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { pendingView, readViewCache, writeViewCache } from "@/lib/view-cache";
+import { conversationsCacheKey, conversationsUrl } from "@/lib/view-prefetch";
 import { useSampleData } from "@/hooks/use-sample-data";
 import { ChannelIcon, CHANNELS, channelLabel } from "./channel-icon";
 import { metaSendMode } from "@/lib/conversations/meta-rules";
@@ -34,6 +36,8 @@ async function call<T>(url: string, body?: unknown): Promise<T> {
 }
 const ago = (iso: string) => { const s = Math.max(1, (Date.now() - new Date(iso).getTime()) / 1000); return s < 60 ? "now" : s < 3600 ? `${Math.floor(s / 60)}m` : s < 86400 ? `${Math.floor(s / 3600)}h` : new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" }); };
 const title = (t: Thread) => t.contact_name || t.contact;
+type ThreadsPayload = { threads: Thread[]; configured: boolean; emailFrom?: string; waNumbers?: WaNumber[] };
+type ThreadPayload = { thread: Thread; messages: Msg[]; routes?: Route[] };
 
 // Demo inbox for the "Sample data" switch: a few realistic chats for this account (nothing is sent or saved).
 function sampleInbox(clientId: string, clientName: string, gallery: string[]): { threads: Thread[]; messages: Record<string, Msg[]> } {
@@ -62,17 +66,19 @@ export function ConversationsView({ scopeClientId, clients, staff = [], currentS
   const [staffFilter, setStaffFilter] = useState<string>("all");
   const people = staff.filter((p) => !p.isBot && (!scopeClientId || !Array.isArray(p.clientAccessIds) || p.clientAccessIds.includes(scopeClientId)));
   const personName = (id?: string) => people.find((p) => p.id === id)?.name || staff.find((p) => p.id === id)?.name || "";
-  const [threads, setThreads] = useState<Thread[]>([]);
-  const [configured, setConfigured] = useState(true);
+  // Show the last inbox instantly (from this session) and refresh it in the background.
+  const [cached] = useState(() => readViewCache<ThreadsPayload>(conversationsCacheKey(scopeClientId)));
+  const [threads, setThreads] = useState<Thread[]>(cached?.threads || []);
+  const [configured, setConfigured] = useState(cached?.configured ?? true);
   const [waSetupOpen, setWaSetupOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cached);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<"all" | "unread" | "handoff" | "notifications">("all");
   const [activeId, setActiveId] = useState("");
   const [active, setActive] = useState<Thread | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
-  const [emailFrom, setEmailFrom] = useState("");
-  const [waNumbers, setWaNumbers] = useState<WaNumber[]>([]);
+  const [emailFrom, setEmailFrom] = useState(cached?.emailFrom || "");
+  const [waNumbers, setWaNumbers] = useState<WaNumber[]>(cached?.waNumbers || []);
   const [newChat, setNewChat] = useState(false);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -107,16 +113,23 @@ export function ConversationsView({ scopeClientId, clients, staff = [], currentS
   }, [sample, scopeClientId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadThreads = useCallback(async () => {
-    try { const r = await call<{ threads: Thread[]; configured: boolean; emailFrom?: string; waNumbers?: WaNumber[] }>(`/api/conversations?view=threads&clientId=${encodeURIComponent(scopeClientId || "agency")}`); setThreads(r.threads); setConfigured(r.configured); setEmailFrom(r.emailFrom || ""); setWaNumbers(r.waNumbers || []); setError(""); }
+    try { const key = conversationsCacheKey(scopeClientId); const r = (await pendingView<ThreadsPayload>(key)) || await call<ThreadsPayload>(conversationsUrl(scopeClientId)); writeViewCache(key, r); setThreads(r.threads); setConfigured(r.configured); setEmailFrom(r.emailFrom || ""); setWaNumbers(r.waNumbers || []); setError(""); }
     catch (e) { setError(e instanceof Error ? e.message : "Could not load conversations."); } finally { setLoading(false); }
   }, [scopeClientId]);
   const loadThread = useCallback(async (id: string) => {
     if (id.startsWith("sample-thread-")) return;
-    try { const r = await call<{ thread: Thread; messages: Msg[]; routes?: Route[] }>(`/api/conversations?view=thread&id=${encodeURIComponent(id)}`); setActive(r.thread); setMessages(r.messages); setRoutes(r.routes || []); } catch (e) { setError(e instanceof Error ? e.message : "Could not open that conversation."); }
+    try { const r = await call<ThreadPayload>(`/api/conversations?view=thread&id=${encodeURIComponent(id)}`); writeViewCache(`conv:thread:${id}`, r); setActive(r.thread); setMessages(r.messages); setRoutes(r.routes || []); } catch (e) { setError(e instanceof Error ? e.message : "Could not open that conversation."); }
   }, []);
-  useEffect(() => { setLoading(true); setActiveId(""); setActive(null); void loadThreads(); }, [loadThreads]);
+  useEffect(() => { setLoading(!readViewCache(conversationsCacheKey(scopeClientId))); void loadThreads(); }, [loadThreads]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { const t = setInterval(() => { if (document.visibilityState === "visible") { void loadThreads(); if (activeId) void loadThread(activeId); } }, 7000); return () => clearInterval(t); }, [loadThreads, loadThread, activeId]);
-  useEffect(() => { if (activeId) void loadThread(activeId); }, [activeId, loadThread]);
+  useEffect(() => {
+    if (!activeId) return;
+    // Open a chat instantly from the last copy, then refresh it.
+    const hit = readViewCache<ThreadPayload>(`conv:thread:${activeId}`);
+    if (hit) { setActive(hit.thread); setMessages(hit.messages); setRoutes(hit.routes || []); }
+    else { const t = threads.find((x) => x.id === activeId); if (t) setActive(t); setMessages([]); }
+    void loadThread(activeId);
+  }, [activeId, loadThread]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (demo && activeId.startsWith("sample-thread-")) { setActive(demo.threads.find((t) => t.id === activeId) || null); setMessages(demo.messages[activeId] || []); } }, [activeId, demo]);
   useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [messages.length, activeId]);
 
