@@ -46,8 +46,8 @@ export async function logoFileToDataUrl(file: File): Promise<string> {
 
 /** Pull a primary + secondary colour out of a logo (data URL or same-origin URL). Ignores transparent, white, black and grey pixels. */
 const toHex = (r: number, g: number, b: number) => "#" + [r, g, b].map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join("");
-const colourCache = new Map<string, { primary: string; secondary: string } | null>();
-export async function extractLogoColours(src: string): Promise<{ primary: string; secondary: string } | null> {
+const colourCache = new Map<string, { primary: string; secondary: string; menu?: string } | null>();
+export async function extractLogoColours(src: string): Promise<{ primary: string; secondary: string; menu?: string } | null> {
   if (!src || typeof document === "undefined") return null;
   if (colourCache.has(src)) return colourCache.get(src)!;
   try {
@@ -56,12 +56,15 @@ export async function extractLogoColours(src: string): Promise<{ primary: string
     const size = 64, canvas = document.createElement("canvas"); canvas.width = size; canvas.height = size;
     const ctx = canvas.getContext("2d", { willReadFrequently: true }); if (!ctx) return null;
     const scale = Math.min(size / (img.naturalWidth || size), size / (img.naturalHeight || size));
-    ctx.drawImage(img, 0, 0, Math.max(1, Math.round((img.naturalWidth || size) * scale)), Math.max(1, Math.round((img.naturalHeight || size) * scale)));
+    const dw = Math.max(1, Math.min(size, Math.round((img.naturalWidth || size) * scale))), dh = Math.max(1, Math.min(size, Math.round((img.naturalHeight || size) * scale)));
+    ctx.drawImage(img, 0, 0, dw, dh);
     const data = ctx.getImageData(0, 0, size, size).data;
     const px = (x: number, y: number) => { const k = (y * size + x) * 4; return { r: data[k], g: data[k + 1], b: data[k + 2], a: data[k + 3] }; };
     // 1) the logo's own background: the most common opaque colour around the edge of the artwork
     const edge = new Map<number, { c: number; r: number; g: number; b: number }>(); let opaqueEdge = 0, edgeTotal = 0;
-    for (let t = 0; t < size; t++) for (const [x, y] of [[t, 0], [t, size - 1], [0, t], [size - 1, t]] as const) {
+    // only the edge of the drawn artwork (a wide logo fills 64 x 24, not the whole 64 x 64 canvas)
+    const edgePts: [number, number][] = []; for (let t = 0; t < dw; t++) edgePts.push([t, 0], [t, dh - 1]); for (let t = 0; t < dh; t++) edgePts.push([0, t], [dw - 1, t]);
+    for (const [x, y] of edgePts) {
       const p = px(x, y); edgeTotal++; if (p.a < 200) continue; opaqueEdge++;
       const key = ((p.r >> 4) << 8) | ((p.g >> 4) << 4) | (p.b >> 4), e = edge.get(key) || { c: 0, r: 0, g: 0, b: 0 }; e.c++; e.r += p.r; e.g += p.g; e.b += p.b; edge.set(key, e);
     }
@@ -80,8 +83,13 @@ export async function extractLogoColours(src: string): Promise<{ primary: string
       bin.c += 1; bin.n += 1 + sat; bin.r += r; bin.g += g; bin.b += b; bins.set(key, bin);
     }
     const ranked = [...bins.values()].sort((x, y) => y.n - x.n).map((v) => ({ n: v.n, r: v.r / v.c, g: v.g / v.c, b: v.b / v.c }));
-    let result: { primary: string; secondary: string } | null = null;
-    if (bg && ranked.length) {
+    let result: { primary: string; secondary: string; menu?: string } | null = null;
+    if (bg && ranked.length && bgLight >= 0.75) {
+      // light (usually white) logo background -> the menu stays that colour; the darker accent is the secondary, the other the primary
+      const first = ranked[0], other = ranked.find((c) => dist(c, first) > 90), lum = (c: { r: number; g: number; b: number }) => 0.299 * c.r + 0.587 * c.g + 0.114 * c.b;
+      const [dark, lightAccent] = other ? (lum(other) < lum(first) ? [other, first] : [first, other]) : [first, first];
+      result = { primary: toHex(lightAccent.r, lightAccent.g, lightAccent.b), secondary: toHex(dark.r, dark.g, dark.b) };
+    } else if (bg && ranked.length) {
       // dark/coloured logo background -> sidebar (secondary); the logo's accent -> buttons (primary)
       result = { primary: toHex(ranked[0].r, ranked[0].g, ranked[0].b), secondary: toHex(bg.r, bg.g, bg.b) };
     } else if (ranked.length) {
@@ -98,6 +106,12 @@ export async function extractLogoColours(src: string): Promise<{ primary: string
       for (let i = 0; i < data.length; i += 4) { if (data[i + 3] < 200) continue; const key = ((data[i] >> 4) << 8) | ((data[i + 1] >> 4) << 4) | (data[i + 2] >> 4), e = all.get(key) || { c: 0, r: 0, g: 0, b: 0 }; e.c++; e.r += data[i]; e.g += data[i + 1]; e.b += data[i + 2]; all.set(key, e); }
       const top = [...all.values()].sort((a, b) => b.c - a.c)[0];
       if (top) result = { primary: DEFAULT_BRANDING.primary, secondary: toHex(top.r / top.c, top.g / top.c, top.b / top.c) };
+    }
+    // menu/top-bar colour for sub-accounts = the logo's own background. A transparent logo with dark ink was made for a light page, so white.
+    if (result) {
+      if (bg) result.menu = toHex(bg.r, bg.g, bg.b);
+      else if (!opaqueEdge || opaqueEdge <= edgeTotal * 0.5) { let sum = 0, n = 0; for (let i = 0; i < data.length; i += 4) { if (data[i + 3] < 128) continue; sum += 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]; n++; } if (n && sum / n < 170) result.menu = "#ffffff"; }
+      if (result.menu === "#ffffff" || (bg && bgLight >= 0.75)) { const lum = (h: string) => { const q = parseInt(h.slice(1), 16); return 0.299 * ((q >> 16) & 255) + 0.587 * ((q >> 8) & 255) + 0.114 * (q & 255); }; if (!bg && ranked.length > 1) { const a = ranked[0], o = ranked.find((c) => dist(c, a) > 90); if (o) { const ah = toHex(a.r, a.g, a.b), oh = toHex(o.r, o.g, o.b); result.primary = lum(ah) < lum(oh) ? oh : ah; result.secondary = lum(ah) < lum(oh) ? ah : oh; } } }
     }
     colourCache.set(src, result); return result;
   } catch (e) { (globalThis as any).__lastErr = String(e); colourCache.set(src, null); return null; }
