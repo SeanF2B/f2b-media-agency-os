@@ -2,6 +2,7 @@
 
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { ChannelIcon } from "./channel-icon";
+import { F2B_MEDIA_MARK_EMAIL_BASE64 } from "@/lib/f2b-media-mark-email";
 
 const WhatsAppSetup = lazy(() => import("./whatsapp-setup").then((m) => ({ default: m.WhatsAppSetup })));
 
@@ -74,7 +75,7 @@ export function AccountSetupGate({ clients }: { clients: Array<{ id: string; nam
   return <div className="asg" role="dialog" aria-modal="true" aria-label="Set up your account">
     <style>{CSS}</style>
     <div className="asg-card">
-      <div className="asg-head"><img src="/f2b-media-mark.png" alt="" /><div><small>ACCOUNT SETUP</small><h1>Hi {setup.name.split(" ")[0] || "there"}, let’s get you connected</h1><p>Link the essentials below and the workspace opens automatically.</p></div></div>
+      <div className="asg-head"><img src={`data:image/png;base64,${F2B_MEDIA_MARK_EMAIL_BASE64}`} alt="F2B Media" /><div><small>ACCOUNT SETUP</small><h1>Hi {setup.name.split(" ")[0] || "there"}, let’s get you connected</h1><p>Link the essentials below and the workspace opens automatically.</p></div></div>
       <div className="asg-bar" aria-label={`${pct}% done`}><i style={{ width: `${pct}%` }} /></div>
       <p className="asg-count">{left ? `${left} left to link` : "All linked"}</p>
 
