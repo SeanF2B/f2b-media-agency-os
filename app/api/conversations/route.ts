@@ -55,7 +55,15 @@ export async function GET(request: Request) {
       // AI approvals: bot replies held back (e.g. they contained a booking link), for the Dashboard and the inbox.
       const rows = (await env.DB!.prepare("SELECT m.id, m.thread_id, m.body, m.error, m.created_at, t.client_id, t.contact_name, t.contact, t.channel FROM conv_messages m JOIN conv_threads t ON t.id = m.thread_id WHERE m.owner_id=?1 AND m.status='held' ORDER BY m.created_at DESC LIMIT 100").bind(auth.ownerId).all<any>().catch(() => ({ results: [] }))).results || [];
       const inView = rows.filter((r: any) => (!allowed || allowed.includes(String(r.client_id || ""))) && (scope === "agency" || r.client_id === scope));
-      return respond({ held: inView.map((r: any) => ({ id: r.id, threadId: r.thread_id, body: r.body, reason: r.error, at: r.created_at, clientId: r.client_id, name: r.contact_name || r.contact, channel: r.channel })) });
+      // Photos the customer sent in each chat (e.g. tattoo references), newest first, so the approval card can show them.
+      // One indexed lookup for all waiting chats, only for inbound messages that carry a photo.
+      const tids = [...new Set(inView.map((r: any) => String(r.thread_id)))].slice(0, 40);
+      const photos: Record<string, string[]> = {};
+      if (tids.length) {
+        const pr = (await env.DB!.prepare(`SELECT thread_id, body FROM conv_messages WHERE thread_id IN (${tids.map((_, i) => `?${i + 1}`).join(",")}) AND direction='in' AND body LIKE '%📷 %' ORDER BY created_at DESC LIMIT 120`).bind(...tids).all<{ thread_id: string; body: string }>().catch(() => ({ results: [] as Array<{ thread_id: string; body: string }> }))).results || [];
+        for (const m of pr) for (const u of m.body.match(/📷\s*(https:\/\/\S+|\/api\/marketing-public\/media\?f=\S+)/g) || []) { const url = u.replace(/^📷\s*/, ""); const list = (photos[m.thread_id] ||= []); if (list.length < 6 && !list.includes(url)) list.push(url); }
+      }
+      return respond({ held: inView.map((r: any) => ({ id: r.id, threadId: r.thread_id, body: r.body, reason: r.error, at: r.created_at, clientId: r.client_id, name: r.contact_name || r.contact, channel: r.channel, photos: photos[r.thread_id] || [] })) });
     }
     if (view === "email-html") {
       // The exact designed email that went out, rendered in a sandboxed frame in the inbox.

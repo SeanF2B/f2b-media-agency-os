@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 // AI approvals list and the Conversations inbox, so approving or dismissing in one place clears both.
 // Nothing is sent or saved on the server.
 
-export type SampleHeld = { id: string; threadId: string; name: string; channel: "whatsapp" | "sms" | "instagram"; clientId: string; body: string; reason: string; ask: string; minsAgo: number };
+export type SampleHeld = { id: string; threadId: string; name: string; channel: "whatsapp" | "sms" | "instagram"; clientId: string; body: string; reason: string; ask: string; minsAgo: number; /** How many of the sample inbox photos this chat has (they come from the client's own site). */ samplePhotos?: number };
 
 const slug = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "book";
 
@@ -18,15 +18,15 @@ export function sampleHeldReplies(clientId: string, clientName: string): SampleH
   const base = `${origin}/f/book/${slug(clientName || "your-business")}`;
   const first = (clientName || "the studio").trim();
   if (isTattooClient(clientName)) return [
-    { id: "sample-held-0", threadId: "sample-thread-0", name: "Aoife Brennan", channel: "whatsapp", clientId, ask: "When could I come in to chat about it?", minsAgo: 9,
-      body: `Love those references Aoife! The next step is a free 30 min consultation with the artist. Pick a time that suits you here: ${base}-consultation`,
-      reason: "Aoife asked when she could come in, so the AI wants to send the consultation booking link." },
+    { id: "sample-held-0", threadId: "sample-thread-0", name: "Aoife Brennan", channel: "whatsapp", clientId, ask: "When could I come in to chat about it?", minsAgo: 9, samplePhotos: 2,
+      body: `Love those references Aoife! That fine line floral style is right up our artist's street. Book your session here and pay the €50 deposit to lock it in: ${base}-tattoo`,
+      reason: "Aoife sent tattoo references and asked when she could come in, so the AI wants to send the tattoo booking link with a deposit." },
     { id: "sample-held-1", threadId: "sample-thread-3", name: "Jade Murphy", channel: "instagram", clientId, ask: "Can I book a helix piercing this week?", minsAgo: 26,
       body: `Hi Jade! Yes, we've a few piercing slots this week. You can book your helix here and pay online: ${base}-piercings`,
       reason: "Jade asked to book a piercing, so the AI wants to send the piercing booking link." },
   ];
   return [
-    { id: "sample-held-0", threadId: "sample-thread-0", name: "Mary Burke", channel: "whatsapp", clientId, ask: "When could someone come out to look at it?", minsAgo: 9,
+    { id: "sample-held-0", threadId: "sample-thread-0", name: "Mary Burke", channel: "whatsapp", clientId, ask: "When could someone come out to look at it?", minsAgo: 9, samplePhotos: 1,
       body: `Thanks Mary. You can pick a time for a free visit from ${first} here and we'll confirm straight away: ${base}-free-quote`,
       reason: "Mary asked when someone could come out, so the AI wants to send the booking link." },
   ];

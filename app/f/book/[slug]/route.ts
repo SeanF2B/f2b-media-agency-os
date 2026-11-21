@@ -135,7 +135,7 @@ function loadSlots(){state.loading=true;render();var p="?cal="+encodeURIComponen
   if(!state.day||!by[state.day]||!by[state.day].length){state.day=Object.keys(by).filter(function(k){return by[k].length})[0]||""}render()})
  .catch(function(err){state.loading=false;state.error=err.message;render()})}
 var first=MANAGE?api("?manage="+encodeURIComponent(TOKEN)).then(function(r){if(!r.calendar||!r.business)throw new Error("This appointment can't be changed online. Please contact us.");state.booking=r.booking;return r}):api("?cal="+encodeURIComponent(SLUG));
-first.then(function(r){state.info=r;state.weekStart=localDate(new Date());if(!MANAGE)loadSlots();else render()}).catch(function(err){
+first.then(function(r){state.info=r;var pre=qs.get("staff")||"";if(!MANAGE&&pre&&(r.staff||[]).some(function(p){return p.id===pre}))state.staffId=pre;state.weekStart=localDate(new Date());if(!MANAGE)loadSlots();else render()}).catch(function(err){
  // Not a single calendar: maybe a booking page (several services under one link).
  if(MANAGE){state.error=err.message;return render()}
  api("?group="+encodeURIComponent(SLUG)).then(function(g){state.group=g;render()}).catch(function(){state.error=err.message;render()})});

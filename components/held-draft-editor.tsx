@@ -33,8 +33,8 @@ export function HeldDraftEditor({ body, clientId, contactName = "", demo = false
   const openMenu = async () => {
     setMenu((m) => !m);
     if (links) return;
-    const sampleLinks = (): Links => { const base = `${window.location.origin}/f/book/`; const name = slugify(contactName ? "studio" : "studio"); void name; const fromBody = (current.match(/\/f\/book\/([a-z0-9-]+?)(?:-consultation|-piercings|-free-quote)?$/i) || [])[1] || "your-business";
-      return { pages: [{ name: "All services", url: `${base}${fromBody}` }], calendars: [{ name: "Free consultation", url: `${base}${fromBody}-consultation`, durationMin: 30 }, { name: "Phone consultation", url: `${base}${fromBody}-phone`, durationMin: 10 }, { name: "Piercings", url: `${base}${fromBody}-piercings`, durationMin: 20 }], staff: [], canCreate: true }; };
+    const sampleLinks = (): Links => { const base = `${window.location.origin}/f/book/`; const name = slugify(contactName ? "studio" : "studio"); void name; const fromBody = (current.match(/\/f\/book\/([a-z0-9-]+?)(?:-consultation|-piercings|-free-quote|-tattoo)?(?:\?.*)?$/i) || [])[1] || "your-business";
+      return { pages: [{ name: "All services", url: `${base}${fromBody}` }], calendars: [{ name: "Tattoo session", url: `${base}${fromBody}-tattoo`, durationMin: 120 }, { name: "Free consultation", url: `${base}${fromBody}-consultation`, durationMin: 30 }, { name: "Phone consultation", url: `${base}${fromBody}-phone`, durationMin: 10 }, { name: "Piercings", url: `${base}${fromBody}-piercings`, durationMin: 20 }], staff: [], canCreate: true }; };
     try {
       const r = await fetch(`/api/scheduling?view=links&clientId=${encodeURIComponent(clientId || "agency")}`, { cache: "no-store" });
       const j = r.ok ? await r.json() as Links : null;

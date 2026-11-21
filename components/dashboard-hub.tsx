@@ -158,7 +158,7 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
   const aiList = tasks.filter((t) => inScope(t) && ((t.aiApprovals || []).some((a) => a.status === "pending") || t.aiRunState === "needs_review" || (awaitingOwner(t) && isBotTask(t))));
   const humanList = tasks.filter((t) => inScope(t) && (t.reviewStatus === "submitted" || (awaitingOwner(t) && !isBotTask(t))));
   // Chat replies the AI held back for approval (it never sends booking links itself) count as AI approvals too.
-  type Held = { id: string; threadId: string; body: string; name: string; channel: string; clientId: string; reason?: string; ask?: string; demo?: boolean };
+  type Held = { id: string; threadId: string; body: string; name: string; channel: string; clientId: string; reason?: string; ask?: string; demo?: boolean; photos?: string[]; samplePhotos?: number };
   const [realHeld, setRealHeld] = useState<Held[]>([]);
   useEffect(() => { let live = true; fetch(`/api/conversations?view=held&clientId=${encodeURIComponent(scopeClientId || "agency")}`, { cache: "no-store" }).then((r) => r.ok ? r.json() : { held: [] }).then((j: { held?: Held[] }) => { if (live) setRealHeld(j.held || []); }).catch(() => undefined); return () => { live = false; }; }, [scopeClientId]);
   // With Sample data on, the account shows demo scheduling-link requests (same ones as its sample inbox).
