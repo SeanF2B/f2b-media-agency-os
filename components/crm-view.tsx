@@ -1,4 +1,5 @@
 "use client";
+import { isTradeBusiness } from "@/lib/trade-wording";
 
 import { prefetchPage } from "@/lib/view-prefetch";
 import { appAlert, appConfirm, appPrompt } from "./app-dialog";
@@ -730,7 +731,7 @@ export function CrmView({ onOpenClient, scopeClientId = "", conversations, initi
               {item.notes && <details className="crm-card-answers"><summary>Full form answers &amp; website visit</summary><pre>{item.notes}</pre></details>}</section>
           </div>
           <footer className="crm-detail-foot">
-            <button type="button" className="crm-detail-book" onClick={() => { setDetailId(""); setBookFor({ clientId: item.client_id || scopeClientId || "", prefill: { name: person || companyName || item.title, phone: phoneValue, email, notes: [item.title, item.project_type, item.project_location].filter(Boolean).join(" · "), images } }); }}><Ico icon={CalendarPlus} size={16} /> Schedule appointment</button>
+            <button type="button" className="crm-detail-book" onClick={() => { setDetailId(""); setBookFor({ clientId: item.client_id || scopeClientId || "", prefill: { name: person || companyName || item.title, phone: phoneValue, email, notes: [item.title, item.project_type, item.project_location].filter(Boolean).join(" · "), images } }); }}><Ico icon={CalendarPlus} size={16} /> {(() => { const c = data.clients.find((x) => x.id === (item.client_id || scopeClientId)) as { name?: string; services?: Array<{ name?: string }> } | undefined; return isTradeBusiness(c?.name || "", c?.services || []) ? "Book job" : "Schedule appointment"; })()}</button>
             {phoneValue && <Suspense fallback={null}><AiCallButton className="crm-detail-book va-callbtn" clientId={item.client_id || scopeClientId || ""} phone={phoneValue} name={person || companyName || item.title} contactId={item.contact_id || undefined} /></Suspense>}
             <button type="button" className="crm-detail-save" onClick={async () => { if (valueEditId === item.id) await saveOpportunityValue(item); setDetailId(""); setNotice({ text: `“${item.title}” saved.` }); }}><Ico icon={Check} size={16} /> Save</button>
           </footer>

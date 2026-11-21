@@ -1,4 +1,5 @@
 "use client";
+import { isTradeBusiness } from "@/lib/trade-wording";
 
 import { useSampleData } from "@/hooks/use-sample-data";
 import { appAlert, appConfirm, appPrompt } from "./app-dialog";
@@ -182,7 +183,7 @@ export function SchedulingView({ scopeClientId, onAddStaff, onEditStaff, content
   return <section className={`sch${isPhone ? ` is-phone m-${phoneView}` : ""}`} aria-label="Scheduling">
     <header className="iv-head"><div><p className="eyebrow">SCHEDULING</p><h1>Appointments &amp; bookings</h1><p>Service calendars, consultations and staff availability, synced with Google Calendar and Apple / Outlook.</p></div>
       {appt.card() && <section className="dh-approvals head-status" aria-label="Appointment updates">{appt.card()}</section>}
-      <div className="iv-head-actions">{data.canManage && <button type="button" className="secondary-button" onClick={() => setEditCal(blankCalendar(data))}><Plus size={15} /> New booking calendar</button>}<button type="button" className="primary-button" onClick={() => setNewAppt({ date: ymd(new Date()), time: "" })}><Plus size={15} /> <span className="lbl-long">New appointment</span><span className="lbl-short">Book</span></button></div></header>
+      <div className="iv-head-actions">{data.canManage && <button type="button" className="secondary-button" onClick={() => setEditCal(blankCalendar(data))}><Plus size={15} /> New booking calendar</button>}<button type="button" className="primary-button" onClick={() => setNewAppt({ date: ymd(new Date()), time: "" })}><Plus size={15} /> <span className="lbl-long">{isTradeBusiness(data.clients.find((c) => c.id === (data.scope || scopeClientId))?.name || "") ? "Book job" : "New appointment"}</span><span className="lbl-short">Book</span></button></div></header>
     {error && <div className="iv-error" role="alert">{error}</div>}{note && <div className="iv-note" role="status">{note}</div>}
     {sample && <div className="dh-sample-banner">Showing sample appointments{site.team.length ? ` with ${sampleClientName || "the client"}’s own team${site.gallery?.length || Object.keys(site.work || {}).length ? " and photos of their work" : ""}` : site.services.length ? ` built from ${sampleClientName || "the client"}’s website` : ""} — drag, open and demo freely; nothing is saved. Turn off “Sample data” for real bookings.{scopeClientId && !site.team.length && !site.services.length ? " Add the client’s website to their profile to show their real team and services." : ""}</div>}
     {!data.emailReady && <div className="iv-warn">Email isn't set up on the server, so confirmations and reminders won't send yet. Bookings still save.</div>}

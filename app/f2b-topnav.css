@@ -3821,3 +3821,28 @@ html body .app-shell .crm-opportunity .crm-card-tags > .crm-card-type, html body
 .sp-pv-head .sp-icons { margin-left: auto; }
 .sp-post.sample { border-left-color: #d97706; background: #fff7e6; outline: 1px dashed #f0b45a; outline-offset: -1px; }
 .app-shell.dark-mode .sp-post.sample { background: #3a2a10; color: #fde7c0; }
+
+/* ===== Phones: Content calendar fits the screen; Content opens from the Dashboard (not the bottom bar) ===== */
+@media (max-width: 860px) {
+  html body .app-shell .tn-item[data-nav="Content"] { display: none !important; }
+}
+@media (max-width: 760px) {
+  html body .app-shell .content-page > .page-heading { margin-bottom: 4px !important; }
+  html body .app-shell .content-page .cv-bar { display: flex !important; flex-wrap: nowrap !important; overflow-x: auto; gap: 6px; padding-bottom: 2px; scrollbar-width: none; }
+  html body .app-shell .content-page .cv-bar::-webkit-scrollbar { display: none; }
+  html body .app-shell .content-page .cv-bar > * { flex: 0 0 auto; }
+  html body .app-shell .content-page .cv-bar select { min-height: 36px; padding: 4px 28px 4px 10px; font-size: 16px; max-width: 150px; }
+  html body .app-shell .content-page .cv-drive { display: none; }
+  html body .app-shell .content-page .sp { padding: 10px; gap: 6px; }
+  html body .app-shell .content-page .sp-head { flex-wrap: nowrap; align-items: center; margin-bottom: 0; }
+  html body .app-shell .content-page .sp-count { display: none; }
+  html body .app-shell .content-page .sp-actions { flex-wrap: nowrap; gap: 6px; }
+  html body .app-shell .content-page .sp-actions button { min-height: 34px; padding: 6px 10px; font-size: 12.5px; white-space: nowrap; }
+  html body .app-shell .content-page .sp-nav { margin: 0; }
+  html body .app-shell .content-page .sp-dow { font-size: 10px; padding: 0 2px; text-align: center; }
+  html body .app-shell .content-page .sp-day { min-height: clamp(38px, calc((100dvh - 400px) / 6), 62px) !important; padding: 2px; border-radius: 8px; }
+  html body .app-shell .content-page .sp-post img { width: 18px; height: 18px; }
+  /* Every pop-up and widget stays inside the screen */
+  html body [role="dialog"] { max-width: calc(100vw - 12px) !important; max-height: calc(100dvh - 12px) !important; overflow: auto; box-sizing: border-box; }
+  html body .app-shell main section, html body .app-shell .panel { max-width: 100%; box-sizing: border-box; }
+}

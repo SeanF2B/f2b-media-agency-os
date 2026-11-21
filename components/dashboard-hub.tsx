@@ -1,10 +1,11 @@
 "use client";
+import { isTradeBusiness } from "@/lib/trade-wording";
 import { useSampleData } from "@/hooks/use-sample-data";
 import { HeldDraftEditor } from "@/components/held-draft-editor";
 import { requestOpenThread, sampleHeldReplies, useSampleHeldDone } from "@/lib/conversations/sample-held";
 import { useAppointmentUpdates } from "@/components/appointment-updates";
 import { useEffect, useMemo, useState, type ReactNode, lazy, Suspense } from "react";
-import { BarChart3, BookOpen, CalendarCheck, CalendarPlus, CheckCircle2, ClipboardList, Workflow, Image as ImageIcon, Mail, MessageSquare, MousePointerClick, Phone, Sparkles, TrendingUp, UserPlus, Users } from "lucide-react";
+import { BarChart3, BookOpen, CalendarCheck, CalendarDays, CalendarPlus, CheckCircle2, ClipboardList, Workflow, Image as ImageIcon, Mail, MessageSquare, MousePointerClick, Phone, Sparkles, TrendingUp, UserPlus, Users } from "lucide-react";
 import { BrandIcon } from "./brand-icon";
 
 // ROAS and close rate, graded only when there's enough data to judge fairly.
@@ -220,11 +221,14 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
 
   const showAppts = !scopeClientId || clients.find((c) => c.id === scopeClientId)?.appointmentBased !== false;
   const appt = useAppointmentUpdates({ scopeClientId, sample, enabled: showAppts, onOpenScheduling: () => onNavigate("Scheduling") });
+  const scopeClient = clients.find((c) => c.id === scopeClientId);
+  const trade = Boolean(scopeClientId) && isTradeBusiness(scopeClient?.name || "", scopeClient?.services || []);
   const actions: Array<{ label: string; hint: string; icon: ReactNode; run: () => void; tint: string }> = [
     ...(!scopeClientId ? [{ label: "Operations", hint: "Tasks, ads, SEO, websites", icon: <Workflow size={18} />, run: () => onNavigate("Operations"), tint: "violet" }] : []),
     { label: "View leads", hint: "Pipeline & contacts", icon: <Users size={18} />, run: () => onNavigate("CRM"), tint: "violet" },
     { label: "Conversations", hint: "Texts, WhatsApp, email", icon: <MessageSquare size={18} />, run: () => onNavigate("Conversations"), tint: "teal" },
-    ...(showAppts ? [{ label: "New appointment", hint: "Book a call or visit", icon: <CalendarPlus size={18} />, run: () => onNavigate("Scheduling"), tint: "amber" }] : []),
+    ...(showAppts ? [{ label: trade ? "Book job" : "New appointment", hint: trade ? "Add a job to the calendar" : "Book a call or visit", icon: <CalendarPlus size={18} />, run: () => onNavigate("Scheduling"), tint: "amber" }] : []),
+    { label: "Content calendar", hint: "Plan social posts", icon: <CalendarDays size={18} />, run: () => onNavigate("Content"), tint: "teal" },
     { label: "Upload media", hint: "Job photos & videos", icon: <ImageIcon size={18} />, run: () => onNavigate("Media Library"), tint: "pink" },
     { label: "Open books", hint: "Income & expenses", icon: <BookOpen size={18} />, run: () => onNavigate("Bookkeeping"), tint: "green" },
   ];
