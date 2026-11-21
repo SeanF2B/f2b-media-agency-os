@@ -3627,15 +3627,15 @@ html body .app-shell .cv-staff-select select, html body .app-shell .cv-staff-sel
 @media (hover: hover) { html body .app-shell .cv-staff-select select:hover { border-color: color-mix(in srgb, var(--brand-secondary-ink, #1e3a8a) 60%, transparent) !important; } }
 html body .app-shell .cv-staff-select select:focus-visible { border-color: color-mix(in srgb, var(--brand-secondary-ink, #1e3a8a) 60%, transparent) !important; }
 html body .app-shell .cv-staff-select:focus-within { box-shadow: none !important; outline: none !important; }
-html body .app-shell .cv-staff-ico { display: none; }
-/* Phones: the staff filter is a compact icon button (the real select sits on top, invisible, so it still opens the native picker at 16px, no zoom). */
-@media (max-width: 820px) {
-  html body .app-shell .cv-staff-select { position: relative; display: inline-grid !important; place-items: center; width: 40px; height: 40px; flex: 0 0 40px !important; margin-left: auto !important; border: 1px solid #dce3e7; border-radius: 10px; background: var(--f2b-white, #fff); color: #3b3e43; }
-  html body .app-shell .cv-staff-select.is-on { background: var(--brand-primary, #3b82f6); border-color: var(--brand-primary, #3b82f6); color: #fff; }
-  html body .app-shell .cv-staff-ico { display: block; pointer-events: none; }
-  html body .app-shell label.cv-staff-select select { position: absolute !important; inset: 0; width: 100% !important; max-width: none !important; height: 100% !important; opacity: 0; font-size: 16px !important; cursor: pointer; border: 0 !important; }
-  html body .app-shell.dark-mode .cv-staff-select { background: #2a3238; border-color: #3c4850; color: #f1f5f7; }
-}
+/* Staff filter: a compact icon button everywhere (the real select sits on top, invisible, so it still opens
+   the native picker; 16px text so phones don't zoom). Keeps the channel row from overflowing and clipping "All". */
+html body .app-shell .cv-staff-select { position: relative; display: inline-grid !important; place-items: center; width: 32px; height: 32px; flex: 0 0 32px !important; margin-left: auto !important; border: 1px solid #dce3e7; border-radius: 10px; background: var(--f2b-white, #fff); color: #3b3e43; cursor: pointer; transition: transform .15s ease, border-color .15s ease; }
+@media (hover: hover) { html body .app-shell .cv-staff-select:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--brand-secondary-ink, #1e3a8a) 60%, transparent); } }
+html body .app-shell .cv-staff-select.is-on { background: var(--brand-primary, #3b82f6); border-color: var(--brand-primary, #3b82f6); color: #fff; }
+html body .app-shell .cv-staff-ico { display: block; pointer-events: none; width: 16px; height: 16px; }
+html body .app-shell label.cv-staff-select select { position: absolute !important; inset: 0; width: 100% !important; max-width: none !important; height: 100% !important; opacity: 0; font-size: 16px !important; cursor: pointer; border: 0 !important; padding: 0 !important; }
+html body .app-shell.dark-mode .cv-staff-select { background: #2a3238; border-color: #3c4850; color: #f1f5f7; }
+@media (max-width: 820px) { html body .app-shell .cv-staff-select { width: 40px; height: 40px; flex-basis: 40px !important; } html body .app-shell .cv-staff-ico { width: 18px; height: 18px; } }
 @media (max-width: 860px) {
   html body .app-shell .cv-channel-bar > button { height: 34px !important; min-width: 34px; }
   html body .app-shell .cv-staff-select select { height: 34px !important; max-width: 104px; font-size: 16px !important; }
@@ -3790,3 +3790,19 @@ html body .app-shell.dark-mode .hd-menu > button { color: #f1f5f7; }
   html body .app-shell .dh-recent-who b, html body .app-shell .dh-recent-who small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
 }
 html body .app-shell .cv-appr-list { margin: 0 0 12px !important; }
+
+/* ===== Phones (21 Nov): pop-ups never run off the right edge ===== */
+@media (max-width: 860px) {
+  /* nothing inside a pop-up can force it wider than the screen */
+  html body :is(.modal-backdrop, .crm-modal-backdrop, .cv-modal, .iv-modal, .ps-modal-back, .ox-drawer-backdrop, .ow-modal-scrim, .stage-pop-backdrop, .upload-backdrop, .review-backdrop, .preview-backdrop, .task-popup-backdrop, .bt-backdrop, .sp-backdrop, .spp-drawer-backdrop) > * * { min-width: 0; }
+  html body :is(.modal-backdrop, .crm-modal-backdrop, .cv-modal, .iv-modal, .ps-modal-back, .task-popup-backdrop, .bt-backdrop, .sp-backdrop) :is(footer, .modal-actions, .iv-actions) { flex-wrap: wrap !important; }
+  html body :is(.modal-backdrop, .crm-modal-backdrop, .cv-modal, .iv-modal, .ps-modal-back, .task-popup-backdrop, .bt-backdrop, .sp-backdrop) :is(footer, .modal-actions, .iv-actions) > :is(button, a) { flex: 1 1 calc(50% - 8px) !important; min-width: 0 !important; white-space: normal !important; }
+  /* invoice: each line is description on top, then qty · price · amount · remove */
+  html body .iv-modal .iv-line { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) auto 30px !important; row-gap: 6px; }
+  html body .iv-modal .iv-line > :first-child { grid-column: 1 / -1; }
+  html body .iv-modal .iv-line.head > :first-child { display: none; }
+  html body .iv-modal .iv-line .iv-linetotal { text-align: right; white-space: nowrap; }
+  html body .iv-modal .iv-totals { width: 100% !important; max-width: 100% !important; justify-self: stretch !important; }
+  html body .iv-modal .iv-dialog > header { position: sticky; top: -1px; z-index: 2; background: inherit; }
+  html body .iv-modal .iv-dialog > footer { position: sticky; bottom: -1px; z-index: 2; background: inherit; padding-top: 10px; }
+}

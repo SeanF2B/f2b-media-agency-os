@@ -1,5 +1,7 @@
 "use client";
 
+import { createPortal } from "react-dom";
+
 import { appAlert, appConfirm, appPrompt } from "./app-dialog";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -104,7 +106,9 @@ function Lines({ items, onChange, currency }: { items: Item[]; onChange: (i: Ite
     <button type="button" className="iv-btn" onClick={() => onChange([...items, { description: "", qty: 1, unit: 0 }])}>＋ Add a line</button></div>;
 }
 function Totals({ items, vat, currency }: { items: Item[]; vat: number; currency: string }) { const t = calc(items, vat); return <div className="iv-totals"><div><span>Subtotal</span><b>{fmt(t.sub, currency)}</b></div>{vat > 0 && <div><span>VAT {vat}%</span><b>{fmt(t.v, currency)}</b></div>}<div className="g"><span>Total</span><b>{fmt(t.total, currency)}</b></div></div>; }
-function Modal({ title, onClose, children, footer }: { title: string; onClose: () => void; children: React.ReactNode; footer: React.ReactNode }) { return <div className="iv-modal" role="dialog" aria-label={title} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}><div className="iv-dialog"><header><h2>{title}</h2><button type="button" className="iv-x" aria-label="Close" onClick={onClose}>✕</button></header>{children}<footer>{footer}</footer></div></div>; }
+// Pop-ups render at the app root, so a panel they're opened from (e.g. a chat) can never clip them or sit above them.
+function Modal(props: { title: string; onClose: () => void; children: React.ReactNode; footer: React.ReactNode }) { const host = typeof document === "undefined" ? null : document.querySelector(".app-shell") || document.body; return host ? createPortal(<ModalBody {...props} />, host) : <ModalBody {...props} />; }
+function ModalBody({ title, onClose, children, footer }: { title: string; onClose: () => void; children: React.ReactNode; footer: React.ReactNode }) { return <div className="iv-modal" role="dialog" aria-label={title} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}><div className="iv-dialog"><header><h2>{title}</h2><button type="button" className="iv-x" aria-label="Close" onClick={onClose}>✕</button></header>{children}<footer>{footer}</footer></div></div>; }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function PreviewModal({ html, onClose, closeLabel = "Close", extra }: { html: string; onClose: () => void; closeLabel?: string; extra?: React.ReactNode }) {
