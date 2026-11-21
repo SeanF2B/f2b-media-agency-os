@@ -15,7 +15,7 @@ export type OpsClient = {
 // Every connection a client can have, shown as an icon with a green (linked to this client) or red (not linked) dot.
 // Red means this client's own account/property isn't linked — even if the agency's Google login is connected in Launchpad —
 // so a click opens the page where that client's account is linked (not Launchpad).
-const CONNECTIONS: Array<{ key: string; label: string; page: string; ok: (client: OpsClient, hasSite: boolean) => boolean; icon: React.ReactNode }> = [
+export const CONNECTIONS: Array<{ key: string; label: string; page: string; ok: (client: OpsClient, hasSite: boolean) => boolean; icon: React.ReactNode }> = [
   { key: "gads", label: "Google Ads", page: "Google Ads", ok: (c) => Boolean(c.googleAdsAccountId), icon: <svg viewBox="0 0 24 24"><path fill="currentColor" d="M9.4 3.6a3 3 0 0 1 4.1 1.1l6.6 11.4a3 3 0 1 1-5.2 3l-6.6-11.4a3 3 0 0 1 1.1-4.1ZM5 15.5a3 3 0 1 1 0 6 3 3 0 0 1 0-6Z" /></svg> },
   { key: "meta", label: "Meta Ads", page: "Meta Ads", ok: (c) => Boolean(c.metaAdsAccountId), icon: <svg viewBox="0 0 24 24"><path fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" d="M3 15c0-4 2-8 4.5-8C11 7 13 17 16.5 17 19 17 21 14.5 21 12s-1.5-5-3.5-5C14 7 12 17 7.5 17 5 17 3 16 3 15Z" /></svg> },
   { key: "gsc", label: "Search Console", page: "SEO", ok: (c) => Boolean(c.googleSearchConsoleAccountId), icon: <svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6" fill="none" stroke="currentColor" strokeWidth="2.4" /><path stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" d="m15 15 5 5" /></svg> },
