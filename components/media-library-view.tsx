@@ -67,6 +67,9 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
   const [selected, setSelected] = useState<MediaItem | null>(null);
   const [panel, setPanel] = useState<"" | "stock" | "drive" | "link" | "mobile" | "ai">("");
   const [dragOver, setDragOver] = useState(false);
+  // Floating + menu (bottom right): every way to add files, plus New folder. Keeps the screen for the images.
+  const [addMenu, setAddMenu] = useState(false);
+  const [newFolders, setNewFolders] = useState<string[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
 
@@ -129,7 +132,7 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
   useEffect(() => { if (active && status) void load(); }, [active, status, load]);
   useEffect(() => { setSelected(null); setFolder(""); }, [listScope]);
 
-  const folders = useMemo(() => [...new Set(items.map((item) => item.folder).filter(Boolean))].sort((a, b) => a.localeCompare(b)), [items]);
+  const folders = useMemo(() => [...new Set([...items.map((item) => item.folder), ...newFolders].filter(Boolean))].sort((a, b) => a.localeCompare(b)), [items, newFolders]);
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase();
     return items.filter((item) => (!folder || item.folder === folder) && (!term || [item.name, item.folder, item.alt, item.credit, item.project?.location || "", item.project?.service || "", item.project?.notes || ""].some((value) => value.toLowerCase().includes(term))));
@@ -207,46 +210,10 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
 
   return (
     <section className="ml-root" aria-labelledby="ml-title" onDragOver={(event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); setDragOver(true); } }} onDragLeave={(event) => { if (event.currentTarget === event.target) setDragOver(false); }} onDrop={onDrop}>
-      <header className="ml-heading">
-        <div>
-          <span className="eyebrow">MARKETING · MEDIA LIBRARY</span>
-          <h1 id="ml-title">Media Library</h1>
-          <p>{inSubAccount ? `Photos, videos and PDFs for ${scopeName(scopeClientId)}.` : "Every client's photos, videos and PDFs in one place. Pick a client to see only their files."}</p>
-        </div>
-        {!inSubAccount && (
-          <label className="ml-scope">
-            <span>Showing</span>
-            <select value={picker} onChange={(event) => setPicker(event.target.value)} aria-label="Choose which client's media to show">
-              {status?.canUseAgency !== false && <option value="agency">🏠 Agency library</option>}
-              {status?.isAdmin && <option value="all">🗂 All clients</option>}
-              {allowedClients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
-            </select>
-          </label>
-        )}
-      </header>
+      <h1 id="ml-title" className="ml-sr">Media Library</h1>
 
-      <div className="ml-actions">
-        <button type="button" className="primary-button" onClick={() => setUploadOpen(true)} disabled={!uploadScope}>⬆ Upload</button>
-        <button type="button" className="secondary-button ml-camera" onClick={() => cameraInput.current?.click()} disabled={!uploadScope}>📷 Take photo</button>
-        <button type="button" className="secondary-button" onClick={() => setPanel("drive")}>🟢 Google Drive</button>
-        <button type="button" className="secondary-button" onClick={() => setPanel("ai")} disabled={!uploadScope}>✨ AI generate</button>
-        <button type="button" className="secondary-button" onClick={() => setPanel("link")}>🔗 Import link</button>
-        <button type="button" className="secondary-button" onClick={() => setPanel("mobile")}>📱 Mobile link</button>
         <input ref={fileInput} type="file" hidden multiple accept="image/*,video/mp4,video/quicktime,video/webm,application/pdf" onChange={(event) => { const files = event.currentTarget.files; if (files) queueUpload(files); event.currentTarget.value = ""; }} />
         <input ref={cameraInput} type="file" hidden accept="image/*,video/*" capture="environment" onChange={(event) => { const files = event.currentTarget.files; if (files) queueUpload(files); event.currentTarget.value = ""; }} />
-      </div>
-      <p className="ml-target">New files go to <b>{uploadScopeName}</b>{" "}
-        <label className="ml-folder-input">· folder <input value={uploadFolder} onChange={(event) => setUploadFolder(event.target.value)} placeholder="optional, e.g. Job photos" maxLength={60} list="ml-folders" /></label>
-        <datalist id="ml-folders">{[...new Set([...folders, ...scopeServices])].map((name) => <option key={name} value={name} />)}</datalist>
-        <button type="button" className="text-button ml-project-toggle" onClick={() => setProjectOpen(!projectOpen)}>{projectOpen ? "Hide project details" : `📍 Project details${uploadProject.location || uploadProject.service ? ` · ${[uploadProject.service, uploadProject.location].filter(Boolean).join(", ")}` : ""}`}</button>
-      </p>
-      {projectOpen && <div className="ml-project-form"><p className="ml-hint">Added to every file you upload now. Used for local SEO: where the job was, what it was, and when. Phone photos also add their GPS location automatically.</p>
-        <label className="field"><span>Location</span><input value={uploadProject.location || ""} onChange={(event) => setUploadProject({ ...uploadProject, location: event.target.value })} placeholder={scopeHints.location} maxLength={160} /></label>
-        <label className="field"><span>Service / job</span><input value={uploadProject.service || ""} onChange={(event) => setUploadProject({ ...uploadProject, service: event.target.value })} placeholder={scopeHints.service} maxLength={120} /></label>
-        <label className="field"><span>Date of job</span><input type="date" value={uploadProject.date || ""} onChange={(event) => setUploadProject({ ...uploadProject, date: event.target.value })} /></label>
-        <label className="field ml-project-notes"><span>Notes</span><input value={uploadProject.notes || ""} onChange={(event) => setUploadProject({ ...uploadProject, notes: event.target.value })} placeholder={scopeHints.notes} maxLength={600} /></label>
-        {(uploadProject.location || uploadProject.service || uploadProject.date || uploadProject.notes) && <button type="button" className="text-button" onClick={() => setUploadProject({})}>Clear</button>}
-      </div>}
 
       {uploads.length > 0 && <ul className="ml-uploads" aria-live="polite">{uploads.map((entry) => <li key={entry.id} className={entry.error ? "is-error" : entry.done ? "is-done" : ""}><span>{entry.name}</span>{entry.error ? <small>{entry.error} <button type="button" className="text-button" onClick={() => setUploads((current) => current.filter((item) => item.id !== entry.id))}>Dismiss</button></small> : <i style={{ width: `${entry.progress}%` }} />}</li>)}</ul>}
       {error && <p className="form-error ml-error" role="alert">{error} <button type="button" className="text-button" onClick={() => setError("")}>Dismiss</button></p>}
@@ -254,9 +221,19 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
 
       <div className="ml-filters">
         <div className="ml-kinds" role="tablist" aria-label="File type">{KINDS.map((entry) => <button type="button" role="tab" key={entry.id} aria-selected={kind === entry.id} className={kind === entry.id ? "active" : ""} onClick={() => setKind(entry.id)}>{entry.label}</button>)}</div>
+          {!inSubAccount && (
+            <label className="ml-scope">
+              <span>Showing</span>
+              <select value={picker} onChange={(event) => setPicker(event.target.value)} aria-label="Choose which client's media to show">
+                {status?.canUseAgency !== false && <option value="agency">🏠 Agency library</option>}
+                {status?.isAdmin && <option value="all">🗂 All clients</option>}
+                {allowedClients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
+              </select>
+            </label>
+          )}
         <input className="ml-search" type="search" placeholder="Search names, folders, alt text…" value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Search media" />
       </div>
-      {folders.length > 0 && <div className="ml-folders">{["", ...folders].map((name) => <button type="button" key={name || "all"} className={folder === name ? "active" : ""} onClick={() => setFolder(name)}>{name ? `📁 ${name}` : "All folders"}</button>)}</div>}
+      {folders.length > 0 && <div className="ml-folders">{["", ...folders].map((name) => <button type="button" key={name || "all"} className={folder === name ? "active" : ""} onClick={() => { setFolder(name); setUploadFolder(name); }}>{name ? `📁 ${name}` : "All folders"}</button>)}</div>}
 
       {visible.length > 0 && <div className={`ml-bulk${picks.size ? " has-picks" : ""}`} role="toolbar" aria-label="Bulk actions">
         <label className="ml-bulk-all"><input type="checkbox" checked={visible.length > 0 && visible.every((item) => picks.has(item.id))} onChange={(event) => setPicks(event.target.checked ? new Set(visible.map((item) => item.id)) : new Set())} /> {picks.size ? `${picks.size} selected` : "Select all"}</label>
@@ -307,6 +284,22 @@ export function MediaLibraryView({ scopeClientId = "", clients, active }: { scop
       {panel === "ai" && <AiPanel target={uploadScope} targetName={uploadScopeName} folder={uploadFolder} project={uploadProject} onClose={() => setPanel("")} onAdded={(item) => { addItem(item); flash(`Added to ${uploadScopeName}`); setPanel(""); setSelected(item); }} />}
       {panel === "link" && <LinkPanel target={uploadScope} targetName={uploadScopeName} folder={uploadFolder} onClose={() => setPanel("")} onAdded={(item) => { addItem(item); flash(`Added to ${uploadScopeName}`); setPanel(""); }} />}
       {panel === "mobile" && <MobilePanel clientId={inSubAccount ? scopeClientId : picker !== "all" && picker !== "agency" ? picker : ""} clientName={inSubAccount ? scopeName(scopeClientId) : picker !== "all" && picker !== "agency" ? scopeName(picker) : ""} onClose={() => setPanel("")} onCopy={(text) => void copy(text)} />}
+      <div className={`ml-fab-wrap${addMenu ? " open" : ""}`}>
+        {addMenu && <button type="button" className="ml-fab-scrim" aria-label="Close menu" onClick={() => setAddMenu(false)} />}
+        {addMenu && <div className="ml-fab-menu" role="menu" aria-label="Add to Media Library">
+          <small>Adds to {uploadScopeName}{uploadFolder ? ` · ${uploadFolder}` : ""}</small>
+          {([
+            ["⬆", "Upload files", () => setUploadOpen(true), !uploadScope],
+            ["📷", "Take photo", () => cameraInput.current?.click(), !uploadScope],
+            ["✨", "AI generate", () => setPanel("ai"), !uploadScope],
+            ["🟢", "Google Drive", () => setPanel("drive"), false],
+            ["🔗", "Import link", () => setPanel("link"), false],
+            ["📱", "Mobile upload link", () => setPanel("mobile"), false],
+            ["📁", "New folder", () => void (async () => { const name = String((await appPrompt("Folder name", "")) || "").trim().slice(0, 60); if (!name) return; setNewFolders((current) => current.includes(name) ? current : [...current, name]); setFolder(name); setUploadFolder(name); flash(`Folder “${name}” ready: new files go in here`); })(), !uploadScope],
+          ] as Array<[string, string, () => void, boolean]>).map(([icon, label, run, off]) => <button key={label} type="button" role="menuitem" disabled={off} className={label === "Take photo" ? "ml-camera" : ""} onClick={() => { setAddMenu(false); run(); }}><span aria-hidden="true">{icon}</span>{label}</button>)}
+        </div>}
+        <button type="button" className="ml-fab" aria-label={addMenu ? "Close" : "Add files or a folder"} aria-expanded={addMenu} onClick={() => setAddMenu((v) => !v)}>+</button>
+      </div>
     </section>
   );
 }

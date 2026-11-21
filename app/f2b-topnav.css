@@ -3990,3 +3990,8 @@ html body .app-shell .content-page .cv-tool svg { flex: 0 0 auto; display: block
 html body .app-shell .cv-settings-btn { display: inline-grid; place-items: center; width: 40px; height: 40px; flex: 0 0 40px; margin-left: 6px; padding: 0; border: 1px solid #dce3e7; border-radius: 12px; background: #fff; color: #344054; cursor: pointer; transition: transform .15s, border-color .15s, box-shadow .15s; }
 html body .app-shell .cv-settings-btn:hover { transform: translateY(-1px); border-color: var(--brand-secondary, var(--brand-primary, #1479b8)); box-shadow: 0 4px 12px rgba(16,24,40,.08); }
 html body .app-shell.dark-mode .cv-settings-btn { background: #1b2227; border-color: #2f3a41; color: #e7edf1; }
+
+/* Books → Payslips: Staff hours & earnings sits underneath the payslips, with even spacing between the cards */
+html body .app-shell .books-payslips-stack { display: flex; flex-direction: column; gap: 14px; }
+html body .app-shell .books-payslips-stack > * { margin: 0 !important; }
+html body .app-shell .books-payslips-stack .books-staff-hours-bar { padding: 14px 18px; }
