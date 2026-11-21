@@ -629,3 +629,9 @@ html body .app-shell.dark-mode .sch-dash-panel-tools .sch-seg button.on{backgrou
 .sch-group-cal .iv-check{flex:1;min-width:200px;display:flex;align-items:center;gap:6px}.sch-dot{width:10px;height:10px;border-radius:50%;display:inline-block}
 .sch-group-order{display:inline-flex;gap:4px}
 .app-shell.dark-mode .sch-page-thumbs span{border-color:#22282e}
+
+/* Hour labels inside every timeline row, so the time sits right beside the bookings (bookings draw over them) */
+.sch-tl .sch-tl-grid{z-index:1}
+.sch-tl .sch-tl-grid em{position:absolute;top:50%;left:5px;transform:translateY(-50%);font-style:normal;font-size:10.5px;font-weight:600;color:#8a96a3;white-space:nowrap;pointer-events:none;font-variant-numeric:tabular-nums}
+.sch-tl .sch-tl-item{z-index:2}
+.app-shell.dark-mode .sch-tl .sch-tl-grid em{color:#7d8a96}
