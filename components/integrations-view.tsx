@@ -6,6 +6,7 @@ import { MessagingLaunchpad } from "./staff-messaging";
 const WhatsAppSetup = lazy(() => import("./whatsapp-setup").then((m) => ({ default: m.WhatsAppSetup })));
 import { BrandIcon } from "./brand-icon";
 import { DataForSeoConnect } from "./dataforseo-connect";
+import { RevolutConnect } from "./revolut-connect";
 import type { GooglePropertyMatch } from "@/lib/google-property-match.mjs";
 
 type IntegrationStatus = "ready" | "partial" | "needs_setup" | "optional" | "not_available";
@@ -62,7 +63,7 @@ const integrationIcons: Record<string, string> = {
 export function IntegrationsView({ onNavigate, onApplyGoogleMatches, clients = [], setupSlot, team = [], scopeClientId = "" }: { onNavigate: (page: string) => void; onApplyGoogleMatches?: (matches: GooglePropertyMatch[]) => Promise<boolean>; clients?: Array<{ id: string; name: string; logo?: string } & Record<string, any>>; setupSlot?: ReactNode; team?: Array<{ id: string; name: string; role?: string; avatar?: string; isBot?: boolean; clientAccessIds?: string[] }>; /** A sub-account picked in the top bar: show only that business. */ scopeClientId?: string }) {
   const [waFor, setWaFor] = useState<string | null>(null);
   const [linking, setLinking] = useState(false);
-  const [linkMessage, setLinkMessage] = useState("");
+  const [linkMessage, setLinkMessage] = useState(() => { try { const m = sessionStorage.getItem("lp-msg") || ""; sessionStorage.removeItem("lp-msg"); return m; } catch { return ""; } });
   async function autoLinkGoogle() {
     if (!onApplyGoogleMatches) return;
     setLinking(true); setLinkMessage("Reading your Search Console and Analytics properties…");
@@ -163,10 +164,11 @@ export function IntegrationsView({ onNavigate, onApplyGoogleMatches, clients = [
           <div><b>{done} of {shown.length} tools connected</b><p>{done === shown.length ? "You’re all set 🎉" : "Connect the rest to unlock reports, ads and lead sync."}</p></div>
         </section>
         {shown.some((item) => item.id === "dataforseo" && item.status !== "ready") && <DataForSeoConnect onConnected={() => void load()} />}
+        {shown.some((item) => item.id === "revolut-payments" && item.status !== "ready") && <RevolutConnect onConnected={() => void load()} />}
         <section className="lp-grid" aria-label="Tools">{shown.map((item, index) => <article className={`lp-card status-${item.status}`} style={{ "--lp-delay": `${index * 55}ms` } as CSSProperties} key={item.id}>
           <div className="lp-icon" aria-hidden="true"><BrandIcon id={item.id} size={24} fallback={integrationIcons[item.id] || "🔗"} /></div>
           <div className="lp-body"><h3>{item.name}</h3><p>{plainHelp[item.id] || firstSentence(item.detail)}</p>{item.mappingUnit && <small className="lp-chip">{mappingSummary(item)}</small>}</div>
-          <div className="lp-action">{item.status === "ready" ? <span className="lp-done" role="img" aria-label="Connected">✓ Connected</span> : item.connectHref ? <a className="lp-button" href={item.connectHref}>Connect</a> : <button className="lp-button" type="button" onClick={() => onNavigate(item.actionPage)}>Set up</button>}
+          <div className="lp-action">{item.status === "ready" ? <span className="lp-done" role="img" aria-label="Connected">✓ Connected</span> : item.connectHref ? <a className="lp-button" href={item.connectHref} onClick={() => { try { sessionStorage.setItem("lp-return", String(Date.now())); } catch { /* storage off */ } }}>Connect</a> : item.id === "revolut-payments" || item.id === "dataforseo" ? <button className="lp-button" type="button" onClick={() => { const form = document.getElementById(item.id === "revolut-payments" ? "lp-revolut" : "lp-dataforseo") || document.querySelector(".dfs-connect"); form?.scrollIntoView({ behavior: "smooth", block: "center" }); (form?.querySelector("input") as HTMLInputElement | null)?.focus(); }}>Connect</button> : <button className="lp-button" type="button" onClick={() => onNavigate(item.actionPage)}>Set up</button>}
             {item.status !== "ready" && <ShareLink name={item.name} href={item.connectHref ? new URL(item.connectHref, window.location.origin).toString() : `${window.location.origin}/?page=${encodeURIComponent(item.actionPage || "Integrations")}`} />}</div>
         </article>)}</section>
         <MessagingLaunchpad clients={clients} team={team} onNavigate={onNavigate} onOpenWhatsApp={(id) => setWaFor(id)} />

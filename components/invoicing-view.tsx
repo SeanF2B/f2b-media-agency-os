@@ -28,7 +28,7 @@ const EVERY: Record<string, string> = { weekly: "Every week", monthly: "Every mo
 
 export function InvoicingView({ scopeClientId }: { scopeClientId: string }) {
   const [data, setData] = useState<Data | null>(null);
-  const [tab, setTab] = useState<"invoices" | "recurring" | "settings">(() => { try { if (sessionStorage.getItem("iv-open-tab") === "settings") { sessionStorage.removeItem("iv-open-tab"); return "settings"; } } catch { /* storage off */ } return "invoices"; });
+  const [tab, setTab] = useState<"invoices" | "recurring" | "settings">(() => { try { if (sessionStorage.getItem("iv-open-tab") === "settings") { window.setTimeout(() => { try { sessionStorage.removeItem("iv-open-tab"); } catch { /* storage off */ } }, 2500); return "settings"; } } catch { /* storage off */ } return "invoices"; });
   const [filter, setFilter] = useState<"all" | "unpaid" | "paid" | "draft">("all");
   const [editor, setEditor] = useState<Draft | null>(null);
   const [recEditor, setRecEditor] = useState<RecDraft | null>(null);
