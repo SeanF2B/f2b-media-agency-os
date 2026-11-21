@@ -34,3 +34,18 @@ export async function authorizeAdminOrSubAccount(action: string, page: "CRM" | "
   if (!scope.length) return { error: admin.error };
   return { ownerId: row?.owner_id || workspace.ownerId || "", scope, staffId: String(profile?.id || "") };
 }
+
+/** Agency admins (scope null), or a sub-account Admin limited to their own sub-account. Used for account-level connections. */
+export async function authorizeAccountAdmin(action: string): Promise<{ ownerId: string; scope: string[] | null; error?: never } | { error: Response; ownerId?: never; scope?: never }> {
+  const admin = await authorizeAdmin(action);
+  if (!admin.error) return { ownerId: admin.ownerId, scope: null };
+  if (admin.error.status !== 403) return { error: admin.error };
+  const user = await getChatGPTUser();
+  const row = await env.DB!.prepare("SELECT owner_id, data FROM workspace_documents WHERE id = ?1").bind("f2b-agency").first<{ owner_id: string; data: string }>();
+  let workspace: any = {}; try { workspace = JSON.parse(row?.data || "{}"); } catch { /* handled below */ }
+  const profile = user && (workspace.staff || []).find((member: any) => !member?.isBot && String(member?.email || "").toLowerCase() === user.email.toLowerCase());
+  const subAdmin = profile && (profile.staffType === "subaccount" || /^Sub-account /.test(String(profile.role || ""))) && /admin/i.test(String(profile.role || ""));
+  const scope = subAdmin && Array.isArray(profile.clientAccessIds) ? profile.clientAccessIds.map(String).filter((id: string) => (workspace.clients || []).some((c: any) => String(c.id) === id)) : [];
+  if (!scope.length) return { error: admin.error };
+  return { ownerId: row?.owner_id || workspace.ownerId || "", scope };
+}
