@@ -650,8 +650,8 @@ html body .app-shell.dark-mode .sch-dash-panel-tools .sch-seg button.on{backgrou
 
 /* Day timeline: bars stay exactly their real length inside the track and show only the duration at the end (e.g. 1.5 hrs) */
 .sch-tl .sch-tl-track{overflow:hidden}
-.sch-tl .sch-tl-item{min-width:0!important;overflow:hidden!important;justify-content:flex-end;padding:0 7px!important}
-.sch-tl .sch-tl-item b{display:inline!important;color:#fff!important;font-size:11px!important;font-weight:800;white-space:nowrap}
-.sch-tl .sch-tl-item span{display:none!important}
+.sch-tl .sch-tl-item{min-width:0!important;overflow:hidden!important;justify-content:space-between;gap:8px;padding:0 9px!important}
+.sch-tl .sch-tl-item .sch-tl-label{display:block!important;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;color:#fff!important;font-size:12px!important;font-weight:700}
+.sch-tl .sch-tl-item .sch-tl-dur{display:inline!important;flex:0 0 auto;color:#fff!important;font-size:11px!important;font-weight:800;white-space:nowrap;opacity:.9}
 /* Hour labels: thin out when the timeline is narrow so they never run into each other */
 .sch-tl .sch-tl-hours em.skip{display:none}
