@@ -3790,3 +3790,14 @@ html body .app-shell.dark-mode .hd-menu > button { color: #f1f5f7; }
   html body .app-shell .dh-recent-who b, html body .app-shell .dh-recent-who small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
 }
 html body .app-shell .cv-appr-list { margin: 0 0 12px !important; }
+
+/* ===== Leads pipeline: photo previews on cards (fixed-height line — cards never change size) ===== */
+html body .app-shell .crm-card-tags .crm-card-metaline { flex: 1 0 100%; display: flex; align-items: center; gap: 8px; height: 22px; min-width: 0; overflow: hidden; }
+html body .app-shell .crm-card-metaline .crm-card-icons { margin-left: auto; flex-wrap: nowrap !important; white-space: nowrap; min-width: 0; overflow: hidden; padding-top: 0; }
+html body .app-shell .crm-card-thumbs { display: inline-flex; align-items: center; gap: 4px; flex: 0 0 auto; }
+html body .app-shell .crm-card-thumb { width: 22px; height: 22px; min-width: 22px; padding: 0; border: 1px solid #e3e8ed; border-radius: 6px; overflow: hidden; background: #f1f4f6; cursor: zoom-in; display: inline-grid; place-items: center; transition: transform .12s ease, box-shadow .12s ease; }
+html body .app-shell .crm-card-thumb:hover { transform: translateY(-1px) scale(1.08); box-shadow: 0 3px 8px rgba(16,24,40,.18); }
+html body .app-shell .crm-card-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+html body .app-shell .crm-card-thumb.more { font-size: 10px; font-weight: 800; color: #475467; cursor: pointer; }
+html body .app-shell.dark-mode .crm-card-thumb, html body.f2b-dark .app-shell .crm-card-thumb { border-color: #3b3e43; background: #2b2c30; }
+html body .app-shell.dark-mode .crm-card-thumb.more, html body.f2b-dark .app-shell .crm-card-thumb.more { color: #c3ccd4; }

@@ -49,6 +49,19 @@ function QuickContactActions({ name, email, phone, subject, dnd, onClearDnd }: {
 }
 
 // Short project facts pulled from a website-form note (job, answers, timing, property, location, rough estimate).
+/** Photo URLs attached to a lead (website-form uploads, media links) — shared by the card strip and the details gallery. */
+const LEAD_IMAGE_RE = /https?:\/\/[^\s"'<>]+?(?:\/api\/site-lead-photo\?key=[^\s"'<>]+|\.(?:jpe?g|png|webp|gif)(?:\?[^\s"'<>]*)?)|\/media\/[^\s"'<>]+\.(?:jpe?g|png|webp|gif)/gi;
+const leadImageCache = new Map<string, string[]>();
+function leadImages(notes?: string | null): string[] {
+  const text = notes || "";
+  if (!text) return [];
+  const hit = leadImageCache.get(text);
+  if (hit) return hit;
+  const found = [...new Set(text.match(LEAD_IMAGE_RE) || [])];
+  if (leadImageCache.size > 500) leadImageCache.clear();
+  leadImageCache.set(text, found);
+  return found;
+}
 const HIDDEN_FACTS = /^(name|phone|email|photos?|photo \d+|source|page|details)$/i;
 function projectFacts(notes?: string | null): Array<[string, string]> {
   if (!notes) return [];
@@ -617,7 +630,7 @@ export function CrmView({ onOpenClient, scopeClientId = "", conversations, initi
       {(() => { const type = (item.project_type || "").trim(); const src = (item.source || "").trim(); const srcLabel = /estimate/i.test(src) ? "Website estimate" : /form|site/i.test(src) ? "Website form" : /ads|google/i.test(src) ? "Google Ads" : /meta|facebook|instagram/i.test(src) ? "Meta" : /referr/i.test(src) ? "Referral" : /client/i.test(src) ? "Client" : src && !/^manual$/i.test(src) ? src : "Manual"; const days = Math.max(0, Math.floor((Date.now() - Date.parse(item.updated_at || "")) / 86_400_000)); return <div className="crm-card-tags">
         {type ? <span className="crm-card-type" title="Service type"><Ico icon={Tag} size={11} />{type}</span> : null}
         <span className={`crm-card-src src-${srcLabel.toLowerCase().replace(/[^a-z]+/g, "-")}`} title={`Source: ${src || "Manual"}`}>{srcLabel}</span>
-        <span className="crm-card-icons">{item.project_location ? <span title={item.project_location}><Ico icon={MapPin} size={12} />{item.project_location.split(",")[0].slice(0, 18)}</span> : null}{item.phone ? <span title={item.phone}><Ico icon={Phone} size={12} /></span> : null}{item.email ? <span title={item.email}><Ico icon={Mail} size={12} /></span> : null}{Number.isFinite(days) ? <span title="Last updated">{days === 0 ? "today" : `${days}d`}</span> : null}</span>
+        {(() => { const photos = leadImages(item.notes); const shown = photos.slice(0, 3); return <span className="crm-card-metaline">{shown.length > 0 ? <span className="crm-card-thumbs" onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()}>{shown.map((src, i) => <button type="button" key={src} className="crm-card-thumb" title={`View photo ${i + 1} of ${photos.length}`} aria-label={`View photo ${i + 1} of ${photos.length}`} onClick={(event) => { event.stopPropagation(); setLightbox({ images: photos, index: i }); }}><img src={src} alt="" loading="lazy" decoding="async" draggable={false} /></button>)}{photos.length > 3 ? <button type="button" className="crm-card-thumb more" aria-label={`View all ${photos.length} photos`} onClick={(event) => { event.stopPropagation(); setLightbox({ images: photos, index: 3 }); }}>+{photos.length - 3}</button> : null}</span> : null}<span className="crm-card-icons">{item.project_location ? <span title={item.project_location}><Ico icon={MapPin} size={12} />{item.project_location.split(",")[0].slice(0, 18)}</span> : null}{item.phone ? <span title={item.phone}><Ico icon={Phone} size={12} /></span> : null}{item.email ? <span title={item.email}><Ico icon={Mail} size={12} /></span> : null}{Number.isFinite(days) ? <span title="Last updated">{days === 0 ? "today" : `${days}d`}</span> : null}</span></span>; })()}
       </div>; })()}
       <div className="crm-card-mini">{(() => { const who = contact && contact !== "No contact linked" && contact !== item.title ? contact : companyName && companyName !== item.title ? companyName : ""; return who ? <span className="crm-card-who">{who}</span> : null; })()}<b className={`crm-card-val ${item.value ? "" : "empty"}`}>{item.value ? `${currencySymbol()}${commaNumber(String(Math.round(Number(item.value))))}` : "No value yet"}{item.source === "website estimate" && item.value ? <small> est.</small> : null}</b></div>
       <div className="crm-card-actions" onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()}>
@@ -682,7 +695,7 @@ export function CrmView({ onOpenClient, scopeClientId = "", conversations, initi
       const contact = linkedPerson || linkedClient?.contact?.trim() || personName(item); const companyName = item.company?.trim() || linkedClient?.company?.trim() || linkedClient?.name || "";
       const email = (item.contact_id && item.email) || linkedClient?.email?.trim() || item.email || ""; const phoneValue = (item.contact_id && item.phone) || linkedClient?.phone?.trim() || item.phone || "";
       const dnd = itemDnd(item); const stage = pipeline?.stages.find((st) => st.id === item.stage_id); const tags = item.contact_id ? tagsByContact.get(item.contact_id) || [] : [];
-      const images = [...new Set((item.notes || "").match(/https?:\/\/[^\s"'<>]+?(?:\/api\/site-lead-photo\?key=[^\s"'<>]+|\.(?:jpe?g|png|webp|gif)(?:\?[^\s"'<>]*)?)|\/media\/[^\s"'<>]+\.(?:jpe?g|png|webp|gif)/gi) || [])];
+      const images = leadImages(item.notes);
       const facts = projectFacts(item.notes); const person = contact && contact !== "No contact linked" ? contact : "";
       const notesCount = notesByOpportunity.get(item.id) || 0;
       return <div className="crm-detail-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setDetailId(""); }}>
