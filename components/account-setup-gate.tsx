@@ -1,6 +1,7 @@
 "use client";
 
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState, type CSSProperties } from "react";
+import { BrandIcon } from "./brand-icon";
 import { ChannelIcon } from "./channel-icon";
 
 const WhatsAppSetup = lazy(() => import("./whatsapp-setup").then((m) => ({ default: m.WhatsAppSetup })));
@@ -76,19 +77,36 @@ export function AccountSetupPanel({ setup, reload, clients, compact = false }: {
       {note && <p className="asp-note" role="status">{note}</p>}
     </section>;
   }
-  return <section className="asp" aria-label="Your setup">
+  // Same look as the agency Launchpad: progress ring, then a grid of tool cards per section.
+  const brandFor: Record<string, string> = { calendar: "google-calendar", social: "facebook", "msg-whatsapp": "whatsapp", "msg-instagram": "instagram", "msg-messenger": "messenger", gmail: "gmail" };
+  const card = (item: Item, index: number) => <article className={`lp-card asp-card ${item.linked ? "status-ready" : ""} ${!item.available && !item.linked ? "asp-card-off" : ""}`} style={{ "--lp-delay": `${index * 55}ms` } as CSSProperties} key={item.id}>
+    <div className="lp-icon" aria-hidden="true"><BrandIcon id={brandFor[item.id] || item.id} size={24} fallback={item.section === "messaging" ? <ChannelIcon channel={item.id === "msg-whatsapp" ? "whatsapp" : item.id === "msg-instagram" ? "instagram" : "messenger"} size={22} /> : ICONS[item.id] || "🔗"} /></div>
+    <div className="lp-body"><h3>{item.name}</h3><p>{item.detail}</p>{item.required && !item.linked && <small className="lp-chip asp-rec">Recommended</small>}</div>
+    <div className="lp-action asp-actions">{item.linked ? <span className="lp-done" role="img" aria-label="Connected">✓ Connected</span> : !item.available ? <span className="asp-soon">Coming soon</span> : <>
+      {item.href && <a className="lp-button" href={item.href}>{item.id === "calendar" ? "Google Calendar" : "Connect"}</a>}
+      {item.action === "createFeed" && <button type="button" className="lp-button asp-ghost-btn" disabled={busy === "calendar"} onClick={() => void makeFeed()}>{busy === "calendar" ? "…" : "Apple / Outlook"}</button>}
+      {item.action === "whatsapp" && <button type="button" className="lp-button" onClick={() => setWaOpen(true)}>Link or buy number</button>}
+    </>}</div>
+  </article>;
+  const groups: Array<[string, string, Item[], boolean?]> = [
+    ["Operations", "Calendars and social media for posts.", ops],
+    ...(setup.agencyAdmin ? [["Business connections", "Only what isn’t linked yet.", biz] as [string, string, Item[]]] : []),
+    ...(acct.length ? [["Business connections", "Your business’s Google accounts, linked by F2B.", acct] as [string, string, Item[]]] : []),
+    ["Messaging", "WhatsApp, Instagram and Facebook chats in one inbox.", msg, true],
+  ];
+  let n = 0;
+  return <section className="asp asp-launchpad" aria-label="Your setup">
     <style>{CSS}</style>
-    <div className="asp-head">
-      <div><p className="eyebrow">YOUR SETUP</p><h2>{left ? `Hi ${setup.name.split(" ")[0] || "there"}, finish your setup` : "You’re all set up"}</h2><p className="muted">{left ? "Link these when you’re ready so bookings and messages land in the right place. Everything else works in the meantime." : "Come back here any time to add or change a connection."}</p></div>
-      <div className="asp-meter"><b>{pct}%</b><span>{left ? `${left} left` : "done"}</span></div>
-    </div>
-    <div className="asp-bar"><i style={{ width: `${pct}%` }} /></div>
-    <div className="asp-cols">
-      <div><h3>Operations</h3><p>Calendars and social media for posts.</p><ul>{ops.map(row)}</ul></div>
-      {setup.agencyAdmin && <div><h3>Business connections</h3><p>Only what isn’t linked yet.</p><ul>{biz.length ? biz.map(row) : <li className="on"><span className="asp-ico">✓</span><div className="asp-txt"><b>Everything’s linked</b></div></li>}</ul></div>}
-      {acct.length > 0 && <div><h3>Business connections</h3><p>Your business’s Google accounts, linked by F2B.</p><ul>{acct.map(row)}</ul></div>}
-      <div><h3>Messaging <span className="asp-opt">Optional · add later</span></h3><p>WhatsApp, Instagram and Facebook chats in one inbox.</p><ul>{msg.map(row)}</ul></div>
-    </div>
+    <header className="launchpad-heading"><div><p className="eyebrow">🚀 YOUR SETUP</p><h1>{left ? `Hi ${setup.name.split(" ")[0] || "there"}, let’s get you set up` : "You’re all set up"}</h1><p className="muted">{left ? "Link these when you’re ready so bookings and messages land in the right place. Everything else works in the meantime." : "Come back here any time to add or change a connection."}</p></div></header>
+    <section className="lp-hero" aria-label="Setup progress">
+      <div className="lp-ring" style={{ "--lp-percent": `${pct}%` } as CSSProperties}><span>{pct}%</span></div>
+      <div><b>{required.length - left} of {required.length} recommended connections linked</b><p>{left ? `${left} left — the rest are optional.` : "You’re all set 🎉"}</p></div>
+    </section>
+    {groups.filter(([, , list]) => list.length).map(([title, sub, list, optional]) => <div className="asp-group" key={title + sub}>
+      <h2 className="asp-group-title">{title}{optional && <span className="asp-opt">Optional · add later</span>}</h2><p className="asp-group-sub">{sub}</p>
+      <div className="lp-grid">{list.map((item) => card(item, n++))}</div>
+    </div>)}
+    {setup.agencyAdmin && !biz.length && <p className="asp-note">✓ All business connections are linked.</p>}
     {note && <p className="asp-note" role="status">{note}</p>}
     {waOpen && <Suspense fallback={null}><WhatsAppSetup clients={setup.accountId ? clients.filter((c) => c.id === setup.accountId) : clients} initialClientId={setup.accountId || ""} onClose={() => { setWaOpen(false); reload(); }} onLive={reload} /></Suspense>}
   </section>;
@@ -111,5 +129,9 @@ const CSS = `
 .asp-ghost{padding:6px 11px;border-radius:9px;border:1px solid rgba(127,127,127,.3);background:transparent;color:inherit;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap}
 .asp-ok{font-size:12.5px;font-weight:800;color:#16a34a;white-space:nowrap}.asp-note{margin:12px 0 0;font-size:13px}
 .asp-compact{padding:12px 14px}.asp-line{margin:0 0 8px;font-size:13px}.asp-line span{opacity:.75}
-@media (max-width:600px){.asp{padding:14px}.asp li{flex-wrap:wrap}.asp-act{width:100%}.asp-act>*{flex:1;justify-content:center}}
+.asp-launchpad{border:0;padding:0;background:none;margin:0}
+.asp-group{margin:0 0 22px}.asp-group-title{display:flex;align-items:center;gap:8px;margin:0;font-size:16px}.asp-group-sub{margin:2px 0 12px;font-size:12.5px;opacity:.7}
+.asp-actions{display:flex;flex-wrap:wrap;gap:8px}.asp-ghost-btn{background:transparent !important;color:inherit !important;border:1px solid rgba(127,127,127,.35) !important;box-shadow:none !important}
+.asp-rec{color:#b45309;background:rgba(217,119,6,.12)}.asp-card-off{opacity:.55}.asp-soon{font-size:12px;font-weight:700;opacity:.7}
+@media (max-width:600px){.asp{padding:14px}.asp-launchpad{padding:0}.asp li{flex-wrap:wrap}.asp-act{width:100%}.asp-act>*{flex:1;justify-content:center}}
 `;

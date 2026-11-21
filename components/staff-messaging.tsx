@@ -3,6 +3,7 @@
 //  · StaffConnectionIcons — integration icons on each Team card (like Operations → Clients), incl. calendars
 //  · StaffMessagingPanel  — per-person channel switches + email name / reply-to / signature (in the staff pop-up)
 //  · MessagingLaunchpad   — Launchpad → Messaging: WhatsApp, Instagram, Facebook and Email per sub-account
+import { isAiTeammate } from "@/lib/access-permissions";
 import { CONNECTIONS, type OpsClient } from "./connection-dots";
 import { BrandIcon as BrandIco } from "./brand-icon";
 import { useCallback, useEffect, useState } from "react";
@@ -106,7 +107,7 @@ export function MessagingLaunchpad({ clients, onOpenWhatsApp, onNavigate, team =
   const load = useCallback(async () => { try { const d = await call<Overview>("/api/meta-messaging"); setData(d); setError(""); return d; } catch (e) { setError(e instanceof Error ? e.message : "Couldn't load."); return null; } }, []);
   useEffect(() => { void load(); const again = () => void load(); window.addEventListener("f2b-messaging-changed", again); return () => window.removeEventListener("f2b-messaging-changed", again); }, [load]);
   const rows: Client[] = scopeClientId ? clients.filter((c) => c.id === scopeClientId) : [{ id: "", name: "F2B Media (agency)" }, ...clients];
-  const people = team.filter((m) => !m.isBot && (!scopeClientId || (Array.isArray(m.clientAccessIds) && m.clientAccessIds.includes(scopeClientId))));
+  const people = team.filter((m) => !m.isBot && !(scopeClientId && isAiTeammate(m)) && (!scopeClientId || (Array.isArray(m.clientAccessIds) && m.clientAccessIds.includes(scopeClientId))));
   const disconnect = async (p: Page) => { if (!(await appConfirm(`Disconnect ${p.pageName}${p.igUsername ? ` and @${p.igUsername}` : ""}? New messages will stop coming into Conversations.`))) return; setBusy(true); try { await call("/api/meta-messaging", { action: "disconnect", clientId: p.clientId || "agency", pageId: p.pageId }); await load(); } catch (e) { setError(e instanceof Error ? e.message : "Couldn't disconnect."); } finally { setBusy(false); } };
   const connectHref = (clientId: string) => `/api/meta-messaging/connect?clientId=${encodeURIComponent(clientId || "agency")}`;
     return <section className="lp-msg" aria-label="Messaging connections">

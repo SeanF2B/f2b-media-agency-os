@@ -29,7 +29,7 @@ import { SourceIcon } from "@/components/source-icon";
 import { CampaignPicker } from "@/components/campaign-picker";
 import { setFocusClient, useFocusClient } from "@/lib/focus-client";
 import { Component, Fragment, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type Dispatch, type PointerEvent as ReactPointerEvent, type ReactNode, type SetStateAction } from "react";
-import { AGENCY_ROLES, SUB_ACCOUNT_ROLES, SUB_ACCOUNT_PAGES, SUB_ACCOUNT_PERMISSION_KEYS, ROLE_DESCRIPTIONS, VIEWABLE_PAGES, isSubAccountRole, fullTeamPermissions, getMemberPermissions, getTeamPermissions, type TeamPermissions } from "@/lib/access-permissions";
+import { AGENCY_ROLES, SUB_ACCOUNT_ROLES, SUB_ACCOUNT_PAGES, SUB_ACCOUNT_PERMISSION_KEYS, ROLE_DESCRIPTIONS, VIEWABLE_PAGES, isSubAccountRole, isAiTeammate, fullTeamPermissions, getMemberPermissions, getTeamPermissions, type TeamPermissions } from "@/lib/access-permissions";
 import { canOpenPage } from "@/lib/sidebar-access";
 import { canViewAiAssignedTask, getAiTaskStage, isAiAssignedTask, isCompletedAiTask } from "@/lib/ai-task-access";
 import { googleAdsDateSelectionFromMessage } from "@/lib/google-ads-date-range";
@@ -6137,9 +6137,10 @@ function TeamView({ workspace, scopeClientId = "", scopeClientName = "", onOpenS
   const memberType = (member: Staff) => member.isBot ? "ai" : member.staffType || (isSubAccountRole(member.role) ? "subaccount" : "agency");
   // Inside a sub-account, only that sub-account's own staff belong to its team. Agency staff and AI
   // agents (e.g. Claude) are agency-level: shown read-only behind "Show agency team", never deletable here.
-  const isOwnSubAccountStaff = (member: Staff) => !member.isBot && memberType(member) === "subaccount" && inSubAccount(member);
+  const isOwnSubAccountStaff = (member: Staff) => !member.isBot && !isAiTeammate(member) && memberType(member) === "subaccount" && inSubAccount(member);
   const subAccountTeam = scopeClientId ? workspace.staff.filter(isOwnSubAccountStaff) : workspace.staff;
-  const agencyTeam = scopeClientId ? workspace.staff.filter((member) => !isOwnSubAccountStaff(member) && !(member.isBot && isAdminBot(member))) : [];
+  // AI agents and Claude are never shown inside a client sub-account, not even behind "Show agency team".
+  const agencyTeam = scopeClientId ? workspace.staff.filter((member) => !isOwnSubAccountStaff(member) && !isAiTeammate(member)) : [];
   const isAgencyInScope = (member: Staff) => Boolean(scopeClientId) && !isOwnSubAccountStaff(member);
   const baseShown = scopeClientId && showAgencyTeam ? [...subAccountTeam, ...agencyTeam] : subAccountTeam;
   const shownStaff = (scopeClientId || typeFilter === "all" ? baseShown : baseShown.filter((member) => typeFilter === "agency" ? memberType(member) !== "subaccount" : memberType(member) === "subaccount")).filter((member) => scopeClientId || hasAccount(member));

@@ -114,3 +114,11 @@ export function crmClientScope(member: { role?: string; clientAccessIds?: unknow
   if (Array.isArray(member.pageAccess) && !member.pageAccess.includes(page)) return [];
   return ids;
 }
+
+/** AI teammates (agents, plus "Claude" kept as a staff record) are agency-level only: never listed in a client sub-account. */
+export function isAiTeammate(member: { id?: string; name?: string; isBot?: boolean; staffType?: string; role?: string }) {
+  if (!member) return false;
+  if (member.isBot || member.staffType === "ai") return true;
+  if (/^(claude|f2b-ai-agent)/i.test(String(member.id || ""))) return true;
+  return /^claude\b/i.test(String(member.name || "").trim()) || /^(ai (agent|teammate))$/i.test(String(member.role || "").trim());
+}

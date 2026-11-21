@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "../../chatgpt-auth";
 import { crmScopeFrom } from "@/lib/client-accounts/client-accounts-api";
 import { loadSchedulingWorkspace, schedulingDeps } from "@/lib/scheduling/context";
-import { getMemberPermissions } from "@/lib/access-permissions";
+import { getMemberPermissions, isAiTeammate } from "@/lib/access-permissions";
 import { googleSchedulingAvailable, startGoogleConnect, disconnectGoogle } from "@/lib/scheduling/google";
 import { aiConfigured, aiEndpoint, aiHeaders, aiModel, getAiProvider, resolveAiProvider, type AiProvider } from "@/lib/ai-provider";
 import { sanitizeCalendar, sanitizeWeekly } from "@/lib/scheduling/core";
@@ -20,7 +20,7 @@ const fail = (error: string, status = 400) => json({ error }, status);
 const str = (v: unknown, n = 200) => (typeof v === "string" ? v.trim().slice(0, n) : "");
 
 /** A sub-account's own team member (older profiles may only carry a "Sub-account …" role). */
-const isClientOwn = (s: { staffType?: string; role?: string }) => s.staffType === "subaccount" || (!s.staffType && /^Sub-account/.test(s.role || ""));
+const isClientOwn = (s: { id?: string; name?: string; isBot?: boolean; staffType?: string; role?: string }) => !isAiTeammate(s) && (s.staffType === "subaccount" || (!s.staffType && /^Sub-account/.test(s.role || "")));
 
 async function context(request: Request) {
   const user = await getChatGPTUser();
