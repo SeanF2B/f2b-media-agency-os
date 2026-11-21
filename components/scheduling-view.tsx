@@ -1198,7 +1198,7 @@ export function BooksStaffHours({ scopeClientId, sample = false, clientName = ""
   if (!data || !realData?.isAdmin) return null;
   const toggle = () => { const v = !open; setOpen(v); try { localStorage.setItem("f2b-books-staff-hours", v ? "1" : "0"); } catch { /* optional */ } };
   return <div className={`books-staff-hours ${open ? "open" : "closed"}`}>
-    {!open ? <button type="button" className="panel books-staff-hours-bar" onClick={toggle} aria-expanded={false}><span className="eyebrow">⏱ STAFF HOURS &amp; EARNINGS <span className="admin-badge">ADMIN</span></span><ChevronDown size={16} /></button>
+    {!open ? <section className="panel books-staff-hours-bar" role="button" tabIndex={0} onClick={toggle} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); toggle(); } }} aria-expanded={false} aria-label="Staff hours and earnings"><span className="eyebrow">⏱ STAFF HOURS &amp; EARNINGS <span className="admin-badge">ADMIN</span></span><ChevronDown size={16} /></section>
       : <><button type="button" className="books-staff-hours-close" onClick={toggle} aria-label="Collapse staff hours" aria-expanded><ChevronUp size={16} /></button><StaffHoursPanel data={data} scopeClientId={scopeClientId} sample={sample} /></>}
   </div>;
 }
