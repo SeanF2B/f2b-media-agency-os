@@ -3806,3 +3806,6 @@ html body .app-shell.dark-mode .crm-card-thumb.more, html body.f2b-dark .app-she
 html body .app-shell .dh-recent-who > i.dh-initial, body.f2b-dark .app-shell .dh-recent-who > i.dh-initial { border: 0 !important; color: #fff !important; font-style: normal; font-weight: 800; font-size: 13px; display: grid; place-items: center; }
 html body .app-shell .cv-pill.bot { background: #e8f1fb !important; color: #175cd3 !important; }
 html body .app-shell.dark-mode .cv-pill.bot { background: rgba(23,92,211,.2) !important; color: #b2ccff !important; }
+/* Type + source tags always share one line (long ones ellipsise) so every pipeline card is the same height */
+html body .app-shell .crm-opportunity .crm-card-tags { flex-wrap: wrap; }
+html body .app-shell .crm-opportunity .crm-card-tags > .crm-card-type, html body .app-shell .crm-opportunity .crm-card-tags > .crm-card-src { max-width: calc(50% - 3px); min-width: 0; flex: 0 1 auto; }

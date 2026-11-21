@@ -483,7 +483,14 @@ async function siteSampleFor(client: { id: string; name: string; email?: string;
       const log = (Array.isArray(debugInfo.fetches) ? debugInfo.fetches : (debugInfo.fetches = [])) as unknown[];
       // A normal browser user agent: some hosts' firewalls refuse bot-looking requests.
       try { const r = await fetch(url, { headers: { "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36", accept: "text/html,application/xhtml+xml", "accept-language": "en-GB,en;q=0.9" }, signal: AbortSignal.timeout(8000), redirect: "follow" }); const html = r.ok ? (await r.text()).slice(0, 700_000) : ""; if (log.length < 10) log.push({ url, status: r.status, bytes: html.length }); return { html, url: r.url || url }; } catch (e) { if (log.length < 10) log.push({ url, error: String(e).slice(0, 120) }); return { html: "", url }; } };
-    const home = await get(site);
+    let home = await get(site);
+    // Some hosts (e.g. Duda, Wix firewalls) refuse server requests outright. Fall back to the www/non-www twin, then the
+    // client's own F2B-built site (website builder preview, or the <domain>-preview worker) which carries the same team and work.
+    if (!home.html) {
+      const host = new URL(site).hostname, stem = host.replace(/^www\./, "").split(".")[0];
+      const fallbacks = [...new Set([`https://${host.startsWith("www.") ? host.slice(4) : `www.${host}`}/`, own.url, stem ? `https://${stem}-preview.f2b-media.workers.dev/` : ""].filter((u) => u && /^https?:\/\//i.test(u)))];
+      for (const alt of fallbacks) { const page = await get(alt); if (page.html && page.html.length > 2000) { home = page; break; } }
+    }
     const html = home.html;
     const text = (h: string) => h.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&#0?39;|&rsquo;|&#8217;/g, "'").replace(/&[a-z#0-9]+;/gi, " ").replace(/\s+/g, " ").trim();
     const nice = (t: string) => t.replace(/\s+artists?$/i, "").replace(/^(high[- ]quality|elite|exclusive|premium|best|professional|expert|affordable|custom|bespoke|top)\s+/i, "").replace(/\b(\w)(\w*)/g, (_, a: string, b: string) => a.toUpperCase() + b.toLowerCase()).replace(/\bAnd\b/g, "&").trim();
