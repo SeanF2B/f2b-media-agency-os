@@ -28,6 +28,7 @@ export async function GET() {
     count("SELECT COUNT(*) AS n FROM outreach_mailboxes"),
     count("SELECT COUNT(*) AS n FROM outreach_connections"),
   ]);
+  const cfToken = await one<{ key_fingerprint: string }>("SELECT key_fingerprint FROM agency_cloudflare_dns_token WHERE owner_id=?1", owner);
   const custom = (re: RegExp) => customRows.find((r) => re.test(r.label));
   const envOrSaved = (envKey: string, re: RegExp): Pick<Row, "source" | "status" | "detail"> => {
     const saved = custom(re);
@@ -69,7 +70,7 @@ export async function GET() {
     // Payments
     { group: "Payments", name: "Stripe", domain: "stripe.com", use: "Onboarding checkout and card payments", source: "Saved in the OS", status: stripe?.l ? "connected" : stripe?.t ? "partial" : "missing", detail: stripe?.l ? "Live key saved" : stripe?.t ? "Test mode only" : "Not connected", manage: "Onboarding → Payments" },
     // Infrastructure
-    { group: "Infrastructure", name: "Cloudflare DNS", domain: "cloudflare.com", use: "Domains, DNS, Domain Guard, outreach domains", ...secret("CLOUDFLARE_DNS_API_TOKEN"), manage: "Server" },
+    { group: "Infrastructure", name: "Cloudflare DNS", domain: "cloudflare.com", use: "Domains, DNS, Domain Guard, outreach domains", ...(cfToken ? { source: "Saved in the OS", status: "connected" as const, detail: `ending ${cfToken.key_fingerprint}` } : secret("CLOUDFLARE_DNS_API_TOKEN")), manage: "Server" },
     { group: "Infrastructure", name: "Cloudflare Access", domain: "cloudflare.com", use: "Staff sign-in and invites", ...secret("CLOUDFLARE_ACCESS_API_TOKEN"), manage: "Server" },
     { group: "Infrastructure", name: "GitHub", domain: "github.com", use: "Publishing client website content", ...secret("GITHUB_CONTENT_TOKEN"), manage: "Server" },
     { group: "Infrastructure", name: "GoHighLevel", domain: "gohighlevel.com", use: "Importing from GHL sub-accounts", source: "Server secret", status: e.GHL_CLIENT_ID ? "connected" : "missing", detail: e.GHL_CLIENT_ID ? "App set up" : "Not set", manage: "Server" },
