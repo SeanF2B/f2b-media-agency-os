@@ -3,14 +3,29 @@
 import "./crm-automations.css";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { readFocusClient, useFocusClient } from "@/lib/focus-client";
-import { Bell, Copy, Mail, Plus, ShieldAlert, Trash2, Zap } from "lucide-react";
+import { AlertTriangle, Bell, CalendarCheck, CalendarClock, CalendarX, ChevronRight, CircleCheck, Columns3, Copy, Euro, FileInput, GitBranch, Hourglass, ListTodo, Mail, PhoneCall, Plus, Search, ShieldAlert, Tag, Trash2, UserPlus, UserX, Workflow, Zap, type LucideIcon } from "lucide-react";
 import { AutomationBuilder } from "@/components/crm-automation-builder";
 import { SCHEDULING_TEMPLATES, nodeSummary, triggerLabel, type AutomationNode } from "@/lib/crm-automations/model";
 
-type Item = { id: string; name: string; status: "on" | "off"; triggerType: string; trigger: AutomationNode | null; sendsEmail: boolean; lastRunAt: string | null; totalRuns: number; updatedAt: string };
-type FormRuleSet = { formId: string; formName: string; clientId: string; clientName: string; status: string; notify: string[]; rules: Array<{ when: string; then: string[] }> };
+type Item = { id: string; name: string; status: "on" | "off"; triggerType: string; trigger: AutomationNode | null; steps?: Array<{ type: string; label: string; summary: string }>; sendsEmail: boolean; lastRunAt: string | null; totalRuns: number; updatedAt: string };
+type FormRuleSet = { formId: string; formName: string; clientId: string; clientName: string; status: string; notify: string[]; rules: Array<{ when: string; then: string[]; kinds?: string[] }> };
 type Payload = { others?: Array<Item & { clientName: string; scopeId?: string }>; formRules?: FormRuleSet[]; scope: string; clients: Array<{ id: string; name: string }>; automations: Item[]; killSwitch: { paused: boolean; pausedBy: string | null; pausedAt: string | null }; notifications: Array<{ id: string; title: string; body: string; read_at: string | null; created_at: string }> };
-type Dialog = { kind: "new" } | { kind: "confirm-email"; id: string; name: string; subjects: string[] } | { kind: "problems"; problems: string[] } | { kind: "delete"; id: string; name: string } | { kind: "kill"; paused: boolean } | null;
+type Dialog = { kind: "new" } | { kind: "confirm-email"; id: string; name: string; subjects: string[]; scope?: string } | { kind: "problems"; problems: string[] } | { kind: "delete"; id: string; name: string } | { kind: "kill"; paused: boolean } | null;
+
+type ClientInfo = { id: string; name: string; logo?: string; color?: string; branding?: { primary?: string; logo?: string } };
+type Step = { icon: LucideIcon; text: string; when?: string };
+type Row = { key: string; kind: "workflow" | "form"; id: string; name: string; clientId: string; clientName: string; on: boolean; triggerIcon: LucideIcon; triggerText: string; triggerDetail: string; steps: Step[]; lastRunAt: string | null; totalRuns: number | null; sendsEmail: boolean };
+
+const TRIGGER_ICONS: Record<string, LucideIcon> = { appointment_before: Hourglass, appointment_after: CalendarCheck, form_lead: FileInput, onboarding_started: FileInput, tag_added: Tag, stage_changed: Columns3, task_completed: CircleCheck, audit_completed: CircleCheck, appointment_completed: CircleCheck, schedule: CalendarClock, appointment_rescheduled: CalendarClock, appointment_booked: CalendarCheck, appointment_cancelled: CalendarX, payment_failed: CalendarX, appointment_no_show: UserX, guidance_requested: Bell, checkout_completed: Euro };
+const STEP_ICONS: Record<string, LucideIcon> = { send_email: Mail, set_value: Euro, add_tag: Tag, remove_tag: Tag, move_stage: Columns3, create_task: ListTodo, notify: Bell, ai_call: PhoneCall, wait: Hourglass, if_else: GitBranch, tag: Tag, urgent: AlertTriangle, stage: Columns3 };
+const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join("").toUpperCase() || "•";
+
+function ClientMark({ client, name }: { client?: ClientInfo; name: string }) {
+  const logo = client?.logo || client?.branding?.logo || "";
+  const color = client?.branding?.primary || client?.color || "#5c6570";
+  if (!client && name === "Agency") return <span className="cau-logo"><img src="/f2b-home-icon.png" alt="" /></span>;
+  return <span className="cau-logo" title={name}>{logo ? <img src={logo} alt="" /> : <i style={{ background: color }}>{initials(name)}</i>}</span>;
+}
 
 const when = (value: string | null) => (value ? new Date(value).toLocaleString("en-IE", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "Never");
 
@@ -18,7 +33,7 @@ const when = (value: string | null) => (value ? new Date(value).toLocaleString("
  * Automations page. `clientId` comes from the app's client switcher when one is present
  * (null/"" = agency view). Without it, the page shows its own small account picker.
  */
-export function CrmAutomationsView({ clientId }: { clientId?: string | null }) {
+export function CrmAutomationsView({ clientId, clientList = [], onOpenForms }: { clientId?: string | null; clientList?: ClientInfo[]; onOpenForms?: () => void }) {
   const controlled = clientId !== undefined;
   const [localScope, setLocalScope] = useState("");
   const scope = controlled ? clientId || "" : localScope;
@@ -35,6 +50,8 @@ export function CrmAutomationsView({ clientId }: { clientId?: string | null }) {
   const [newName, setNewName] = useState("");
   const [busy, setBusy] = useState("");
   const [toast, setToast] = useState("");
+  const [kindFilter, setKindFilter] = useState<"all" | "workflow" | "form">("all");
+  const [query, setQuery] = useState("");
 
   const load = useCallback(async () => {
     const response = await fetch(`/api/crm-automations?scope=${encodeURIComponent(scope)}`, { cache: "no-store" });
@@ -58,8 +75,8 @@ export function CrmAutomationsView({ clientId }: { clientId?: string | null }) {
       const itemScope = scopeOverride ?? data?.others?.find((other) => other.id === id)?.scopeId;
       const { response, payload } = await post({ action: "setStatus", id, status: next, confirmEmails }, itemScope);
       if (response.status === 409 && payload.needsConfirmation) {
-        const item = data?.automations.find((automation) => automation.id === id);
-        setDialog({ kind: "confirm-email", id, name: item?.name || "This automation", subjects: (payload.emailSubjects as string[]) || [] });
+        const item = [...(data?.automations || []), ...(data?.others || [])].find((automation) => automation.id === id);
+        setDialog({ kind: "confirm-email", id, name: item?.name || "This automation", subjects: (payload.emailSubjects as string[]) || [], scope: scopeOverride });
         return false;
       }
       if (response.status === 422 && Array.isArray(payload.problems)) { setDialog({ kind: "problems", problems: payload.problems as string[] }); return false; }
@@ -73,10 +90,41 @@ export function CrmAutomationsView({ clientId }: { clientId?: string | null }) {
   const create = async (template?: string) => {
     const { response, payload } = await post({ action: "create", name: template ? "" : newName.trim() || "Untitled automation", ...(template ? { template } : {}) });
     if (!response.ok) { setToast(payload.error || "Could not create the automation."); return; }
-    setDialog(null); setNewName(""); await load(); setOpenId(String(payload.id));
+    setDialog(null); setNewName(""); setOpenScope(null); await load(); setOpenId(String(payload.id));
   };
 
-  if (openId) return <div className="ca-root"><AutomationBuilder id={openId} scope={openScope ?? scope} onBack={() => { setOpenId(""); setOpenScope(null); void load(); }} onToggle={(id, next) => toggle(id, next)} onChanged={() => void load()} />{dialog && renderDialog()}{toast && <div className="ca-toast" role="status">{toast}</div>}</div>;
+  // One list: agency workflows, every client's workflows and the rules built into website forms.
+  const rows = useMemo<Row[]>(() => {
+    if (!data) return [];
+    const nameOf = (id: string) => (id ? clientList.find((client) => client.id === id)?.name || data.clients.find((client) => client.id === id)?.name || "Client" : "Agency");
+    const workflow = (item: Item, owner: string, ownerName: string): Row => ({
+      key: `w:${item.id}`, kind: "workflow", id: item.id, name: item.name, clientId: owner, clientName: ownerName, on: item.status === "on",
+      triggerIcon: TRIGGER_ICONS[String(item.trigger?.config?.type || "")] || Zap, triggerText: triggerLabel(item.trigger?.config?.type),
+      triggerDetail: item.trigger?.config?.type ? nodeSummary(item.trigger) : "",
+      steps: (item.steps || []).map((step) => ({ icon: STEP_ICONS[step.type] || Zap, text: step.summary && step.summary !== step.label ? `${step.label}: ${step.summary}` : step.label })),
+      lastRunAt: item.lastRunAt, totalRuns: item.totalRuns, sendsEmail: item.sendsEmail,
+    });
+    const list: Row[] = [
+      ...data.automations.map((item) => workflow(item, scope, nameOf(scope))),
+      ...(data.others || []).map((item) => workflow(item, item.scopeId || "", item.clientName || nameOf(item.scopeId || ""))),
+      ...(data.formRules || []).map((form): Row => ({
+        key: `f:${form.formId}`, kind: "form", id: form.formId, name: form.formName, clientId: form.clientId, clientName: form.clientName, on: form.status === "live",
+        triggerIcon: FileInput, triggerText: "Website form sent", triggerDetail: "Every submission",
+        steps: [
+          { icon: UserPlus, text: "Create lead in Leads" },
+          ...(form.notify.length ? [{ icon: Mail, text: `Email ${form.notify.join(", ")}` }] : []),
+          ...form.rules.flatMap((rule) => rule.then.map((text, index) => ({ icon: STEP_ICONS[rule.kinds?.[index] || ""] || Zap, text, when: index === 0 ? rule.when : undefined }))),
+        ],
+        lastRunAt: null, totalRuns: null, sendsEmail: form.notify.length > 0,
+      })),
+    ];
+    return list.sort((a, b) => a.clientName.localeCompare(b.clientName) || a.name.localeCompare(b.name));
+  }, [data, scope, clientList]);
+  const counts = { all: rows.length, workflow: rows.filter((row) => row.kind === "workflow").length, form: rows.filter((row) => row.kind === "form").length };
+  const needle = query.trim().toLowerCase();
+  const shown = rows.filter((row) => (kindFilter === "all" || row.kind === kindFilter) && (!needle || `${row.name} ${row.clientName} ${row.triggerText} ${row.steps.map((step) => step.text).join(" ")}`.toLowerCase().includes(needle)));
+
+  if (openId) return <div className="ca-root"><AutomationBuilder id={openId} scope={openScope ?? scope} onBack={() => { setOpenId(""); setOpenScope(null); void load(); }} onToggle={(id, next) => toggle(id, next, false, openScope ?? scope)} onChanged={() => void load()} />{dialog && renderDialog()}{toast && <div className="ca-toast" role="status">{toast}</div>}</div>;
 
   function renderDialog() {
     if (!dialog) return null;
@@ -95,7 +143,7 @@ export function CrmAutomationsView({ clientId }: { clientId?: string | null }) {
       <p>&ldquo;{dialog.name}&rdquo; will send real emails to contacts as soon as it&apos;s on:</p>
       <ul className="ca-list">{dialog.subjects.map((subject, index) => <li key={index}>{subject || "(no subject)"}</li>)}</ul>
       <p className="ca-muted">Tip: use <b>Test run</b> in the builder first to check the wording. Only send to people who agreed to hear from you.</p>
-      <div className="ca-dialog-actions"><button type="button" className="secondary-button" onClick={close}>Not yet</button><button type="button" className="primary-button" onClick={async () => { const id = dialog.id; close(); await toggle(id, "on", true); }}>Yes, switch on</button></div>
+      <div className="ca-dialog-actions"><button type="button" className="secondary-button" onClick={close}>Not yet</button><button type="button" className="primary-button" onClick={async () => { const id = dialog.id; const itemScope = dialog.scope; close(); await toggle(id, "on", true, itemScope); }}>Yes, switch on</button></div>
     </>;
     if (dialog.kind === "problems") content = <>
       <h3>A few things to finish first</h3>
@@ -105,7 +153,7 @@ export function CrmAutomationsView({ clientId }: { clientId?: string | null }) {
     if (dialog.kind === "delete") content = <>
       <h3>Delete &ldquo;{dialog.name}&rdquo;?</h3>
       <p>This removes the automation and its run history. Anyone part-way through it will stop. This can&apos;t be undone.</p>
-      <div className="ca-dialog-actions"><button type="button" className="secondary-button" onClick={close}>Cancel</button><button type="button" className="primary-button ca-danger" onClick={async () => { const { response, payload } = await post({ action: "delete", id: dialog.id }); close(); setToast(response.ok ? "Automation deleted." : payload.error || "Could not delete."); await load(); }}>Delete</button></div>
+      <div className="ca-dialog-actions"><button type="button" className="secondary-button" onClick={() => { setOpenScope(null); close(); }}>Cancel</button><button type="button" className="primary-button ca-danger" onClick={async () => { const { response, payload } = await post({ action: "delete", id: dialog.id }, openScope ?? undefined); setOpenScope(null); close(); setToast(response.ok ? "Automation deleted." : payload.error || "Could not delete."); await load(); }}>Delete</button></div>
     </>;
     if (dialog.kind === "kill") content = <>
       <h3><ShieldAlert size={18} /> {dialog.paused ? "Pause every automation for this account?" : "Resume automations for this account?"}</h3>
@@ -120,7 +168,7 @@ export function CrmAutomationsView({ clientId }: { clientId?: string | null }) {
 
   return <div className="ca-root">
     <div className="page-heading ca-heading">
-      <div><p className="eyebrow">⚡ WORKSPACE · {scopeName.toUpperCase()}</p><h1>Automations</h1><p className="muted">Let the CRM follow up for you: when something happens, do the next steps automatically.</p></div>
+      <div><p className="eyebrow">WORKSPACE · {scopeName.toUpperCase()}</p><h1>Automations</h1><p className="muted">Let the CRM follow up for you: when something happens, do the next steps automatically.</p></div>
       <div className="ca-heading-actions">
         {!controlled && data && <label className="ca-scope"><span>Account</span><select value={scope} onChange={(event) => setLocalScope(event.target.value)}><option value="">Agency</option>{data.clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></label>}
         <button type="button" className="primary-button" onClick={() => setDialog({ kind: "new" })}><Plus size={16} /> New automation</button>
@@ -138,41 +186,38 @@ export function CrmAutomationsView({ clientId }: { clientId?: string | null }) {
       <button type="button" className="primary-button" onClick={() => setDialog({ kind: "new" })}><Plus size={16} /> Create your first automation</button>
     </div>}
 
-    {data && !scope && data.automations.length === 0 && ((data.others?.length || 0) > 0 || (data.formRules?.length || 0) > 0) && <p className="ca-muted ca-agency-none">No agency-level automations yet — client and website-form automations are listed below.</p>}
-    {data && data.automations.length > 0 && <div className="ca-table-wrap"><table className="ca-table">
-      <thead><tr><th>Name</th><th>Starts when</th><th>Status</th><th>Last run</th><th className="num">Total runs</th><th><span className="sr-only">Actions</span></th></tr></thead>
-      <tbody>{data.automations.map((item) => <tr key={item.id}>
-        <td><button type="button" className="ca-link" onClick={() => setOpenId(item.id)}>{item.name}</button>{item.sendsEmail && <span className="ca-tag-mini" title="Sends emails"><Mail size={12} /> Email</span>}</td>
-        <td><span className="ca-trigger-cell"><b>{triggerLabel(item.trigger?.config?.type)}</b>{item.trigger?.config?.type ? <small>{nodeSummary(item.trigger)}</small> : null}</span></td>
-        <td><label className={`ca-switch ${item.status === "on" ? "on" : ""}`}><input type="checkbox" checked={item.status === "on"} disabled={busy === item.id} onChange={(event) => void toggle(item.id, event.target.checked ? "on" : "off")} aria-label={`Switch ${item.name} ${item.status === "on" ? "off" : "on"}`} /><span className="ca-switch-track"><span /></span>{item.status === "on" ? "On" : "Off"}</label></td>
-        <td>{when(item.lastRunAt)}</td>
-        <td className="num">{item.totalRuns.toLocaleString("en-IE")}</td>
-        <td className="ca-row-actions">
-          <button type="button" className="ca-icon-btn" title="Duplicate" aria-label={`Duplicate ${item.name}`} onClick={async () => { const { response, payload } = await post({ action: "duplicate", id: item.id }); setToast(response.ok ? "Copy created (switched off)." : payload.error || "Could not duplicate."); await load(); }}><Copy size={15} /></button>
-          <button type="button" className="ca-icon-btn" title="Delete" aria-label={`Delete ${item.name}`} onClick={() => setDialog({ kind: "delete", id: item.id, name: item.name })}><Trash2 size={15} /></button>
-        </td>
-      </tr>)}</tbody>
-    </table></div>}
-
-    {data && !scope && (data.others?.length || 0) > 0 && <section className="ca-section"><h2 className="ca-section-title">Client automations <span>{data.others!.length}</span></h2><div className="ca-table-wrap"><table className="ca-table">
-      <thead><tr><th>Name</th><th>Client</th><th>Starts when</th><th>Status</th><th>Last run</th><th className="num">Total runs</th></tr></thead>
-      <tbody>{data.others!.map((item) => <tr key={item.id}>
-        <td><button type="button" className="ca-link" onClick={() => { setOpenScope(item.scopeId || ""); setOpenId(item.id); }}>{item.name}</button>{item.sendsEmail && <span className="ca-tag-mini" title="Sends emails"><Mail size={12} /> Email</span>}</td>
-        <td><span className="ca-client-chip">{item.clientName}</span></td>
-        <td><span className="ca-trigger-cell"><b>{triggerLabel(item.trigger?.config?.type)}</b>{item.trigger?.config?.type ? <small>{nodeSummary(item.trigger)}</small> : null}</span></td>
-        <td><label className={`ca-switch ${item.status === "on" ? "on" : ""}`}><input type="checkbox" checked={item.status === "on"} disabled={busy === item.id} onChange={(event) => void toggle(item.id, event.target.checked ? "on" : "off", false, item.scopeId || "")} aria-label={`Switch ${item.name} ${item.status === "on" ? "off" : "on"}`} /><span className="ca-switch-track"><span /></span>{item.status === "on" ? "On" : "Off"}</label></td>
-        <td>{when(item.lastRunAt)}</td>
-        <td className="num">{item.totalRuns.toLocaleString("en-IE")}</td>
-      </tr>)}</tbody>
-    </table></div></section>}
-
-    {data && !scope && (data.formRules?.length || 0) > 0 && <section className="ca-section"><h2 className="ca-section-title">Website form automations <span>{data.formRules!.length}</span></h2><p className="ca-muted">Built into each website form. Edit them in Operations → Forms.</p><div className="ca-form-rules">{data.formRules!.map((form) => <article key={form.formId} className="ca-form-rule-card">
-      <header><b>{form.formName}</b><span className="ca-client-chip">{form.clientName}</span><span className={`ca-form-status ${form.status === "live" ? "on" : ""}`}>{form.status === "live" ? "Live" : "Paused"}</span></header>
-      <ul>
-        <li><span className="ca-when">Every submission</span><span>→ Create lead in Leads{form.notify.length ? ` · Email ${form.notify.join(", ")}` : ""}</span></li>
-        {form.rules.map((rule, index) => <li key={index}><span className="ca-when">When {rule.when}</span><span>→ {rule.then.join(" · ") || "No action"}</span></li>)}
-      </ul>
-    </article>)}</div></section>}
+    {data && rows.length > 0 && <section className="cau-wrap">
+      <div className="cau-bar">
+        <div className="cau-seg" role="tablist" aria-label="Automation type">{([["all", "All", Zap], ["workflow", "Workflows", Workflow], ["form", "Website forms", FileInput]] as Array<[typeof kindFilter, string, LucideIcon]>).map(([key, label, Icon]) => <button key={key} type="button" role="tab" aria-selected={kindFilter === key} className={kindFilter === key ? "on" : ""} onClick={() => setKindFilter(key)}><Icon size={14} />{label}<span>{counts[key]}</span></button>)}</div>
+        <label className="cau-search"><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search automations" aria-label="Search automations" /></label>
+      </div>
+      <div className="cau-list">
+        <div className="cau-head" aria-hidden="true"><span>Automation</span><span>Starts when</span><span>What it does</span><span>Status</span><span>Runs</span><span /></div>
+        {shown.length === 0 && <p className="ca-muted cau-none">No automations match.</p>}
+        {shown.map((row) => {
+          const client = row.clientId ? clientList.find((entry) => entry.id === row.clientId) : undefined;
+          const open = () => { if (row.kind === "workflow") { setOpenScope(row.clientId); setOpenId(row.id); } else onOpenForms?.(); };
+          const TypeIcon = row.kind === "form" ? FileInput : Workflow;
+          const TriggerIcon = row.triggerIcon;
+          return <div key={row.key} className={`cau-row ${row.on ? "" : "off"}`} role="button" tabIndex={0} onClick={open} onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && event.target === event.currentTarget) { event.preventDefault(); open(); } }} title={row.kind === "form" ? "Open in Forms" : "Open automation"}>
+            <div className="cau-name"><ClientMark client={client} name={row.clientName} /><span><b>{row.name}</b><small><span className={`cau-type ${row.kind}`}><TypeIcon size={12} />{row.kind === "form" ? "Website form" : "Workflow"}</span>{row.clientName}</small></span></div>
+            <div className="cau-trigger"><span className="cau-ico"><TriggerIcon size={15} /></span><span><b>{row.triggerText}</b>{row.triggerDetail && <small>{row.triggerDetail}</small>}</span></div>
+            <ul className="cau-steps">{row.steps.length === 0 ? <li className="ca-muted">No steps yet</li> : row.steps.map((step, index) => { const StepIcon = step.icon; return <li key={index}>{step.when && <em>If {step.when}</em>}<span><StepIcon size={13} />{step.text}</span></li>; })}</ul>
+            <div className="cau-status" onClick={(event) => event.stopPropagation()}>{row.kind === "workflow"
+              ? <label className={`ca-switch ${row.on ? "on" : ""}`}><input type="checkbox" checked={row.on} disabled={busy === row.id} onChange={(event) => void toggle(row.id, event.target.checked ? "on" : "off", false, row.clientId)} aria-label={`Switch ${row.name} ${row.on ? "off" : "on"}`} /><span className="ca-switch-track"><span /></span>{row.on ? "On" : "Off"}</label>
+              : <span className={`cau-pill ${row.on ? "on" : ""}`}>{row.on ? "Live" : "Paused"}</span>}</div>
+            <div className="cau-runs">{row.totalRuns === null ? <small>Every form</small> : <><b>{row.totalRuns.toLocaleString("en-IE")}</b><small>{row.lastRunAt ? `Last ${when(row.lastRunAt)}` : "Not run yet"}</small></>}</div>
+            <div className="cau-actions" onClick={(event) => event.stopPropagation()}>
+              {row.kind === "workflow" && <>
+                <button type="button" className="ca-icon-btn" title="Duplicate" aria-label={`Duplicate ${row.name}`} onClick={async () => { const { response, payload } = await post({ action: "duplicate", id: row.id }, row.clientId); setToast(response.ok ? "Copy created (switched off)." : payload.error || "Could not duplicate."); await load(); }}><Copy size={15} /></button>
+                <button type="button" className="ca-icon-btn" title="Delete" aria-label={`Delete ${row.name}`} onClick={() => { setOpenScope(row.clientId); setDialog({ kind: "delete", id: row.id, name: row.name }); }}><Trash2 size={15} /></button>
+              </>}
+              <button type="button" className="ca-icon-btn" title={row.kind === "form" ? "Open in Forms" : "Open"} aria-label={`Open ${row.name}`} onClick={open}><ChevronRight size={16} /></button>
+            </div>
+          </div>;
+        })}
+      </div>
+    </section>}
 
     {data && <div className="ca-lower">
       <section className="ca-card">
