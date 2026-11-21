@@ -66,7 +66,7 @@ export async function GET(request: Request) {
     if (connect) {
       if (!googleSchedulingAvailable()) return Response.redirect(new URL("/?page=Scheduling&schedulingGoogle=not-configured", request.url));
       if (!(ctx.admin || ctx.me?.id === connect) || !ctx.ws.staff.some((s) => s.id === connect)) return Response.redirect(new URL("/?page=Scheduling&schedulingGoogle=not-allowed", request.url));
-      return startGoogleConnect(request, connect);
+      return await startGoogleConnect(request, connect);
     }
     const view = url.searchParams.get("view") || "";
     if (view === "site") {

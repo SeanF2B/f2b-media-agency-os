@@ -36,6 +36,9 @@ export function AccountSetupPanel({ setup, reload, clients, compact = false }: {
   const [busy, setBusy] = useState("");
   const [note, setNote] = useState("");
   const [waOpen, setWaOpen] = useState(false);
+  // Google refuses sign-in inside apps' built-in browsers (Instagram, Facebook, TikTok…): tell people to open Safari / Chrome.
+  const [inAppBrowser, setInAppBrowser] = useState(false);
+  useEffect(() => { setInAppBrowser(isInAppBrowser(navigator.userAgent)); }, []);
   const required = setup.items.filter((i) => i.required);
   const left = required.filter((i) => !i.linked).length;
   const pct = required.length ? Math.round(((required.length - left) / required.length) * 100) : 100;
@@ -52,7 +55,11 @@ export function AccountSetupPanel({ setup, reload, clients, compact = false }: {
       const j = await r.json() as { feedUrl?: string; error?: string };
       if (!r.ok || !j.feedUrl) throw new Error(j.error || "Couldn’t create your calendar link.");
       if (/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent)) window.location.href = j.feedUrl.replace(/^https?:/, "webcal:");
-      else { await navigator.clipboard?.writeText(j.feedUrl).catch(() => undefined); setNote("Calendar link copied. In Outlook: Add calendar → From internet → paste."); }
+      else {
+        // Phones often refuse clipboard writes after a network wait, so show the link when copying didn't work.
+        const copied = await (navigator.clipboard?.writeText(j.feedUrl).then(() => true, () => false) ?? Promise.resolve(false));
+        setNote(copied ? "Calendar link copied. In Outlook: Add calendar → Subscribe from web → paste." : `Your calendar link: ${j.feedUrl} — copy it, then in Outlook: Add calendar → Subscribe from web → paste.`);
+      }
       reload();
     } catch (e) { setNote(e instanceof Error ? e.message : "Couldn’t create your calendar link."); }
     setBusy("");
@@ -109,6 +116,7 @@ export function AccountSetupPanel({ setup, reload, clients, compact = false }: {
       <div className="lp-ring" style={{ "--lp-percent": `${pct}%` } as CSSProperties}><span>{pct}%</span></div>
       <div><b>{required.length - left} of {required.length} recommended connections linked</b><p>{left ? `${left} left — the rest are optional.` : "You’re all set 🎉"}</p></div>
     </section>
+    {inAppBrowser && left > 0 && <p className="asp-warn" role="alert"><b>Open this page in Safari or Chrome.</b> Google won’t let you sign in from inside another app’s browser. Tap ⋯ or the share icon, then “Open in browser”.</p>}
     {groups.filter(([, , list]) => list.length).map(([title, sub, list, optional]) => <div className="asp-group" key={title + sub}>
       <h2 className="asp-group-title">{title}{optional && <span className="asp-opt">Optional · add later</span>}</h2><p className="asp-group-sub">{sub}</p>
       <div className="lp-grid">{list.map((item) => card(item, n++))}</div>
@@ -117,6 +125,11 @@ export function AccountSetupPanel({ setup, reload, clients, compact = false }: {
     {note && <p className="asp-note" role="status">{note}</p>}
     {waOpen && <Suspense fallback={null}><WhatsAppSetup clients={setup.accountId ? clients.filter((c) => c.id === setup.accountId) : clients} initialClientId={setup.accountId || ""} onClose={() => { setWaOpen(false); reload(); }} onLive={reload} /></Suspense>}
   </section>;
+}
+
+/** True for apps' built-in browsers where Google blocks sign-in ("disallowed_useragent"). */
+export function isInAppBrowser(ua: string) {
+  return /FBAN|FBAV|FB_IAB|Instagram|LinkedInApp|Snapchat|musical_ly|TikTok|Bytedance|Line\/|MicroMessenger|Pinterest|GSA\/|; wv\)/i.test(ua || "");
 }
 
 const CSS = `
@@ -140,5 +153,8 @@ const CSS = `
 .asp-group{margin:0 0 22px}.asp-group-title{display:flex;align-items:center;gap:8px;margin:0;font-size:16px}.asp-group-sub{margin:2px 0 12px;font-size:12.5px;opacity:.7}
 .asp-actions{display:flex;flex-wrap:wrap;gap:8px}.asp-ghost-btn{background:transparent !important;color:inherit !important;border:1px solid rgba(127,127,127,.35) !important;box-shadow:none !important}
 .asp-rec{color:#b45309;background:rgba(217,119,6,.12)}.asp-card-off{opacity:.55}.asp-soon{font-size:12px;font-weight:700;opacity:.7}
+.asp-warn{margin:0 0 16px;padding:12px 14px;border-radius:12px;border:1px solid rgba(217,119,6,.45);background:rgba(217,119,6,.1);font-size:13.5px;line-height:1.45}
+.asp-launchpad .lp-grid{grid-template-columns:repeat(auto-fill,minmax(min(280px,100%),1fr))}
+@media (max-width:600px){.asp-launchpad .lp-grid{grid-template-columns:1fr;gap:10px}.asp-launchpad .asp-actions{width:100%}.asp-launchpad .asp-actions>.lp-button{flex:1 1 auto;min-height:44px;justify-content:center;text-align:center}.asp-launchpad .launchpad-heading h1{font-size:24px;line-height:1.2}}
 @media (max-width:600px){.asp{padding:14px}.asp-launchpad{padding:0}.asp li{flex-wrap:wrap}.asp-act{width:100%}.asp-act>*{flex:1;justify-content:center}}
 `;

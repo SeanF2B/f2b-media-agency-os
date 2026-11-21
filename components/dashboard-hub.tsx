@@ -113,10 +113,12 @@ function sampleDetail(m: Marketing): { gsc: Gsc | null; ads: AdsDetail } {
   };
 }
 
-export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel = null, scopeClientId, clients, tasks, staff, onNavigate, onAddTask, onOpenTask, onReviewTask, currentStaffId = "", adsPanel, valuePanel, periodStart = "", periodEnd = "", periodLabel = "Last 30 days", focusClientId = "" }: { isAdmin?: boolean; salesStats?: SalesStats | null; activityPanel?: ReactNode; focusClientId?: string; periodStart?: string; periodEnd?: string; periodLabel?: string; adsPanel?: ReactNode; valuePanel?: ReactNode; scopeClientId: string; clients: HubClient[]; tasks: HubTask[]; staff: HubStaff[]; onNavigate: (page: string) => void; onAddTask: () => void; onOpenTask?: (id: string) => void; onReviewTask?: (id: string, action: "approve" | "request_changes") => void; currentStaffId?: string }) {
+export function DashboardHub({ isAdmin = false, ownerView = false, salesStats = null, activityPanel = null, scopeClientId, clients, tasks, staff, onNavigate, onAddTask, onOpenTask, onReviewTask, currentStaffId = "", adsPanel, valuePanel, periodStart = "", periodEnd = "", periodLabel = "Last 30 days", focusClientId = "" }: { isAdmin?: boolean; ownerView?: boolean; salesStats?: SalesStats | null; activityPanel?: ReactNode; focusClientId?: string; periodStart?: string; periodEnd?: string; periodLabel?: string; adsPanel?: ReactNode; valuePanel?: ReactNode; scopeClientId: string; clients: HubClient[]; tasks: HubTask[]; staff: HubStaff[]; onNavigate: (page: string) => void; onAddTask: () => void; onOpenTask?: (id: string) => void; onReviewTask?: (id: string, action: "approve" | "request_changes") => void; currentStaffId?: string }) {
   const [pickedClient, setPickedClient] = useState(() => { try { return localStorage.getItem("f2b-dash-client") || ""; } catch { return ""; } });
   // Agency view defaults to all clients' Google Ads; a client can be picked for their full results.
   const clientId = scopeClientId || (clients.some((c) => c.id === focusClientId) ? focusClientId : (clients.find((c) => c.googleAdsAccountId) || clients[0])?.id || ""); void pickedClient; void setPickedClient;
+  // Agency admins, and a client's own Sub-account Admin (data is scoped to their account on the server), see the full Dashboard.
+  const full = isAdmin || ownerView;
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(false);
   const [apprOpen, setApprOpen] = useState<"" | "ai" | "human">("");
@@ -252,8 +254,8 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
     <section className="dh-actions" aria-label="Quick actions">{actions.map((a) => <button type="button" key={a.label} className={`dh-action ${a.tint}`} onClick={a.run}><span className="dh-action-icon">{a.icon}</span><span><b>{a.label}</b><small>{a.hint}</small></span></button>)}</section>
     {showAppts && <Suspense fallback={null}><AppointmentsDashboard key={scopeClientId || "agency"} showStaffHours scopeClientId={scopeClientId} sample={sample} clientName={clients.find((c) => c.id === scopeClientId)?.name || ""} periodStart={periodStart} periodEnd={periodEnd} periodLabel={periodLabel} onOpen={() => onNavigate("Scheduling")} /></Suspense>}
     {/* Admin-only money & marketing sections (tagged ADMIN) */}
-    {isAdmin && valuePanel}
-    {isAdmin && <section className="panel dh-panel" aria-label="Website and marketing results" data-admin="">
+    {full && valuePanel}
+    {full && <section className="panel dh-panel" aria-label="Website and marketing results" data-admin="">
       <div className="dh-head"><div><p className="eyebrow">📈 {periodLabel.toUpperCase()}</p><h2>Marketing</h2></div>
         {!scopeClientId && marketingPicked && <span className="dh-client-note">{clients.find((c) => c.id === clientId)?.name}</span>}
       </div>
@@ -373,7 +375,7 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
         })()}
       </>}
     </section>}
-    {isAdmin && marketingPicked && m && (() => { const bp = sample ? SAMPLE_GBP : m.businessProfile; const tp = sample ? { status: "ok", rating: 4.8, total: 63 } as typeof m.trustpilot : m.trustpilot; const gR = sample ? { total: 214, averageRating: 4.9 } : gReviews; return <>
+    {full && marketingPicked && m && (() => { const bp = sample ? SAMPLE_GBP : m.businessProfile; const tp = sample ? { status: "ok", rating: 4.8, total: 63 } as typeof m.trustpilot : m.trustpilot; const gR = sample ? { total: 214, averageRating: 4.9 } : gReviews; return <>
       <section className="panel dh-panel dh-sec-reviews" aria-label="Reviews" data-admin=""><div className="dh-head"><div><p className="eyebrow">⭐ {periodLabel.toUpperCase()}</p><h2>Reviews</h2></div></div>
         <div className="dh-reviews">
             <div className="dh-review"><BrandIcon id="business-profile" size={22} fallback={null} /><span><b>{gR?.averageRating != null ? `${gR.averageRating.toFixed(1)} ★` : "—"}</b><small>{gR?.total != null ? `${num(gR.total)} Google reviews` : L("Google reviews · connect Business Profile")}</small></span></div>
@@ -392,7 +394,7 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
           {(sample || (clientId && clientId !== "all")) && <GbpPosts sample={sample} clientId={clientId} businessName={clientOf(clientId)?.name || "Your business"} onOpenCalendar={() => go("Content")} />}
       </section>
     </>; })()}
-    {isAdmin && marketingPicked && m && m.scope !== "all" && <section className="panel dh-panel dh-sec-showup" aria-label="Where you show up" data-admin=""><div className="dh-head"><div><p className="eyebrow">🔎 {periodLabel.toUpperCase()}</p><h2>Where you show up</h2></div></div>
+    {full && marketingPicked && m && m.scope !== "all" && <section className="panel dh-panel dh-sec-showup" aria-label="Where you show up" data-admin=""><div className="dh-head"><div><p className="eyebrow">🔎 {periodLabel.toUpperCase()}</p><h2>Where you show up</h2></div></div>
         <div className="dh-ranks">
           <div className={`dh-rank dh-rank-click ${rankOpen === "google" ? "open" : ""}`} role="button" tabIndex={0} aria-expanded={rankOpen === "google"} onClick={() => setRankOpen(rankOpen === "google" ? "" : "google")} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setRankOpen(rankOpen === "google" ? "" : "google"); } }}><span className="dh-rank-chev">{rankOpen === "google" ? "▲" : "▼"} Keywords</span><div className="dh-rank-logos"><BrandIcon id="google" size={24} fallback={<span>G</span>} /><span className="dh-rank-also" title="Chrome and Safari use Google search"><BrandIcon id="chrome" size={14} fallback={null} /><BrandIcon id="safari" size={14} fallback={null} /></span></div><small>Google · Chrome & Safari</small>{m.google ? <><b>{m.google.position != null ? `#${m.google.position}` : "—"}</b><em>avg of {m.google.tracked} keywords · {m.google.top3} in top 3 <Delta now={m.google.position} before={m.google.previous} lowerIsBetter suffix="" /></em></> : m.gsc && !m.gsc.error && m.gsc.position != null ? <><b>#{m.gsc.position}</b><em>avg position across {num(m.gsc.queriesTracked || 0)} searches (Search Console) <Delta now={m.gsc.position} before={m.gsc.previousPosition} lowerIsBetter suffix="" /></em></> : <><b>—</b><em>{L(m.gsc?.error || m.rankNote || "Not tracked yet")}</em></>}</div>
           <div className="dh-rank"><div className="dh-rank-logos"><BrandIcon id="bing" size={24} fallback={<span>b</span>} /><span className="dh-rank-also" title="Microsoft Edge uses Bing search"><BrandIcon id="edge" size={14} fallback={null} /></span></div><small>Bing · Microsoft Edge</small><b>—</b><em>{L(m.bingNote)}</em></div>
@@ -413,9 +415,9 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
 
 
     {!isAdmin && scopeClientId && <UsageClientPanel clientId={scopeClientId} />}
-    {isAdmin && adsPanel && <div className="dh-ads-wrap">{adsPanel}</div>}
-    {isAdmin && activityPanel}
-    {isAdmin && <div className="dh-grid">
+    {full && adsPanel && <div className="dh-ads-wrap">{adsPanel}</div>}
+    {full && activityPanel}
+    {full && <div className="dh-grid">
 
       <section className="panel dh-panel dh-email" data-admin=""><div className="dh-head"><div><p className="eyebrow"><Mail size={12} /> {periodLabel.toUpperCase()}</p><h2>Emails &amp; health</h2></div><button type="button" className="text-button" onClick={() => onNavigate("Conversations")}>Open inbox →</button></div>
         {(() => { const e = view?.emails; if (!e) return <p className="dh-muted">{loading ? "Loading…" : "No emails yet."}</p>; const rate = e.total ? Math.round(((e.delivered ?? e.total) / e.total) * 100) : null; const tone = rate == null ? "" : rate >= 98 ? "good" : rate >= 90 ? "warn" : "bad"; return <>

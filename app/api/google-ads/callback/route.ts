@@ -170,13 +170,17 @@ async function completeGbpConnection(request: Request, ownerId: string, clients:
 
 export async function GET(request: Request) {
   const user = await getChatGPTUser();
+  // Scheduling: any staff member can connect their own calendar (admins can connect anyone's). The signed state
+  // lets this finish on phones where Google sends you back in a browser without the app's sign-in.
+  const schedState = new URL(request.url).searchParams.get("state") || "";
+  if (schedState.startsWith("sched:") && env.DB) {
+    const ws = await env.DB.prepare("SELECT data FROM workspace_documents WHERE id = 'f2b-agency'").first<{ data: string }>();
+    if (ws) return completeGoogleConnect(request, user, JSON.parse(ws.data), schedState);
+  }
   if (!user || !env.DB) return finish(request, "sign-in-required");
   const workspace = await env.DB.prepare("SELECT data FROM workspace_documents WHERE id = 'f2b-agency'").first<{ data: string }>();
   if (!workspace) return finish(request, "workspace-unavailable");
   const data = JSON.parse(workspace.data);
-  // Scheduling: any staff member can connect their own calendar (admins can connect anyone's).
-  const schedState = new URL(request.url).searchParams.get("state") || "";
-  if (schedState.startsWith("sched:")) return completeGoogleConnect(request, user, data, schedState);
   // A team member's own Google Drive (Content calendar): stored under their email, no admin needed.
   if (schedState.startsWith("udrive:")) return completeDriveConnection(request, userDriveKey(user.email), schedState, new URL(request.url).searchParams.get("code") || "", "Content");
   const admin = data.ownerId === user.userId || data.staff?.some((person: { email?: string; role?: string }) => person.email?.toLowerCase() === user.email.toLowerCase() && ["Owner", "Admin"].includes(person.role || ""));

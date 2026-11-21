@@ -321,7 +321,9 @@ const worker = {
     // Sign-in gate: every outside request needs a signed-in user except the login pages and a few public files.
     // Service-binding calls from our other workers carry no request.cf and pass through as before.
     const external = Boolean((request as Request & { cf?: unknown }).cf);
-    if (!import.meta.env.DEV && external && !signedInEmail && !auth.isPublicPath(incomingUrl.pathname) && !incomingUrl.pathname.startsWith("/_next/") && !incomingUrl.pathname.startsWith("/assets/")) {
+    // Calendar sign-in can come back without the session on phones; that route checks its own signed state.
+    const signedCalendarReturn = incomingUrl.pathname === "/api/google-ads/callback" && (incomingUrl.searchParams.get("state") || "").startsWith("sched:");
+    if (!import.meta.env.DEV && external && !signedInEmail && !signedCalendarReturn && !auth.isPublicPath(incomingUrl.pathname) && !incomingUrl.pathname.startsWith("/_next/") && !incomingUrl.pathname.startsWith("/assets/")) {
       const wantsPage = (request.method === "GET" || request.method === "HEAD") && !incomingUrl.pathname.startsWith("/api/") && /text\/html|\*\/\*/.test(request.headers.get("accept") || "text/html");
       if (wantsPage) return withSecurityHeaders(new Response(null, { status: 302, headers: { location: `/login?next=${encodeURIComponent(auth.safeNext(incomingUrl.pathname + incomingUrl.search))}`, "cache-control": "no-store" } }), "/login");
       return withSecurityHeaders(Response.json({ error: "Sign in to continue." }, { status: 401, headers: { "cache-control": "no-store" } }), incomingUrl.pathname);
