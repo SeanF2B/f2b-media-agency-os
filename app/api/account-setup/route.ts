@@ -10,7 +10,7 @@ import { listMetaPages, metaMessagingConfigured } from "@/lib/conversations/meta
 
 export const dynamic = "force-dynamic";
 
-type Item = { id: string; section: "operations" | "messaging" | "business" | "account"; name: string; detail: string; linked: boolean; required: boolean; available: boolean; href?: string; action?: "createFeed" | "whatsapp" };
+type Item = { id: string; section: "operations" | "messaging" | "business" | "account"; name: string; detail: string; linked: boolean; required: boolean; available: boolean; href?: string; action?: "createFeed" | "whatsapp" | "connectLink" };
 const json = (b: unknown, status = 200) => Response.json(b, { status, headers: { "Cache-Control": "no-store" } });
 
 async function count(sql: string, ...args: unknown[]) {
@@ -52,16 +52,16 @@ export async function GET() {
 
   const items: Item[] = [
     { id: "calendar", section: "operations", name: "Your calendar", detail: googleCal || ownerCal ? "Google Calendar connected" : feed ? "Apple / Outlook calendar linked" : "Connect Google Calendar, or link your Apple / Outlook calendar, so bookings land in it.", linked: Boolean(googleCal || feed || ownerCal), required: true, available: true, href: googleKeys ? `/api/scheduling?connect=${encodeURIComponent(me.id)}` : undefined, action: "createFeed" },
-    { id: "social", section: "operations", name: "Facebook & Instagram for posts", detail: myPages.length ? `Connected: ${myPages.map((p) => p.pageName).join(", ")}` : !metaReady ? "Coming soon: F2B is finishing the Facebook connection." : canConnectMeta ? "Connect the business Facebook Page (and its Instagram) so scheduled posts publish." : "Your manager connects the business Facebook Page.", linked: myPages.length > 0, required: canConnectMeta, available: canConnectMeta, href: canConnectMeta ? metaHref : undefined },
+    { id: "social", section: "operations", name: "Facebook & Instagram for posts", detail: myPages.length ? `Connected: ${myPages.map((p) => p.pageName).join(", ")}` : !metaReady ? "Waiting on F2B: the Facebook app is being set up." : canConnectMeta ? "Connect the business Facebook Page (and its Instagram) so scheduled posts publish." : "Your manager connects the business Facebook Page.", linked: myPages.length > 0, required: canConnectMeta, available: canConnectMeta, href: canConnectMeta ? metaHref : undefined },
     { id: "msg-whatsapp", section: "messaging", name: "WhatsApp", detail: waNumbers.length ? `Live on ${waNumbers.map((n: any) => n.number).join(", ")}` : canSetUpWhatsApp ? "Link your existing WhatsApp number or buy a new one." : "Your manager sets up WhatsApp.", linked: waNumbers.length > 0, required: false, available: canSetUpWhatsApp, action: canSetUpWhatsApp ? "whatsapp" : undefined },
-    { id: "msg-instagram", section: "messaging", name: "Instagram messages", detail: myPages.some((p) => p.igId) ? "Instagram DMs come into Conversations" : "Comes with the Facebook Page connection.", linked: myPages.some((p) => p.igId), required: false, available: canConnectMeta, href: canConnectMeta ? metaHref : undefined },
-    { id: "msg-facebook", section: "messaging", name: "Facebook Messenger", detail: myPages.length ? "Messenger chats come into Conversations" : "Comes with the Facebook Page connection.", linked: myPages.length > 0, required: false, available: canConnectMeta, href: canConnectMeta ? metaHref : undefined },
+    { id: "msg-instagram", section: "messaging", name: "Instagram messages", detail: myPages.some((p) => p.igId) ? "Instagram DMs come into Conversations" : !metaReady ? "Waiting on F2B: the Facebook app is being set up." : "Comes with the Facebook Page connection.", linked: myPages.some((p) => p.igId), required: false, available: canConnectMeta, href: canConnectMeta ? metaHref : undefined },
+    { id: "msg-facebook", section: "messaging", name: "Facebook Messenger", detail: myPages.length ? "Messenger chats come into Conversations" : !metaReady ? "Waiting on F2B: the Facebook app is being set up." : "Comes with the Facebook Page connection.", linked: myPages.length > 0, required: false, available: canConnectMeta, href: canConnectMeta ? metaHref : undefined },
   ];
 
   if (accountAdmin) {
     // The business's Google connections are linked by F2B through the agency login; show where each stands.
     const client = (ws.clients || []).find((c: any) => String(c.id) === scope![0]) || {};
-    const g = (id: string, name: string, linked: unknown, what: string): Item => ({ id, section: "account", name, detail: linked ? "Linked" : `F2B links this for you. ${what}`, linked: Boolean(linked), required: false, available: false });
+    const g = (id: string, name: string, linked: unknown, what: string): Item => ({ id, section: "account", name, detail: linked ? "Linked" : `${what} Connect it with your Google login.`, linked: Boolean(linked), required: false, available: true, action: "connectLink" });
     items.push(
       g("google-ads", "Google Ads", client.googleAdsAccountId, "Ad results show on your Dashboard."),
       g("search-console", "Google Search Console", client.googleSearchConsoleAccountId, "Search rankings and clicks."),

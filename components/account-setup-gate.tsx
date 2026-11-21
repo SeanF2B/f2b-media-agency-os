@@ -6,7 +6,7 @@ import { ChannelIcon } from "./channel-icon";
 
 const WhatsAppSetup = lazy(() => import("./whatsapp-setup").then((m) => ({ default: m.WhatsAppSetup })));
 
-type Item = { id: string; section: "operations" | "messaging" | "business" | "account"; name: string; detail: string; linked: boolean; required: boolean; available: boolean; href?: string; action?: "createFeed" | "whatsapp" };
+type Item = { id: string; section: "operations" | "messaging" | "business" | "account"; name: string; detail: string; linked: boolean; required: boolean; available: boolean; href?: string; action?: "createFeed" | "whatsapp" | "connectLink" };
 export type AccountSetup = { name: string; staffId: string; isOwner: boolean; agencyAdmin: boolean; accountAdmin?: boolean; accountId?: string; blocked: boolean; items: Item[] };
 
 const ICONS: Record<string, string> = { calendar: "📅", social: "📣", "google-ads": "📈", "search-console": "🔎", ga4: "📊", "business-profile": "📍", "meta-ads": "📱", "google-drive": "🗂️", gmail: "🧾" };
@@ -39,6 +39,12 @@ export function AccountSetupPanel({ setup, reload, clients, compact = false }: {
   const required = setup.items.filter((i) => i.required);
   const left = required.filter((i) => !i.linked).length;
   const pct = required.length ? Math.round(((required.length - left) / required.length) * 100) : 100;
+  // Business Google accounts: open the business's own connect page (same one the agency sends clients).
+  const openConnect = async (id: string) => {
+    setBusy(id); setNote("");
+    try { const r = await fetch(`/api/client-connect-link?clientId=${encodeURIComponent(setup.accountId || "")}`, { cache: "no-store" }); const j = await r.json() as { url?: string; error?: string }; if (!r.ok || !j.url) throw new Error(j.error || "Couldn’t open the connect page."); window.location.href = j.url; }
+    catch (e) { setNote(e instanceof Error ? e.message : "Couldn’t open the connect page."); setBusy(""); }
+  };
   const makeFeed = async () => {
     setBusy("calendar"); setNote("");
     try {
@@ -80,12 +86,13 @@ export function AccountSetupPanel({ setup, reload, clients, compact = false }: {
   // Same look as the agency Launchpad: progress ring, then a grid of tool cards per section.
   const brandFor: Record<string, string> = { calendar: "google-calendar", social: "facebook", "msg-whatsapp": "whatsapp", "msg-instagram": "instagram", "msg-messenger": "messenger", gmail: "gmail" };
   const card = (item: Item, index: number) => <article className={`lp-card asp-card ${item.linked ? "status-ready" : ""} ${!item.available && !item.linked ? "asp-card-off" : ""}`} style={{ "--lp-delay": `${index * 55}ms` } as CSSProperties} key={item.id}>
-    <div className="lp-icon" aria-hidden="true"><BrandIcon id={brandFor[item.id] || item.id} size={24} fallback={item.section === "messaging" ? <ChannelIcon channel={item.id === "msg-whatsapp" ? "whatsapp" : item.id === "msg-instagram" ? "instagram" : "messenger"} size={22} /> : ICONS[item.id] || "🔗"} /></div>
+    <div className="lp-icon" aria-hidden="true">{item.section === "messaging" ? <ChannelIcon channel={item.id === "msg-whatsapp" ? "whatsapp" : item.id === "msg-instagram" ? "instagram" : "messenger"} size={24} /> : <BrandIcon id={brandFor[item.id] || item.id} size={24} fallback={ICONS[item.id] || "🔗"} />}</div>
     <div className="lp-body"><h3>{item.name}</h3><p>{item.detail}</p>{item.required && !item.linked && <small className="lp-chip asp-rec">Recommended</small>}</div>
-    <div className="lp-action asp-actions">{item.linked ? <span className="lp-done" role="img" aria-label="Connected">✓ Connected</span> : !item.available ? <span className="asp-soon">Coming soon</span> : <>
+    <div className="lp-action asp-actions">{item.linked ? <span className="lp-done" role="img" aria-label="Connected">✓ Connected</span> : !item.available ? <span className="asp-soon">Waiting on F2B</span> : <>
       {item.href && <a className="lp-button" href={item.href}>{item.id === "calendar" ? "Google Calendar" : "Connect"}</a>}
       {item.action === "createFeed" && <button type="button" className="lp-button asp-ghost-btn" disabled={busy === "calendar"} onClick={() => void makeFeed()}>{busy === "calendar" ? "…" : "Apple / Outlook"}</button>}
       {item.action === "whatsapp" && <button type="button" className="lp-button" onClick={() => setWaOpen(true)}>Link or buy number</button>}
+      {item.action === "connectLink" && <button type="button" className="lp-button" disabled={busy === item.id} onClick={() => void openConnect(item.id)}>{busy === item.id ? "…" : "Connect"}</button>}
     </>}</div>
   </article>;
   const groups: Array<[string, string, Item[], boolean?]> = [
