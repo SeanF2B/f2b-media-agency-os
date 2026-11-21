@@ -3966,3 +3966,5 @@ html body .app-shell .content-page .cv-tool svg { flex: 0 0 auto; display: block
   html body .app-shell.topnav-layout .tn-right .top-actions > *, html body .app-shell.topnav-layout .tn-right > .tn-sample { margin: 0 !important; }
   html body .app-shell.topnav-layout .tn-right .top-actions > :empty:not(button):not(a):not(label) { display: none !important; }
 }
+/* Leads tabs: the Conversations cog always keeps its space, so switching tabs never shifts the bar */
+.crm-tabs .crm-tab-cog.is-idle { visibility: hidden !important; pointer-events: none !important; }
