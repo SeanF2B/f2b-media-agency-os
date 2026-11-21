@@ -74,7 +74,9 @@ export async function GET(request: Request) {
       const client = ctx.ws.clients.find((c) => c.id === (str(url.searchParams.get("clientId"), 80) || ctx.scope));
       if (!client) return json({ services: [], locations: [], team: [] });
       if (url.searchParams.get("debug") === "1") { siteCache.clear(); debugInfo.fetches = []; const out = await siteSampleFor(client, db); return json({ ...out, debug: debugInfo }); }
-      return json(await siteSampleFor(client, db));
+      // Never list another client/business of this workspace as a staff member (e.g. the agency site naming its clients).
+      const out = await siteSampleFor(client, db); const brands = new Set(ctx.ws.clients.map((c) => c.name.trim().toLowerCase()));
+      return json({ ...out, team: out.team.filter((n) => !brands.has(n.trim().toLowerCase())) });
     }
     if (view === "links") {
       // For the chat box: booking pages and calendar links this person can send.

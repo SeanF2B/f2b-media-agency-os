@@ -71,3 +71,8 @@ test("trade service headings are never staff (Heatwise: Emergency Callout, Hot W
   const html = `<h2>Meet the team</h2><h3>Emergency Callout</h3><img src="/a.jpg"><h3>Hot Water Cylinders</h3><img src="/b.jpg"><h3>Boiler Repairs</h3><h3>Gutter Cleaning</h3>`;
   assert.deepEqual(parseTeam(html, "https://heatwise.example/").team, []);
 });
+
+test("'Meet Aldo' gives Aldo; grant/help headings are not people", () => {
+  const html = `<h2>Meet Aldo</h2><img src="/aldo.jpg"><h3>SEAI Grant Help</h3><img src="/g.jpg">`;
+  assert.deepEqual(parseTeam(html, "https://aldo.example/").team, ["Aldo"]);
+});
