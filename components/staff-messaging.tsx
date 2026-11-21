@@ -104,21 +104,33 @@ export function MessagingLaunchpad({ clients, onOpenWhatsApp }: { clients: Clien
   const rows = [{ id: "", name: "F2B Media (agency)" }, ...clients];
   const disconnect = async (p: Page) => { if (!(await appConfirm(`Disconnect ${p.pageName}${p.igUsername ? ` and @${p.igUsername}` : ""}? New messages will stop coming into Conversations.`))) return; setBusy(true); try { await call("/api/meta-messaging", { action: "disconnect", clientId: p.clientId || "agency", pageId: p.pageId }); await load(); } catch (e) { setError(e instanceof Error ? e.message : "Couldn't disconnect."); } finally { setBusy(false); } };
   const connectHref = (clientId: string) => `/api/meta-messaging/connect?clientId=${encodeURIComponent(clientId || "agency")}`;
-  const badge = (on: boolean, label: string) => on ? <span className="lp-msg-badge on">Connected</span> : <span className="lp-msg-badge">{label}</span>;
-  return <section className="lp-msg" aria-label="Messaging connections">
+    return <section className="lp-msg" aria-label="Messaging connections">
     <div className="lp-msg-head"><div><h2>Messaging</h2><p className="muted">Connect each account's WhatsApp, Instagram and Facebook so every chat lands in Conversations.</p></div><button type="button" className="secondary-button" onClick={() => setShowSetup(!showSetup)}>{showSetup ? "Hide" : "Meta app"} setup</button></div>
     {error && <div className="cv-error" role="alert">{error}</div>}
     {showSetup && data && <div className="lp-msg-setup"><p>One-off, in the Meta developer app (the same app as Meta Ads): add <b>Messenger</b> and <b>Instagram</b>, request <code>pages_messaging</code> and <code>instagram_manage_messages</code>, then set the webhook for both <i>Page</i> and <i>Instagram</i> (field <code>messages</code>):</p><div className="lp-msg-copy"><span>Callback URL</span><code>{data.webhook.url}</code><button type="button" onClick={() => void navigator.clipboard?.writeText(data.webhook.url)}>Copy</button></div><div className="lp-msg-copy"><span>Verify token</span><code>{data.webhook.verifyToken || "Add META_APP_SECRET first"}</code><button type="button" disabled={!data.webhook.verifyToken} onClick={() => void navigator.clipboard?.writeText(data.webhook.verifyToken)}>Copy</button></div>{!data.configured && <p className="iv-small">The server is missing the Meta app settings, so Connect won't work yet.</p>}</div>}
-    {!data ? <p className="iv-small">Loading…</p> : <div className="lp-msg-table" role="table">
-      <div className="lp-msg-row lp-msg-th" role="row"><span>Account</span><span><ChannelIcon channel="whatsapp" size={16} /> WhatsApp</span><span><ChannelIcon channel="instagram" size={16} /> Instagram</span><span><ChannelIcon channel="messenger" size={16} /> Facebook</span><span><ChannelIcon channel="email" size={16} /> Email</span></div>
+    {!data ? <p className="iv-small">Loading…</p> : <div className="lp-msg-cards">
+      <style>{MSG_CARDS_CSS}</style>
       {rows.map((c) => { const ch = data.channels[c.id] || { whatsapp: [], sms: [], messenger: [], instagram: [] }; const pages = data.pages.filter((p) => p.clientId === c.id && p.status === "connected"); const logo = (c as Client).logo;
-        return <div className="lp-msg-row" role="row" key={c.id || "agency"}>
-          <span className="lp-msg-account">{logo ? <img src={logo} alt="" /> : <i>{c.name.slice(0, 1)}</i>}<b>{c.name}</b></span>
-          <span>{badge(ch.whatsapp.length > 0, "Not set up")}{ch.whatsapp[0] && <small>{ch.whatsapp[0]}</small>}{onOpenWhatsApp && <button type="button" className="lp-msg-link" onClick={() => onOpenWhatsApp(c.id)}>{ch.whatsapp.length ? "Manage" : "Set up"}</button>}</span>
-          <span>{badge(ch.instagram.length > 0, "Not connected")}{ch.instagram[0] && <small>{ch.instagram[0]}</small>}{!ch.instagram.length && pages.length > 0 && <small className="muted">Link an Instagram professional account to {pages[0].pageName} in Meta</small>}</span>
-          <span>{badge(pages.length > 0, "Not connected")}{pages.map((p) => <small key={p.pageId} className="lp-msg-page">{p.pageName}<button type="button" aria-label={`Disconnect ${p.pageName}`} title="Disconnect" disabled={busy} onClick={() => void disconnect(p)}>×</button></small>)}<a className="lp-msg-link" href={connectHref(c.id)}>{pages.length ? "Add / reconnect" : "Connect Facebook & Instagram"}</a></span>
-          <span>{badge(data.emailReady, "Not set up")}{data.emailReady && <small>Replies from {data.emailFrom.replace(/^.*</, "").replace(/>$/, "")}</small>}</span>
-        </div>; })}
+        // Same look as the client cards: one icon per channel with a green (connected) or red (not connected) dot.
+        const items = [
+          { key: "whatsapp", label: "WhatsApp", ok: ch.whatsapp.length > 0, info: ch.whatsapp[0] || "", act: onOpenWhatsApp ? () => onOpenWhatsApp(c.id) : undefined, href: "" },
+          { key: "instagram", label: "Instagram", ok: ch.instagram.length > 0, info: ch.instagram[0] || (pages.length ? `Link an Instagram professional account to ${pages[0].pageName} in Meta` : ""), href: connectHref(c.id) },
+          { key: "messenger", label: "Facebook", ok: pages.length > 0, info: pages.map((p) => p.pageName).join(", "), href: connectHref(c.id) },
+          { key: "email", label: "Email", ok: data.emailReady, info: data.emailReady ? `Replies from ${data.emailFrom.replace(/^.*</, "").replace(/>$/, "")}` : "", href: "" },
+        ];
+        const done = items.filter((i) => i.ok).length, pct = Math.round(done / items.length * 100);
+        return <article className="lp-msg-card" key={c.id || "agency"}>
+          <header>{logo ? <img src={logo} alt="" /> : <i>{c.name.slice(0, 1)}</i>}<b title={c.name}>{c.name}</b></header>
+          <span className="ops-conn">
+            <span className={`ops-conn-pct ${pct >= 80 ? "good" : pct >= 50 ? "mid" : "low"}`} style={{ ["--pct" as string]: `${pct}%` }} title={`${done} of ${items.length} connected`}><b>{pct}%</b></span>
+            {items.map((i) => { const title = `${i.label}: ${i.ok ? `connected${i.info ? ` · ${i.info}` : ""}` : `not connected${i.act || i.href ? " — click to set up" : ""}`}`;
+              const inner = <><ChannelIcon channel={i.key as "whatsapp"} size={16} /><i /></>;
+              return i.act ? <button key={i.key} type="button" className={i.ok ? "ok" : "missing"} title={title} aria-label={title} onClick={i.act}>{inner}</button>
+                : i.href && !i.ok ? <a key={i.key} className={`lp-msg-ico missing`} href={i.href} title={title} aria-label={title}>{inner}</a>
+                : <button key={i.key} type="button" className={i.ok ? "ok" : "missing"} title={title} aria-label={title} disabled={!i.ok}>{inner}</button>; })}
+          </span>
+          {pages.length > 0 && <div className="lp-msg-pages-on">{pages.map((p) => <small key={p.pageId}>{p.pageName}<button type="button" aria-label={`Disconnect ${p.pageName}`} title="Disconnect" disabled={busy} onClick={() => void disconnect(p)}>×</button></small>)}</div>}
+        </article>; })}
     </div>}
   </section>;
 }
@@ -147,3 +159,18 @@ export function MetaPickPrompt({ clients }: { clients: Client[] }) {
   </div></div>;
 }
 
+
+const MSG_CARDS_CSS = `
+.lp-msg-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.lp-msg-card{border:1px solid rgba(127,127,127,.22);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:10px;transition:transform .15s,border-color .15s}
+.lp-msg-card:hover{transform:translateY(-1px);border-color:var(--brand-secondary,var(--brand-primary,#287cac))}
+.lp-msg-card header{display:flex;align-items:center;gap:8px;min-width:0}.lp-msg-card header img,.lp-msg-card header i{width:26px;height:26px;border-radius:7px;object-fit:contain;flex:none;display:grid;place-items:center;font-style:normal;font-weight:800;background:rgba(127,127,127,.12)}
+.lp-msg-card header b{font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lp-msg-card .ops-conn{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.lp-msg-card .ops-conn a.lp-msg-ico{position:relative;display:grid;place-items:center;width:28px;height:28px;border:1px solid rgba(127,127,127,.3);border-radius:8px;color:inherit}
+.lp-msg-card .ops-conn a.lp-msg-ico i{position:absolute;right:-3px;top:-3px;width:9px;height:9px;border-radius:50%;background:#dc2626;border:2px solid var(--f2b-white,#fff)}
+.lp-msg-card .ops-conn a.lp-msg-ico:hover{transform:translateY(-1px);border-color:var(--brand-secondary,var(--brand-primary,#287cac))}
+.lp-msg-card .ops-conn button:disabled{cursor:default}
+.lp-msg-pages-on{display:flex;flex-wrap:wrap;gap:4px}.lp-msg-pages-on small{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;padding:2px 8px;border-radius:99px;background:rgba(34,197,94,.12)}
+.lp-msg-pages-on button{border:0;background:none;color:inherit;cursor:pointer;font-size:13px;line-height:1;padding:0}
+`;
