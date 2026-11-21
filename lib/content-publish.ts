@@ -39,9 +39,15 @@ async function pageFor(ownerId: string, clientId: string) {
   const tok = await pageTokenFor(ownerId, page.pageId);
   return tok ? { pageId: page.pageId, igId: page.igId, token: tok.token } : null;
 }
+const isVideoUrl = (u: string) => { try { return /\.(mp4|mov|m4v|webm)(?:$|[?&#])/i.test(decodeURIComponent(u)); } catch { return false; } };
+/** Video drafts carry the AI's filming plan after this marker; it is never posted. */
+const stripPlan = (caption: string) => { const i = caption.indexOf("🎬 Video plan (not posted):"); return (i >= 0 ? caption.slice(0, i) : caption).replace(/\s*-{3,}\s*$/, "").trim(); };
 async function postFacebook(ownerId: string, clientId: string, caption: string, images: string[]) {
   const p = await pageFor(ownerId, clientId);
   if (!p) throw new Error("No Facebook Page is connected for this client. Connect it in Launchpad → Messaging.");
+  const video = images.find(isVideoUrl);
+  if (video) { const r = await graph<{ id?: string }>("POST", `${p.pageId}/videos`, p.token, { file_url: absolute(video), description: caption }); const id = r.id || ""; return { id, url: id ? `https://www.facebook.com/${id}` : "" }; }
+  images = images.filter((u) => !isVideoUrl(u));
   if (images.length === 1) { const r = await graph<{ id?: string; post_id?: string }>("POST", `${p.pageId}/photos`, p.token, { url: absolute(images[0]), caption }); const id = r.post_id || r.id || ""; return { id, url: id ? `https://www.facebook.com/${id}` : "" }; }
   if (images.length > 1) {
     const media: string[] = [];
@@ -54,9 +60,14 @@ async function postFacebook(ownerId: string, clientId: string, caption: string, 
 async function postInstagram(ownerId: string, clientId: string, caption: string, images: string[]) {
   const p = await pageFor(ownerId, clientId);
   if (!p?.igId) throw new Error("No Instagram business account is linked to this client's Facebook Page.");
-  if (!images.length) throw new Error("Instagram posts need at least one image.");
+  if (!images.length) throw new Error("Instagram posts need at least one image or video.");
   let creation: string;
-  if (images.length === 1) creation = (await graph<{ id: string }>("POST", `${p.igId}/media`, p.token, { image_url: absolute(images[0]), caption })).id;
+  const video = images.find(isVideoUrl);
+  if (video) {
+    // Reels: Instagram processes the video first; wait until it's ready (up to ~60s) before publishing.
+    creation = (await graph<{ id: string }>("POST", `${p.igId}/media`, p.token, { media_type: "REELS", video_url: absolute(video), caption, share_to_feed: "true" })).id;
+    for (let i = 0; i < 12; i++) { const st = await graph<{ status_code?: string }>("GET", creation, p.token, { fields: "status_code" }).catch(() => ({} as { status_code?: string })); if (st.status_code === "FINISHED") break; if (st.status_code === "ERROR") throw new Error("Instagram couldn't process this video (use MP4, H.264, under 90 seconds)."); await new Promise((r) => setTimeout(r, 5000)); }
+  } else if (images.length === 1) creation = (await graph<{ id: string }>("POST", `${p.igId}/media`, p.token, { image_url: absolute(images[0]), caption })).id;
   else {
     const children: string[] = [];
     for (const img of images.slice(0, 10)) children.push((await graph<{ id: string }>("POST", `${p.igId}/media`, p.token, { image_url: absolute(img), is_carousel_item: "true" })).id);
@@ -115,6 +126,7 @@ async function postGoogle(ownerId: string, clientId: string, caption: string, im
   const token = await gbpToken(ownerId);
   const locId = loc.location.replace(/^locations\//, "");
   const body: Record<string, unknown> = { languageCode: "en", summary: caption.slice(0, 1500), topicType: "STANDARD" };
+  images = images.filter((u) => !isVideoUrl(u));
   if (images.length) body.media = images.slice(0, 1).map((u) => ({ mediaFormat: "PHOTO", sourceUrl: absolute(u) }));
   const r = await gapi<{ name?: string; searchUrl?: string }>(`https://mybusiness.googleapis.com/v4/${loc.account}/locations/${locId}/localPosts`, token, { method: "POST", body: JSON.stringify(body) });
   return { id: r.name || "", url: r.searchUrl || "" };
@@ -132,6 +144,7 @@ export async function listGooglePosts(ownerId: string, clientId: string) {
 export async function publishPost(db: Db, ownerId: string, row: Row) {
   await ensureContentTables(db);
   const platforms = parse<string[]>(row.platforms, []), images = parse<string[]>(row.images, []);
+  row = { ...row, caption: stripPlan(row.caption) };
   const prev = parse<Result>(row.publish_result, {});
   const result: Result = { ...prev };
   for (const p of platforms) {

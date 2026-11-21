@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PostEditor, SocialPlanner, STATUS_LABEL, splitCaption, type Post } from "./social-planner";
 import { PlatformIcon } from "./platform-icon";
+import { MediaLibraryView } from "./media-library-view";
 
 // Top-bar → Content: one content calendar for every social platform, for the agency and every sub-account.
 //  · Calendar (one client), List and Approvals (agency) views; filter by person, platform and status
@@ -25,6 +26,10 @@ export function ContentView({ clients, scopeClientId = "", isAgency }: { clients
   const [msg, setMsg] = useState("");
   const [gbp, setGbp] = useState<{ connected: boolean; email: string; locations: Array<{ location: string; title: string; clientId: string }> } | null>(null);
   const [seed, setSeed] = useState(0);
+  const [mediaOpen, setMediaOpen] = useState(false);
+  const [drive, setDrive] = useState<{ connected: boolean; mine: boolean; email: string } | null>(null);
+  useEffect(() => { let live = true; fetch("/api/media-library?status=1", { cache: "no-store" }).then((r) => r.ok ? r.json() : null).then((j) => { if (live && j?.drive) setDrive(j.drive); }).catch(() => undefined); return () => { live = false; }; }, []);
+  useEffect(() => { if (!mediaOpen) return; const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setMediaOpen(false); }; document.addEventListener("keydown", esc); return () => document.removeEventListener("keydown", esc); }, [mediaOpen]);
   const [editMedia, setEditMedia] = useState<Array<{ id: string; url: string; name: string; kind: string; createdBy?: string }>>([]);
   // The list view's editor gets that client's Media Library too.
   useEffect(() => { if (!edit) return; let live = true; fetch(`/api/media-library?scope=${encodeURIComponent(edit.clientId)}&kind=image`, { cache: "no-store" }).then((r) => r.ok ? r.json() : null).then((j) => { if (live && j) setEditMedia(j.items || []); }).catch(() => undefined); return () => { live = false; }; }, [edit]);
@@ -58,9 +63,18 @@ export function ContentView({ clients, scopeClientId = "", isAgency }: { clients
       <select value={person} onChange={(e) => setPerson(e.target.value)} aria-label="Person"><option value="">Everyone</option>{people.map((p) => <option key={p}>{p}</option>)}</select>
       <select value={platform} onChange={(e) => setPlatform(e.target.value)} aria-label="Platform"><option value="">All platforms</option>{PLATFORMS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
       <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status"><option value="">Any status</option>{Object.entries(STATUS_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
-      <a className="cv-drive" href="/api/media-library/drive?mine=1" title="Connect your own Google Drive to pick images from it">Connect my Google Drive</a>
+      <span className="cv-tools">
+        <button type="button" className="cv-tool" onClick={() => setMediaOpen(true)} title="Open the Media Library"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.5-3.5L8 21" /></svg>Media</button>
+        <a className={`cv-tool${drive?.mine ? " on" : ""}`} href="/api/media-library/drive?mine=1" title={drive?.mine ? `Connected as ${drive.email}. Click to use a different account.` : "Connect your own Google Drive to pick photos and videos from it"}><svg width="16" height="16" viewBox="0 0 87.3 78" aria-hidden="true"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3L27.5 53H0c0 1.55.4 3.1 1.2 4.5z" fill="#0066da" /><path d="M43.65 25 29.9 1.2c-1.35.8-2.5 1.9-3.3 3.3L1.2 48.5A9 9 0 0 0 0 53h27.5z" fill="#00ac47" /><path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5H59.8l5.85 11.5z" fill="#ea4335" /><path d="M43.65 25 57.4 1.2C56.05.4 54.5 0 52.9 0H34.4c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d" /><path d="M59.8 53H27.5L13.75 76.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc" /><path d="M73.4 26.5 60.7 4.5c-.8-1.4-1.95-2.5-3.3-3.3L43.65 25 59.8 53h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00" /></svg>{drive?.mine ? "Google Drive connected" : "Connect Google Drive"}</a>
+      </span>
     </div>
     {msg && <p className="cv-msg" role="status">{msg}</p>}
+    {mediaOpen && <div className="cv-media-pop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setMediaOpen(false); }}>
+      <div className="cv-media-box" role="dialog" aria-modal="true" aria-label="Media Library">
+        <header><b>Media Library{client ? ` · ${client.name}` : ""}</b><small>Upload photos and videos here, or import them from Google Drive. They show up in every post's picker.</small><button type="button" className="cv-media-x" aria-label="Close" onClick={() => { setMediaOpen(false); setSeed((n) => n + 1); }}>×</button></header>
+        <div className="cv-media-body"><MediaLibraryView scopeClientId={scopeClientId || clientId} clients={clients} active /></div>
+      </div>
+    </div>}
 
     {isAgency && clientId && <div className="cv-conn">
       <span><b>Facebook &amp; Instagram posting</b><a href={`/api/meta-messaging/connect?clientId=${encodeURIComponent(clientId)}&posting=1`}>Connect / reconnect with posting →</a></span>
@@ -91,7 +105,18 @@ const CSS = `
 .cv .cv-seg{display:inline-flex;gap:3px;padding:3px;border-radius:11px;background:color-mix(in srgb,currentColor 6%,transparent)}
 .cv .cv-seg button{border:0;background:transparent;color:inherit;font:inherit;font-size:13px;font-weight:700;padding:6px 12px;border-radius:8px;cursor:pointer}
 .cv .cv-seg button.on{background:var(--brand-primary,#101828);color:#fff}
-.cv .cv-drive{margin-left:auto;font-size:13px;font-weight:700;color:var(--brand-primary,#101828)}
+.cv .cv-tools{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.cv .cv-tool{display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 14px;border-radius:12px;border:1px solid rgba(16,24,40,.12);background:rgba(255,255,255,.7);color:inherit;font:inherit;font-size:13px;font-weight:700;text-decoration:none;cursor:pointer;transition:transform .15s,box-shadow .15s,border-color .15s}
+.cv .cv-tool:hover{transform:translateY(-1px);border-color:var(--brand-secondary,var(--brand-primary,#101828));box-shadow:0 6px 16px rgba(16,24,40,.1)}
+.cv .cv-tool.on{border-color:#16a34a55}
+.dark-mode .cv .cv-tool{background:#1b2227;border-color:#2f3a41;color:#e7edf1}
+.cv-media-pop{position:fixed;inset:0;z-index:1000;background:rgba(15,23,42,.5);display:flex;align-items:center;justify-content:center;padding:18px}
+.cv-media-box{width:min(1200px,100%);height:min(90vh,920px);background:#fff;color:#0f172a;border-radius:18px;box-shadow:0 30px 80px rgba(0,0,0,.3);display:flex;flex-direction:column;overflow:hidden}
+.cv-media-box>header{display:flex;align-items:baseline;gap:12px;padding:14px 18px;border-bottom:1px solid #eef2f5;flex-wrap:wrap}.cv-media-box>header b{font-size:16px}.cv-media-box>header small{color:#667085;font-size:12.5px;flex:1}
+.cv-media-x{border:0;background:#f1f5f9;width:34px;height:34px;border-radius:50%;font-size:20px;cursor:pointer;color:inherit}
+.cv-media-body{flex:1;overflow:auto;padding:4px 14px 14px}
+.dark-mode .cv-media-box{background:#1b2227;color:#e7edf1}.dark-mode .cv-media-box>header{border-color:#2f3a41}.dark-mode .cv-media-x{background:#2a343b}
+@media(max-width:760px){.cv-media-pop{padding:0}.cv-media-box{height:100%;border-radius:0}}
 .cv .cv-msg{margin:0;font-size:13px;padding:8px 12px;border-radius:10px;background:color-mix(in srgb,currentColor 5%,transparent)}
 .cv .cv-conn{display:flex;flex-wrap:wrap;gap:10px 22px;align-items:center;padding:12px 14px;border:1px solid rgba(127,127,127,.16);border-radius:14px;font-size:13px}
 .cv .cv-conn span{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.cv .cv-conn a{font-weight:700;color:var(--brand-primary,#101828)}
@@ -105,5 +130,5 @@ const CSS = `
 .cv .cv-main{display:flex;flex-direction:column;min-width:0}.cv .cv-main b{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cv .cv-main small{font-size:12px;opacity:.65}
 .cv .cv-by{display:flex;flex-direction:column;font-size:13px;font-weight:600}.cv .cv-by small{font-weight:400;opacity:.6;font-size:11.5px}
 body.f2b-dark .cv .cv-row,.dark-mode .cv .cv-row{background:rgba(255,255,255,.03)}
-@media (max-width:760px){.cv .cv-row{grid-template-columns:48px minmax(0,1fr) auto}.cv .cv-by{display:none}.cv .cv-drive{margin-left:0}}
+@media (max-width:760px){.cv .cv-row{grid-template-columns:48px minmax(0,1fr) auto}.cv .cv-by{display:none}.cv .cv-tools{margin-left:0}}
 `;

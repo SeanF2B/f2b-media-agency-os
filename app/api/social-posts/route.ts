@@ -106,20 +106,23 @@ export async function POST(request: Request) {
       const provider = await resolveAiProvider(env as any, auth.ownerId);
       const endpoint = provider ? aiEndpoint(env as any, "responses", provider) : null;
       if (!provider || !endpoint) return respond({ error: "Add an AI key in Settings → APIs to generate posts." }, 400);
-      const count = Math.min(12, Math.max(1, Number(b.count) || 1));
+      const briefs = (Array.isArray(b.briefs) ? b.briefs : []).map((x: unknown) => String(x || "").slice(0, 200)).filter(Boolean).slice(0, 12);
+      const count = briefs.length || Math.min(12, Math.max(1, Number(b.count) || 1));
       const instructions = [
         `You write social media posts for ${String(b.clientName || "a local business")}.`,
         b.about ? `About the business: ${String(b.about).slice(0, 1500)}` : "",
         `Platforms: ${(Array.isArray(b.platforms) && b.platforms.length ? b.platforms : ["facebook", "instagram"]).join(", ")}.`,
         "Each post: a hook first line, 2-4 short lines, a clear call to action, then 3-6 relevant hashtags. Warm, local, human. No made-up prices, offers or awards. Emojis sparingly.",
-        `Return ONLY JSON: {"posts":[{"caption":"...","idea":"short label"}]} with exactly ${count} posts, each a different angle (behind the scenes, customer story, tip, offer reminder, before/after, team, FAQ).`,
+        briefs.length
+          ? `Write exactly ${count} posts, in this order, each following its brief:\n${briefs.map((x: string, i: number) => `${i + 1}. ${x}`).join("\n")}\nWhen a brief names a service, the whole post is about that service. For VIDEO posts the caption suits a Reel, and add "videoPlan": a 15-30 second filming plan of 3-5 short numbered shots (hook first, what to film, on-screen text), plain text. Photo posts have no videoPlan.\nReturn ONLY JSON: {"posts":[{"caption":"...","idea":"short label","videoPlan":"..."}]}.`
+          : `Return ONLY JSON: {"posts":[{"caption":"...","idea":"short label"}]} with exactly ${count} posts, each a different angle (behind the scenes, customer story, tip, offer reminder, before/after, team, FAQ).`,
       ].filter(Boolean).join("\n");
       const input = String(b.prompt || "Write engaging posts for this month.").slice(0, 1500);
-      const res = await fetch(endpoint, { method: "POST", headers: aiHeaders(env as any, provider)!, body: JSON.stringify({ model: aiModel(env as any, undefined, provider), instructions, input, max_output_tokens: 2400 }), signal: AbortSignal.timeout(45000) });
+      const res = await fetch(endpoint, { method: "POST", headers: aiHeaders(env as any, provider)!, body: JSON.stringify({ model: aiModel(env as any, undefined, provider), instructions, input, max_output_tokens: briefs.length ? 4200 : 2400 }), signal: AbortSignal.timeout(45000) });
       if (!res.ok) return respond({ error: "The AI couldn't write posts right now. Try again." }, 502);
       const text = outputText(await res.json());
-      const json = parse<{ posts?: Array<{ caption?: string; idea?: string }> }>(text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1), {});
-      const posts = (json.posts || []).map((p) => ({ caption: String(p.caption || "").slice(0, 3000), idea: String(p.idea || "").slice(0, 80) })).filter((p) => p.caption);
+      const json = parse<{ posts?: Array<{ caption?: string; idea?: string; videoPlan?: string }> }>(text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1), {});
+      const posts = (json.posts || []).map((p) => ({ caption: String(p.caption || "").slice(0, 3000), idea: String(p.idea || "").slice(0, 80), videoPlan: String(p.videoPlan || "").slice(0, 1200) })).filter((p) => p.caption);
       if (!posts.length) return respond({ error: "The AI reply couldn't be read. Try again." }, 502);
       return respond({ posts });
     }

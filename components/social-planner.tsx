@@ -19,6 +19,12 @@ export const STATUS_LABEL: Record<string, string> = { draft: "Draft", pending: "
 const initials = (n = "") => n.replace(/\|.*$/, "").trim().split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase() || "?";
 const PLATFORMS: Array<[string, string, string]> = [["facebook", "Facebook", "#1877f2"], ["instagram", "Instagram", "#e1306c"], ["google", "Google Business", "#34a853"], ["linkedin", "LinkedIn", "#0a66c2"], ["tiktok", "TikTok", "#111"]];
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+/** Videos are stored in the same list as photos; the file extension tells them apart. */
+export const isVideo = (url: string) => /\.(mp4|mov|m4v|webm)(?:$|[?&#])/i.test(decodeURIComponent(url || ""));
+/** Marker for the AI's filming plan on video drafts. Everything after it is stripped before posting. */
+export const VIDEO_PLAN_MARK = "🎬 Video plan (not posted):";
+export const postableCaption = (caption: string) => { const i = caption.indexOf(VIDEO_PLAN_MARK); return (i >= 0 ? caption.slice(0, i) : caption).replace(/\s*-{3,}\s*$/, "").trim(); };
+const MediaThumb = ({ url, alt = "" }: { url: string; alt?: string }) => isVideo(url) ? <video src={url} muted playsInline preload="metadata" aria-label={alt || "Video"} /> : <img src={url} alt={alt} loading="lazy" />;
 const hm = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 
 async function call<T>(url: string, body?: unknown): Promise<T> {
@@ -47,7 +53,8 @@ export function SocialPlanner({ clientId, clientName, filters = {}, canApprove =
     catch (e) { setStatus(e instanceof Error ? e.message : "Couldn't load posts."); }
   }, [clientId, month, filters.createdBy, filters.platform, filters.status]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { void load(); }, [load]);
-  useEffect(() => { let live = true; call<{ items: Media[] }>(`/api/media-library?scope=${encodeURIComponent(clientId)}&kind=image`).then((r) => { if (live) setMedia(r.items || []); }).catch(() => undefined); return () => { live = false; }; }, [clientId]);
+  useEffect(() => { let live = true; Promise.all([call<{ items: Media[] }>(`/api/media-library?scope=${encodeURIComponent(clientId)}&kind=image`).catch(() => ({ items: [] as Media[] })), call<{ items: Media[] }>(`/api/media-library?scope=${encodeURIComponent(clientId)}&kind=video`).catch(() => ({ items: [] as Media[] }))]).then(([a, b]) => { if (live) setMedia([...(a.items || []), ...(b.items || [])]); }).catch(() => undefined); return () => { live = false; }; }, [clientId]);
+  const [planOpen, setPlanOpen] = useState(false);
 
   const days = useMemo(() => { const start = new Date(month); const lead = (start.getDay() + 6) % 7; start.setDate(start.getDate() - lead); return Array.from({ length: 42 }, (_, i) => { const d = new Date(start); d.setDate(start.getDate() + i); return d; }); }, [month]);
   const shown = useMemo(() => (sample ? [...posts, ...demo] : posts), [sample, posts, demo]);
@@ -56,31 +63,52 @@ export function SocialPlanner({ clientId, clientName, filters = {}, canApprove =
   const due = posts.filter((p) => p.status === "scheduled" && Date.parse(p.postAt) < Date.now());
 
   const newPost = (day: Date) => { const d = new Date(day); d.setHours(10, 0, 0, 0); setEdit({ id: "", clientId, postAt: d.toISOString(), platforms: ["facebook", "instagram"], caption: "", images: [], status: "draft" }); };
-  // Plan the month: AI writes posts for Tue / Thu / Sat and attaches photos from the Media Library.
-  const planMonth = async () => {
-    setPlanning(true); setStatus("Writing this month's posts…");
+  // Plan the month with the options the person picked (days, frequency, times, platforms, photo/video, theme per post).
+  const planMonth = async (opt: PlanOptions) => {
+    setPlanOpen(false); setPlanning(true); setStatus("Writing this month's posts…");
     try {
-      const slots = days.filter((d) => d.getMonth() === month.getMonth() && [2, 4, 6].includes(d.getDay()) && d.getTime() >= new Date().setHours(0, 0, 0, 0) && !byDay.get(ymd(d))?.length).slice(0, 12);
-      if (!slots.length) { setStatus("No free Tue/Thu/Sat left this month — try next month."); return; }
+      const slots = planSlots(days, month, opt, (d) => Boolean(byDay.get(ymd(d))?.length));
+      if (!slots.length) { setStatus("No free days left this month with those settings. Pick more days, or try next month."); return; }
+      const themes = opt.mode === "services" ? opt.services : opt.mode === "custom" ? opt.custom.split("\n").map((x) => x.trim()).filter(Boolean) : [];
+      const n = themes.length && !opt.rotate ? Math.min(themes.length, slots.length) : slots.length;
+      const plan = slots.slice(0, n).map((d, i) => {
+        const fmt: "photo" | "video" = opt.format === "video" ? "video" : opt.format === "mix" ? (i % 2 ? "video" : "photo") : "photo";
+        const time = opt.time2 && i % 2 ? opt.time2 : opt.time1 || "10:00";
+        const at = new Date(d); const [hh, mm] = time.split(":").map(Number); at.setHours(hh || 10, mm || 0, 0, 0);
+        return { at, fmt, theme: themes.length ? themes[i % themes.length] : "" };
+      });
+      const briefs = plan.map((x) => [x.fmt === "video" ? "VIDEO (Reel / short video)" : "PHOTO post", x.theme ? `about: ${x.theme}` : "", `for ${x.at.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}`].filter(Boolean).join(" · "));
+      const monthName = month.toLocaleDateString("en-GB", { month: "long" });
+      // Captions in batches of 10 (the AI writes a few at a time so they stay varied).
+      const results: Array<{ caption: string; videoPlan?: string }> = [];
+      let aiFailed = "";
+      for (let i = 0; i < briefs.length; i += 10) {
+        const chunk = briefs.slice(i, i + 10);
+        try { const r = await call<{ posts: Array<{ caption: string; videoPlan?: string }> }>("/api/social-posts", { action: "generate", clientId, clientName, count: chunk.length, platforms: opt.platforms, briefs: chunk, prompt: `Plan ${chunk.length} posts for ${monthName}.${opt.extra ? ` Notes: ${opt.extra}` : ""}` }); results.push(...r.posts); }
+        catch (e) { aiFailed = e instanceof Error ? e.message : "AI unavailable"; break; }
+      }
+      const name = clientName || "us";
+      const fallback = (theme: string, k: number) => theme ? `${theme} at ${name} ✨ Get in touch to book yours today.\n\n#${theme.replace(/[^\p{L}\p{N}]+/gu, "").toLowerCase()} #local #booknow` : [`Weekend bookings are filling up fast at ${name}. Message us today to grab a spot ✨\n\n#booknow #local #smallbusiness`, `A look at some recent work from the ${name} team. Which is your favourite? 👇\n\n#recentwork #behindthescenes`, `Got a question before you book? Our team is happy to help — just drop us a message.\n\n#askus #customercare`, `Thank you to everyone who visited ${name} this month. Your reviews mean the world to us 🙏\n\n#thankyou #reviews`][k % 4];
+      if (aiFailed && !sample) { setStatus(aiFailed); return; }
+      // Photos / videos from the Media Library, matched to the theme by file name where possible.
+      let photos = media.filter((m) => !isVideo(m.url) && m.kind !== "video");
+      const videos = media.filter((m) => isVideo(m.url) || m.kind === "video");
+      if (sample && !photos.length) { try { const site = await call<{ gallery?: string[]; work?: Record<string, string[]> }>(`/api/scheduling?clientId=${encodeURIComponent(clientId)}&view=site`); photos = [...new Set([...Object.values(site.work || {}).flat(), ...(site.gallery || [])])].map((url, i) => ({ id: `site-${i}`, url, name: "", kind: "image" })); } catch { /* no photos */ } }
+      const pick = (list: Media[], theme: string, i: number) => { if (!list.length) return ""; const words = theme.toLowerCase().split(/\W+/).filter((w) => w.length > 3); const hit = words.length ? list.find((m) => words.some((w) => (m.name || "").toLowerCase().includes(w))) : undefined; return (hit || list[i % list.length]).url; };
+      const made: Post[] = plan.map((x, i) => {
+        const r = results[i]; const base = r?.caption || fallback(x.theme, i);
+        const caption = x.fmt === "video" ? `${base}\n\n---\n${VIDEO_PLAN_MARK}\n${r?.videoPlan || "Film a 15–30 second clip: hook in the first 2 seconds, show the work up close, end on the result with a call to book."}` : base;
+        const file = x.fmt === "video" ? pick(videos, x.theme, i) || "" : pick(photos, x.theme, i);
+        return { id: sample ? `sample-${ymd(x.at)}-${i}` : "", clientId, postAt: x.at.toISOString(), platforms: opt.platforms, caption, images: file ? [file] : [], status: "draft", createdByName: sample ? "Sample" : undefined };
+      });
+      const noVideo = made.filter((m) => m.caption.includes(VIDEO_PLAN_MARK) && !m.images.length).length;
       if (sample) {
-        // Example run: real AI captions + the client's own photos (Media Library, else their website's work), kept on screen only.
-        let captions: string[] = [];
-        try { const r = await call<{ posts: Array<{ caption: string }> }>("/api/social-posts", { action: "generate", clientId, clientName, count: slots.length, platforms: ["facebook", "instagram"], prompt: `Plan ${slots.length} posts for ${month.toLocaleDateString("en-GB", { month: "long" })}.` }); captions = r.posts.map((x) => x.caption).filter(Boolean); } catch { /* no AI key: use the examples below */ }
-        const name = clientName || "us";
-        const fallback = [`Weekend bookings are filling up fast at ${name}. Message us today to grab a spot ✨\n\n#booknow #local #smallbusiness`, `A look at some recent work from the ${name} team. Which is your favourite? 👇\n\n#recentwork #behindthescenes`, `Got a question before you book? Our team is happy to help — just drop us a message.\n\n#askus #customercare`, `Thank you to everyone who visited ${name} this month. Your reviews mean the world to us 🙏\n\n#thankyou #reviews`];
-        let pics = media.map((m) => m.url);
-        if (!pics.length) { try { const site = await call<{ gallery?: string[]; work?: Record<string, string[]> }>(`/api/scheduling?clientId=${encodeURIComponent(clientId)}&view=site`); pics = [...new Set([...Object.values(site.work || {}).flat(), ...(site.gallery || [])])]; } catch { /* no photos */ } }
-        const made: Post[] = slots.map((d, i) => { const at = new Date(d); at.setHours(i % 2 ? 18 : 10, 0, 0, 0); return { id: `sample-${ymd(d)}-${i}`, clientId, postAt: at.toISOString(), platforms: ["facebook", "instagram"], caption: captions[i] || fallback[i % fallback.length], images: pics.length ? [pics[i % pics.length]] : [], status: "draft", createdByName: "Sample" }; });
-        setDemo((cur) => [...cur.filter((x) => !made.some((m) => ymd(new Date(m.postAt)) === ymd(new Date(x.postAt)))), ...made]);
-        setStatus(`Sample: drafted ${made.length} example posts${captions.length ? " with AI" : ""}. They're not saved — open one and Save draft to keep it.`);
+        setDemo((cur) => [...cur.filter((c) => !made.some((m) => ymd(new Date(m.postAt)) === ymd(new Date(c.postAt)))), ...made]);
+        setStatus(`Sample: drafted ${made.length} example posts${results.length ? " with AI" : ""}. They're not saved — open one and Save draft to keep it.`);
         return;
       }
-      const r = await call<{ posts: Array<{ caption: string }> }>("/api/social-posts", { action: "generate", clientId, clientName, count: slots.length, platforms: ["facebook", "instagram"], prompt: `Plan ${slots.length} posts for ${month.toLocaleDateString("en-GB", { month: "long" })}.` });
-      for (const [i, p] of r.posts.slice(0, slots.length).entries()) {
-        const at = new Date(slots[i]); at.setHours(i % 2 ? 18 : 10, 0, 0, 0);
-        await call("/api/social-posts", { action: "save", clientId, post: { postAt: at.toISOString(), platforms: ["facebook", "instagram"], caption: p.caption, images: media.length ? [media[i % media.length].url] : [], status: "draft" } });
-      }
-      setStatus(`Drafted ${Math.min(r.posts.length, slots.length)} posts with descriptions and hashtags. Open any to check it, then Schedule.`); await load();
+      for (const m of made) await call("/api/social-posts", { action: "save", clientId, post: { postAt: m.postAt, platforms: m.platforms, caption: m.caption, images: m.images, status: "draft" } });
+      setStatus(`Drafted ${made.length} posts${themes.length ? ` (${opt.mode === "services" ? "by service" : "your ideas"})` : ""}.${noVideo ? ` ${noVideo} video post${noVideo === 1 ? " needs" : "s need"} a video: each has a filming plan, so record it and attach it.` : ""} Open any to check it, then Schedule.`); await load();
     } catch (e) { setStatus(e instanceof Error ? e.message : "Couldn't plan the month."); }
     finally { setPlanning(false); }
   };
@@ -88,7 +116,7 @@ export function SocialPlanner({ clientId, clientName, filters = {}, canApprove =
   return <section className="sp" aria-label="Social posts">
     <header className="sp-head">
       <div><h3>📅 Social posts</h3><p>Plan {clientName}'s posts on a calendar, write them with AI and add photos from the Media Library.</p></div>
-      <div className="sp-actions"><span className="sp-count"><b>{upcoming}</b> upcoming</span><button type="button" className="secondary-button" disabled={planning} onClick={() => void planMonth()}>{planning ? "Drafting…" : "✨ Draft this month’s posts"}</button><button type="button" className="primary-button" onClick={() => newPost(new Date())}>+ New post</button></div>
+      <div className="sp-actions"><span className="sp-count"><b>{upcoming}</b> upcoming</span><button type="button" className="secondary-button" disabled={planning} onClick={() => setPlanOpen(true)}>{planning ? "Drafting…" : "✨ Draft this month’s posts"}</button><button type="button" className="primary-button" onClick={() => newPost(new Date())}>+ New post</button></div>
     </header>
     {status && <p className="sp-status" role="status">{status}</p>}
     {due.length > 0 && <div className="sp-due">⏰ {due.length} post{due.length === 1 ? " is" : "s are"} ready to go out: {due.map((p) => <button key={p.id} type="button" className="text-button" onClick={() => setEdit(p)}>{new Date(p.postAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</button>)}</div>}
@@ -99,11 +127,12 @@ export function SocialPlanner({ clientId, clientName, filters = {}, canApprove =
         return <div key={k} className={`sp-day${out ? " out" : ""}${today ? " today" : ""}`} onClick={(e) => { if (e.target === e.currentTarget) newPost(d); }}>
           <span className="sp-date" onClick={() => newPost(d)}>{d.getDate()}</span>
           {list.map((p) => <button key={p.id} type="button" className={`sp-post ${p.status}${p.id.startsWith("sample-") ? " sample" : ""}`} onClick={() => { if (p.id.startsWith("sample-")) { setOpened(p.id); setEdit({ ...p, id: "", createdByName: "" }); } else { setOpened(""); setEdit(p); } }} title={p.caption}>
-            {p.images[0] && <img src={p.images[0]} alt="" loading="lazy" />}
+            {p.images[0] ? <MediaThumb url={p.images[0]} /> : p.caption.includes(VIDEO_PLAN_MARK) ? <i className="sp-vid-need" title="Needs a video">🎬</i> : null}
             <span><em>{hm(p.postAt)} <span className="sp-icons">{p.platforms.map((x) => <PlatformIcon key={x} id={x} size={12} />)}</span>{p.createdByName && <b className="sp-who" title={`By ${p.createdByName}`}>{initials(p.createdByName)}</b>}</em><small>{p.caption.split("\n")[0].slice(0, 60) || "Untitled post"}</small></span>
           </button>)}
         </div>; })}
     </div>
+    {planOpen && <PlanModal clientId={clientId} month={month} onClose={() => setPlanOpen(false)} onRun={(o) => void planMonth(o)} preview={(o) => planSlots(days, month, o, (d) => Boolean(byDay.get(ymd(d))?.length)).length} />}
     {edit && <PostEditor post={edit} clientId={clientId} clientName={clientName} media={media} canApprove={canApprove} onMedia={(m) => setMedia((cur) => [m, ...cur])} onClose={() => setEdit(null)} onSaved={async (msg) => { setEdit(null); if (opened) { setDemo((cur) => cur.filter((x) => x.id !== opened)); setOpened(""); } setStatus(msg); await load(); onChanged?.(); }} />}
   </section>;
 }
@@ -112,7 +141,7 @@ export function PostEditor({ post, clientId, clientName, media, onMedia, onClose
   const [uploader, setUploader] = useState("");
   const [drive, setDrive] = useState<{ connected: boolean; files: Array<{ id: string; name: string; thumbnailLink?: string; mimeType?: string }> } | null>(null);
   const [note, setNote] = useState("");
-  const openDrive = async () => { setErr(""); try { const r = await call<{ connected: boolean; files: Array<{ id: string; name: string; thumbnailLink?: string; mimeType?: string }> }>("/api/media-library?drive=1&folder=root"); setDrive({ connected: r.connected, files: (r.files || []).filter((f) => String(f.mimeType || "").startsWith("image/")) }); } catch (e) { setErr(e instanceof Error ? e.message : "Google Drive couldn't be opened."); } };
+  const openDrive = async () => { setErr(""); try { const r = await call<{ connected: boolean; files: Array<{ id: string; name: string; thumbnailLink?: string; mimeType?: string }> }>("/api/media-library?drive=1&folder=root"); setDrive({ connected: r.connected, files: (r.files || []).filter((f) => /^(image|video)\//.test(String(f.mimeType || ""))) }); } catch (e) { setErr(e instanceof Error ? e.message : "Google Drive couldn't be opened."); } };
   const importDrive = async (fileId: string, name: string) => { setBusy("upload"); try { const r = await call<{ item: Media }>("/api/media-library", { action: "importDrive", scope: clientId, fileId, name, folder: "Social posts" }); onMedia(r.item); setP((cur) => ({ ...cur, images: [...cur.images, r.item.url].slice(0, 10) })); } catch (e) { setErr(e instanceof Error ? e.message : "Couldn't import from Drive."); } finally { setBusy(""); } };
   const review = async (action: "approve" | "reject" | "publish") => { setBusy("save"); setErr(""); try { if (action !== "publish") await call("/api/social-posts", { action: "save", clientId, post: p }); const r = await call<{ result?: { status: string } }>("/api/social-posts", { action, clientId, id: p.id, note }); onSaved(action === "approve" ? "Approved and scheduled." : action === "reject" ? "Sent back with your note." : r.result?.status === "posted" ? "Published ✓" : "Publish attempted — see results on the post."); } catch (e) { setErr(e instanceof Error ? e.message : "Couldn't do that."); } finally { setBusy(""); } };
   const [p, setP] = useState<Post>(post);
@@ -126,7 +155,7 @@ export function PostEditor({ post, clientId, clientName, media, onMedia, onClose
   const setWhen = (date: string, time: string) => setP({ ...p, postAt: new Date(`${date}T${time}:00`).toISOString() });
   const write = async () => { setBusy("ai"); setErr(""); try { const r = await call<{ posts: Array<{ caption: string }> }>("/api/social-posts", { action: "generate", clientId, clientName, count: 3, platforms: p.platforms, prompt: prompt || p.caption || "A post for this week." }); setIdeas(r.posts.map((x) => x.caption)); } catch (e) { setErr(e instanceof Error ? e.message : "No ideas."); } finally { setBusy(""); } };
   const upload = async (files: FileList | null) => {
-    for (const file of [...(files || [])].filter((f) => f.type.startsWith("image/")).slice(0, 6)) {
+    for (const file of [...(files || [])].filter((f) => f.type.startsWith("image/") || f.type.startsWith("video/")).slice(0, 6)) {
       setBusy("upload");
       try { const q = new URLSearchParams({ scope: clientId, folder: "Social posts", name: file.name.slice(0, 120) }); const res = await fetch(`/api/media-library?${q}`, { method: "PUT", headers: { "Content-Type": file.type || "application/octet-stream" }, body: file }); const out = await res.json().catch(() => ({})) as { item?: Media; error?: string }; if (!res.ok || !out.item) throw new Error(out.error || "Upload failed"); onMedia(out.item); setP((cur) => ({ ...cur, images: [...cur.images, out.item!.url].slice(0, 10) })); }
       catch (e) { setErr(e instanceof Error ? e.message : "Upload failed."); }
@@ -149,25 +178,79 @@ export function PostEditor({ post, clientId, clientName, media, onMedia, onClose
           {ideas.length > 0 && <div className="sp-ideas">{ideas.map((t, i) => { const d = splitCaption(t); return <button key={i} type="button" onClick={() => { setP({ ...p, caption: t }); setIdeas([]); }}><b>Option {i + 1}</b><span>{d.text}</span>{d.tags.length > 0 && <em className="sp-idea-tags">{d.tags.join(" ")}</em>}</button>; })}</div>}
         </div>
         <div className="sp-col">
-          <b className="sp-label">Photos</b>
-          <div className="sp-images">{p.images.map((u) => <span key={u}><img src={u} alt="" /><button type="button" aria-label="Remove" onClick={() => setP({ ...p, images: p.images.filter((x) => x !== u) })}>×</button></span>)}
+          <b className="sp-label">Photos &amp; videos</b>
+          <div className="sp-images">{p.images.map((u) => <span key={u} className={isVideo(u) ? "vid" : ""}><MediaThumb url={u} /><button type="button" aria-label="Remove" onClick={() => setP({ ...p, images: p.images.filter((x) => x !== u) })}>×</button></span>)}
             <button type="button" className="sp-add" onClick={() => setPicker((v) => !v)}>🖼️<small>Media Library</small></button>
             <button type="button" className="sp-add" onClick={() => void openDrive()}>🟢<small>Google Drive</small></button>
-            <label className="sp-add">{busy === "upload" ? "…" : "⬆️"}<small>Upload</small><input type="file" accept="image/*" multiple hidden onChange={(e) => { void upload(e.target.files); e.target.value = ""; }} /></label></div>
+            <label className="sp-add">{busy === "upload" ? "…" : "⬆️"}<small>Upload</small><input type="file" accept="image/*,video/mp4,video/quicktime,video/webm" multiple hidden onChange={(e) => { void upload(e.target.files); e.target.value = ""; }} /></label></div>
           {picker && [...new Set(media.map((m) => m.createdBy).filter(Boolean))].length > 1 && <select className="sp-uploader" value={uploader} onChange={(e) => setUploader(e.target.value)} aria-label="Uploaded by"><option value="">Uploaded by anyone</option>{[...new Set(media.map((m) => m.createdBy).filter(Boolean))].map((u) => <option key={u}>{u}</option>)}</select>}
           {drive && <div className="sp-drive">{!drive.connected ? <p>Connect your own Google Drive to pick images from it. <a className="primary-button" href="/api/media-library/drive?mine=1">Connect my Google Drive</a></p> : drive.files.length ? drive.files.slice(0, 48).map((f) => <button key={f.id} type="button" title={f.name} onClick={() => void importDrive(f.id, f.name)}>{f.thumbnailLink ? <img src={f.thumbnailLink} alt="" referrerPolicy="no-referrer" /> : <span>{f.name}</span>}</button>) : <p>No images in the top of your Drive. <a href="/api/media-library/drive?mine=1">Use a different Google account</a></p>}<button type="button" className="text-button" onClick={() => setDrive(null)}>Close Drive</button></div>}
-          {picker && <div className="sp-picker">{media.filter((m) => !uploader || m.createdBy === uploader).length ? media.filter((m) => !uploader || m.createdBy === uploader).slice(0, 48).map((m) => { const on = p.images.includes(m.url); return <button key={m.id} type="button" className={on ? "on" : ""} onClick={() => setP({ ...p, images: on ? p.images.filter((x) => x !== m.url) : [...p.images, m.url].slice(0, 10) })}><img src={m.url} alt={m.name} loading="lazy" /></button>; }) : <p>No photos in {clientName}'s Media Library yet. Upload one.</p>}</div>}
-          <div className="sp-preview"><b className="sp-label">Preview</b><div className="sp-preview-card"><div className="sp-pv-head"><span>{clientName.slice(0, 1)}</span><b>{clientName}</b><i className="sp-icons">{p.platforms.map((x) => <PlatformIcon key={x} id={x} size={14} />)}</i><small>{new Date(p.postAt).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</small></div>{p.caption && <p>{p.caption}</p>}{p.images[0] && <img src={p.images[0]} alt="" />}</div></div>
+          {picker && <div className="sp-picker">{media.filter((m) => !uploader || m.createdBy === uploader).length ? media.filter((m) => !uploader || m.createdBy === uploader).slice(0, 48).map((m) => { const on = p.images.includes(m.url); return <button key={m.id} type="button" className={on ? "on" : ""} onClick={() => setP({ ...p, images: on ? p.images.filter((x) => x !== m.url) : [...p.images, m.url].slice(0, 10) })}><MediaThumb url={m.url} alt={m.name} /></button>; }) : <p>No photos or videos in {clientName}'s Media Library yet. Upload one.</p>}</div>}
+          {p.images.some(isVideo) && <small className="sp-vid-note">Video posts go out as a Reel on Instagram and a video on Facebook (one video per post). Google Business gets the text only.</small>}
+          {p.caption.includes(VIDEO_PLAN_MARK) && !p.images.some(isVideo) && <small className="sp-vid-note warn">This is a video post: film it using the plan in the description, then attach it here. The plan is never posted.</small>}
+          <div className="sp-preview"><b className="sp-label">Preview</b><div className="sp-preview-card"><div className="sp-pv-head"><span>{clientName.slice(0, 1)}</span><b>{clientName}</b><i className="sp-icons">{p.platforms.map((x) => <PlatformIcon key={x} id={x} size={14} />)}</i><small>{new Date(p.postAt).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</small></div>{p.caption && <p>{postableCaption(p.caption)}</p>}{p.images[0] && (isVideo(p.images[0]) ? <video src={p.images[0]} controls playsInline preload="metadata" /> : <img src={p.images[0]} alt="" />)}</div></div>
         </div>
       </div>
       {err && <p className="sp-err" role="alert">{err}</p>}
-      <footer>{p.id && <button type="button" className="text-button sp-del" onClick={() => void remove()}>Delete</button>}{p.caption && <button type="button" className="text-button" onClick={() => { void navigator.clipboard?.writeText(p.caption); }}>Copy caption</button>}<span style={{ flex: 1 }} />
+      <footer>{p.id && <button type="button" className="text-button sp-del" onClick={() => void remove()}>Delete</button>}{p.caption && <button type="button" className="text-button" onClick={() => { void navigator.clipboard?.writeText(postableCaption(p.caption)); }}>Copy caption</button>}<span style={{ flex: 1 }} />
         {p.status === "scheduled" && Date.parse(p.postAt) < Date.now() && <button type="button" className="secondary-button" disabled={!!busy} onClick={() => void save("posted")}>Mark as posted</button>}
         <button type="button" className="secondary-button" disabled={!!busy} onClick={() => void save("draft")}>Save draft</button>
         {canApprove && p.id && p.status === "pending" ? <><input className="sp-note" placeholder="Note for the client (optional)" value={note} onChange={(e) => setNote(e.target.value)} /><button type="button" className="secondary-button" disabled={!!busy} onClick={() => void review("reject")}>Send back</button><button type="button" className="primary-button" disabled={!!busy} onClick={() => void review("approve")}>Approve &amp; schedule</button></>
           : <button type="button" className="primary-button" disabled={!!busy || !p.caption.trim() || !p.platforms.length} onClick={() => void save("scheduled")}>{canApprove ? "Schedule" : "Send for approval"}</button>}
         {canApprove && p.id && ["scheduled", "failed"].includes(p.status) && <button type="button" className="secondary-button" disabled={!!busy} onClick={() => void review("publish")}>Publish now</button>}</footer>
       {(p.reviewNote || Object.keys(p.publish || {}).length > 0) && <div className="sp-results">{p.reviewNote && <p className="sp-review">💬 {p.reviewedBy ? `${p.reviewedBy}: ` : ""}{p.reviewNote}</p>}{Object.entries(p.publish || {}).map(([k, r]) => <p key={k} className={r.ok ? "ok" : "bad"}><b>{PLATFORMS.find((x) => x[0] === k)?.[1] || k}</b> {r.ok ? <>posted {r.url && <a href={r.url} target="_blank" rel="noreferrer">view ↗</a>}</> : r.error}</p>)}</div>}
+    </div>
+  </div>;
+}
+
+export type PlanOptions = { days: number[]; perWeek: number; time1: string; time2: string; platforms: string[]; format: "photo" | "video" | "mix"; mode: "mixed" | "services" | "custom"; services: string[]; custom: string; rotate: boolean; extra: string; skipBusy: boolean };
+const DAY_CHIPS: Array<[number, string]> = [[1, "Mon"], [2, "Tue"], [3, "Wed"], [4, "Thu"], [5, "Fri"], [6, "Sat"], [0, "Sun"]];
+
+/** The dates a plan will use: chosen weekdays this month, from today, spread to the weekly frequency. */
+export function planSlots(grid: Date[], month: Date, o: PlanOptions, busy: (d: Date) => boolean) {
+  const today = new Date().setHours(0, 0, 0, 0);
+  const pool = grid.filter((d) => d.getMonth() === month.getMonth() && o.days.includes(d.getDay()) && d.getTime() >= today && !(o.skipBusy && busy(d)));
+  if (!o.perWeek) return pool.slice(0, 31);
+  const weeks = new Map<string, Date[]>();
+  for (const d of pool) { const m = new Date(d); m.setDate(m.getDate() - ((m.getDay() + 6) % 7)); const k = ymd(m); weeks.set(k, [...(weeks.get(k) || []), d]); }
+  const out: Date[] = [];
+  for (const list of weeks.values()) { const n = Math.min(o.perWeek, list.length); for (let i = 0; i < n; i++) out.push(list[Math.floor((i * list.length) / n)]); }
+  return out.slice(0, 31);
+}
+
+function PlanModal({ clientId, month, onClose, onRun, preview }: { clientId: string; month: Date; onClose: () => void; onRun: (o: PlanOptions) => void; preview: (o: PlanOptions) => number }) {
+  const [o, setO] = useState<PlanOptions>(() => { const base: PlanOptions = { days: [2, 4, 6], perWeek: 0, time1: "10:00", time2: "18:00", platforms: ["facebook", "instagram"], format: "photo", mode: "mixed", services: [], custom: "", rotate: false, extra: "", skipBusy: true }; try { const saved = JSON.parse(localStorage.getItem(`f2b-plan-${clientId}`) || "null"); return saved ? { ...base, ...saved, services: [] } : base; } catch { return base; } });
+  const [options, setOptions] = useState<string[]>([]);
+  const [adding, setAdding] = useState("");
+  const set = (p: Partial<PlanOptions>) => setO((x) => ({ ...x, ...p }));
+  // The client's own services: their booking calendars, plus the work types found on their website.
+  useEffect(() => { let live = true; Promise.all([call<{ calendars?: Array<{ name: string }> }>(`/api/scheduling?clientId=${encodeURIComponent(clientId)}&view=links`).catch(() => ({ calendars: [] })), call<{ work?: Record<string, string[]> }>(`/api/scheduling?clientId=${encodeURIComponent(clientId)}&view=site`).catch(() => ({ work: {} }))]).then(([a, b]) => { if (!live) return; const names = [...new Set([...(a.calendars || []).map((c) => c.name), ...Object.keys(b.work || {})].map((x) => String(x).trim()).filter((x) => x && x.length < 60))]; setOptions(names); }).catch(() => undefined); return () => { live = false; }; }, [clientId]);
+  const slots = preview(o);
+  const themes = o.mode === "services" ? o.services : o.mode === "custom" ? o.custom.split("\n").map((x) => x.trim()).filter(Boolean) : [];
+  const count = themes.length && !o.rotate ? Math.min(themes.length, slots) : o.mode === "mixed" ? slots : themes.length ? slots : 0;
+  const run = () => { try { const { services: _s, custom: _c, ...keep } = o; void _s; void _c; localStorage.setItem(`f2b-plan-${clientId}`, JSON.stringify(keep)); } catch { /* ignore */ } onRun(o); };
+  const addService = () => { const v = adding.trim(); if (!v) return; setOptions((x) => [...new Set([...x, v])]); set({ services: [...new Set([...o.services, v])] }); setAdding(""); };
+  return <div className="sp-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="sp-editor sp-plan" role="dialog" aria-modal="true" aria-label="Draft this month's posts">
+      <header><b>✨ Draft {month.toLocaleDateString("en-GB", { month: "long" })}’s posts</b><button type="button" className="sp-x" aria-label="Close" onClick={onClose}>×</button></header>
+      <div className="sp-plan-body">
+        <section><b className="sp-label">Which days</b><div className="sp-chips">{DAY_CHIPS.map(([d, l]) => { const on = o.days.includes(d); return <button key={d} type="button" className={on ? "on" : ""} aria-pressed={on} onClick={() => set({ days: on ? o.days.filter((x) => x !== d) : [...o.days, d] })}>{l}</button>; })}<button type="button" className="sp-chip-text" onClick={() => set({ days: [1, 2, 3, 4, 5] })}>Weekdays</button><button type="button" className="sp-chip-text" onClick={() => set({ days: [0, 1, 2, 3, 4, 5, 6] })}>Every day</button></div></section>
+        <section className="sp-plan-row">
+          <label>How often<select value={o.perWeek} onChange={(e) => set({ perWeek: Number(e.target.value) })}><option value={0}>Every chosen day</option>{[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n} post{n === 1 ? "" : "s"} a week</option>)}</select></label>
+          <label>Time<input type="time" value={o.time1} onChange={(e) => set({ time1: e.target.value })} /></label>
+          <label>Alternate with<input type="time" value={o.time2} onChange={(e) => set({ time2: e.target.value })} /><small>Leave empty for one time</small></label>
+        </section>
+        <section><b className="sp-label">Platforms</b><div className="sp-platforms">{PLATFORMS.map(([k, label, color]) => { const on = o.platforms.includes(k); return <button key={k} type="button" className={on ? "on" : ""} style={{ ["--pc" as string]: color }} aria-pressed={on} onClick={() => set({ platforms: on ? o.platforms.filter((x) => x !== k) : [...o.platforms, k] })}><PlatformIcon id={k} size={14} /> {label}</button>; })}</div></section>
+        <section><b className="sp-label">Photos or videos</b><div className="sp-seg">{([["photo", "📷 Photos"], ["video", "🎬 Videos / Reels"], ["mix", "Mix of both"]] as const).map(([k, l]) => <button key={k} type="button" className={o.format === k ? "on" : ""} onClick={() => set({ format: k })}>{l}</button>)}</div>{o.format !== "photo" && <small className="sp-hint">Videos come from the Media Library (matched to the service where the file name fits). If there isn't one, the post gets a short filming plan so you can record it.</small>}</section>
+        <section><b className="sp-label">What the posts are about</b><div className="sp-seg">{([["mixed", "AI mix (tips, work, reviews…)"], ["services", "One per service"], ["custom", "My own ideas"]] as const).map(([k, l]) => <button key={k} type="button" className={o.mode === k ? "on" : ""} onClick={() => set({ mode: k })}>{l}</button>)}</div>
+          {o.mode === "services" && <div className="sp-services">{options.length ? options.map((sv) => { const on = o.services.includes(sv); return <label key={sv} className={on ? "on" : ""}><input type="checkbox" checked={on} onChange={() => set({ services: on ? o.services.filter((x) => x !== sv) : [...o.services, sv] })} />{sv}</label>; }) : <small className="sp-hint">No services found yet. Add them below.</small>}
+            <div className="sp-add-svc"><input value={adding} placeholder="Add a service, e.g. Fine line tattoos" onChange={(e) => setAdding(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addService(); } }} /><button type="button" className="secondary-button" onClick={addService}>Add</button>{options.length > 0 && <button type="button" className="text-button" onClick={() => set({ services: o.services.length === options.length ? [] : options })}>{o.services.length === options.length ? "Clear" : "Select all"}</button>}</div></div>}
+          {o.mode === "custom" && <textarea rows={5} value={o.custom} placeholder={"One post idea per line, e.g.\nMeet the team: Sarah\nBefore & after of a bathroom refit\nBlack Friday gift vouchers"} onChange={(e) => set({ custom: e.target.value })} />}
+          {o.mode !== "mixed" && <label className="sp-check"><input type="checkbox" checked={o.rotate} onChange={(e) => set({ rotate: e.target.checked })} />Fill every free slot, rotating through them (otherwise one post each)</label>}
+        </section>
+        <section><label>Anything to mention? <small>(optional)</small><input value={o.extra} maxLength={400} placeholder="e.g. Christmas vouchers on sale, new artist joining, keep it fun" onChange={(e) => set({ extra: e.target.value })} /></label><label className="sp-check"><input type="checkbox" checked={o.skipBusy} onChange={(e) => set({ skipBusy: e.target.checked })} />Skip days that already have a post</label></section>
+      </div>
+      <footer><span className="sp-plan-count">{count ? <><b>{count}</b> post{count === 1 ? "" : "s"} will be drafted{themes.length > slots && !o.rotate ? ` (only ${slots} free slot${slots === 1 ? "" : "s"} for ${themes.length} ideas: add more days)` : ""}</> : o.mode === "mixed" ? "No free days with these settings" : o.mode === "services" ? "Pick at least one service" : "Add at least one idea"}</span><span style={{ flex: 1 }} /><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button type="button" className="primary-button" disabled={!count || !o.platforms.length} onClick={run}>Draft {count || ""} post{count === 1 ? "" : "s"}</button></footer>
     </div>
   </div>;
 }
