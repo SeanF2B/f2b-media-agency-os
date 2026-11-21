@@ -167,7 +167,8 @@ export function ConversationsView({ scopeClientId, clients, staff = [], currentS
     void loadThread(activeId);
   }, [activeId, loadThread]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (demoLive && activeId.startsWith("sample-thread-")) { setActive(demoLive.threads.find((t) => t.id === activeId) || null); setMessages(demoLive.messages[activeId] || []); } }, [activeId, demoLive]);
-  useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [messages.length, activeId]);
+  // Scroll only the message list to the newest message. scrollIntoView would also scroll the page, which made it jump on phones.
+  useEffect(() => { const box = endRef.current?.closest(".cv-msgs") as HTMLElement | null; if (box) box.scrollTop = box.scrollHeight; }, [messages.length, activeId]);
 
   const act = async (body: Record<string, unknown>) => { if (activeId.startsWith("sample-thread-")) { if (body.action === "held-approve" || body.action === "held-discard") { heldDone.mark(scopeClientId, String(body.messageId || ""), body.action === "held-approve" ? "sent" : "dismissed", String(body.body || "")); setNotice(body.action === "held-approve" ? "Reply sent (sample)" : "Draft dismissed (sample)"); return; } if (body.action === "send") setMessages((m) => [...m, { id: `local-${Date.now()}`, direction: "out", sender: "staff", body: String(body.body || ""), created_at: new Date().toISOString() }]); return; } setBusy(true); setError(""); try { await call("/api/conversations", body); await loadThreads(); if (String(body.action || "").startsWith("held-")) void loadHeld(); if (activeId) await loadThread(activeId); } catch (e) { setError(e instanceof Error ? e.message : "Something went wrong."); } finally { setBusy(false); } };
   const [subject, setSubject] = useState("");
