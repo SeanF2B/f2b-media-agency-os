@@ -3,6 +3,8 @@
 //  · StaffConnectionIcons — integration icons on each Team card (like Operations → Clients), incl. calendars
 //  · StaffMessagingPanel  — per-person channel switches + email name / reply-to / signature (in the staff pop-up)
 //  · MessagingLaunchpad   — Launchpad → Messaging: WhatsApp, Instagram, Facebook and Email per sub-account
+import { CONNECTIONS, type OpsClient } from "./connection-dots";
+import { BrandIcon as BrandIco } from "./brand-icon";
 import { useCallback, useEffect, useState } from "react";
 import { BrandIcon } from "./brand-icon";
 import { ChannelIcon } from "./channel-icon";
@@ -12,7 +14,8 @@ type ChannelSet = { whatsapp: string[]; sms: string[]; messenger: string[]; inst
 type StaffMsg = { channels: Record<string, boolean>; emailName: string; emailReplyTo: string; signature: string; notify: boolean };
 type TeamData = { channels: Record<string, ChannelSet>; staff: Record<string, StaffMsg>; defaults: StaffMsg; google: Record<string, string>; feeds: string[]; emailReady: boolean; canEdit: boolean };
 type Member = { id: string; name: string; isBot?: boolean; clientAccessIds?: string[] };
-type Client = { id: string; name: string; logo?: string };
+type Client = { id: string; name: string; logo?: string } & Partial<OpsClient>;
+type TeamMember = { id: string; name: string; role?: string; avatar?: string; isBot?: boolean; clientAccessIds?: string[]; staffType?: string };
 
 async function call<T>(url: string, body?: unknown): Promise<T> {
   const res = await fetch(url, body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : { cache: "no-store" });
@@ -94,21 +97,23 @@ type Page = { pageId: string; pageName: string; igId: string; igUsername: string
 type Overview = { configured: boolean; webhook: { url: string; verifyToken: string }; channels: Record<string, ChannelSet>; pages: Page[]; emailReady: boolean; emailFrom: string };
 
 /** Launchpad → Messaging: one row per sub-account with WhatsApp, Instagram, Facebook and Email. */
-export function MessagingLaunchpad({ clients, onOpenWhatsApp }: { clients: Client[]; onOpenWhatsApp?: (clientId: string) => void }) {
+export function MessagingLaunchpad({ clients, onOpenWhatsApp, onNavigate, team = [], scopeClientId = "" }: { clients: Client[]; onOpenWhatsApp?: (clientId: string) => void; onNavigate?: (page: string) => void; team?: TeamMember[]; scopeClientId?: string }) {
+  const [tab, setTab] = useState<"business" | "team">("business");
   const [data, setData] = useState<Overview | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [showSetup, setShowSetup] = useState(false);
   const load = useCallback(async () => { try { const d = await call<Overview>("/api/meta-messaging"); setData(d); setError(""); return d; } catch (e) { setError(e instanceof Error ? e.message : "Couldn't load."); return null; } }, []);
   useEffect(() => { void load(); const again = () => void load(); window.addEventListener("f2b-messaging-changed", again); return () => window.removeEventListener("f2b-messaging-changed", again); }, [load]);
-  const rows = [{ id: "", name: "F2B Media (agency)" }, ...clients];
+  const rows: Client[] = scopeClientId ? clients.filter((c) => c.id === scopeClientId) : [{ id: "", name: "F2B Media (agency)" }, ...clients];
+  const people = team.filter((m) => !m.isBot && (!scopeClientId || (Array.isArray(m.clientAccessIds) && m.clientAccessIds.includes(scopeClientId))));
   const disconnect = async (p: Page) => { if (!(await appConfirm(`Disconnect ${p.pageName}${p.igUsername ? ` and @${p.igUsername}` : ""}? New messages will stop coming into Conversations.`))) return; setBusy(true); try { await call("/api/meta-messaging", { action: "disconnect", clientId: p.clientId || "agency", pageId: p.pageId }); await load(); } catch (e) { setError(e instanceof Error ? e.message : "Couldn't disconnect."); } finally { setBusy(false); } };
   const connectHref = (clientId: string) => `/api/meta-messaging/connect?clientId=${encodeURIComponent(clientId || "agency")}`;
     return <section className="lp-msg" aria-label="Messaging connections">
-    <div className="lp-msg-head"><div><h2>Messaging</h2><p className="muted">Connect each account's WhatsApp, Instagram and Facebook so every chat lands in Conversations.</p></div><button type="button" className="secondary-button" onClick={() => setShowSetup(!showSetup)}>{showSetup ? "Hide" : "Meta app"} setup</button></div>
+    <div className="lp-msg-head"><div><h2>Connections</h2><p className="muted">{tab === "business" ? "Every business: ads, Google, website and messaging. Red dots need linking — click one to set it up." : "Each person’s own connections: calendar and the channels they reply on."}</p><div className="lp-msg-tabs" role="tablist"><button type="button" role="tab" aria-selected={tab === "business"} className={tab === "business" ? "on" : ""} onClick={() => setTab("business")}>Businesses</button><button type="button" role="tab" aria-selected={tab === "team"} className={tab === "team" ? "on" : ""} onClick={() => setTab("team")}>Team</button></div></div><button type="button" className="secondary-button" onClick={() => setShowSetup(!showSetup)}>{showSetup ? "Hide" : "Meta app"} setup</button></div>
     {error && <div className="cv-error" role="alert">{error}</div>}
     {showSetup && data && <div className="lp-msg-setup"><p>One-off, in the Meta developer app (the same app as Meta Ads): add <b>Messenger</b> and <b>Instagram</b>, request <code>pages_messaging</code> and <code>instagram_manage_messages</code>, then set the webhook for both <i>Page</i> and <i>Instagram</i> (field <code>messages</code>):</p><div className="lp-msg-copy"><span>Callback URL</span><code>{data.webhook.url}</code><button type="button" onClick={() => void navigator.clipboard?.writeText(data.webhook.url)}>Copy</button></div><div className="lp-msg-copy"><span>Verify token</span><code>{data.webhook.verifyToken || "Add META_APP_SECRET first"}</code><button type="button" disabled={!data.webhook.verifyToken} onClick={() => void navigator.clipboard?.writeText(data.webhook.verifyToken)}>Copy</button></div>{!data.configured && <p className="iv-small">The server is missing the Meta app settings, so Connect won't work yet.</p>}</div>}
-    {!data ? <p className="iv-small">Loading…</p> : <div className="lp-msg-cards">
+    {tab === "team" ? <div className="lp-msg-cards"><style>{MSG_CARDS_CSS}</style>{people.length ? people.map((m) => <article className="lp-msg-card" key={m.id}><header>{m.avatar && /^(data:image\/|https:\/\/)/.test(m.avatar) ? <img src={m.avatar} alt="" style={{ borderRadius: "50%" }} /> : <i style={{ borderRadius: "50%" }}>{m.name.slice(0, 1)}</i>}<b title={m.name}>{m.name.split("|")[0].trim()}</b><small className="lp-msg-role">{(m.role || "").replace(/^Sub-account /, "")}</small></header><StaffConnectionIcons member={m} /></article>) : <p className="iv-small">No one on this account yet.</p>}</div> : !data ? <p className="iv-small">Loading…</p> : <div className="lp-msg-cards">
       <style>{MSG_CARDS_CSS}</style>
       {rows.map((c) => { const ch = data.channels[c.id] || { whatsapp: [], sms: [], messenger: [], instagram: [] }; const pages = data.pages.filter((p) => p.clientId === c.id && p.status === "connected"); const logo = (c as Client).logo;
         // Same look as the client cards: one icon per channel with a green (connected) or red (not connected) dot.
@@ -118,11 +123,15 @@ export function MessagingLaunchpad({ clients, onOpenWhatsApp }: { clients: Clien
           { key: "messenger", label: "Facebook", ok: pages.length > 0, info: pages.map((p) => p.pageName).join(", "), href: connectHref(c.id) },
           { key: "email", label: "Email", ok: data.emailReady, info: data.emailReady ? `Replies from ${data.emailFrom.replace(/^.*</, "").replace(/>$/, "")}` : "", href: "" },
         ];
-        const done = items.filter((i) => i.ok).length, pct = Math.round(done / items.length * 100);
+        // Business integrations (the same checks as the client cards); not shown for the agency row.
+        const biz = c.id ? CONNECTIONS.map((k) => ({ key: k.key, label: k.label, page: k.page, icon: k.icon, ok: k.ok(c as OpsClient, Boolean(c.website || c.wordpressSiteUrl)) })) : [];
+        const done = items.filter((i) => i.ok).length + biz.filter((b) => b.ok).length, total = items.length + biz.length, pct = Math.round(done / total * 100);
         return <article className="lp-msg-card" key={c.id || "agency"}>
           <header>{logo ? <img src={logo} alt="" /> : <i>{c.name.slice(0, 1)}</i>}<b title={c.name}>{c.name}</b></header>
           <span className="ops-conn">
-            <span className={`ops-conn-pct ${pct >= 80 ? "good" : pct >= 50 ? "mid" : "low"}`} style={{ ["--pct" as string]: `${pct}%` }} title={`${done} of ${items.length} connected`}><b>{pct}%</b></span>
+            <span className={`ops-conn-pct ${pct >= 80 ? "good" : pct >= 50 ? "mid" : "low"}`} style={{ ["--pct" as string]: `${pct}%` }} title={`${done} of ${total} connected`}><b>{pct}%</b></span>
+            {biz.map((b) => { const title = `${b.label}: ${b.ok ? `linked to ${c.name}` : `not linked to ${c.name} yet — click to link it`}`; return <button key={b.key} type="button" className={b.ok ? "ok" : "missing"} title={title} aria-label={title} onClick={() => onNavigate?.(b.page)}><BrandIco id={b.key} size={16} fallback={b.icon} /><i /></button>; })}
+            {biz.length > 0 && <span className="lp-msg-sep" aria-hidden="true" />}
             {items.map((i) => { const title = `${i.label}: ${i.ok ? `connected${i.info ? ` · ${i.info}` : ""}` : `not connected${i.act || i.href ? " — click to set up" : ""}`}`;
               const inner = <><ChannelIcon channel={i.key as "whatsapp"} size={16} /><i /></>;
               return i.act ? <button key={i.key} type="button" className={i.ok ? "ok" : "missing"} title={title} aria-label={title} onClick={i.act}>{inner}</button>
@@ -171,6 +180,8 @@ const MSG_CARDS_CSS = `
 .lp-msg-card .ops-conn a.lp-msg-ico i{position:absolute;right:-3px;top:-3px;width:9px;height:9px;border-radius:50%;background:#dc2626;border:2px solid var(--f2b-white,#fff)}
 .lp-msg-card .ops-conn a.lp-msg-ico:hover{transform:translateY(-1px);border-color:var(--brand-secondary,var(--brand-primary,#287cac))}
 .lp-msg-card .ops-conn button:disabled{cursor:default}
+.lp-msg-tabs{display:inline-flex;gap:4px;margin-top:8px;padding:3px;border-radius:10px;background:rgba(127,127,127,.12)}.lp-msg-tabs button{border:0;background:transparent;color:inherit;font:inherit;font-size:12.5px;font-weight:700;padding:6px 12px;border-radius:8px;cursor:pointer}.lp-msg-tabs button.on{background:var(--brand-primary,#287cac);color:#fff}
+.lp-msg-sep{width:1px;height:20px;background:rgba(127,127,127,.3);margin:0 2px}.lp-msg-role{margin-left:auto;font-size:11px;opacity:.65;white-space:nowrap}
 .lp-msg-pages-on{display:flex;flex-wrap:wrap;gap:4px}.lp-msg-pages-on small{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;padding:2px 8px;border-radius:99px;background:rgba(34,197,94,.12)}
 .lp-msg-pages-on button{border:0;background:none;color:inherit;cursor:pointer;font-size:13px;line-height:1;padding:0}
 `;

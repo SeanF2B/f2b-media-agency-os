@@ -57,7 +57,7 @@ const integrationIcons: Record<string, string> = {
   dataforseo: "🔍", pagespeed: "⚡", wordpress: "🌐", "marketing-public": "🚀", gohighlevel: "🧩", "landing-hosting": "🪄",
 };
 
-export function IntegrationsView({ onNavigate, onApplyGoogleMatches, clients = [], setupSlot }: { onNavigate: (page: string) => void; onApplyGoogleMatches?: (matches: GooglePropertyMatch[]) => Promise<boolean>; clients?: Array<{ id: string; name: string; logo?: string }>; setupSlot?: ReactNode }) {
+export function IntegrationsView({ onNavigate, onApplyGoogleMatches, clients = [], setupSlot, team = [], scopeClientId = "" }: { onNavigate: (page: string) => void; onApplyGoogleMatches?: (matches: GooglePropertyMatch[]) => Promise<boolean>; clients?: Array<{ id: string; name: string; logo?: string } & Record<string, any>>; setupSlot?: ReactNode; team?: Array<{ id: string; name: string; role?: string; avatar?: string; isBot?: boolean; clientAccessIds?: string[] }>; /** A sub-account picked in the top bar: show only that business. */ scopeClientId?: string }) {
   const [waFor, setWaFor] = useState<string | null>(null);
   const [linking, setLinking] = useState(false);
   const [linkMessage, setLinkMessage] = useState("");
@@ -147,7 +147,10 @@ export function IntegrationsView({ onNavigate, onApplyGoogleMatches, clients = [
     {linkMessage && <p role="status" className="integrations-message launchpad-state">{linkMessage}</p>}
     {loading && <p role="status" className="integrations-message launchpad-state">Checking connection setup…</p>}
     {message && <div role="alert" className="launchpad-error"><span>{message}</span><button className="secondary-button" type="button" onClick={() => void load()} disabled={loading}>Try again</button></div>}
-    {!loading && !message && (() => {
+    {scopeClientId ? <>
+      <MessagingLaunchpad clients={clients} scopeClientId={scopeClientId} team={team} onNavigate={onNavigate} onOpenWhatsApp={(id) => setWaFor(id)} />
+      {waFor !== null && <Suspense fallback={null}><WhatsAppSetup clients={clients.filter((c) => c.id === scopeClientId).map((c) => ({ id: c.id, name: c.name }))} initialClientId={waFor} onClose={() => setWaFor(null)} onLive={() => undefined} /></Suspense>}
+    </> : !loading && !message && (() => {
       const keep = new Set(["google-ads", "meta-ads", "search-console", "ga4", "business-profile", "wordpress", "dataforseo", "google-calendar", "google-drive", "gmail-bookkeeping", "email-sending", "twilio"]);
       const shown = items.filter((item) => keep.has(item.id)).sort((a, b) => Number(a.status === "ready") - Number(b.status === "ready"));
       const done = shown.filter((item) => item.status === "ready").length;
@@ -164,7 +167,7 @@ export function IntegrationsView({ onNavigate, onApplyGoogleMatches, clients = [
           <div className="lp-action">{item.status === "ready" ? <span className="lp-done" role="img" aria-label="Connected">✓ Connected</span> : item.connectHref ? <a className="lp-button" href={item.connectHref}>Connect</a> : <button className="lp-button" type="button" onClick={() => onNavigate(item.actionPage)}>Set up</button>}
             {item.status !== "ready" && <ShareLink name={item.name} href={item.connectHref ? new URL(item.connectHref, window.location.origin).toString() : `${window.location.origin}/?page=${encodeURIComponent(item.actionPage || "Integrations")}`} />}</div>
         </article>)}</section>
-        <MessagingLaunchpad clients={clients} onOpenWhatsApp={(id) => setWaFor(id)} />
+        <MessagingLaunchpad clients={clients} team={team} onNavigate={onNavigate} onOpenWhatsApp={(id) => setWaFor(id)} />
         {waFor !== null && <Suspense fallback={null}><WhatsAppSetup clients={clients.map((c) => ({ id: c.id, name: c.name }))} initialClientId={waFor} onClose={() => setWaFor(null)} onLive={() => undefined} /></Suspense>}
       </>;
     })()}

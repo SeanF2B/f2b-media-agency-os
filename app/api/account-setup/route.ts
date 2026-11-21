@@ -37,11 +37,13 @@ export async function GET() {
   const googleKeys = Boolean(env.GOOGLE_ADS_CLIENT_ID && env.GOOGLE_ADS_CLIENT_SECRET);
   const metaReady = metaMessagingConfigured();
 
-  const [googleCal, feed, pages, settings] = await Promise.all([
+  const [googleCal, feed, pages, settings, ownerCal] = await Promise.all([
     count("SELECT COUNT(*) AS n FROM sched_google_connections WHERE owner_id = ?1 AND staff_id = ?2", ownerId, me.id),
     count("SELECT COUNT(*) AS n FROM sched_staff_settings WHERE owner_id = ?1 AND staff_id = ?2 AND COALESCE(ics_token,'') <> ''", ownerId, me.id),
     listMetaPages(ownerId).catch(() => [] as Awaited<ReturnType<typeof listMetaPages>>),
     loadSettings(ownerId).then((r) => r.settings).catch(() => null),
+    // The owner's Google Calendar (task dates) counts as their calendar too.
+    isOwner ? count("SELECT COUNT(*) AS n FROM google_calendar_connections WHERE owner_id = ?1", ownerId) : Promise.resolve(0),
   ]);
   const myPages = pages.filter((p) => p.status === "connected" && accounts.includes(p.clientId || ""));
   const canConnectMeta = metaReady && (agencyAdmin || (accounts.length === 1 && accounts[0] !== "" && /manager|admin/i.test(String(me.role || ""))));
@@ -49,7 +51,7 @@ export async function GET() {
   const waNumbers = settings?.hasToken ? (settings.numbers || []).filter((n: any) => n.channel === "whatsapp" && accounts.includes(n.clientId || "")) : [];
 
   const items: Item[] = [
-    { id: "calendar", section: "operations", name: "Your calendar", detail: googleCal ? "Google Calendar connected" : feed ? "Apple / Outlook calendar linked" : "Connect Google Calendar, or link your Apple / Outlook calendar, so bookings land in it.", linked: Boolean(googleCal || feed), required: true, available: true, href: googleKeys ? `/api/scheduling?connect=${encodeURIComponent(me.id)}` : undefined, action: "createFeed" },
+    { id: "calendar", section: "operations", name: "Your calendar", detail: googleCal || ownerCal ? "Google Calendar connected" : feed ? "Apple / Outlook calendar linked" : "Connect Google Calendar, or link your Apple / Outlook calendar, so bookings land in it.", linked: Boolean(googleCal || feed || ownerCal), required: true, available: true, href: googleKeys ? `/api/scheduling?connect=${encodeURIComponent(me.id)}` : undefined, action: "createFeed" },
     { id: "social", section: "operations", name: "Facebook & Instagram for posts", detail: myPages.length ? `Connected: ${myPages.map((p) => p.pageName).join(", ")}` : !metaReady ? "Coming soon: F2B is finishing the Facebook connection." : canConnectMeta ? "Connect the business Facebook Page (and its Instagram) so scheduled posts publish." : "Your manager connects the business Facebook Page.", linked: myPages.length > 0, required: canConnectMeta, available: canConnectMeta, href: canConnectMeta ? metaHref : undefined },
     { id: "msg-whatsapp", section: "messaging", name: "WhatsApp", detail: waNumbers.length ? `Live on ${waNumbers.map((n: any) => n.number).join(", ")}` : canSetUpWhatsApp ? "Link your existing WhatsApp number or buy a new one." : "Your manager sets up WhatsApp.", linked: waNumbers.length > 0, required: false, available: canSetUpWhatsApp, action: canSetUpWhatsApp ? "whatsapp" : undefined },
     { id: "msg-instagram", section: "messaging", name: "Instagram messages", detail: myPages.some((p) => p.igId) ? "Instagram DMs come into Conversations" : "Comes with the Facebook Page connection.", linked: myPages.some((p) => p.igId), required: false, available: canConnectMeta, href: canConnectMeta ? metaHref : undefined },
@@ -82,7 +84,7 @@ export async function GET() {
       biz("google-ads", "Google Ads", ads, googleKeys, "/api/google-ads/connect", "Campaign results and AI suggestions."),
       biz("search-console", "Google Search Console", gsc, googleKeys, "/api/search-console/connect", "Rankings and clicks for each site."),
       biz("ga4", "Google Analytics", ga4, googleKeys, "/api/search-console/connect", "Website visitors for each client."),
-      biz("business-profile", "Google Business Profile", gbp, googleKeys, "/api/gbp/connect", "Maps listing, reviews and posts."),
+      biz("business-profile", "Business Profile posting", gbp, googleKeys, "/api/gbp/connect", "Lets scheduled posts and review replies publish to Google (reporting is already linked)."),
       biz("meta-ads", "Meta Ads", meta, metaReady, "/api/meta-ads/connect", "Facebook and Instagram ad results."),
       biz("google-drive", "Google Drive", drive, googleKeys, "/api/media-library/drive", "Bring photos and files into Media."),
       biz("gmail", "Gmail receipts", gmail, googleKeys, "/api/bookkeeping-email/connect?scope=agency", "Receipts and supplier invoices into Books."),
