@@ -3966,5 +3966,7 @@ html body .app-shell .content-page .cv-tool svg { flex: 0 0 auto; display: block
   html body .app-shell.topnav-layout .tn-right .top-actions > *, html body .app-shell.topnav-layout .tn-right > .tn-sample { margin: 0 !important; }
   html body .app-shell.topnav-layout .tn-right .top-actions > :empty:not(button):not(a):not(label) { display: none !important; }
 }
-/* Leads tabs: the Conversations cog always keeps its space, so switching tabs never shifts the bar */
-.crm-tabs .crm-tab-cog.is-idle { visibility: hidden !important; pointer-events: none !important; }
+/* Conversations: settings cog sits right beside the staff selector */
+html body .app-shell .cv-settings-btn { display: inline-grid; place-items: center; width: 40px; height: 40px; flex: 0 0 40px; margin-left: 6px; padding: 0; border: 1px solid #dce3e7; border-radius: 12px; background: #fff; color: #344054; cursor: pointer; transition: transform .15s, border-color .15s, box-shadow .15s; }
+html body .app-shell .cv-settings-btn:hover { transform: translateY(-1px); border-color: var(--brand-secondary, var(--brand-primary, #1479b8)); box-shadow: 0 4px 12px rgba(16,24,40,.08); }
+html body .app-shell.dark-mode .cv-settings-btn { background: #1b2227; border-color: #2f3a41; color: #e7edf1; }
