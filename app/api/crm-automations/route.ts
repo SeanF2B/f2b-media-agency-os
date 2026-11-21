@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "../../chatgpt-auth";
 import { ensureAutomationTables, emitAutomationEvent, firstFireAt, simulateRun, startRunStatements, type Db } from "../../../lib/crm-automations/engine.ts";
-import { SCHEDULING_TEMPLATES, blankDefinition, normalizeTag, readinessProblems, sanitizeDefinition, sendsEmail, triggerOf, type AutomationDefinition } from "../../../lib/crm-automations/model.ts";
+import { SCHEDULING_TEMPLATES, actionLabel, blankDefinition, nextNodeId, nodeById, nodeSummary, normalizeTag, readinessProblems, sanitizeDefinition, sendsEmail, triggerOf, type AutomationDefinition } from "../../../lib/crm-automations/model.ts";
 
 export const dynamic = "force-dynamic";
 const noStore = { "Cache-Control": "no-store" };
@@ -42,7 +42,19 @@ function scopeFrom(value: unknown, workspace: WorkspaceData) {
 
 function listItem(row: AutomationRow) {
   const definition = (() => { try { return JSON.parse(row.definition) as AutomationDefinition; } catch { return blankDefinition(); } })();
-  return { id: row.id, scopeId: row.scope_id, name: row.name, status: row.status, triggerType: row.trigger_type, trigger: triggerOf(definition) || null, sendsEmail: Boolean(row.sends_email), nextFireAt: row.next_fire_at, lastRunAt: row.last_run_at, totalRuns: Number(row.total_runs) || 0, updatedAt: row.updated_at, enabledBy: row.enabled_by, enabledAt: row.enabled_at };
+  // The steps it runs, in order along the main path (the "yes" side of any If / Else), so the list can show what it does.
+  const steps: Array<{ type: string; label: string; summary: string }> = [];
+  const start = triggerOf(definition);
+  let cursor = start ? nextNodeId(definition, start.id) || nextNodeId(definition, start.id, "yes") : null;
+  const seen = new Set<string>();
+  while (cursor && !seen.has(cursor) && steps.length < 12) {
+    seen.add(cursor);
+    const node = nodeById(definition, cursor); if (!node) break;
+    let summary = ""; try { summary = nodeSummary(node); } catch { summary = ""; }
+    steps.push({ type: node.type, label: actionLabel(node.type), summary });
+    cursor = nextNodeId(definition, node.id) || nextNodeId(definition, node.id, "yes");
+  }
+  return { id: row.id, scopeId: row.scope_id, name: row.name, status: row.status, triggerType: row.trigger_type, trigger: start || null, steps, sendsEmail: Boolean(row.sends_email), nextFireAt: row.next_fire_at, lastRunAt: row.last_run_at, totalRuns: Number(row.total_runs) || 0, updatedAt: row.updated_at, enabledBy: row.enabled_by, enabledAt: row.enabled_at };
 }
 
 export async function GET(request: Request) {
@@ -104,7 +116,7 @@ export async function GET(request: Request) {
     // Agency view also lists every client's automations and the rules built into website forms, so nothing is hidden.
     const clientName = (id: string) => String((workspace.clients || []).find((client) => String(client.id) === id)?.name || "Client");
     let others: Array<ReturnType<typeof listItem> & { clientName: string }> = [];
-    let formRules: Array<{ formId: string; formName: string; clientId: string; clientName: string; status: string; notify: string[]; rules: Array<{ when: string; then: string[] }> }> = [];
+    let formRules: Array<{ formId: string; formName: string; clientId: string; clientName: string; status: string; notify: string[]; rules: Array<{ when: string; then: string[]; kinds: string[] }> }> = [];
     if (!scope) {
       const otherRows = await raw.prepare("SELECT * FROM crm_automations WHERE owner_id=?1 AND scope_id<>'' ORDER BY updated_at DESC LIMIT 300").bind(ownerId).all<AutomationRow>();
       others = (otherRows.results || []).filter((row) => (workspace.clients || []).some((client) => String(client.id) === row.scope_id)).map((row) => ({ ...listItem(row), clientName: clientName(row.scope_id) }));
@@ -115,7 +127,7 @@ export async function GET(request: Request) {
         const settings = (() => { try { return JSON.parse(form.settings || "{}"); } catch { return {}; } })() as { status?: string; notify?: string[] };
         const label = (id?: string) => def.fields?.find((field) => field.id === id)?.label || id || "answer";
         return { formId: form.id, formName: form.name, clientId: form.client_id, clientName: clientName(form.client_id), status: settings.status || "live", notify: Array.isArray(settings.notify) ? settings.notify : [],
-          rules: (def.rules || []).map((rule) => ({ when: `${label(rule.when?.field)} is “${rule.when?.equals || ""}”`, then: (rule.then || []).map((step) => `${verb[String(step.action)] || step.action}${step.value ? `: ${step.value}` : ""}`) })) };
+          rules: (def.rules || []).map((rule) => ({ when: `${label(rule.when?.field)} is “${rule.when?.equals || ""}”`, then: (rule.then || []).map((step) => `${verb[String(step.action)] || step.action}${step.value ? `: ${step.value}` : ""}`), kinds: (rule.then || []).map((step) => String(step.action || "")) })) };
       });
     }
     return ok({
