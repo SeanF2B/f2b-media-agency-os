@@ -10,7 +10,7 @@ import { listMetaPages, metaMessagingConfigured } from "@/lib/conversations/meta
 
 export const dynamic = "force-dynamic";
 
-type Item = { id: string; section: "operations" | "messaging" | "business"; name: string; detail: string; linked: boolean; required: boolean; available: boolean; href?: string; action?: "createFeed" | "whatsapp" };
+type Item = { id: string; section: "operations" | "messaging" | "business" | "account"; name: string; detail: string; linked: boolean; required: boolean; available: boolean; href?: string; action?: "createFeed" | "whatsapp" };
 const json = (b: unknown, status = 200) => Response.json(b, { status, headers: { "Cache-Control": "no-store" } });
 
 async function count(sql: string, ...args: unknown[]) {
@@ -30,6 +30,9 @@ export async function GET() {
   const scope: string[] | null = Array.isArray(me.clientAccessIds) ? me.clientAccessIds.map(String) : null;
   const subAccount = me.staffType === "subaccount" || /^Sub-account /.test(String(me.role || ""));
   const agencyAdmin = !subAccount && (isOwner || me.role === "Admin" || me.role === "Owner");
+  // Sub-account Admin: manages their own business's connections (WhatsApp, Facebook & Instagram) and sees its Google links.
+  const accountAdmin = subAccount && /admin/i.test(String(me.role || "")) && Array.isArray(scope) && scope.length === 1;
+  const canSetUpWhatsApp = agencyAdmin || accountAdmin;
   const accounts = scope && scope.length ? scope : [""];
   const googleKeys = Boolean(env.GOOGLE_ADS_CLIENT_ID && env.GOOGLE_ADS_CLIENT_SECRET);
   const metaReady = metaMessagingConfigured();
@@ -48,11 +51,22 @@ export async function GET() {
   const items: Item[] = [
     { id: "calendar", section: "operations", name: "Your calendar", detail: googleCal ? "Google Calendar connected" : feed ? "Apple / Outlook calendar linked" : "Connect Google Calendar, or link your Apple / Outlook calendar, so bookings land in it.", linked: Boolean(googleCal || feed), required: true, available: true, href: googleKeys ? `/api/scheduling?connect=${encodeURIComponent(me.id)}` : undefined, action: "createFeed" },
     { id: "social", section: "operations", name: "Facebook & Instagram for posts", detail: myPages.length ? `Connected: ${myPages.map((p) => p.pageName).join(", ")}` : !metaReady ? "Coming soon: F2B is finishing the Facebook connection." : canConnectMeta ? "Connect the business Facebook Page (and its Instagram) so scheduled posts publish." : "Your manager connects the business Facebook Page.", linked: myPages.length > 0, required: canConnectMeta, available: canConnectMeta, href: canConnectMeta ? metaHref : undefined },
-    { id: "msg-whatsapp", section: "messaging", name: "WhatsApp", detail: waNumbers.length ? `Live on ${waNumbers.map((n: any) => n.number).join(", ")}` : agencyAdmin ? "Link your existing WhatsApp number or buy a new one." : "Your manager sets up WhatsApp.", linked: waNumbers.length > 0, required: false, available: agencyAdmin, action: agencyAdmin ? "whatsapp" : undefined },
+    { id: "msg-whatsapp", section: "messaging", name: "WhatsApp", detail: waNumbers.length ? `Live on ${waNumbers.map((n: any) => n.number).join(", ")}` : canSetUpWhatsApp ? "Link your existing WhatsApp number or buy a new one." : "Your manager sets up WhatsApp.", linked: waNumbers.length > 0, required: false, available: canSetUpWhatsApp, action: canSetUpWhatsApp ? "whatsapp" : undefined },
     { id: "msg-instagram", section: "messaging", name: "Instagram messages", detail: myPages.some((p) => p.igId) ? "Instagram DMs come into Conversations" : "Comes with the Facebook Page connection.", linked: myPages.some((p) => p.igId), required: false, available: canConnectMeta, href: canConnectMeta ? metaHref : undefined },
     { id: "msg-facebook", section: "messaging", name: "Facebook Messenger", detail: myPages.length ? "Messenger chats come into Conversations" : "Comes with the Facebook Page connection.", linked: myPages.length > 0, required: false, available: canConnectMeta, href: canConnectMeta ? metaHref : undefined },
   ];
 
+  if (accountAdmin) {
+    // The business's Google connections are linked by F2B through the agency login; show where each stands.
+    const client = (ws.clients || []).find((c: any) => String(c.id) === scope![0]) || {};
+    const g = (id: string, name: string, linked: unknown, what: string): Item => ({ id, section: "account", name, detail: linked ? "Linked" : `F2B links this for you. ${what}`, linked: Boolean(linked), required: false, available: false });
+    items.push(
+      g("google-ads", "Google Ads", client.googleAdsAccountId, "Ad results show on your Dashboard."),
+      g("search-console", "Google Search Console", client.googleSearchConsoleAccountId, "Search rankings and clicks."),
+      g("ga4", "Google Analytics", client.googleAnalyticsAccountId, "Website visitors."),
+      g("business-profile", "Google Business Profile", client.googleBusinessProfileLocationId, "Maps listing and reviews."),
+    );
+  }
   if (agencyAdmin) {
     const [ads, gsc, ga4, meta, gbp, drive, gmail] = await Promise.all([
       count("SELECT COUNT(*) AS n FROM google_ads_connections WHERE owner_id = ?1", ownerId),
@@ -75,5 +89,5 @@ export async function GET() {
     );
   }
   const blocked = items.some((i) => i.required && !i.linked);
-  return json({ name: String(me.name || "").split("|")[0].trim(), staffId: me.id, isOwner, agencyAdmin, blocked, items });
+  return json({ name: String(me.name || "").split("|")[0].trim(), staffId: me.id, isOwner, agencyAdmin, accountAdmin, accountId: accountAdmin ? scope![0] : "", blocked, items });
 }

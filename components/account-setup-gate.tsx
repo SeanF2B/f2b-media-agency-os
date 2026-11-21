@@ -5,8 +5,8 @@ import { ChannelIcon } from "./channel-icon";
 
 const WhatsAppSetup = lazy(() => import("./whatsapp-setup").then((m) => ({ default: m.WhatsAppSetup })));
 
-type Item = { id: string; section: "operations" | "messaging" | "business"; name: string; detail: string; linked: boolean; required: boolean; available: boolean; href?: string; action?: "createFeed" | "whatsapp" };
-export type AccountSetup = { name: string; staffId: string; isOwner: boolean; agencyAdmin: boolean; blocked: boolean; items: Item[] };
+type Item = { id: string; section: "operations" | "messaging" | "business" | "account"; name: string; detail: string; linked: boolean; required: boolean; available: boolean; href?: string; action?: "createFeed" | "whatsapp" };
+export type AccountSetup = { name: string; staffId: string; isOwner: boolean; agencyAdmin: boolean; accountAdmin?: boolean; accountId?: string; blocked: boolean; items: Item[] };
 
 const ICONS: Record<string, string> = { calendar: "📅", social: "📣", "google-ads": "📈", "search-console": "🔎", ga4: "📊", "business-profile": "📍", "meta-ads": "📱", "google-drive": "🗂️", gmail: "🧾" };
 
@@ -64,6 +64,7 @@ export function AccountSetupPanel({ setup, reload, clients, compact = false }: {
   const ops = setup.items.filter((i) => i.section === "operations");
   const biz = setup.items.filter((i) => i.section === "business" && !i.linked);
   const msg = setup.items.filter((i) => i.section === "messaging");
+  const acct = setup.items.filter((i) => i.section === "account");
   if (compact) {
     const mine = ops.filter((i) => !i.linked && i.available);
     const bizLeft = setup.items.filter((i) => i.section === "business" && i.required && !i.linked).map((i) => i.name);
@@ -85,10 +86,11 @@ export function AccountSetupPanel({ setup, reload, clients, compact = false }: {
     <div className="asp-cols">
       <div><h3>Operations</h3><p>Calendars and social media for posts.</p><ul>{ops.map(row)}</ul></div>
       {setup.agencyAdmin && <div><h3>Business connections</h3><p>Only what isn’t linked yet.</p><ul>{biz.length ? biz.map(row) : <li className="on"><span className="asp-ico">✓</span><div className="asp-txt"><b>Everything’s linked</b></div></li>}</ul></div>}
+      {acct.length > 0 && <div><h3>Business connections</h3><p>Your business’s Google accounts, linked by F2B.</p><ul>{acct.map(row)}</ul></div>}
       <div><h3>Messaging <span className="asp-opt">Optional · add later</span></h3><p>WhatsApp, Instagram and Facebook chats in one inbox.</p><ul>{msg.map(row)}</ul></div>
     </div>
     {note && <p className="asp-note" role="status">{note}</p>}
-    {waOpen && <Suspense fallback={null}><WhatsAppSetup clients={clients} initialClientId="" onClose={() => { setWaOpen(false); reload(); }} onLive={reload} /></Suspense>}
+    {waOpen && <Suspense fallback={null}><WhatsAppSetup clients={setup.accountId ? clients.filter((c) => c.id === setup.accountId) : clients} initialClientId={setup.accountId || ""} onClose={() => { setWaOpen(false); reload(); }} onLive={reload} /></Suspense>}
   </section>;
 }
 
