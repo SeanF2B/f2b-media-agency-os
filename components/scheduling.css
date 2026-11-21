@@ -631,9 +631,6 @@ html body .app-shell.dark-mode .sch-dash-panel-tools .sch-seg button.on{backgrou
 .app-shell.dark-mode .sch-page-thumbs span{border-color:#22282e}
 
 /* Booking bars always show "start–end Name" in full: the bar grows to fit its label */
-.sch-tl .sch-tl-track{overflow:visible}
-.sch-tl .sch-tl-item{min-width:max-content!important;padding:0 10px!important;overflow:visible;z-index:2}
-.sch-tl .sch-tl-item span{overflow:visible;text-overflow:clip}
 /* Calendars | Groups switch + Share / embed window */
 .sch-calview-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
 .sch-calview-bar .iv-filters small{opacity:.6;font-weight:600;margin-left:2px}
@@ -650,3 +647,11 @@ html body .app-shell.dark-mode .sch-dash-panel-tools .sch-seg button.on{backgrou
 /* Dashboard appointments: the middle button shows the date you're looking at (click to jump back to today) */
 .sch-date-btn{min-width:96px;white-space:nowrap;font-variant-numeric:tabular-nums}
 .sch-date-btn.off-today{border-color:var(--brand-secondary,var(--brand-primary,#1479b8))}
+
+/* Day timeline: bars stay exactly their real length inside the track and show only the duration at the end (e.g. 1.5 hrs) */
+.sch-tl .sch-tl-track{overflow:hidden}
+.sch-tl .sch-tl-item{min-width:0!important;overflow:hidden!important;justify-content:flex-end;padding:0 7px!important}
+.sch-tl .sch-tl-item b{display:inline!important;color:#fff!important;font-size:11px!important;font-weight:800;white-space:nowrap}
+.sch-tl .sch-tl-item span{display:none!important}
+/* Hour labels: thin out when the timeline is narrow so they never run into each other */
+.sch-tl .sch-tl-hours em.skip{display:none}

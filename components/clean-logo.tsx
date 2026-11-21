@@ -87,8 +87,13 @@ export function CleanLogo({ src, alt, className }: { src: string; alt: string; c
 // dark bar. Coloured parts (brand colours) are left as they are. Cached per source.
 const darkCache = new Map<string, Promise<string>>();
 async function loadImage(src: string) {
-  const img = new Image(); img.crossOrigin = "anonymous"; img.decoding = "async";
-  await new Promise<void>((resolve, reject) => { img.onload = () => resolve(); img.onerror = () => reject(new Error("load")); img.src = src; });
+  // Read the logo as a blob first: logos hosted elsewhere often lack CORS headers, which would block the
+  // canvas and leave the logo in its box. A blob URL is same-origin, so the background can always be removed.
+  let url = src;
+  if (!/^(data:|blob:)/.test(src)) { try { const res = await fetch(src, { mode: "cors", cache: "force-cache" }); if (res.ok) url = URL.createObjectURL(await res.blob()); } catch { /* fall back to loading it directly */ } }
+  const img = new Image(); if (!/^(data:|blob:)/.test(url)) img.crossOrigin = "anonymous"; img.decoding = "async";
+  try { await new Promise<void>((resolve, reject) => { img.onload = () => resolve(); img.onerror = () => reject(new Error("load")); img.src = url; }); }
+  catch (e) { if (url !== src) { const plain = new Image(); plain.crossOrigin = "anonymous"; await new Promise<void>((resolve, reject) => { plain.onload = () => resolve(); plain.onerror = () => reject(new Error("load")); plain.src = src; }); return plain; } throw e; }
   return img;
 }
 export function darkReadyLogo(src: string): Promise<string> {
@@ -195,7 +200,7 @@ export function barReadyLogo(src: string, dark: boolean): Promise<string> {
     if (probes.length >= 4) {
       const [br, bg, bb] = [0, 1, 2].map((c) => { const v = probes.map((i) => px[i + c]).sort((a, b) => a - b); return v[v.length >> 1]; });
       const dist = (i: number) => Math.max(Math.abs(px[i] - br), Math.abs(px[i + 1] - bg), Math.abs(px[i + 2] - bb));
-      if (probes.filter((i) => dist(i) < 28).length >= 4) {
+      if (probes.filter((i) => dist(i) < 40).length >= 4) {
         const seen = new Uint8Array(w * h); const stack: number[] = [];
         for (let x = 0; x < w; x++) stack.push(x, (h - 1) * w + x);
         for (let y = 0; y < h; y++) stack.push(y * w, y * w + w - 1);
