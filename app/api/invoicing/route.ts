@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { settleCreditInvoice } from "@/lib/usage-credits";
 import { authorizeAdmin, respond } from "@/lib/settings-auth";
+import { loadPaymentSettings, saveRevolutConnection } from "@/lib/invoicing/payments";
 import { addDays, addInterval, cleanItems, createInvoice, ensureTables, invoiceHtml, loadSettings, runRecurring, saveSettings, sendInvoiceEmail, today, totals, type Interval } from "@/lib/invoicing/core";
 
 export const dynamic = "force-dynamic";
@@ -39,11 +40,12 @@ export async function GET(request: Request) {
     const info = await workspaceInfo(), url = new URL(request.url), scope = url.searchParams.get("clientId") || "agency";
     const settings = await loadSettings(auth.ownerId), mailReady = Boolean(env.RESEND_API_KEY && env.TASK_NOTIFICATION_FROM);
     const made = await runRecurring(auth.ownerId, info.clients);
-    for (const entry of made) if (entry.endsWith(":send")) { const id = entry.slice(0, -5); const inv = await env.DB!.prepare("SELECT * FROM inv_invoices WHERE id=?1").bind(id).first<any>(); try { await sendInvoiceEmail(inv, settings, url.origin, info.adminEmail); await env.DB!.prepare("UPDATE inv_invoices SET status='sent', sent_at=?2 WHERE id=?1").bind(id, new Date().toISOString()).run(); } catch (e) { console.error("auto-send", e); } }
+    const payments = await loadPaymentSettings(auth.ownerId), payOnline = payments.preferred !== "none";
+    for (const entry of made) if (entry.endsWith(":send")) { const id = entry.slice(0, -5); const inv = await env.DB!.prepare("SELECT * FROM inv_invoices WHERE id=?1").bind(id).first<any>(); try { await sendInvoiceEmail(inv, settings, url.origin, info.adminEmail, payOnline); await env.DB!.prepare("UPDATE inv_invoices SET status='sent', sent_at=?2 WHERE id=?1").bind(id, new Date().toISOString()).run(); } catch (e) { console.error("auto-send", e); } }
     const where = scope === "agency" ? "owner_id=?1" : "owner_id=?1 AND client_id=?2", bind = (st: D1PreparedStatement) => scope === "agency" ? st.bind(auth.ownerId) : st.bind(auth.ownerId, scope);
     const invoices = ((await bind(env.DB!.prepare(`SELECT * FROM inv_invoices WHERE ${where} ORDER BY issue_date DESC, number DESC LIMIT 500`)).all<any>()).results || []).map(shape);
     const recurring = ((await bind(env.DB!.prepare(`SELECT * FROM inv_recurring WHERE ${where} ORDER BY next_date`)).all<any>()).results || []).map((r: any) => ({ id: r.id, clientId: r.client_id, title: r.title, items: JSON.parse(r.items || "[]"), vatRate: r.vat_rate, currency: r.currency, interval: r.interval, nextDate: r.next_date, active: r.active === 1, autoSend: r.auto_send === 1, notes: r.notes }));
-    return respond({ invoices, recurring, settings, clients: info.clients, currency: info.currency, mailReady, generated: made.length });
+    return respond({ invoices, recurring, settings, payments, clients: info.clients, currency: info.currency, mailReady, generated: made.length });
   } catch (e) { console.error("invoicing GET", e); return respond({ error: "Could not load invoices." }, 503); }
 }
 
@@ -54,6 +56,7 @@ export async function POST(request: Request) {
   try {
     await ensureTables();
     const info = await workspaceInfo(), origin = new URL(request.url).origin, action = String(b.action || ""), now = new Date().toISOString();
+    if (action === "save-payments") return respond({ payments: await saveRevolutConnection(auth.ownerId, { key: b.revolutKey, mode: b.revolutMode, disconnect: Boolean(b.disconnect) }, origin) });
     if (action === "save-settings") { await saveSettings(auth.ownerId, b.settings || {}); return respond({ settings: await loadSettings(auth.ownerId) }); }
     if (action === "preview") {
       const settings = await loadSettings(auth.ownerId);
@@ -98,7 +101,7 @@ export async function POST(request: Request) {
     if (["send", "mark-paid", "void", "delete", "mark-unpaid"].includes(action)) {
       const inv = await env.DB!.prepare("SELECT * FROM inv_invoices WHERE id=?1 AND owner_id=?2").bind(b.id, auth.ownerId).first<any>();
       if (!inv) return respond({ error: "Invoice not found." }, 404);
-      if (action === "send") { await sendInvoiceEmail(inv, await loadSettings(auth.ownerId), origin, info.adminEmail); await env.DB!.prepare("UPDATE inv_invoices SET status=CASE WHEN status='draft' THEN 'sent' ELSE status END, sent_at=?2 WHERE id=?1").bind(inv.id, now).run(); }
+      if (action === "send") { await sendInvoiceEmail(inv, await loadSettings(auth.ownerId), origin, info.adminEmail, (await loadPaymentSettings(auth.ownerId)).preferred !== "none"); await env.DB!.prepare("UPDATE inv_invoices SET status=CASE WHEN status='draft' THEN 'sent' ELSE status END, sent_at=?2 WHERE id=?1").bind(inv.id, now).run(); }
       if (action === "mark-paid") { await env.DB!.prepare("UPDATE inv_invoices SET status='paid', paid_at=?2 WHERE id=?1").bind(inv.id, date(b.paidAt, today())).run(); await settleCreditInvoice(env.DB!, inv.id, true); }
       if (action === "mark-unpaid") { await env.DB!.prepare("UPDATE inv_invoices SET status=CASE WHEN sent_at<>'' THEN 'sent' ELSE 'draft' END, paid_at='' WHERE id=?1").bind(inv.id).run(); await settleCreditInvoice(env.DB!, inv.id, false); }
       if (action === "void") await env.DB!.prepare("UPDATE inv_invoices SET status='void' WHERE id=?1").bind(inv.id).run();

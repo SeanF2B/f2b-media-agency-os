@@ -8,7 +8,8 @@ type Invoice = { id: string; clientId: string; clientName: string; clientEmail: 
 type Recurring = { id: string; clientId: string; title: string; items: Item[]; vatRate: number; currency: string; interval: string; nextDate: string; active: boolean; autoSend: boolean; notes: string };
 type ClientInfo = { id: string; name: string; email: string; currency: string; fee: number; services: Array<{ name: string; fee: number }> };
 type Settings = { businessName: string; address: string; vatNumber: string; bankDetails: string; paymentTermsDays: number; prefix: string; nextNumber: number; footerNote: string; replyTo: string };
-type Data = { invoices: Invoice[]; recurring: Recurring[]; settings: Settings; clients: ClientInfo[]; currency: string; mailReady: boolean };
+type Payments = { revolut: { connected: boolean; mode: "live" | "sandbox"; webhook: boolean; error: string }; stripe: { ready: boolean }; preferred: "revolut" | "stripe" | "none" };
+type Data = { invoices: Invoice[]; recurring: Recurring[]; settings: Settings; payments?: Payments; clients: ClientInfo[]; currency: string; mailReady: boolean };
 type Draft = { id?: string; saveEmailToClient?: boolean; clientId: string; clientName: string; clientEmail: string; clientAddress: string; issueDate: string; dueDate: string; items: Item[]; vatRate: number; notes: string; currency: string };
 type RecDraft = { id?: string; clientId: string; title: string; items: Item[]; vatRate: number; interval: string; nextDate: string; autoSend: boolean; notes: string; currency: string };
 
@@ -90,6 +91,7 @@ export function InvoicingView({ scopeClientId }: { scopeClientId: string }) {
           <button type="button" className="iv-btn danger" disabled={busy} onClick={async () => { if ((await appConfirm("Delete this subscription? Invoices already created stay."))) void act({ action: "delete-recurring", id: r.id }); }}>Delete</button></div></div>; })}</div>}
       <p className="iv-hint">Invoices are created automatically on each due date whenever Invoicing is opened, so none are missed. Choose “Auto-sends” to email them straight away, or leave it to create drafts for you to check first.</p></div>}
 
+    {tab === "settings" && data.payments && <PaymentsPanel payments={data.payments} onSave={async (body) => { await call({ action: "save-payments", ...body }); await load(); }} />}
     {tab === "settings" && <SettingsPanel settings={data.settings} onSave={async (s) => { await call({ action: "save-settings", settings: s }); await load(); }} />}
     {editor && <InvoiceEditor draft={editor} clients={data.clients} terms={data.settings.paymentTermsDays} onClose={() => setEditor(null)} onSave={async (d, send) => { const r = await call<{ id: string }>({ action: "save-invoice", ...d }); let sendErr = ""; if (send) { try { await call({ action: "send", id: d.id || r.id }); } catch (e) { sendErr = e instanceof Error ? e.message : "The email could not be sent."; } } setEditor(null); if (sendErr) { setError(`Saved as a draft, but not sent: ${sendErr} Use Edit on the draft to fix it — no duplicate was created.`); setNote(""); } else setNote(send ? "Invoice saved and sent." : "Invoice saved."); await load(); }} />}
     {preview !== null && <PreviewModal html={preview} onClose={() => setPreview(null)} />}
@@ -150,6 +152,27 @@ function RecurringEditor({ draft, clients, onClose, onSave }: { draft: RecDraft;
     <Lines items={d.items} currency={d.currency} onChange={(items) => setD({ ...d, items })} /><Totals items={d.items} vat={d.vatRate} currency={d.currency} />
     <label className="iv-check"><input type="checkbox" checked={d.autoSend} onChange={(e) => setD({ ...d, autoSend: e.target.checked })} /> Email each invoice to the client automatically (otherwise it’s created as a draft for you to check)</label>{err && <p className="iv-error">{err}</p>}</Modal>;
 }
+function PaymentsPanel({ payments, onSave }: { payments: Payments; onSave: (b: Record<string, unknown>) => Promise<void> }) {
+  const [key, setKey] = useState(""); const [mode, setMode] = useState<"live" | "sandbox">(payments.revolut.mode); const [busy, setBusy] = useState(false); const [msg, setMsg] = useState("");
+  const run = async (body: Record<string, unknown>, ok: string) => { setBusy(true); setMsg(""); try { await onSave(body); setKey(""); setMsg(ok); } catch (e) { setMsg(e instanceof Error ? e.message : "Could not save."); } finally { setBusy(false); } };
+  const r = payments.revolut;
+  return <div className="iv-card iv-settings iv-payments">
+    <div className="iv-pay-head"><div><b>Online payments</b><p>Every invoice gets a <b>Pay now</b> button: Apple Pay, Google Pay, Revolut Pay, card, or pay by bank from AIB, Bank of Ireland, PTSB, UK banks and more. Invoices mark themselves paid. Bank transfer details stay on the invoice too.</p></div></div>
+    <div className="iv-pay-row">
+      <div className="iv-pay-title"><span className="iv-pay-logo" aria-hidden="true">R</span><div><b>Revolut Business</b><small>Main option · Apple Pay · Google Pay · pay by bank (capped fee)</small></div>{r.connected ? <span className="iv-pay-on">Connected{r.mode === "sandbox" ? " · sandbox" : ""}</span> : <span className="iv-pay-off">Not connected</span>}</div>
+      {r.connected && !r.webhook && <p className="iv-warn">Connected, but Revolut didn't return a webhook signing secret, so invoices won't mark themselves paid. Reconnect to fix.</p>}
+      <div className="iv-grid"><label>Merchant API secret key<input type="password" autoComplete="off" value={key} placeholder={r.connected ? "•••••••• saved (paste a new key to replace)" : "sk_…"} onChange={(e) => { setMsg(""); setKey(e.target.value); }} /></label>
+        <label>Mode<select value={mode} onChange={(e) => setMode(e.target.value as "live" | "sandbox")}><option value="live">Live</option><option value="sandbox">Sandbox (testing)</option></select></label></div>
+      <p className="iv-hint">In the Revolut Business app: turn on online payments (Merchant), then APIs → Merchant API → copy the secret key. The OS registers its payment notifications with Revolut by itself.</p>
+      <div className="iv-foot">{msg && <span className="iv-ok">{msg}</span>}{r.connected && <button type="button" className="secondary-button" disabled={busy} onClick={() => void run({ disconnect: true }, "Revolut disconnected.")}>Disconnect</button>}<button type="button" className="primary-button" disabled={busy || !key.trim()} onClick={() => void run({ revolutKey: key, revolutMode: mode }, "Revolut connected. New invoices now have a Pay now button.")}>{busy ? "Connecting…" : r.connected ? "Replace key" : "Connect Revolut"}</button></div>
+    </div>
+    <div className="iv-pay-row">
+      <div className="iv-pay-title"><span className="iv-pay-logo stripe" aria-hidden="true">S</span><div><b>Stripe</b><small>Card backup · uses the keys in Onboarding → Payments</small></div>{payments.stripe.ready ? <span className="iv-pay-on">Ready</span> : <span className="iv-pay-off">Not set up</span>}</div>
+      <p className="iv-hint">{payments.stripe.ready ? (r.connected ? "Shown as a small \"Pay with Stripe\" link under the Revolut button." : "Used for the Pay now button until Revolut is connected.") : "Optional. Add Stripe keys in Onboarding → Payments to offer it as a backup."}</p>
+    </div>
+  </div>;
+}
+
 function SettingsPanel({ settings, onSave }: { settings: Settings; onSave: (s: Settings) => Promise<void> }) {
   const [s, setS] = useState(settings); const [busy, setBusy] = useState(false); const [msg, setMsg] = useState("");
   const set = (p: Partial<Settings>) => { setMsg(""); setS({ ...s, ...p }); };

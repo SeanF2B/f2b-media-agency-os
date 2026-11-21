@@ -9834,3 +9834,12 @@ html.f2b-dark .onb-admin, .dark-mode .onb-admin { background:#0f172a; color:#f8f
 @media (max-width:900px){.lb-grid{grid-template-columns:1fr}.lb-preview{position:static}.lb-url{margin-left:0}}
 @media (max-width:600px){.lb-link-fields{grid-template-columns:1fr}.lb-links li{flex-direction:column;align-items:stretch}.lb-link-tools{justify-content:flex-end}.lb-phone{width:min(300px,100%);height:540px}.lb-card input,.lb-card textarea{font-size:16px!important}}
 .lp-sub { display: grid; gap: 14px; width: 100%; } .lp-sub-wrap { display: grid; gap: 14px; width: 100%; } .lp-sub .lp-grid { width: 100%; }
+/* Invoicing → Settings → Online payments (Revolut main, Stripe backup) */
+.iv-payments{margin-bottom:14px}.iv-pay-head p{margin:4px 0 0;color:#667085;font-size:13px;line-height:1.45}
+.iv-pay-row{display:grid;gap:10px;padding:14px;border:1px solid #e8edf1;border-radius:14px;background:rgba(255,255,255,.6)}
+.iv-pay-title{display:flex;align-items:center;gap:10px}.iv-pay-title>div{flex:1;display:grid;gap:1px;min-width:0}.iv-pay-title small{color:#667085;font-size:12px}
+.iv-pay-logo{flex:none;display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:#191c1f;color:#fff;font-weight:900;font-size:16px}.iv-pay-logo.stripe{background:#635bff}
+.iv-pay-on{padding:4px 10px;border-radius:99px;background:#12a150;color:#fff;font-size:12px;font-weight:800;white-space:nowrap}.iv-pay-off{padding:4px 10px;border-radius:99px;background:#f2f4f7;color:#475467;font-size:12px;font-weight:700;white-space:nowrap}
+.iv-hint{margin:0;color:#667085;font-size:12px;line-height:1.45}.iv-warn{margin:0;padding:8px 12px;border-radius:10px;background:#fff6e5;color:#93520b;font-size:13px}
+.app-shell.dark-mode .iv-pay-row{background:#1b2227;border-color:#2f3a41}.app-shell.dark-mode .iv-pay-off{background:#2a343b;color:#d0d5dd}.app-shell.dark-mode .iv-pay-head p,.app-shell.dark-mode .iv-pay-title small,.app-shell.dark-mode .iv-hint{color:#a6b0b8}
+@media (max-width:640px){.iv-pay-title{flex-wrap:wrap}}

@@ -523,7 +523,8 @@ html body .app-shell.dark-mode .sch-dash-panel-tools .sch-seg button.on{backgrou
 .ps-card-edit{margin-left:auto;align-self:flex-start;display:grid;place-items:center;width:28px;height:28px;border-radius:8px;border:1px solid transparent;background:transparent;color:#667085;cursor:pointer;transition:background .15s,border-color .15s,transform .15s}
 .ps-card-edit:hover{background:#f2f4f7;border-color:#d0d5dd;transform:translateY(-1px);color:#101828}
 .ps-hours input{width:110px}
-.ps-settings{display:grid;gap:10px}
+.ps-settings{display:grid;gap:10px;padding:22px 24px;box-sizing:border-box}
+@media (max-width:640px){.ps-settings{padding:16px 14px}}
 .ps-staff-list{display:grid;gap:8px}
 .ps-staff-line{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #e8edf1;border-radius:12px}
 .ps-staff-line>span:not(.sch-avatar){flex:1;display:grid;gap:1px;min-width:0}.ps-staff-line small{color:#667085;font-size:12px}

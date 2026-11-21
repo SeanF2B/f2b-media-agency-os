@@ -637,6 +637,27 @@ export async function createProposalCheckout(input: {
   await updateSession(session, { quote: { ...quote, mode }, checkout_id: String(checkout.id || ""), payment_status: "checkout_started", approvals: [{ what: `Proposal approved: ${quote.services.join(", ")}`, at: nowIso() }] });
   return { url: String(checkout.url || ""), mode, sessionId: session.id };
 }
+/** Invoice "Pay by card" backup (Revolut is the main option). One-off Stripe Checkout for the invoice total;
+ * Apple Pay, Google Pay and Link show automatically when switched on in Stripe. The webhook marks the invoice paid. */
+export async function createInvoiceCheckout(inv: Row, backUrl: string) {
+  const settings = await getSettings(inv.owner_id);
+  const mode = settings.stripeMode;
+  const secret = await stripeSecret(inv.owner_id, mode, "key");
+  if (!secret) throw new OnboardingError("Card payment isn't set up yet.", 503);
+  if (mode === "live" && !E.isLiveKey(secret)) throw new OnboardingError("Payments are misconfigured.", 503);
+  if (mode === "test" && !E.isTestKey(secret)) throw new OnboardingError("Test mode needs a Stripe test key.", 503);
+  const amount = Math.round(Number(inv.total || 0) * 100);
+  const fields: Array<[string, string]> = [
+    ["mode", "payment"], ["success_url", `${backUrl}&paid=1`], ["cancel_url", backUrl],
+    ["line_items[0][quantity]", "1"], ["line_items[0][price_data][currency]", String(inv.currency || "EUR").toLowerCase()],
+    ["line_items[0][price_data][unit_amount]", String(amount)], ["line_items[0][price_data][product_data][name]", `Invoice ${inv.number}`],
+    ["client_reference_id", `inv_${inv.id}`], ["metadata[os_invoice_id]", String(inv.id)], ["metadata[os_owner_id]", String(inv.owner_id)],
+    ["payment_intent_data[description]", `Invoice ${inv.number}`], ["payment_intent_data[metadata][os_invoice_id]", String(inv.id)],
+  ];
+  if (inv.client_email && String(inv.client_email).includes("@")) fields.push(["customer_email", String(inv.client_email)]);
+  const checkout = await stripeRequest(secret, "checkout/sessions", fields, `inv_${inv.id}_${amount}_${Math.floor(Date.now() / 3_600_000)}`);
+  return { id: String(checkout.id || ""), url: String(checkout.url || "") };
+}
 /** Whether the agency has online payment ready (so the proposal page can offer card / Apple Pay). */
 export async function proposalPaymentsReady(ownerId: string) {
   const settings = await getSettings(ownerId).catch(() => null);
@@ -658,6 +679,17 @@ export async function handleStripeWebhook(payload: string, signature: string | n
   const claimed = await db().prepare("INSERT OR IGNORE INTO stripe_events (id, owner_id, type, livemode, processed_at) VALUES (?1, ?2, ?3, ?4, ?5)").bind(String(event.id).slice(0, 100), ownerId, String(event.type || "").slice(0, 80), mode === "live" ? 1 : 0, nowIso()).run();
   if (!changes(claimed)) return { duplicate: true };
   try {
+    // Invoice "Pay by card" checkouts (Books → Invoicing) carry the OS invoice id; they never touch onboarding sessions.
+    const obj = (event.data as Row | undefined)?.object as Row | undefined;
+    const invoiceId = String(obj?.metadata?.os_invoice_id || "");
+    if (invoiceId && String(event.type || "").startsWith("checkout.session.")) {
+      const settled = event.type === "checkout.session.async_payment_succeeded" || (event.type === "checkout.session.completed" && obj?.payment_status === "paid");
+      if (settled) {
+        const { markInvoicePaidOnline } = await import("@/lib/invoicing/payments");
+        await markInvoicePaidOnline(invoiceId, String(obj?.metadata?.os_owner_id || ownerId), Number(obj?.amount_total || 0), `card via Stripe${mode === "live" ? "" : " — TEST MODE"}`);
+      }
+      return { ok: true, invoice: invoiceId };
+    }
     const outcome = E.stripeEventOutcome(event);
     if (outcome.kind === "ignored") return { ignored: true };
     let session = outcome.sessionRef ? await getSession(ownerId, outcome.sessionRef) : null;
