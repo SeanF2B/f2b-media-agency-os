@@ -3971,3 +3971,26 @@ html body .app-shell .content-page .cv-tool svg { flex: 0 0 auto; display: block
 html body .app-shell .cv-settings-btn { display: inline-grid; place-items: center; width: 40px; height: 40px; flex: 0 0 40px; margin-left: 6px; padding: 0; border: 1px solid #dce3e7; border-radius: 12px; background: #fff; color: #344054; cursor: pointer; transition: transform .15s, border-color .15s, box-shadow .15s; }
 html body .app-shell .cv-settings-btn:hover { transform: translateY(-1px); border-color: var(--brand-secondary, var(--brand-primary, #1479b8)); box-shadow: 0 4px 12px rgba(16,24,40,.08); }
 html body .app-shell.dark-mode .cv-settings-btn { background: #1b2227; border-color: #2f3a41; color: #e7edf1; }
+
+/* ===== Phones: Payslips fits one screen (staff in a swipe row, controls in one row); the preview scrolls into view ===== */
+@media (max-width: 760px) {
+  html body .app-shell .ps-view { padding: 12px !important; gap: 8px !important; }
+  html body .app-shell .ps-view .ps-head { align-items: center; margin: 0 !important; }
+  html body .app-shell .ps-view .ps-head p { display: none; }
+  html body .app-shell .ps-view .ps-head h2 { font-size: 20px; margin: 0; }
+  html body .app-shell .ps-view .ps-head .secondary-button { min-height: 34px; padding: 6px 10px; font-size: 12.5px; }
+  html body .app-shell .ps-view .ps-banner { padding: 6px 10px; font-size: 12px; margin: 0; }
+  html body .app-shell .ps-view .ps-staff { display: flex !important; flex-wrap: nowrap !important; overflow-x: auto; gap: 8px; padding-bottom: 2px; scrollbar-width: none; grid-template-columns: none !important; }
+  html body .app-shell .ps-view .ps-staff::-webkit-scrollbar { display: none; }
+  html body .app-shell .ps-view .ps-card { flex: 0 0 auto; min-width: 0; width: auto; padding: 8px 34px 8px 10px !important; gap: 8px; }
+  html body .app-shell .ps-view .ps-card small { font-size: 11px; }
+  html body .app-shell .ps-view .crv-controls { display: grid !important; grid-template-columns: 1fr 1fr 1fr; gap: 6px; align-items: end; }
+  html body .app-shell .ps-view .crv-controls .crv-field span { font-size: 11px; }
+  html body .app-shell .ps-view .crv-controls input, html body .app-shell .ps-view .crv-controls select { min-height: 38px; padding: 4px 6px; font-size: 16px; width: 100%; box-sizing: border-box; }
+  html body .app-shell .ps-view .crv-range { grid-column: 1 / -1; font-size: 11.5px; }
+  html body .app-shell .ps-view .crv-go { grid-column: 1 / -1; width: 100%; min-height: 42px; }
+  html body .app-shell .ps-view .crv-history h3 { font-size: 15px; margin: 4px 0 0; }
+  html body .app-shell .ps-view .crv-history .crv-sub { display: none; }
+  html body .app-shell .ps-view .ps-preview { scroll-margin-top: calc(var(--tn-bar-h, 64px) + 8px); }
+  html body .app-shell .ps-view .ps-preview .crv-bar { flex-wrap: wrap; gap: 6px; }
+}

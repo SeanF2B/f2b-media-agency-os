@@ -1539,7 +1539,7 @@ function PayslipCreator({ symbol = "€", data, people, employer, business, slip
       <button type="button" className="primary-button crv-go" disabled={!person || generating} onClick={generate}>{generating ? "Generating…" : shown ? "Regenerate" : "Generate preview"}</button>
     </div>
     {generating && person && <ReportGeneratingAnimation variant="payslip" symbol={symbol} title={`Generating ${firstName(person.name)}'s payslip`} steps={genSteps} />}
-    {preview && <div className="crv-preview ps-preview">
+    {preview && <div className="crv-preview ps-preview" ref={(el) => { if (el && !el.dataset.seen) { el.dataset.seen = "1"; requestAnimationFrame(() => el.scrollIntoView({ behavior: "smooth", block: "start" })); } }}>
       <div className="crv-bar">
         <span className="crv-live">{already ? `Payslip #${already.number} already saved for this period — saving again replaces it` : "Preview · not saved yet"}</span>
         <span className="crv-spacer" />
