@@ -30,6 +30,8 @@ function blankBlocks(h: string): string {
   let m: RegExpExecArray | null;
   while ((m = open.exec(h))) {
     const tag = m[1].toLowerCase();
+    // Page wrappers (<html>, <body>, <main>) often carry theme classes like "ehf-header ehf-footer": never blank those.
+    if (/^(html|body|main|article)$/.test(tag)) continue;
     if (!BLOCK_TAG.test(tag) && !BLOCK_ATTR.test(m[0])) continue;
     if (/\/>$/.test(m[0]) || /^(img|br|hr|input|meta|link|source)$/.test(tag)) continue;
     // Find the matching close tag (counting nested tags of the same name).

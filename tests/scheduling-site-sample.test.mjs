@@ -58,3 +58,11 @@ test("gift-voucher feature headings are never read as team names", () => {
   const r = parseTeam(html, "https://studio.example/");
   assert.deepEqual(r.team, []);
 });
+
+test("body theme classes like ehf-header don't hide the whole team page (The Black Poppy)", () => {
+  const html = `<body class="page wp-theme-kadence ehf-header ehf-footer"><nav><h2>Home</h2></nav><h2>Our Expert Tattoo Artists Are As Follows -</h2>
+    <h2>Jeliza Rose</h2><img src="/u/jeliza.webp"><h2>Elena</h2><img src="/u/elena.webp"><h2>Gin</h2><img src="/u/gin.webp"><h2>Slim</h2><img src="/u/slim.webp"><h2>Fiorella</h2><img src="/u/fio.webp">
+    <h1>Guest Artist</h1><h3>Simona Cordero</h3><footer><h2>Hours</h2></footer></body>`;
+  const r = parseTeam(html, "https://theblackpoppycork.com/artists/");
+  assert.deepEqual(r.team, ["Jeliza Rose", "Elena", "Gin", "Slim", "Fiorella"]);
+});
