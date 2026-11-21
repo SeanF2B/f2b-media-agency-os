@@ -132,7 +132,7 @@ export async function GET() {
           // Sub-account staff only ever see people in their own sub-account (plus account-level AI agents), never the wider agency team.
           staff: !permissions.team ? normalized.staff.filter((member: Staff) => member.id === profile?.id)
             : isSubAccountRole((profile as any)?.role) && Array.isArray((profile as any)?.clientAccessIds)
-              ? normalized.staff.filter((member: any) => member.id === profile?.id || (member.isBot && member.botLevel !== "admin") || (Array.isArray(member.clientAccessIds) && member.clientAccessIds.some((id: string) => (profile as any).clientAccessIds.includes(id))))
+              ? normalized.staff.filter((member: any) => member.id === profile?.id || (member.isBot && member.botLevel !== "admin") || ((member.staffType === "subaccount" || isSubAccountRole(member.role)) && Array.isArray(member.clientAccessIds) && member.clientAccessIds.some((id: string) => (profile as any).clientAccessIds.includes(id))))
               : normalized.staff,
           clients: safeClients,
           projects: visibleProjects,
