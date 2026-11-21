@@ -3809,3 +3809,13 @@ html body .app-shell.dark-mode .cv-pill.bot { background: rgba(23,92,211,.2) !im
 /* Type + source tags always share one line (long ones ellipsise) so every pipeline card is the same height */
 html body .app-shell .crm-opportunity .crm-card-tags { flex-wrap: wrap; }
 html body .app-shell .crm-opportunity .crm-card-tags > .crm-card-type, html body .app-shell .crm-opportunity .crm-card-tags > .crm-card-src { max-width: calc(50% - 3px); min-width: 0; flex: 0 1 auto; }
+
+/* Content calendar: channel icons, hashtag chips, AI idea hashtags */
+.sp-icons { display: inline-flex; gap: 3px; align-items: center; vertical-align: middle; margin-left: 4px; }
+.sp-platforms button { display: inline-flex; align-items: center; gap: 6px; }
+.sp-tags > div { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 4px; }
+.sp-tags span { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; background: color-mix(in srgb, var(--brand-primary, #287cac) 12%, transparent); color: var(--brand-primary, #287cac); font-size: 12.5px; font-weight: 700; }
+.sp-tags span button { border: 0; background: none; color: inherit; cursor: pointer; font-size: 14px; line-height: 1; padding: 0; }
+.sp-tags input { border: 1px dashed rgba(127,127,127,.4); border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 12.5px; background: transparent; color: inherit; min-width: 110px; }
+.sp-idea-tags { display: block; margin-top: 4px; font-style: normal; font-size: 12px; font-weight: 700; color: var(--brand-primary, #287cac); }
+.sp-pv-head .sp-icons { margin-left: auto; }
