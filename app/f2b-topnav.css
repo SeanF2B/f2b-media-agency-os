@@ -3804,3 +3804,5 @@ html body .app-shell.dark-mode .crm-card-thumb.more, html body.f2b-dark .app-she
 
 /* Recent enquiries: contact initial in a colour picked from the letter (not the client logo). */
 html body .app-shell .dh-recent-who > i.dh-initial, body.f2b-dark .app-shell .dh-recent-who > i.dh-initial { border: 0 !important; color: #fff !important; font-style: normal; font-weight: 800; font-size: 13px; display: grid; place-items: center; }
+html body .app-shell .cv-pill.bot { background: #e8f1fb !important; color: #175cd3 !important; }
+html body .app-shell.dark-mode .cv-pill.bot { background: rgba(23,92,211,.2) !important; color: #b2ccff !important; }
