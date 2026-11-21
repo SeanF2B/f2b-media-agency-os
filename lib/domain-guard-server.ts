@@ -139,6 +139,27 @@ async function checkSite(domain: string): Promise<GuardSite> {
 
 type Observation = GuardObservation & { publicNs: string[] | null; postureCheckedAt?: string };
 
+/**
+ * Some hosts (e.g. SiteGround) drop requests that come from a Cloudflare Worker, so Cloudflare
+ * answers the Guard with 520–527 even while real visitors get the site. Before counting such an
+ * error, check the zone's real visitor traffic for the last hour: true = visitors are fine,
+ * false = visitors are failing too, null = not enough traffic or no Analytics Read permission.
+ */
+async function visitorsHealthy(token: string, zoneId: string, now: Date, missing: Set<string>): Promise<boolean | null> {
+  const since = new Date(now.getTime() - 3_600_000).toISOString();
+  const query = `{ viewer { zones(filter: { zoneTag: "${zoneId}" }) { httpRequestsAdaptiveGroups(limit: 100, filter: { datetime_geq: "${since}", requestSource: "eyeball", cacheStatus_neq: "hit" }) { count dimensions { edgeResponseStatus } } } } }`;
+  try {
+    const response = await fetch(`${CF_API}/graphql`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ query }), signal: AbortSignal.timeout(12_000) });
+    const payload = await response.json().catch(() => null) as { data?: { viewer?: { zones?: Array<{ httpRequestsAdaptiveGroups?: Array<{ count: number; dimensions: { edgeResponseStatus: number } }> }> } }; errors?: unknown[] | null } | null;
+    const rows = payload?.data?.viewer?.zones?.[0]?.httpRequestsAdaptiveGroups;
+    if (!response.ok || !rows) { if (response.status === 403 || payload?.errors?.length) missing.add("Analytics Read"); return null; }
+    let total = 0, failed = 0;
+    for (const row of rows) { total += row.count; if (row.dimensions.edgeResponseStatus >= 520 && row.dimensions.edgeResponseStatus <= 527) failed += row.count; }
+    if (total < 10) return null;
+    return failed / total < 0.2;
+  } catch { return null; }
+}
+
 // DNS records, live nameservers and the website are checked every pass; slow-changing settings
 // (HTTPS / TLS / SSL mode / DNSSEC) at most hourly, to keep each cron run light.
 async function observe(token: string, zone: ZoneInfo, registrar: RegistrarInfo, missing: Set<string>, baseline: Observation | null, now: Date): Promise<Observation> {
@@ -147,13 +168,17 @@ async function observe(token: string, zone: ZoneInfo, registrar: RegistrarInfo, 
   const dnsRequest = cf<Array<{ type: string; name: string; content: string; priority?: number; proxied?: boolean }>>(token, `/zones/${zone.id}/dns_records?per_page=500`);
   // Email-only domains (e.g. outreach sending domains) have no website: skip the site check for them.
   const hasWebsite = dnsRequest.then((r) => !r.ok || !r.result || r.result.some((rec) => /^(A|AAAA|CNAME)$/.test(rec.type) && (rec.name === zone.name || rec.name === `www.${zone.name}`)));
-  const [dns, settings, dnssec, publicNs, site] = await Promise.all([
+  const [dns, settings, dnssec, publicNs, guardSite] = await Promise.all([
     dnsRequest,
     postureDue ? cf<Array<{ id: string; value: unknown }>>(token, `/zones/${zone.id}/settings`) : skip as Promise<{ ok: boolean; status: number; result: Array<{ id: string; value: unknown }> | null }>,
     postureDue ? cf<{ status?: string }>(token, `/zones/${zone.id}/dnssec`) : skip as Promise<{ ok: boolean; status: number; result: { status?: string } | null }>,
     publicNameServers(zone.name),
     hasWebsite.then((web) => (web ? checkSite(zone.name) : null)),
   ]);
+  // Cloudflare origin error seen only by the Guard while real visitors load the site: not an outage,
+  // so treat it as "not checked this pass" (keeps the last good baseline and clears the down alert).
+  const site = guardSite && !guardSite.ok && (guardSite.status ?? 0) >= 520 && (guardSite.status ?? 0) <= 527
+    && await visitorsHealthy(token, zone.id, now, missing) === true ? null : guardSite;
   if (dns.status === 403) missing.add("DNS Read");
   if (settings.status === 403) missing.add("Zone Settings Read");
   if (dnssec.status === 403) missing.add("DNS Read (DNSSEC)");
