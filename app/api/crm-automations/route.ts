@@ -116,18 +116,29 @@ export async function GET(request: Request) {
     // Agency view also lists every client's automations and the rules built into website forms, so nothing is hidden.
     const clientName = (id: string) => String((workspace.clients || []).find((client) => String(client.id) === id)?.name || "Client");
     let others: Array<ReturnType<typeof listItem> & { clientName: string }> = [];
-    let formRules: Array<{ formId: string; formName: string; clientId: string; clientName: string; status: string; notify: string[]; rules: Array<{ when: string; then: string[]; kinds: string[] }> }> = [];
+    let formRules: Array<{ formId: string; formIds: string[]; formName: string; clientId: string; clientName: string; status: string; notify: string[]; rules: Array<{ when: string; then: string[]; kinds: string[] }> }> = [];
     if (!scope) {
       const otherRows = await raw.prepare("SELECT * FROM crm_automations WHERE owner_id=?1 AND scope_id<>'' ORDER BY updated_at DESC LIMIT 300").bind(ownerId).all<AutomationRow>();
       others = (otherRows.results || []).filter((row) => (workspace.clients || []).some((client) => String(client.id) === row.scope_id)).map((row) => ({ ...listItem(row), clientName: clientName(row.scope_id) }));
-      const forms = await raw.prepare("SELECT id, client_id, name, definition, settings FROM site_forms WHERE owner_id=?1 ORDER BY name LIMIT 100").bind(ownerId).all<{ id: string; client_id: string; name: string; definition: string; settings: string }>().catch(() => ({ results: [] as Array<{ id: string; client_id: string; name: string; definition: string; settings: string }> }));
+      const forms = await raw.prepare("SELECT id, client_id, form_key, name, definition, settings FROM site_forms WHERE owner_id=?1 ORDER BY name LIMIT 100").bind(ownerId).all<{ id: string; client_id: string; form_key: string; name: string; definition: string; settings: string }>().catch(() => ({ results: [] as Array<{ id: string; client_id: string; form_key: string; name: string; definition: string; settings: string }> }));
       const verb: Record<string, string> = { tag: "Add tag", urgent: "Mark urgent", stage: "Move to stage", notify: "Also email" };
-      formRules = (forms.results || []).map((form) => {
+      const perForm = (forms.results || []).map((form) => {
         const def = (() => { try { return JSON.parse(form.definition || "{}"); } catch { return {}; } })() as { rules?: Array<{ when?: { field?: string; equals?: string }; then?: Array<{ action?: string; value?: string }> }>; fields?: Array<{ id: string; label: string }> };
         const settings = (() => { try { return JSON.parse(form.settings || "{}"); } catch { return {}; } })() as { status?: string; notify?: string[] };
         const label = (id?: string) => def.fields?.find((field) => field.id === id)?.label || id || "answer";
-        return { formId: form.id, formName: form.name, clientId: form.client_id, clientName: clientName(form.client_id), status: settings.status || "live", notify: Array.isArray(settings.notify) ? settings.notify : [],
+        return { formId: form.id, formIds: [form.id], formKey: form.form_key || "", formName: form.name, clientId: form.client_id, clientName: clientName(form.client_id), status: settings.status || "live", notify: Array.isArray(settings.notify) ? settings.notify : [],
           rules: (def.rules || []).map((rule) => ({ when: `${label(rule.when?.field)} is “${rule.when?.equals || ""}”`, then: (rule.then || []).map((step) => `${verb[String(step.action)] || step.action}${step.value ? `: ${step.value}` : ""}`), kinds: (rule.then || []).map((step) => String(step.action || "")) })) };
+      });
+      // One row per client (like Operations → Forms): a client's extra form records fold into its main form.
+      const byClient = new Map<string, typeof perForm>();
+      for (const form of perForm) byClient.set(form.clientId, [...(byClient.get(form.clientId) || []), form]);
+      formRules = [...byClient.values()].map((list) => {
+        const main = list.find((form) => /:(quote|interior-design)$/.test(form.formKey)) || list.find((form) => /quote/i.test(form.formName)) || list[0];
+        const seen = new Set<string>();
+        return { formId: main.formId, formIds: list.map((form) => form.formId), formName: main.formName, clientId: main.clientId, clientName: main.clientName,
+          status: list.some((form) => form.status === "live") ? "live" : main.status,
+          notify: [...new Set(list.flatMap((form) => form.notify.map((e) => String(e).toLowerCase())))],
+          rules: list.flatMap((form) => form.rules).filter((rule) => { const k = `${rule.when}|${rule.then.join("|")}`; if (seen.has(k)) return false; seen.add(k); return true; }) };
       });
     }
     return ok({
@@ -152,6 +163,18 @@ export async function POST(request: Request) {
   const load = async (id: unknown) => raw.prepare("SELECT * FROM crm_automations WHERE id=?1 AND owner_id=?2 AND scope_id=?3").bind(clean(id, 120), ownerId, scope).first<AutomationRow>();
   const cancelActive = (automationId: string, reason: string) => raw.prepare("UPDATE crm_automation_runs SET status='cancelled', error=?1, resume_at=NULL, updated_at=?2, finished_at=?2 WHERE automation_id=?3 AND status IN ('running','waiting') AND dry_run=0").bind(reason, stamp, automationId);
   try {
+    if (action === "deleteForms") {
+      // Removes the built-in rules of website forms (agency only). Leads still arrive: the site relay always
+      // creates the lead and falls back to the client's own email, then sean@, when a form has no settings.
+      if (scope) return reply("Website forms are managed from the agency view.", 403);
+      const ids = (Array.isArray(body.formIds) ? body.formIds : []).map((id) => clean(id, 80)).filter(Boolean).slice(0, 50);
+      if (!ids.length) return reply("Choose a form to delete.");
+      await raw.batch(ids.flatMap((id) => [
+        raw.prepare("DELETE FROM site_form_history WHERE owner_id=?1 AND form_id=?2").bind(ownerId, id),
+        raw.prepare("DELETE FROM site_forms WHERE owner_id=?1 AND id=?2").bind(ownerId, id),
+      ]));
+      return ok({ ok: true, deleted: ids.length });
+    }
     if (action === "create") {
       const id = crypto.randomUUID();
       const template = SCHEDULING_TEMPLATES.find((t) => t.key === clean(body.template, 40));

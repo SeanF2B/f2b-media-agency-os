@@ -150,7 +150,8 @@ async function saveLead(request: Request, env: Env, site: SiteConfig) {
   if (dup) return json({ ok: true, duplicate: true, id: dup.id, delivered: true });
 
   // Settings saved in Operations → Forms (notify list, landing stage) override the built-in defaults.
-  const formCfg = await formSettingsFor(db, owner, `site:${site.clientId}:${kind === "contact" ? "contact" : "quote"}`);
+  // One form per client: every submission (quote or contact) uses the client's main form settings.
+  const formCfg = (await formSettingsFor(db, owner, `site:${site.clientId}:quote`)) || (kind === "contact" ? await formSettingsFor(db, owner, `site:${site.clientId}:contact`) : null);
   const notifyTo = formCfg?.notify?.length ? formCfg.notify : site.notify.length ? site.notify : [TEST_INBOX];
   const cfgStage = formCfg?.stageId ? await db.prepare("SELECT s.id, s.pipeline_id FROM crm_pipeline_stages s JOIN crm_pipelines p ON p.id=s.pipeline_id AND p.owner_id=s.owner_id WHERE s.owner_id=?1 AND s.id=?2 AND p.archived=0").bind(owner, formCfg.stageId).first<{ id: string; pipeline_id: string }>() : null;
   let stage = cfgStage || (keyRow ? await db.prepare("SELECT s.id, s.pipeline_id FROM crm_pipeline_stages s JOIN crm_pipelines p ON p.id=s.pipeline_id AND p.owner_id=s.owner_id WHERE s.owner_id=?1 AND s.id=?2 AND p.archived=0").bind(owner, keyRow.stage_id).first<{ id: string; pipeline_id: string }>() : null);

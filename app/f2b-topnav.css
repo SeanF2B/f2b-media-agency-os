@@ -4002,3 +4002,7 @@ html body .app-shell .cv-channel-bar .cv-staff-select { margin-left: auto !impor
 html body .app-shell .cv-channel-bar .cv-settings-btn { width: 32px; height: 32px; flex: 0 0 32px; margin-left: 0; border-radius: 10px; }
 html body .app-shell .cv-channel-bar .cv-settings-btn svg { width: 16px; height: 16px; }
 @media (max-width: 860px) { html body .app-shell .cv-channel-bar .cv-settings-btn { width: 34px; height: 34px; flex-basis: 34px; } }
+/* Books / Team: the folded Staff hours & earnings card looks like every other folded section (a normal panel, not a pill button) */
+html body .app-shell .books-staff-hours-bar { margin: 0; padding: 16px 20px; box-sizing: border-box; outline: none; }
+html body .app-shell .books-staff-hours-bar .eyebrow { margin: 0; }
+html body .app-shell .books-staff-hours-bar:focus-visible { box-shadow: 0 0 0 2px var(--brand-primary, #1479b8); }
