@@ -6,7 +6,7 @@ import { getMemberPermissions } from "@/lib/access-permissions";
 import { googleSchedulingAvailable, startGoogleConnect, disconnectGoogle } from "@/lib/scheduling/google";
 import { aiConfigured, aiEndpoint, aiHeaders, aiModel, getAiProvider, resolveAiProvider, type AiProvider } from "@/lib/ai-provider";
 import { sanitizeCalendar, sanitizeWeekly } from "@/lib/scheduling/core";
-import { findGalleryHref, findTeamHref, parseGallery, parseTeam } from "@/lib/scheduling/site-sample";
+import { findGalleryHref, findTeamHref, looksLikePerson, parseGallery, parseTeam } from "@/lib/scheduling/site-sample";
 import {
   SchedulingError, availableSlots, createBooking, deleteCalendar, getBooking, getCalendar, getStaffSettings, listBookings, listCalendars,
   saveCalendar, saveStaffSettings, staffFeedToken, updateBooking, getStaffProfiles, saveStaffProfile, reviewLinkToken,
@@ -446,7 +446,9 @@ async function siteContentSample(db: SiteDb, clientId: string) {
       const obj = node as Record<string, unknown>;
       const label = String(obj.title || obj.name || obj.heading || "").trim();
       if (label && label.length >= 3 && label.length <= 40) {
-        if (/team|staff|artist|people|crew|member/i.test(trail) && /^[A-Z][a-zà-ú'’-]+( [A-Z][a-zà-ú'’-]+){0,2}$/.test(label)) out.team.push(label);
+        // Only a real team list counts (a "team"/"staff"/"members" key in the content), never the file name or menus.
+        const keys = trail.split(".").slice(1).join(".");
+        if (/(^|\.)(team|teams|staff|members|artists|people|crew)(\.|$)/i.test(keys) && !/(^|\.)(nav|navigation|menu|menus|header|footer|links|dropdown|drawer)(\.|$)/i.test(keys) && looksLikePerson(label)) out.team.push(label);
         else if (/service|treatment|offer|menu|package|style/i.test(trail) || SERVICE_WORDS.test(label)) out.services.push(label);
       }
       for (const [k, v] of Object.entries(obj)) {
@@ -456,7 +458,7 @@ async function siteContentSample(db: SiteDb, clientId: string) {
       }
     };
     for (const row of rows) {
-      if (row.path.endsWith(".json")) { try { walk(JSON.parse(row.text), row.path); } catch { /* not JSON */ } }
+      if (row.path.endsWith(".json")) { try { walk(JSON.parse(row.text), row.path.replace(/\./g, "_")); } catch { /* not JSON */ } }
       else for (const m of row.text.matchAll(/^#{2,3}\s+(.{3,40})$/gm)) if (SERVICE_WORDS.test(m[1])) out.services.push(m[1].trim());
     }
   } catch { /* no website builder content */ }
@@ -467,7 +469,7 @@ async function siteSampleFor(client: { id: string; name: string; email?: string;
   const services = cleanList(client.seoServices), locations = cleanList(client.seoLocations);
   const base = { services: services.slice(0, 6), locations: locations.slice(0, 6), team: [] as string[] };
   const own = db ? await siteContentSample(db, client.id) : { services: [], team: [], locations: [], url: "" };
-  base.services = [...new Set([...base.services, ...own.services])].slice(0, 6); base.team = [...new Set(own.team)].slice(0, 5); base.locations = [...new Set([...base.locations, ...own.locations])].slice(0, 6);
+  base.services = [...new Set([...base.services, ...own.services])].slice(0, 6); base.team = [...new Set(own.team.filter(looksLikePerson))].slice(0, 5); base.locations = [...new Set([...base.locations, ...own.locations])].slice(0, 6);
   const emailDomain = /@([a-z0-9.-]+\.[a-z]{2,})$/i.exec(String(client.email || ""))?.[1] || "";
   const freeMail = /^(gmail|googlemail|hotmail|outlook|live|yahoo|icloud|me|aol|eircom|proton|protonmail)\./i.test(emailDomain);
   let site = String(client.website || "").trim() || own.url || (emailDomain && !freeMail ? emailDomain : "");
@@ -496,7 +498,7 @@ async function siteSampleFor(client: { id: string; name: string; email?: string;
     let crew = { team: [] as string[], photos: {} as Record<string, string>, work: {} as Record<string, string[]> };
     if (teamUrl) { const page = await get(teamUrl); if (page.html) crew = parseTeam(page.html, page.url); }
     if (crew.team.length < 2) { const scope = /(meet (the|our) (team|artists)|our (team|artists)|the (team|artists)|resident artists?)[\s\S]{0,12000}/i.exec(html)?.[0] || ""; if (scope) { const homeCrew = parseTeam(scope, home.url); if (homeCrew.team.length > crew.team.length) crew = homeCrew; } }
-    const team = crew.team, photos = crew.photos;
+    const team = crew.team.filter(looksLikePerson), photos = crew.photos;
     // Gallery: photos of their work for the calendar (only fetched when the team page didn't already give enough).
     let gallery = [...new Set(Object.values(crew.work).flat())];
     if (gallery.length < 6) { const galleryUrl = findGalleryHref(html, home.url); if (galleryUrl) { const page = await get(galleryUrl); if (page.html) gallery = [...new Set([...gallery, ...parseGallery(page.html, page.url)])]; } }

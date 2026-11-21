@@ -35,3 +35,20 @@ test("team and gallery links stay on the same site; gallery skips logos", () => 
   assert.equal(findTeamHref(`<a href="https://other.example/team">x</a>`, "https://x.example/"), "");
   assert.deepEqual(parseGallery(`<img src="/apex+no+bg.png"><img src="/a.jpg"><img src="/a.jpg"><img src="/b.jpg">`, "https://x.example/g"), ["https://x.example/a.jpg", "https://x.example/b.jpg"]);
 });
+
+test("menu labels, section titles and reviewer names are never read as team (sole-trader about page)", async () => {
+  const { looksLikePerson } = await import("../lib/scheduling/site-sample.ts");
+  const html = `<header><nav><div class="dropdown"><h4>Bridal</h4><h4>Occasions</h4><h4>Areas</h4></div></nav></header>
+    <div class="mobile-drawer"><h4>Bridal</h4><h4>More</h4></div>
+    <h1>Your Makeup Artist, Lea</h1><img src="/u/lea.jpg" alt="Lea Flanagan, mobile makeup artist in Dublin">
+    <h2>5 Star Reviews</h2><strong>Aimee Carroll</strong><strong>Donna Murphy</strong>
+    <h2>Professional Makeup Artist</h2><h3>Mobile Service</h3><h3>Any Occasion</h3><h3>Premium Products</h3>
+    <footer><h4>Services</h4><h4>Areas</h4><h4>Explore</h4></footer>`;
+  const r = parseTeam(html, "https://mua.example/about/");
+  for (const bad of ["Bridal", "Occasions", "Areas", "More", "Professional Makeup Artist", "Any Occasion", "Mobile Service", "Premium Products", "Aimee Carroll", "Donna Murphy", "Explore"]) assert.ok(!r.team.includes(bad), bad);
+  assert.deepEqual(r.team, ["Lea Flanagan"]);
+  assert.equal(r.photos["Lea Flanagan"], "https://mua.example/u/lea.jpg");
+  assert.equal(looksLikePerson("Any Occasion"), false);
+  assert.equal(looksLikePerson("Jeliza Rose"), true);
+  assert.equal(looksLikePerson("CJ"), true);
+});

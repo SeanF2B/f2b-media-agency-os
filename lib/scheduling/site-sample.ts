@@ -11,7 +11,40 @@ const STOP = /^(guest artists?|our work|gallery|tattoo gallery|reviews?|testimon
 const BAD_IMG = /logo|no\+bg|no-bg|icon|\.svg|sprite|placeholder|data:image|empty_|blank|spacer|payment|insta\.|avatar-default|gravatar|emoji|flag/i;
 
 export const htmlText = (h: string) => h.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&#0?39;|&rsquo;|&#8217;/g, "'").replace(/&[a-z#0-9]+;/gi, " ").replace(/[​﻿]/g, "").replace(/\s+/g, " ").trim();
-const strip = (h: string) => h.replace(/<script\b[\s\S]*?<\/script>|<style\b[\s\S]*?<\/style>|<noscript\b[\s\S]*?<\/noscript>/gi, (m) => " ".repeat(m.length));
+const stripCode = (h: string) => h.replace(/<script\b[\s\S]*?<\/script>|<style\b[\s\S]*?<\/style>|<noscript\b[\s\S]*?<\/noscript>/gi, (m) => " ".repeat(m.length));
+// Words that mark a heading as a section title, menu label, role or service rather than a person's name
+// (e.g. "Professional Makeup Artist", "Any Occasion", "Bridal", "Areas", "More" from a site's menu).
+const NOT_PERSON_WORD = /^(a|an|and|any|all|the|our|my|your|of|for|to|in|on|with|by|why|how|what|who|get|just|me|more|less|other|not|sure|free|paid|new|real|best|top|five|star|stars|professional|expert|experts|premium|luxury|mobile|local|award|winning|certified|qualified|makeup|make-up|mua|artist|artists|stylist|stylists|specialist|consultant|technician|therapist|owner|founder|director|manager|team|staff|member|members|crew|people|bridal|bride|brides|wedding|weddings|occasion|occasions|event|events|party|parties|group|groups|debs|grads|photoshoot|area|areas|explore|services?|products?|packages?|prices?|offers?|deals?|studio|salon|clinic|shop|beauty|beautiful|hair|nails|lashes|brows|skin|glam|day|days|touch|enquire|enquiry|availability|check|popular|cookies|parking|booking|bookings|reviews?|clients?|customers?|gift|vouchers?|collection|courses?|classes?|training|academy|insurance|careers?|jobs?)$/i;
+/** True when a short label reads like a person's name (not a menu item, section title, role or service). */
+export function looksLikePerson(label: string): boolean {
+  const t = String(label || "").trim();
+  if (!NAME.test(t) || NOT_NAME.test(t) || SERVICE.test(t)) return false;
+  return !t.split(/\s+/).some((w) => NOT_PERSON_WORD.test(w.replace(/[.'’]+$/, "")));
+}
+// Blank out whole blocks (menus, headers, footers, drawers, forms) so their labels are never read as team names.
+const BLOCK_TAG = /^(nav|header|footer|form|aside|dialog|select|button)$/i;
+const BLOCK_ATTR = /\b(?:class|id|role)="[^"]*\b(nav|navbar|navigation|menu|menubar|drawer|dropdown|mega|offcanvas|off-canvas|footer|header|site-header|cookie|modal|popup)\b[^"]*"/i;
+function blankBlocks(h: string): string {
+  const out = h.split("");
+  const open = /<([a-z][a-z0-9]*)\b[^>]*>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = open.exec(h))) {
+    const tag = m[1].toLowerCase();
+    if (!BLOCK_TAG.test(tag) && !BLOCK_ATTR.test(m[0])) continue;
+    if (/\/>$/.test(m[0]) || /^(img|br|hr|input|meta|link|source)$/.test(tag)) continue;
+    // Find the matching close tag (counting nested tags of the same name).
+    const re = new RegExp(`<(/?)${tag}\\b[^>]*>`, "gi"); re.lastIndex = m.index + m[0].length;
+    let depth = 1, end = h.length, x: RegExpExecArray | null;
+    while ((x = re.exec(h))) { depth += x[1] ? -1 : 1; if (!depth) { end = x.index + x[0].length; break; } }
+    for (let i = m.index; i < end; i++) out[i] = " ";
+    open.lastIndex = end;
+  }
+  return out.join("");
+}
+const strip = (h: string) => stripCode(h);
+const stripChrome = (h: string) => blankBlocks(stripCode(h));
+// Headings that start a reviews / testimonials block: reviewer names there are customers, not staff.
+const REVIEWS = /\b(reviews?|testimonials?|what (my|our) (clients|customers) say|happy (clients|customers)|kind words)\b/i;
 const abs = (src: string, page: string) => { try { return new URL(src.replace(/&amp;/g, "&").trim(), page).href.replace(/^http:/, "https:"); } catch { return ""; } };
 
 type Img = { at: number; src: string; alt: string };
@@ -46,18 +79,22 @@ export function findGalleryHref(html: string, pageUrl: string): string {
 
 /** Team names with their portrait and the photos of their work that follow them on the page. */
 export function parseTeam(html: string, pageUrl: string, max = 6): TeamSample {
-  const clean = strip(html);
+  const clean = stripChrome(html);
   const imgs = pageImages(html, pageUrl);
-  const heads: Array<{ at: number; t: string }> = [];
+  const heads: Array<{ at: number; t: string; level: number }> = [];
   for (const m of clean.matchAll(/<(h1|h2|h3|h4|h5|h6|strong|figcaption)\b[^>]*>([\s\S]{1,600}?)<\/\1>/gi)) {
-    const t = htmlText(m[2]); if (t) heads.push({ at: m.index || 0, t });
+    const t = htmlText(m[2]); if (t) heads.push({ at: m.index || 0, t, level: /^h[1-6]$/i.test(m[1]) ? Number(m[1][1]) : 9 });
   }
   const names: Array<{ at: number; name: string }> = [];
   let stopAt = Infinity;
+  let reviewsLevel = 0; // inside a reviews block until the next heading at the same or higher level
   for (const h of heads) {
+    if (reviewsLevel && h.level <= reviewsLevel) reviewsLevel = 0;
+    if (h.level <= 6 && REVIEWS.test(h.t)) { if (names.length) { stopAt = h.at; break; } reviewsLevel = h.level; continue; }
+    if (reviewsLevel) continue;
     if (names.length && STOP.test(h.t)) { stopAt = h.at; break; } // resident team is over
     const t = h.t.replace(/\s*(\(|[-–|:@]).*$/, "").trim();
-    if (!NAME.test(t) || NOT_NAME.test(t) || SERVICE.test(t) || names.some((n) => n.name === t)) continue;
+    if (!looksLikePerson(t) || names.some((n) => n.name === t)) continue;
     names.push({ at: h.at, name: t });
     if (names.length >= max) break;
   }
@@ -80,8 +117,8 @@ export function parseTeam(html: string, pageUrl: string, max = 6): TeamSample {
   });
   // Few names but none with a heading? Fall back to image alt text that looks like a name.
   if (names.length < 2) for (const x of imgs) {
-    const t = htmlText(x.alt).replace(/\s*[-–|:].*$/, "").trim();
-    if (names.length >= max || !NAME.test(t) || NOT_NAME.test(t) || SERVICE.test(t) || names.some((n) => n.name === t)) continue;
+    const t = htmlText(x.alt).replace(/\s*[-–|:,].*$/, "").trim();
+    if (names.length >= max || !looksLikePerson(t) || names.some((n) => n.name === t)) continue;
     names.push({ at: x.at, name: t }); photos[t] = x.src;
   }
   return { team: names.map((n) => n.name), photos, work };
