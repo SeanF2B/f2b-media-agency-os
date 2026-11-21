@@ -31,6 +31,13 @@ d1.database_name = "f2b-media-agency-os";
 d1.database_id = databaseId;
 d1.migrations_dir = "../../drizzle";
 config.r2_buckets = marketingBucketName ? [{ binding: "BUCKET", bucket_name: marketingBucketName }] : [];
+// Our own client preview sites on workers.dev can't be fetched over the public URL from this worker
+// (same-account workers.dev -> 404), so sample-data lookups reach them via service bindings: SITE_<WORKER_NAME>.
+const sitePreviewWorkers = ["apexink-preview"];
+config.services = [
+  ...(config.services || []).filter((s) => !String(s.binding || "").startsWith("SITE_")),
+  ...sitePreviewWorkers.map((service) => ({ binding: `SITE_${service.replace(/-/g, "_").toUpperCase()}`, service })),
+];
 config.vars = {
   ...config.vars,
   F2B_AUTH_PROVIDER: "cloudflare-access",
