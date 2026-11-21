@@ -32,7 +32,8 @@ export async function GET(request: Request) {
   const admin = owner || ["Owner", "Admin"].includes(staff?.role || "");
   if (!admin && !staff) return reply({ error: "You do not have access." }, 403);
   const permissions = owner ? fullTeamPermissions : getTeamPermissions(staff?.role || "Viewer", staff?.permissions);
-  const allowedIds = admin || !staff?.limitClientAccess ? null : staff.clientAccessIds || [];
+  // Anyone with a client list (client staff, limited agency staff) only ever gets their own accounts.
+  const allowedIds = admin ? null : Array.isArray(staff?.clientAccessIds) ? staff!.clientAccessIds! : staff?.limitClientAccess ? [] : null;
   const url = new URL(request.url);
   let clientId = (url.searchParams.get("clientId") || "").slice(0, 120);
   const allClients = clientId === "all" && !allowedIds;
