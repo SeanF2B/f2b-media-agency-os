@@ -324,7 +324,7 @@ function ScopeSearch({ value, onChange, onEnter }: { value: string; onChange: (v
 }
 const matchesClient = (client: Client, query: string) => !query.trim() || `${client.name} ${client.company || ""}`.toLowerCase().includes(query.trim().toLowerCase());
 
-function ClientScopePicker({ value, clients, onChange }: { value: string; clients: Client[]; onChange: (id: string) => void }) {
+function ClientScopePicker({ value, clients, onChange, allowAgency = true }: { value: string; clients: Client[]; onChange: (id: string) => void; allowAgency?: boolean }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -341,10 +341,10 @@ function ClientScopePicker({ value, clients, onChange }: { value: string; client
   const pick = (id: string) => { onChange(id); setOpen(false); };
   return <div className="client-scope" ref={rootRef}>
     <label id="client-scope-label">Viewing</label>
-    <button type="button" className="client-scope-trigger" aria-haspopup="listbox" aria-expanded={open} aria-labelledby="client-scope-label" onClick={() => setOpen((state) => !state)}><span className="client-scope-name">{current ? current.name : "Agency"}</span><span className="client-scope-caret" aria-hidden="true">▾</span></button>
+    <button type="button" className="client-scope-trigger" aria-haspopup="listbox" aria-expanded={open} aria-labelledby="client-scope-label" onClick={() => setOpen((state) => !state)}><span className="client-scope-name">{current ? current.name : allowAgency ? "Agency" : "Choose account"}</span><span className="client-scope-caret" aria-hidden="true">▾</span></button>
     {open && <ul className="client-scope-menu" role="listbox" aria-labelledby="client-scope-label">
       <ScopeSearch value={query} onChange={setQuery} onEnter={() => { if (shown[0]) pick(shown[0].id); }} />
-      {(!query.trim() || "agency".includes(query.trim().toLowerCase())) && <li><button type="button" role="option" aria-selected={!value} className={!value ? "active" : ""} onClick={() => pick("")}>{badge()}<span>Agency</span></button></li>}
+      {allowAgency && (!query.trim() || "agency".includes(query.trim().toLowerCase())) && <li><button type="button" role="option" aria-selected={!value} className={!value ? "active" : ""} onClick={() => pick("")}>{badge()}<span>Agency</span></button></li>}
       {!shown.length && query.trim() && !"agency".includes(query.trim().toLowerCase()) && <li className="client-scope-empty">No clients match</li>}
       {shown.map((client) => <li key={client.id}><button type="button" role="option" aria-selected={value === client.id} className={value === client.id ? "active" : ""} onClick={() => pick(client.id)}>{badge(client)}<span>{client.name}</span></button></li>)}
     </ul>}
@@ -1542,7 +1542,10 @@ export function AgencyApp() {
   const previewPermissions = previewMember ? getTeamPermissions(previewMember.role, previewMember.permissions) : access;
   const [clientScope, setClientScopeState] = useState("");
   useEffect(() => { try { const saved = window.localStorage.getItem("f2b-client-scope"); if (saved) setClientScopeState(saved); document.cookie = `f2b_client=${encodeURIComponent(saved || "agency")}; Path=/; Max-Age=31536000; SameSite=Lax; Secure`; } catch { /* storage unavailable */ } }, []);
-  const activeScopeId = workspace.clients.some((item) => item.id === clientScope) ? clientScope : "";
+  // Anyone limited to certain clients (client staff, or agency staff with an account limit) never gets the agency view:
+  // they're always inside one of their own accounts.
+  const scopeLocked = !isAdmin && Array.isArray(selfProfile?.clientAccessIds);
+  const activeScopeId = workspace.clients.some((item) => item.id === clientScope) ? clientScope : scopeLocked ? (workspace.clients.find((item) => (selfProfile?.clientAccessIds || []).includes(item.id))?.id || workspace.clients[0]?.id || "") : "";
   const scopedClient = activeScopeId ? workspace.clients.find((item) => item.id === activeScopeId) : undefined;
   if (scopedClient?.currency) setDisplayCurrency(scopedClient.currency);
   useEffect(() => { if (activeScopeId && page === "Clients" && !selectedClient) setPage("Overview"); }, [activeScopeId, page, selectedClient]);
@@ -2814,7 +2817,7 @@ ${senderName}`, staffType: member.staffType || (isSubAccountRole(member.role) ? 
       <header className="tn-bar">
         <div className="tn-left">
           <div className="tn-brand">{activeScopeId && scopedClient?.logo ? <div className="tn-logo tn-logo-client"><CleanLogo className="sidebar-client-logo" src={scopedClient.logo} alt={scopedClient.name} /></div> : <><div className="tn-logo"><BrandLogo className="sidebar-logo" bar dark={darkMode} /></div><button type="button" className="tn-bot-logo" aria-label="Open AI Assistant" onClick={() => setAiAssistantPopupOpen(true)}><AiEyesIcon /></button></>}</div>
-          {viewWorkspace.clients.length > 0 || activeScopeId ? <ClientScopePicker value={activeScopeId} clients={workspace.clients.filter((item) => (previewMember ? baseViewWorkspace.clients.some((allowed) => allowed.id === item.id) : true))} onChange={setClientScope} /> : null}
+          {viewWorkspace.clients.length > 0 || activeScopeId ? <ClientScopePicker value={activeScopeId} allowAgency={!(scopeLocked || (previewMember && viewHasClientScope))} clients={workspace.clients.filter((item) => (previewMember ? baseViewWorkspace.clients.some((allowed) => allowed.id === item.id) : true))} onChange={setClientScope} /> : null}
           {!activeScopeId && viewWorkspace.clients.length > 0 && <ClientFocusPicker clients={viewWorkspace.clients.filter((client) => !/^(inactive|archived)$/i.test(client.status || ""))} />}
           <button type="button" className="icon-button tn-layout-toggle" onClick={toggleNavSide} aria-label={navSide ? "Switch to top menu" : "Switch to side menu"} title={navSide ? "Top menu (A/D or ←/→)" : "Side menu (W/S or ↑/↓)"}>{navSide ? <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3" /><path d="M3 9h18" /></svg> : <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3" /><path d="M9 4v16" /></svg>}</button>
         </div>
@@ -6142,7 +6145,7 @@ function TeamView({ workspace, scopeClientId = "", scopeClientName = "", onOpenS
   const shownStaff = (scopeClientId || typeFilter === "all" ? baseShown : baseShown.filter((member) => typeFilter === "agency" ? memberType(member) !== "subaccount" : memberType(member) === "subaccount")).filter((member) => scopeClientId || hasAccount(member));
   const clientNameOf = (id?: string) => workspace.clients.find((item) => item.id === id)?.name || "Sub-account";
   return <>
-    <div className="page-heading"><div><p className="eyebrow">PEOPLE · ACCESS · CAPACITY</p><h1>Team</h1><p className="muted">Manage staff and create AI agents with their own instructions and access to all task modes and clients.</p></div><div className="team-heading-actions"><button className="primary-button" onClick={onAdd}>＋ Add teammate</button>{!scopeClientId && <button className="secondary-button" onClick={onAddAi}><AiEyesIcon /> Create AI agent</button>}{!scopeClientId && (workspace.hiddenAiAgentIds || []).includes(aiTeammate.id) && <button className="secondary-button" onClick={onRestoreAi}><AiEyesIcon /> Add AI teammate</button>}</div></div>
+    <div className="page-heading"><div><p className="eyebrow">PEOPLE · ACCESS · CAPACITY</p><h1>Team</h1><p className="muted">Manage staff and create AI agents with their own instructions and access to all task modes and clients.</p></div><div className="team-heading-actions"><button className="primary-button" onClick={onAdd}>＋ Add teammate</button>{!scopeClientId && <button className="secondary-button" onClick={onAddAi}><AiEyesIcon /> Create AI agent</button>}{!scopeClientId && (workspace.hiddenAiAgentIds || []).includes(aiTeammate.id) && <button type="button" className="text-button team-restore-ai" title="Bring back the built-in AI Assistant you removed" onClick={onRestoreAi}>Restore AI Assistant</button>}</div></div>
     <TeamSignInLink scopeClientId={scopeClientId} scopeClientName={scopeClientName} onOpenSystemEmails={onOpenSystemEmails} />
     {scopeClientId && <div className="team-scope-bar"><span>{subAccountTeam.length ? `${subAccountTeam.length} team member${subAccountTeam.length === 1 ? "" : "s"} with access to ${scopeClientName || "this sub-account"}` : `No team members are assigned to ${scopeClientName || "this sub-account"} yet. Add a teammate or give an agency teammate access to it.`}</span><label className="team-agency-toggle"><input type="checkbox" role="switch" checked={showAgencyTeam} onChange={(event) => setShowAgencyTeam(event.target.checked)} /><i aria-hidden="true" /><b>Show agency team</b>{agencyTeam.length ? <small>{agencyTeam.length}</small> : null}</label></div>}
     {!scopeClientId && <div className="team-filter-row"><div className="iv-tabs team-type-filter" role="tablist" aria-label="Filter team by type">{([["all", "Everyone"], ["agency", "Agency staff"], ["subaccount", "Sub-account staff"]] as const).map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={typeFilter === key} className={typeFilter === key ? "on" : ""} onClick={() => setTypeFilter(key)}>{label} <small>{key === "all" ? workspace.staff.length : workspace.staff.filter((member) => key === "agency" ? memberType(member) !== "subaccount" : memberType(member) === "subaccount").length}</small></button>)}</div><label className="team-account-filter"><span>Sub-account</span><select value={accountFilter} onChange={(event) => setAccountFilter(event.target.value)} aria-label="Filter team by sub-account"><option value="">All sub-accounts</option>{workspace.clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></label></div>}

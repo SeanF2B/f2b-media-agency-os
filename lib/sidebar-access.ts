@@ -2,7 +2,7 @@ import { AGENCY_ONLY_PAGES, CRM_ROLES, isSubAccountRole, type TeamPermissions } 
 
 export function canOpenPage(page: string, permissions: TeamPermissions, isAdmin: boolean, hasClientScope = false, role = "") {
   if (!isAdmin && isSubAccountRole(role) && (AGENCY_ONLY_PAGES as readonly string[]).includes(page)) return false;
-  return page === "Overview" ? permissions.overview || isAdmin
+  return page === "Overview" ? permissions.overview || isAdmin || (hasClientScope && isSubAccountRole(role) && /^Sub-account (Admin|Manager)$/.test(role)) // a client's own admin/manager gets their own Dashboard
     : page === "Activity" || page === "Activity & Time" ? permissions.overview || permissions.timesheets || permissions.clientActivity || permissions.allActivity
     : page === "Clients" ? permissions.clients || hasClientScope
     : page === "Scheduling" ? isAdmin || permissions.scheduling

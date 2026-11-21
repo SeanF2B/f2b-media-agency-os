@@ -119,7 +119,16 @@ export async function GET() {
           : [];
         visible = {
           ...normalized,
-          settings: { ...normalized.settings, adminEmail: "" },
+          settings: restrictedClients ? { ...normalized.settings, adminEmail: "", bookkeepingEmail: "", tax: undefined } : { ...normalized.settings, adminEmail: "" },
+          // Agency-wide extras never go to people limited to certain accounts (client staff or limited agency staff).
+          ...(restrictedClients ? {
+            financeRecurring: permissions.finance ? (normalized.financeRecurring || []).filter((r: any) => r.clientId && allowedClientIds.has(r.clientId)) : [],
+            generatedReports: (normalized.generatedReports || []).filter((r: any) => r.clientId && allowedClientIds.has(r.clientId)),
+            marketingSetupWorkflows: (normalized.marketingSetupWorkflows || []).filter((r: any) => r.clientId && allowedClientIds.has(r.clientId)),
+            siteMetadataDrafts: {}, aiPrompts: {}, hiddenAiAgentIds: [],
+            chessGames: (normalized.chessGames || []).filter((g: any) => profile?.id && JSON.stringify(g).includes(profile.id)),
+            clockIns: profile?.id && normalized.clockIns && typeof normalized.clockIns === "object" ? Object.fromEntries(Object.entries(normalized.clockIns).filter(([k]) => k === profile.id)) : {},
+          } : {}),
           // Sub-account staff only ever see people in their own sub-account (plus account-level AI agents), never the wider agency team.
           staff: !permissions.team ? normalized.staff.filter((member: Staff) => member.id === profile?.id)
             : isSubAccountRole((profile as any)?.role) && Array.isArray((profile as any)?.clientAccessIds)
@@ -130,7 +139,7 @@ export async function GET() {
           tasks: visibleTasks,
           entries: permissions.timesheets ? (permissions.allTimesheets ? normalized.entries : normalized.entries.filter((entry: any) => entry.staffId === profile?.id)).filter((entry: any) => isAllowedClient(entry.clientId)) : [],
           activeTimer: permissions.timesheets && (permissions.allTimesheets || normalized.activeTimer?.staffId === profile?.id) && isAllowedClient(normalized.tasks.find((task: any) => task.id === normalized.activeTimer?.taskId)?.clientId) ? normalized.activeTimer : null,
-          financeRecords: permissions.finance ? normalized.financeRecords.filter((record: any) => isAllowedClient(record.clientId)) : [],
+          financeRecords: permissions.finance ? normalized.financeRecords.filter((record: any) => restrictedClients ? Boolean(record.clientId) && allowedClientIds.has(record.clientId) : isAllowedClient(record.clientId)) : [], // agency money never reaches account-limited people
           activity: visibleActivity,
           reportTemplates: permissions.reports ? normalized.reportTemplates || [] : [],
           auditRuns: (normalized.auditRuns || []).filter((run: any) => visibleClientIds.has(run.clientId)),

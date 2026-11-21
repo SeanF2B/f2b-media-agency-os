@@ -76,8 +76,12 @@ export function ImpersonationBanner() {
   const [me, setMe] = useState<Me | null>(null);
   useEffect(() => { void loadMe().then(setMe); }, []);
   if (!me?.impersonatedBy) return null;
-  return <div role="status" style={{ position: "fixed", left: "50%", bottom: 14, transform: "translateX(-50%)", zIndex: 10000, display: "flex", alignItems: "center", gap: 12, padding: "9px 10px 9px 16px", borderRadius: 999, background: "#1d2833", color: "#fff", boxShadow: "0 10px 30px rgba(0,0,0,.35)", fontSize: 13, maxWidth: "calc(100vw - 24px)" }}>
-    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Signed in as <b>{me.email}</b></span>
-    <button type="button" onClick={() => void backToMine()} style={{ border: 0, borderRadius: 999, padding: "7px 13px", background: "#287cac", color: "#fff", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>Back to my account</button>
+  return <div role="status" className="f2b-imp-bar">
+    <style>{`html body .f2b-imp-bar{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:10000;display:flex;align-items:center;gap:12px;padding:8px 8px 8px 16px;border-radius:999px;background:#1d2833 !important;color:#fff !important;box-shadow:0 10px 30px rgba(0,0,0,.35);font-size:13px !important;max-width:calc(100vw - 24px)}
+html body .f2b-imp-bar span,html body .f2b-imp-bar b{color:#fff !important;font-size:13px !important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+html body .f2b-imp-bar button{border:0;border-radius:999px;padding:7px 13px;background:#287cac !important;color:#fff !important;font-weight:700;cursor:pointer;white-space:nowrap;flex:none;font-size:13px !important}
+@media (max-width:760px){html body .f2b-imp-bar{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 74px);width:calc(100vw - 24px);justify-content:space-between}}`}</style>
+    <span>Viewing as <b>{me.email}</b></span>
+    <button type="button" onClick={() => void backToMine()}>Back to my account</button>
   </div>;
 }
