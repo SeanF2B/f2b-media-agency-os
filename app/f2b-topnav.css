@@ -3918,7 +3918,8 @@ html body .app-shell .client-tax-overview > .client-tax-head::after { content: "
   html body .app-shell .client-tax-overview[data-dopen] > .client-tax-head::after { transform: rotate(-135deg); top: 20px; }
 }
 @media (max-width: 860px) {
-  html body .app-shell .page-content:has(> .book-tabs) > .client-tax.client-tax { order: 0; }
+  html body .app-shell .page-content:has(> .book-tabs) > .client-tax.client-tax { order: 4; }
+  html body .app-shell .page-content:has(> .book-tabs) > .client-tax-records.client-tax-records { order: 5; }
   html body .app-shell .client-tax-overview[data-mopen] > .client-tax-head::after { transform: rotate(-135deg); top: 20px; }
 }
 /* Content planner: plan options window + videos */
