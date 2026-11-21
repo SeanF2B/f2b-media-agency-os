@@ -3801,3 +3801,6 @@ html body .app-shell .crm-card-thumb img { width: 100%; height: 100%; object-fit
 html body .app-shell .crm-card-thumb.more { font-size: 10px; font-weight: 800; color: #475467; cursor: pointer; }
 html body .app-shell.dark-mode .crm-card-thumb, html body.f2b-dark .app-shell .crm-card-thumb { border-color: #3b3e43; background: #2b2c30; }
 html body .app-shell.dark-mode .crm-card-thumb.more, html body.f2b-dark .app-shell .crm-card-thumb.more { color: #c3ccd4; }
+
+/* Recent enquiries: contact initial in a colour picked from the letter (not the client logo). */
+html body .app-shell .dh-recent-who > i.dh-initial, body.f2b-dark .app-shell .dh-recent-who > i.dh-initial { border: 0 !important; color: #fff !important; font-style: normal; font-weight: 800; font-size: 13px; display: grid; place-items: center; }
