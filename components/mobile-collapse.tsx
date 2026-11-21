@@ -10,12 +10,13 @@ export const MOBILE_COLLAPSE_HEADS = [
   ".dh > section.panel > :first-child",
   ".dh > .dh-grid > .panel > :first-child",
   ".dh > .dh-ads-wrap > .panel > :first-child",
-  ".client-tax > .client-tax-head",
-  ".finance-panel > .panel-heading",
+  ".client-tax-overview > .client-tax-head", // Books: only the Overview folds (closed by default); Income / expenses is always open
 ].join(", ");
 // Phones only: Books yearly estimate folds too (on desktop it stays open with its period picker).
 const PHONE_HEADS = `${MOBILE_COLLAPSE_HEADS}, .overview-projection-panel > :first-child`;
-const PANELS = ".dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel, .client-tax, .finance-panel";
+const PANELS = ".dh > section.panel, .dh > .dh-grid > .panel, .dh > .dh-ads-wrap > .panel";
+const OPENED = "f2b-opened-sections"; // sections that start closed (Books Overview) and were opened on this device
+const readOpened = (): string[] => { try { const v = JSON.parse(localStorage.getItem(OPENED) || "[]"); return Array.isArray(v) ? v : []; } catch { return []; } };
 const STORE = "f2b-folded-sections";
 
 const keyOf = (panel: HTMLElement) => panel.getAttribute("aria-label") || panel.querySelector("h2, h3")?.textContent?.trim() || "";
@@ -38,6 +39,8 @@ export function MobileCollapse() {
     const apply = () => {
       queued = false;
       trackBar();
+      const opened = new Set(readOpened());
+      document.querySelectorAll<HTMLElement>(".client-tax-overview:not([data-dfold-seen])").forEach((panel) => { if (opened.has(keyOf(panel))) panel.setAttribute("data-dopen", ""); panel.setAttribute("data-dfold-seen", ""); });
       const folded = new Set(readFolded());
       if (!folded.size) return;
       document.querySelectorAll<HTMLElement>(PANELS).forEach((panel) => {
@@ -62,6 +65,7 @@ export function MobileCollapse() {
       const panel = head?.parentElement;
       if (!panel) return;
       if (phone.matches) { panel.toggleAttribute("data-mopen"); return; }
+      if (panel.classList.contains("client-tax-overview")) { const open = panel.toggleAttribute("data-dopen"); const key = keyOf(panel); const list = readOpened().filter((k) => k !== key); try { localStorage.setItem(OPENED, JSON.stringify(open ? [...list, key] : list)); } catch { /* private mode */ } return; }
       const closed = panel.toggleAttribute("data-dclosed");
       const key = keyOf(panel);
       if (key) { const list = readFolded().filter((k) => k !== key); writeFolded(closed ? [...list, key] : list); }

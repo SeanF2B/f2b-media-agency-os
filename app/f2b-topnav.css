@@ -3900,3 +3900,24 @@ html body .app-shell.dark-mode .dh-appr-list > .dh-appr-item { background: #1b22
 @media (max-width: 860px) {
   html body .app-shell .dh-approvals.head-status.cv-status-card, html body .app-shell .cv-head-status-fallback:has(.cv-status-card) { display: none !important; }
 }
+
+/* Conversation header: closing a chat is a small × at the top right */
+html body .app-shell .cv-chat-head { position: relative; padding-right: 48px; }
+html body .app-shell .cv-chat-head .cv-close-x { position: absolute; top: 8px; right: 8px; width: 34px; height: 34px; min-height: 0 !important; padding: 0 !important; border-radius: 50%; border: 1px solid #e4e8ec; background: #fff; color: #475467; font-size: 22px; line-height: 1; display: grid; place-items: center; cursor: pointer; flex: none !important; }
+html body .app-shell .cv-chat-head .cv-close-x:hover { background: #f2f4f7; color: #101828; }
+html body .app-shell.dark-mode .cv-chat-head .cv-close-x { background: #222b31; border-color: #2f3a41; color: #e7edf1; }
+
+/* ===== Books (client + agency): Overview at the top, folded closed until opened; Income / expenses always open and full width ===== */
+html body .app-shell .client-tax-records > .client-tax-head, html body .app-shell .finance-panel > .panel-heading { cursor: default !important; padding-right: 0 !important; }
+html body .app-shell .client-tax-records > .client-tax-head::after, html body .app-shell .finance-panel > .panel-heading::after { content: none !important; }
+html body .app-shell .client-tax-overview { cursor: default; }
+html body .app-shell .client-tax-overview > .client-tax-head { position: relative; padding-right: 34px !important; cursor: pointer; }
+html body .app-shell .client-tax-overview > .client-tax-head::after { content: ""; position: absolute; right: 10px; top: 16px; width: 9px; height: 9px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); opacity: .55; transition: transform .2s; }
+@media (min-width: 861px) {
+  html body .app-shell .client-tax-overview:not([data-dopen]) > :not(.client-tax-head) { display: none !important; }
+  html body .app-shell .client-tax-overview[data-dopen] > .client-tax-head::after { transform: rotate(-135deg); top: 20px; }
+}
+@media (max-width: 860px) {
+  html body .app-shell .page-content:has(> .book-tabs) > .client-tax.client-tax { order: 0; }
+  html body .app-shell .client-tax-overview[data-mopen] > .client-tax-head::after { transform: rotate(-135deg); top: 20px; }
+}

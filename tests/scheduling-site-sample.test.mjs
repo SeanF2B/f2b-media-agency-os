@@ -66,3 +66,8 @@ test("body theme classes like ehf-header don't hide the whole team page (The Bla
   const r = parseTeam(html, "https://theblackpoppycork.com/artists/");
   assert.deepEqual(r.team, ["Jeliza Rose", "Elena", "Gin", "Slim", "Fiorella"]);
 });
+
+test("trade service headings are never staff (Heatwise: Emergency Callout, Hot Water Cylinders)", () => {
+  const html = `<h2>Meet the team</h2><h3>Emergency Callout</h3><img src="/a.jpg"><h3>Hot Water Cylinders</h3><img src="/b.jpg"><h3>Boiler Repairs</h3><h3>Gutter Cleaning</h3>`;
+  assert.deepEqual(parseTeam(html, "https://heatwise.example/").team, []);
+});
