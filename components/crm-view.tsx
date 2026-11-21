@@ -19,7 +19,7 @@ const Ico = ({ icon: C, size = 15 }: { icon: LucideIcon; size?: number }) => <C 
 type Contact = { id: string; client_id?: string | null; first_name: string; last_name: string; email: string; phone: string; company: string; source: string; notes: string; created_at?: string; updated_at: string };
 type Stage = { id: string; name: string; position: number; category: "open" | "won" | "lost" };
 type Pipeline = { id: string; name: string; description: string; stages: Stage[] };
-type Opportunity = { id: string; pipeline_id: string; stage_id: string; contact_id?: string | null; client_id?: string | null; title: string; value: number; currency: string; assigned_to?: string | null; expected_close_date?: string | null; notes: string; source?: string; project_type?: string; project_location?: string; sort_order?: number | null; first_name?: string; last_name?: string; email?: string; phone?: string; company?: string; stage_name?: string; updated_at: string };
+type Opportunity = { id: string; pipeline_id: string; stage_id: string; contact_id?: string | null; client_id?: string | null; title: string; value: number; currency: string; assigned_to?: string | null; expected_close_date?: string | null; notes: string; source?: string; project_type?: string; project_location?: string; sort_order?: number | null; first_name?: string; last_name?: string; email?: string; phone?: string; company?: string; stage_name?: string; photos?: string[]; updated_at: string };
 type Flag = { kind: "contact" | "opportunity"; ref_id: string; flag: "spam" | "dnd" };
 type SmartFilters = { search?: string; tags?: string[]; tagMode?: "any" | "all"; source?: string; dnd?: "" | "only" | "exclude"; spam?: "" | "only" | "exclude"; hasEmail?: boolean; hasPhone?: boolean };
 type SmartList = { id: string; name: string; filters: SmartFilters };
@@ -62,6 +62,7 @@ function leadImages(notes?: string | null): string[] {
   leadImageCache.set(text, found);
   return found;
 }
+const photosOf = (item: { photos?: string[]; notes?: string | null }) => (item.photos?.length ? item.photos : leadImages(item.notes));
 const HIDDEN_FACTS = /^(name|phone|email|photos?|photo \d+|source|page|details)$/i;
 function projectFacts(notes?: string | null): Array<[string, string]> {
   if (!notes) return [];
@@ -88,7 +89,8 @@ export function CrmView({ onOpenClient, scopeClientId = "", conversations, initi
   const [sampleOn] = useSampleData();
   const [sampleMoves, setSampleMoves] = useState<Record<string, string>>({});
   const [sampleGone, setSampleGone] = useState<string[]>([]);
-  const data = useMemo(() => sampleOn ? withSampleLeads(realData, scopeClientId, sampleMoves, sampleGone) : realData, [sampleOn, realData, scopeClientId, sampleMoves, sampleGone]);
+  const sampleGallery = useSampleGallery(scopeClientId, sampleOn);
+  const data = useMemo(() => sampleOn ? withSampleLeads(realData, scopeClientId, sampleMoves, sampleGone, sampleGallery) : realData, [sampleOn, realData, scopeClientId, sampleMoves, sampleGone, sampleGallery]);
   const [tab, setTabState] = useState<LeadsTab>((initialTab === "Conversations" && !conversations) || (initialTab === "Outreach" && !outreach) || (initialTab === "Media" && !media) ? "Pipeline" : initialTab);
   const setTab = (next: LeadsTab) => { setTabState(next); onTabChange?.(next); };
   const crmTab = tab === "Pipeline" || tab === "Contacts";
@@ -630,7 +632,7 @@ export function CrmView({ onOpenClient, scopeClientId = "", conversations, initi
       {(() => { const type = (item.project_type || "").trim(); const src = (item.source || "").trim(); const srcLabel = /estimate/i.test(src) ? "Website estimate" : /form|site/i.test(src) ? "Website form" : /ads|google/i.test(src) ? "Google Ads" : /meta|facebook|instagram/i.test(src) ? "Meta" : /referr/i.test(src) ? "Referral" : /client/i.test(src) ? "Client" : src && !/^manual$/i.test(src) ? src : "Manual"; const days = Math.max(0, Math.floor((Date.now() - Date.parse(item.updated_at || "")) / 86_400_000)); return <div className="crm-card-tags">
         {type ? <span className="crm-card-type" title="Service type"><Ico icon={Tag} size={11} />{type}</span> : null}
         <span className={`crm-card-src src-${srcLabel.toLowerCase().replace(/[^a-z]+/g, "-")}`} title={`Source: ${src || "Manual"}`}>{srcLabel}</span>
-        {(() => { const photos = leadImages(item.notes); const shown = photos.slice(0, 3); return <span className="crm-card-metaline">{shown.length > 0 ? <span className="crm-card-thumbs" onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()}>{shown.map((src, i) => <button type="button" key={src} className="crm-card-thumb" title={`View photo ${i + 1} of ${photos.length}`} aria-label={`View photo ${i + 1} of ${photos.length}`} onClick={(event) => { event.stopPropagation(); setLightbox({ images: photos, index: i }); }}><img src={src} alt="" loading="lazy" decoding="async" draggable={false} /></button>)}{photos.length > 3 ? <button type="button" className="crm-card-thumb more" aria-label={`View all ${photos.length} photos`} onClick={(event) => { event.stopPropagation(); setLightbox({ images: photos, index: 3 }); }}>+{photos.length - 3}</button> : null}</span> : null}<span className="crm-card-icons">{item.project_location ? <span title={item.project_location}><Ico icon={MapPin} size={12} />{item.project_location.split(",")[0].slice(0, 18)}</span> : null}{item.phone ? <span title={item.phone}><Ico icon={Phone} size={12} /></span> : null}{item.email ? <span title={item.email}><Ico icon={Mail} size={12} /></span> : null}{Number.isFinite(days) ? <span title="Last updated">{days === 0 ? "today" : `${days}d`}</span> : null}</span></span>; })()}
+        {(() => { const photos = photosOf(item); const shown = photos.slice(0, 3); return <span className="crm-card-metaline">{shown.length > 0 ? <span className="crm-card-thumbs" onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()}>{shown.map((src, i) => <button type="button" key={src} className="crm-card-thumb" title={`View photo ${i + 1} of ${photos.length}`} aria-label={`View photo ${i + 1} of ${photos.length}`} onClick={(event) => { event.stopPropagation(); setLightbox({ images: photos, index: i }); }}><img src={src} alt="" loading="lazy" decoding="async" draggable={false} /></button>)}{photos.length > 3 ? <button type="button" className="crm-card-thumb more" aria-label={`View all ${photos.length} photos`} onClick={(event) => { event.stopPropagation(); setLightbox({ images: photos, index: 3 }); }}>+{photos.length - 3}</button> : null}</span> : null}<span className="crm-card-icons">{item.project_location ? <span title={item.project_location}><Ico icon={MapPin} size={12} />{item.project_location.split(",")[0].slice(0, 18)}</span> : null}{item.phone ? <span title={item.phone}><Ico icon={Phone} size={12} /></span> : null}{item.email ? <span title={item.email}><Ico icon={Mail} size={12} /></span> : null}{Number.isFinite(days) ? <span title="Last updated">{days === 0 ? "today" : `${days}d`}</span> : null}</span></span>; })()}
       </div>; })()}
       <div className="crm-card-mini">{(() => { const who = contact && contact !== "No contact linked" && contact !== item.title ? contact : companyName && companyName !== item.title ? companyName : ""; return who ? <span className="crm-card-who">{who}</span> : null; })()}<b className={`crm-card-val ${item.value ? "" : "empty"}`}>{item.value ? `${currencySymbol()}${commaNumber(String(Math.round(Number(item.value))))}` : "No value yet"}{item.source === "website estimate" && item.value ? <small> est.</small> : null}</b></div>
       <div className="crm-card-actions" onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()}>
@@ -695,7 +697,7 @@ export function CrmView({ onOpenClient, scopeClientId = "", conversations, initi
       const contact = linkedPerson || linkedClient?.contact?.trim() || personName(item); const companyName = item.company?.trim() || linkedClient?.company?.trim() || linkedClient?.name || "";
       const email = (item.contact_id && item.email) || linkedClient?.email?.trim() || item.email || ""; const phoneValue = (item.contact_id && item.phone) || linkedClient?.phone?.trim() || item.phone || "";
       const dnd = itemDnd(item); const stage = pipeline?.stages.find((st) => st.id === item.stage_id); const tags = item.contact_id ? tagsByContact.get(item.contact_id) || [] : [];
-      const images = leadImages(item.notes);
+      const images = photosOf(item);
       const facts = projectFacts(item.notes); const person = contact && contact !== "No contact linked" ? contact : "";
       const notesCount = notesByOpportunity.get(item.id) || 0;
       return <div className="crm-detail-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setDetailId(""); }}>
@@ -757,7 +759,26 @@ export function CrmView({ onOpenClient, scopeClientId = "", conversations, initi
 }
 
 /** Demo leads for "Sample data": 2–4 cards in each open stage plus a couple won, in the account's own pipeline. */
-function withSampleLeads(real: Payload, scopeClientId: string, moves: Record<string, string>, gone: string[]): Payload {
+/** The client's own work photos (same source + cache Scheduling's sample data uses) so sample leads can show real photo previews. */
+function useSampleGallery(scope: string, enabled: boolean): string[] {
+  const read = (): string[] => { try { const v = scope ? window.localStorage.getItem(`f2b-site-sample-${scope}`) : null; if (!v) return []; const site = JSON.parse(v) as { gallery?: string[]; work?: Record<string, string[]> }; return [...new Set([...(site.gallery || []), ...Object.values(site.work || {}).flat()])].filter((u) => typeof u === "string" && u).slice(0, 24); } catch { return []; } };
+  const [gallery, setGallery] = useState<string[]>(() => (enabled ? read() : []));
+  useEffect(() => {
+    if (!enabled || !scope) { setGallery((g) => (g.length ? [] : g)); return; }
+    setGallery(read());
+    let live = true;
+    fetch(`/api/scheduling?clientId=${encodeURIComponent(scope)}&view=site`, { credentials: "same-origin" }).then((r) => (r.ok ? r.json() : null)).then((v: { services?: string[]; locations?: string[]; team?: string[]; photos?: Record<string, string>; work?: Record<string, string[]>; gallery?: string[] } | null) => {
+      if (!v || !live) return;
+      const next = { services: v.services || [], locations: v.locations || [], team: v.team || [], photos: v.photos || {}, work: v.work || {}, gallery: v.gallery || [] };
+      try { window.localStorage.setItem(`f2b-site-sample-${scope}`, JSON.stringify(next)); } catch { /* storage blocked */ }
+      setGallery([...new Set([...next.gallery, ...Object.values(next.work).flat()])].filter(Boolean).slice(0, 24));
+    }).catch(() => { /* keep cached photos */ });
+    return () => { live = false; };
+  }, [scope, enabled]); // eslint-disable-line react-hooks/exhaustive-deps
+  return gallery;
+}
+
+function withSampleLeads(real: Payload, scopeClientId: string, moves: Record<string, string>, gone: string[], gallery: string[] = []): Payload {
   const pipelines: Pipeline[] = real.pipelines.length ? real.pipelines : [{ id: "sample-pipeline", name: "Sales pipeline", description: "", stages: ["New lead", "Contacted", "Qualified", "Proposal sent", "Appointment booked", "Won", "Lost"].map((name, i) => ({ id: `sample-stage-${i}`, name, position: i, category: name === "Won" ? "won" as const : name === "Lost" ? "lost" as const : "open" as const })) }];
   const clientName = real.clients.find((c) => c.id === scopeClientId)?.name || real.clients[0]?.name || "";
   const tattoo = /tattoo|ink|poppy|piercing/i.test(clientName), roof = /roof/i.test(clientName);
@@ -776,6 +797,8 @@ function withSampleLeads(real: Payload, scopeClientId: string, moves: Record<str
   const towns = ["Dublin 8", "Rathmines", "Swords", "Drumcondra", "Tallaght", "Clontarf"];
   const contacts: Contact[] = []; const opportunities: Opportunity[] = [];
   const now = Date.now();
+  // About two in three sample leads carry 1–5 of the client's own work photos, like real website-form uploads.
+  const samplePhotos = (i: number): string[] => { if (!gallery.length || i % 3 === 2) return []; const n = [2, 1, 4, 3, 5, 1][i % 6]; return Array.from({ length: Math.min(n, gallery.length) }, (_, k) => gallery[(i * 3 + k) % gallery.length]); };
   for (const pipe of pipelines.slice(0, 1)) {
     const open = pipe.stages.filter((x) => x.category === "open").sort((a, b) => a.position - b.position);
     const won = pipe.stages.find((x) => x.category === "won");
@@ -785,7 +808,7 @@ function withSampleLeads(real: Payload, scopeClientId: string, moves: Record<str
       const id = `sample-opp-${i}`, cid = `sample-contact-${i}`, at = new Date(now - (i * 19 + 2) * 3_600_000).toISOString();
       if (gone.includes(id)) return;
       contacts.push({ id: cid, client_id: scopeClientId || null, first_name: first, last_name: last, email: `${first.toLowerCase().replace(/[^a-z]/g, "")}.${last.toLowerCase().replace(/[^a-z]/g, "")}@example.com`, phone: `+35387${String(1000000 + i * 137531).slice(0, 7)}`, company: "", source, notes: "", created_at: at, updated_at: at });
-      opportunities.push({ id, pipeline_id: pipe.id, stage_id: moves[id] || stageId, contact_id: cid, client_id: scopeClientId || null, title, value: Math.round(avg * (0.6 + (i % 4) * 0.35)), currency: "", notes: "", source, project_type: type, project_location: towns[i % towns.length], sort_order: i, first_name: first, last_name: last, email: "", phone: "", company: "", updated_at: at } as Opportunity);
+      opportunities.push({ id, pipeline_id: pipe.id, stage_id: moves[id] || stageId, contact_id: cid, client_id: scopeClientId || null, title, value: Math.round(avg * (0.6 + (i % 4) * 0.35)), currency: "", notes: "", source, project_type: type, project_location: towns[i % towns.length], sort_order: i, first_name: first, last_name: last, email: "", phone: "", company: "", photos: samplePhotos(i), updated_at: at } as Opportunity);
     });
   }
   return { ...real, pipelines, contacts: [...contacts, ...real.contacts], opportunities: [...opportunities, ...real.opportunities] };
