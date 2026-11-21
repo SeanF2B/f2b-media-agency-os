@@ -101,7 +101,7 @@ export function isSubAccountRole(role?: string) { return Boolean(role && (SUB_AC
 /** Pages that exist inside a client sub-account. Sub-account staff can only ever be given these. */
 export const SUB_ACCOUNT_PAGES = ["CRM", "Conversations", "Content", "Scheduling", "Tasks", "Activity", "AI Assistant", "Team", "Media Library"] as const;
 /** Agency-only pages (Operations, reports, proposals, SEO, ads…): never open for sub-account staff. */
-export const AGENCY_ONLY_PAGES = ["Clients", "Report Studio", "Proposal Studio", "Reports", "SEO", "Google Ads", "Meta Ads", "Tracking & Analytics", "Chess", "Operations", "Onboarding", "Operating World", "Sites", "Automations", "CRM Automations", "Integrations", "Lead Factory", "Settings", "Client Vault", "Invoicing", "Bookkeeping", "Email Marketing", "Cold Outreach"] as const;
+export const AGENCY_ONLY_PAGES = ["Clients", "Report Studio", "Proposal Studio", "Reports", "SEO", "Google Ads", "Meta Ads", "Tracking & Analytics", "Operations", "Onboarding", "Operating World", "Sites", "Automations", "CRM Automations", "Integrations", "Lead Factory", "Settings", "Client Vault", "Invoicing", "Bookkeeping", "Email Marketing", "Cold Outreach"] as const;
 /** Permission switches that apply inside a sub-account (agency-only switches are hidden for sub-account staff). */
 export const SUB_ACCOUNT_PERMISSION_KEYS: (keyof TeamPermissions)[] = ["tasks", "allTasks", "aiTasks", "aiCompletedTasks", "clientActivity", "timesheets", "allTimesheets", "team", "aiAssistant", "scheduling", "allAppointments", "manageScheduling"];
 /** Sub-account levels that can use that sub-account's Pipeline/contacts and Conversations. */

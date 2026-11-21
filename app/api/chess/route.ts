@@ -23,6 +23,14 @@ function getIdentity(data: any, user: any) {
   const profile = (data.staff || []).find((s: any) => !s.isBot && (s.id === user.userId || s.email?.toLowerCase() === user.email?.toLowerCase()));
   return { id: profile?.id || user.userId, name: profile?.name || user.displayName || user.email || "Team member", avatar: profile?.avatar || "♟", profile };
 }
+// Who can play whom: everyone can play the AI; agency staff can play anyone; sub-account staff can play the
+// agency team and their own sub-account's team, never people from another sub-account.
+const isSubStaff = (s: any) => s?.staffType === "subaccount" || (!s?.staffType && /^Sub-account /.test(String(s?.role || "")));
+function sameAccount(a: any, b: any) {
+  if (!isSubStaff(a) || !isSubStaff(b)) return true;
+  const mine = new Set(Array.isArray(a?.clientAccessIds) ? a.clientAccessIds : []);
+  return (Array.isArray(b?.clientAccessIds) ? b.clientAccessIds : []).some((id: string) => mine.has(id));
+}
 function memberName(data: any, id: string) { return data.staff?.find((s: any) => s.id === id)?.name || (id === "chess-ai" ? "AI" : "Team member"); }
 function finished(chess: Chess, game: Game) {
   if (!chess.isGameOver()) return false;
@@ -67,10 +75,14 @@ export async function GET() {
   const data = { staff: chessStaff };
   const identity = getIdentity(data, user);
   if (!row.owner_id || !(row.owner_id === user.userId || identity.profile)) return Response.json({ error: "Chess is available to F2B team members only." }, { status: 403 });
-  const games: Game[] = row.games_json ? JSON.parse(row.games_json) as Game[] : [];
+  const allGames: Game[] = row.games_json ? JSON.parse(row.games_json) as Game[] : [];
+  const me = identity.profile || {};
+  const allowedIds = new Set<string>(["chess-ai", identity.id, ...chessStaff.filter((s: any) => !s.isBot && sameAccount(me, s)).map((s: any) => s.id)]);
+  const inMyAccount = (id: string) => !id || id === "pending" || allowedIds.has(id);
+  const games = allGames.filter((g) => inMyAccount(g.whiteId) && inMyAccount(g.blackId) && inMyAccount(g.challengerId) && inMyAccount(g.challengedId || ""));
   const visible = games.filter((g) => g.status === "active" || g.status === "pending" || g.whiteId === identity.id || g.blackId === identity.id || g.challengerId === identity.id || g.challengedId === identity.id).map((g) => ({ ...g, ...(g.status === "active" || g.status === "pending" ? { timeControl: "inf" as const, clocks: { w: 0, b: 0 } } : {}), whiteName: memberName(data, g.whiteId), blackName: memberName(data, g.blackId) }));
   const aiAvatar = data.staff?.find((s: any) => s.id === "f2b-ai-agent")?.avatar || "🤖";
-  const staff = chessStaff.filter((s: any) => !s.isBot).map((s: any) => ({ id: s.id, name: s.name, avatar: s.avatar }));
+  const staff = chessStaff.filter((s: any) => !s.isBot && allowedIds.has(s.id)).map((s: any) => ({ id: s.id, name: s.name, avatar: s.avatar }));
   const leaderboardPeople = [...staff, { id: "chess-ai", name: "AI", avatar: aiAvatar }];
   const standings = new Map<string, { id: string; name: string; avatar?: string; wins: number; games: number }>(leaderboardPeople.map((person: any) => [person.id, { id: person.id, name: person.name, avatar: person.avatar, wins: 0, games: 0 }] as const));
   for (const game of games) {
@@ -122,6 +134,7 @@ export async function POST(request: Request) {
       const vsAi = body.action === "play-ai";
       const target = String(body.opponentId || "");
       if (!vsAi && (!target || target === actor.id || !data.staff?.some((s: any) => s.id === target && !s.isBot))) return Response.json({ error: "Choose another active staff member." }, { status: 400 });
+      if (!vsAi && !sameAccount(actor.profile || {}, data.staff.find((s: any) => s.id === target))) return Response.json({ error: "You can only challenge the agency team or people in your own account." }, { status: 403 });
       const color: "white" | "black" | "random" = ["white", "black", "random"].includes(body.color) ? body.color as "white" | "black" | "random" : "random";
       const humanColor: Color = color === "random" ? (Math.random() < .5 ? "w" : "b") : color === "white" ? "w" : "b";
       const whiteId = vsAi ? (humanColor === "w" ? actor.id : "chess-ai") : color === "white" ? actor.id : color === "black" ? target : "pending";

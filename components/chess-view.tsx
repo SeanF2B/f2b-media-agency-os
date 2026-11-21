@@ -492,6 +492,22 @@ export function ChessView({ staff, currentUserId, canPlay = true, openInviteId =
     const opponentId = game.whiteId === currentUserId ? game.blackId : game.whiteId;
     void act("challenge", { opponentId, color: myColor });
   };
+  // Board colours follow the account brand; very dark or very light brand colours are toned so the pieces never blend in.
+  useEffect(() => {
+    const root = document.documentElement;
+    const tune = () => {
+      const raw = getComputedStyle(root).getPropertyValue("--brand-primary").trim();
+      const m = /^#?([0-9a-f]{6})$/i.exec(raw); if (!m) { if (root.style.getPropertyValue("--chess-dark-auto")) root.style.removeProperty("--chess-dark-auto"); return; }
+      const n = parseInt(m[1], 16), lin = (v: number) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+      const lum = 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+      const want = lum < 0.06 ? `color-mix(in srgb, #${m[1]} 45%, #a7b0bd)` : lum > 0.6 ? `color-mix(in srgb, #${m[1]} 55%, #475467)` : "";
+      const now = root.style.getPropertyValue("--chess-dark-auto").trim(); // only write on change, so the observer can't loop
+      if (want && now !== want) root.style.setProperty("--chess-dark-auto", want); else if (!want && now) root.style.removeProperty("--chess-dark-auto");
+    };
+    tune();
+    const obs = new MutationObserver(tune); obs.observe(root, { attributes: true, attributeFilter: ["style", "class"] });
+    return () => { obs.disconnect(); root.style.removeProperty("--chess-dark-auto"); };
+  }, []);
   return <div className="chess-page" onPointerDownCapture={unlockSound}>
     <header className="chess-page-head"><div><p className="eyebrow">TEAM PLAY</p><h1><svg className="chess-piece-svg cp-toon black-piece chess-title-icon" viewBox="0 0 45 45" aria-hidden="true"><ToonPiece type="p" /></svg>Chess</h1><p>Challenge a teammate or play AI.</p></div></header>
     <div className="chess-status-toasts" aria-live="polite">

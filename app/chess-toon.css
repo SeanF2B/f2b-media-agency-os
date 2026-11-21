@@ -212,3 +212,53 @@
   .app-shell .chess-play-modal .chess-game-head { margin-top:40px; }
   .app-shell .chess-play-modal .chess-game[data-game-id] .chess-board { width:min(100%, 720px) !important; }
 }
+
+/* ===== Chess fixes (21 Nov): centred play window, padding, readable resume cards, wider pickers ===== */
+@media (min-width:901px) {
+  .app-shell .chess-play-modal { padding:24px 32px; }
+  .app-shell .chess-play-modal .chess-game { grid-template-columns:minmax(0, min(calc(100dvh - 64px), 940px)) 360px; justify-content:center; column-gap:36px; max-width:1400px; margin:0 auto; min-height:calc(100dvh - 48px); }
+  .app-shell .chess-play-modal .chess-game > .chess-play-area { min-height:calc(100dvh - 48px); }
+  .app-shell .chess-play-modal .chess-game[data-game-id] .chess-board { width:min(100%, calc(100dvh - 64px), 940px) !important; }
+  .app-shell .chess-play-modal .chess-game-head { margin-top:56px; padding-right:8px; }
+}
+@media (max-width:900px) {
+  .app-shell .chess-play-modal { padding:16px 16px 28px; }
+  .app-shell .chess-play-modal .chess-game { row-gap:12px; }
+  .app-shell .chess-play-modal .chess-game-head { margin-top:44px; padding-right:4px; }
+  .app-shell .chess-play-modal .chess-play-area { padding:2px 0; }
+  .app-shell .chess-play-modal .chess-game[data-game-id] .chess-board { width:100% !important; }
+  .app-shell .chess-play-modal .chess-modal-leaderboard { margin-top:8px; }
+}
+/* Coordinates sit in the corners and stay small, so they never cover a piece */
+.app-shell .chess-square small, .app-shell .chess-square em { font-size:clamp(7px, 1.1vw, 11px) !important; line-height:1; pointer-events:none; }
+.app-shell .chess-square small { top:2px !important; left:3px !important; }
+.app-shell .chess-square em { right:3px !important; bottom:2px !important; }
+@media (max-width:600px) { .app-shell .chess-square .chess-piece-svg { width:84% !important; height:84% !important; } }
+
+/* Resume cards: solid background with readable text in light and dark mode */
+.app-shell .chess-resume-card { background:#fff !important; color:#101828 !important; border:1px solid rgba(16,24,40,.1) !important; }
+.app-shell.dark-mode .chess-resume-card { background:#1b2227 !important; color:#e7edf1 !important; border-color:#2f3a41 !important; }
+.app-shell .chess-resume-card *:not(.chess-resume-cta):not(.chess-resume-cta *) { -webkit-text-fill-color:currentColor; }
+.app-shell .chess-resume-players { display:grid !important; grid-template-columns:auto minmax(0,1fr); align-items:center; column-gap:8px; row-gap:6px; }
+.app-shell .chess-resume-players > i { display:none; }
+.app-shell .chess-resume-players b { color:inherit !important; max-width:none; font-size:13.5px; }
+.app-shell .chess-resume-players :is(img, .chess-player-avatar, span:not(b)) { width:26px !important; height:26px !important; min-width:26px; border-radius:50%; object-fit:cover; display:grid; place-items:center; overflow:hidden; font-size:11px; font-weight:800; }
+.app-shell .chess-resume-info small { color:inherit !important; opacity:.65; }
+.app-shell .chess-resume-card .chess-game-thumbnail { border-radius:10px; overflow:hidden; }
+
+/* Start a game: pickers wide enough to read the names */
+.app-shell .chess-new-game-controls { display:flex !important; flex-wrap:wrap; align-items:flex-end; gap:10px; }
+.app-shell .chess-new-game-controls > label { display:grid; gap:5px; flex:1 1 200px; min-width:170px !important; }
+.app-shell .chess-new-game-controls select { width:100% !important; min-width:0; height:40px; padding:0 30px 0 12px; text-overflow:ellipsis; }
+.app-shell .chess-new-game-controls > button { flex:0 0 auto; height:40px; white-space:nowrap; }
+@media (max-width:600px) { .app-shell .chess-new-game-controls > label { flex-basis:100%; } .app-shell .chess-new-game-controls > button { width:100%; } }
+.app-shell .chess-resume-players .chess-player-avatar { background-size:cover; background-position:center; background-color:color-mix(in srgb, var(--brand-primary,#2563eb) 14%, #fff); }
+
+/* Board colours follow the account's branding (sub-account colours inside a sub-account) */
+.app-shell { --chess-dark: var(--chess-dark-auto, var(--brand-primary, #0b7fb5)); --chess-light: color-mix(in srgb, var(--chess-dark) 8%, #f7f9fc); --chess-edge: color-mix(in srgb, var(--chess-dark) 35%, #111827); }
+.app-shell .chess-square.dark, .app-shell .chess-final-square.dark, .app-shell .chess-thumbnail-square.dark { background:var(--chess-dark) !important; color:var(--chess-dark) !important; }
+.app-shell .chess-square.light, .app-shell .chess-final-square.light, .app-shell .chess-thumbnail-square.light { background:var(--chess-light) !important; color:var(--chess-light) !important; }
+.app-shell .chess-board, .app-shell .chess-game[data-game-id] .chess-board, .app-shell .chess-final-board { border-color:var(--chess-edge) !important; box-shadow:0 6px 0 var(--chess-edge), 0 16px 28px rgba(0,0,0,.22) !important; }
+.app-shell .chess-square.light small, .app-shell .chess-square.light em { color:var(--chess-dark) !important; }
+.app-shell .chess-square.dark small, .app-shell .chess-square.dark em { color:var(--chess-light) !important; }
+.app-shell .chess-square.last-move-highlight, .app-shell .chess-thumbnail-square.last-move-highlight, .app-shell .chess-final-square.last-move { background:color-mix(in srgb, var(--chess-dark) 45%, #9be37a) !important; }

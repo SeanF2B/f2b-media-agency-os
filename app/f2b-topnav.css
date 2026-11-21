@@ -3959,3 +3959,10 @@ html body .app-shell .content-page .cv-tools { display: flex !important; flex-wr
 html body .app-shell .content-page .cv-tool { display: inline-flex !important; flex-direction: row !important; align-items: center !important; justify-content: center; gap: 7px !important; width: auto !important; min-width: 0 !important; height: 38px !important; padding: 0 14px !important; white-space: nowrap !important; flex: 0 0 auto !important; line-height: 1 !important; font-size: 13px !important; }
 html body .app-shell .content-page .cv-tool svg { flex: 0 0 auto; display: block; }
 @media (max-width: 760px) { html body .app-shell .content-page .cv-tools { margin-left: 0; } html body .app-shell .content-page .cv-tool { height: 36px !important; padding: 0 11px !important; } }
+/* Top bar right side: one even gap between the Sample switch and every icon button */
+@media (min-width: 761px) {
+  html body .app-shell.topnav-layout .tn-right { gap: 8px !important; }
+  html body .app-shell.topnav-layout .tn-right .top-actions { gap: 8px !important; }
+  html body .app-shell.topnav-layout .tn-right .top-actions > *, html body .app-shell.topnav-layout .tn-right > .tn-sample { margin: 0 !important; }
+  html body .app-shell.topnav-layout .tn-right .top-actions > :empty:not(button):not(a):not(label) { display: none !important; }
+}
