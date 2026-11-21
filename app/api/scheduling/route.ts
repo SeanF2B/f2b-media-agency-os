@@ -493,10 +493,10 @@ async function siteSampleFor(client: { id: string; name: string; email?: string;
     }
     const html = home.html;
     const text = (h: string) => h.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&#0?39;|&rsquo;|&#8217;/g, "'").replace(/&[a-z#0-9]+;/gi, " ").replace(/\s+/g, " ").trim();
-    const nice = (t: string) => t.replace(/\s+artists?$/i, "").replace(/^(high[- ]quality|elite|exclusive|premium|best|professional|expert|affordable|custom|bespoke|top)\s+/i, "").replace(/\b(\w)(\w*)/g, (_, a: string, b: string) => a.toUpperCase() + b.toLowerCase()).replace(/\bAnd\b/g, "&").trim();
+    const nice = (t: string) => t.replace(/^(tattoo|piercing)\s+styles?\s+/i, "").replace(/\s+artists?$/i, "").replace(/^(high[- ]quality|elite|exclusive|premium|best|professional|expert|affordable|custom|bespoke|top)\s+/i, "").replace(/\b(\w)(\w*)/g, (_, a: string, b: string) => a.toUpperCase() + b.toLowerCase()).replace(/\bAnd\b/g, "&").trim();
     const found: string[] = [];
     for (const m of html.matchAll(/<(a|h2|h3|h4|li)\b[^>]*>([\s\S]{1,200}?)<\/\1>/gi)) {
-      const t = text(m[2]); if (t.length < 4 || t.length > 40 || SKIP_WORDS.test(t) || /[@|©]|\d{5,}|http|styles?$|^(our|all|view|see|book|meet)\b/i.test(t)) continue;
+      const t = text(m[2]); if (t.length < 4 || t.length > 40 || SKIP_WORDS.test(t) || /\b(quote|real skin|real tattoos|free|enquir|contact|call)\b/i.test(t) || /[@|©]|\d{5,}|http|styles?$|^(our|all|view|see|book|meet)\b/i.test(t)) continue;
       const href = /href="([^"]+)"/i.exec(m[0])?.[1] || "";
       if ((SERVICE_WORDS.test(t) || /\/services?\//i.test(href)) && nice(t).split(/\s+/).length <= 4 && !/\b(shop|studio|near me|birmingham|dublin|galway|london|ireland|uk)\b/i.test(t)) found.push(nice(t));
     }
