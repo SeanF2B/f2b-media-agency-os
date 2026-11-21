@@ -5,7 +5,7 @@ import { useSampleData } from "@/hooks/use-sample-data";
 import { requestOpenThread, sampleHeldReplies, useSampleHeldDone } from "@/lib/conversations/sample-held";
 import { useAppointmentUpdates } from "@/components/appointment-updates";
 import { useEffect, useMemo, useState, type ReactNode, lazy, Suspense } from "react";
-import { BarChart3, BookOpen, CalendarCheck, CalendarDays, CalendarPlus, CheckCircle2, ClipboardList, Workflow, Image as ImageIcon, Mail, MessageSquare, MousePointerClick, Phone, Sparkles, TrendingUp, UserPlus, Users } from "lucide-react";
+import { BarChart3, BookOpen, CalendarCheck, CalendarPlus, Megaphone, CheckCircle2, ClipboardList, Workflow, Image as ImageIcon, Mail, MessageSquare, MousePointerClick, Phone, Sparkles, TrendingUp, UserPlus, Users } from "lucide-react";
 import { BrandIcon } from "./brand-icon";
 
 // ROAS and close rate, graded only when there's enough data to judge fairly.
@@ -228,14 +228,13 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
     { label: "View leads", hint: "Pipeline & contacts", icon: <Users size={18} />, run: () => onNavigate("CRM"), tint: "violet" },
     { label: "Conversations", hint: "Texts, WhatsApp, email", icon: <MessageSquare size={18} />, run: () => onNavigate("Conversations"), tint: "teal" },
     ...(showAppts ? [{ label: trade ? "Book job" : "New appointment", hint: trade ? "Add a job to the calendar" : "Book a call or visit", icon: <CalendarPlus size={18} />, run: () => onNavigate("Scheduling"), tint: "amber" }] : []),
-    { label: "Content calendar", hint: "Plan social posts", icon: <CalendarDays size={18} />, run: () => onNavigate("Content"), tint: "teal" },
+    { label: "Content calendar", hint: "Plan social posts", icon: <Megaphone size={18} />, run: () => onNavigate("Content"), tint: "teal" },
     { label: "Upload media", hint: "Job photos & videos", icon: <ImageIcon size={18} />, run: () => onNavigate("Media Library"), tint: "pink" },
     { label: "Open books", hint: "Income & expenses", icon: <BookOpen size={18} />, run: () => onNavigate("Bookkeeping"), tint: "green" },
   ];
 
   return <div className="dh">
     {sample && <div className="dh-sample-banner">Showing sample figures for demos — turn off “Sample” in the top bar for your real numbers.</div>}
-    <section className="dh-actions" aria-label="Quick actions">{actions.map((a) => <button type="button" key={a.label} className={`dh-action ${a.tint}`} onClick={a.run}><span className="dh-action-icon">{a.icon}</span><span><b>{a.label}</b><small>{a.hint}</small></span></button>)}</section>
 
     <section className="dh-approvals" aria-label="Pending approvals">
       {[{ key: "ai" as const, label: "AI approvals", n: aiPending, mine: aiMine.length, icon: <Sparkles size={18} />, hint: "Changes the AI wants you to approve" }, { key: "human" as const, label: "Team approvals", n: humanPending, mine: humanMine.length, icon: <Users size={18} />, hint: "Work your team submitted for review" }].map((a) => { const t = tone(a.n, oldestHours(a.key === "ai" ? aiList : humanList)); return <button type="button" key={a.key} className={`dh-approval ${t} ${apprOpen === a.key ? "open" : ""}`} aria-expanded={apprOpen === a.key} onClick={() => { setApprOpen(apprOpen === a.key ? "" : a.key); appt.setOpen(false); }}><span className="dh-approval-icon">{a.icon}</span><span className="dh-approval-text"><b>{a.label}</b><small>{t === "overload" ? `${a.n} waiting — catch up` : a.mine ? `${a.mine} waiting on you` : a.n ? `${a.n} waiting with others` : "All done"}</small></span><span className="dh-approval-n">{a.n || "✓"}</span></button>; })}
@@ -250,6 +249,7 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
       {apprOpen === "ai" && heldError && <p className="dh-held-err" role="alert">{heldError}</p>}
     </section>; })()}
     {appt.list}
+    <section className="dh-actions" aria-label="Quick actions">{actions.map((a) => <button type="button" key={a.label} className={`dh-action ${a.tint}`} onClick={a.run}><span className="dh-action-icon">{a.icon}</span><span><b>{a.label}</b><small>{a.hint}</small></span></button>)}</section>
     {showAppts && <Suspense fallback={null}><AppointmentsDashboard key={scopeClientId || "agency"} showStaffHours scopeClientId={scopeClientId} sample={sample} clientName={clients.find((c) => c.id === scopeClientId)?.name || ""} periodStart={periodStart} periodEnd={periodEnd} periodLabel={periodLabel} onOpen={() => onNavigate("Scheduling")} /></Suspense>}
     {/* Admin-only money & marketing sections (tagged ADMIN) */}
     {isAdmin && valuePanel}
