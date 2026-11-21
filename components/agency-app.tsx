@@ -2774,7 +2774,7 @@ ${senderName}`, staffType: member.staffType || (isSubAccountRole(member.role) ? 
   const pinnedNav = ["Bookkeeping", "Team"];
   // Every page sits on the bar (no More menu); Settings is the gear button beside the profile picture.
   void settingsNav; void pinnedNav;
-  const barExcluded = [...(viewIsAdmin && !activeScopeId ? ["Tasks"] : []), "Content", "Team", "AI Assistant", "Activity", "Conversations", "Media Library", "Invoicing", "CRM Automations", "Lead Factory", "Chess", "Operating World", ...(visibleNav.some((item) => item.key === "CRM") ? ["Clients"] : [])];
+  const barExcluded = [...(viewIsAdmin && !activeScopeId ? ["Tasks"] : []), "Team", "AI Assistant", "Activity", "Conversations", "Media Library", "Invoicing", "CRM Automations", "Lead Factory", "Chess", "Operating World", ...(visibleNav.some((item) => item.key === "CRM") ? ["Clients"] : [])];
   const chessOnBar = visibleNav.some((item) => item.key === "Chess");
   const worldOnBar = orderedNav.some((item) => item.key === "Operating World");
   const canSeeClients = visibleNav.some((item) => item.key === "Clients"); // Team is a button beside the profile; AI Assistant and Activity have their own buttons
@@ -2794,7 +2794,7 @@ ${senderName}`, staffType: member.staffType || (isSubAccountRole(member.role) ? 
   </nav>;
   const canSeeInvoicing = visibleNav.some((item) => item.key === "Invoicing");
   // Less-used pages sit under "More" on the top bar (Content scheduling).
-  const moreNav: typeof orderedNav = orderedNav.filter((item) => item.key === "Content");
+  const moreNav: typeof orderedNav = []; // Content is back on the bar (it was hard to find under More)
   const moreActive = moreNav.some((item) => navActive(item.key));
   navOrderRef.current = [...primaryNav, ...moreNav].map((item) => item.key);
   const goPage = (key: string) => { setPage(key); setSelectedClient(""); setNavMoreOpen(false); };

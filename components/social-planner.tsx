@@ -1,6 +1,15 @@
 "use client";
 // Social post planner: a month calendar of posts per client. Write with AI, attach photos from the client's Media Library.
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { PlatformIcon } from "./platform-icon";
+
+/** Split a caption into the text and its hashtags (shown as chips; joined back when saved). */
+export function splitCaption(caption: string) {
+  const tags = [...new Set((caption.match(/#[\p{L}\p{N}_]+/gu) || []))];
+  const text = caption.replace(/(\s*#[\p{L}\p{N}_]+)+\s*$/u, "").trim();
+  return { text, tags };
+}
+const joinCaption = (text: string, tags: string[]) => [text.trim(), tags.join(" ")].filter(Boolean).join("\n\n");
 
 export type Post = { id: string; clientId: string; postAt: string; platforms: string[]; caption: string; images: string[]; status: "draft" | "pending" | "scheduled" | "posted" | "failed" | "rejected"; updatedAt?: string; createdByName?: string; createdBy?: string; authorType?: string; reviewNote?: string; reviewedBy?: string; publish?: Record<string, { ok: boolean; url?: string; error?: string; manual?: boolean; at?: string }> };
 type Media = { id: string; url: string; name: string; kind: string; createdBy?: string };
@@ -51,7 +60,7 @@ export function SocialPlanner({ clientId, clientName, filters = {}, canApprove =
         const at = new Date(slots[i]); at.setHours(i % 2 ? 18 : 10, 0, 0, 0);
         await call("/api/social-posts", { action: "save", clientId, post: { postAt: at.toISOString(), platforms: ["facebook", "instagram"], caption: p.caption, images: media.length ? [media[i % media.length].url] : [], status: "draft" } });
       }
-      setStatus(`Added ${Math.min(r.posts.length, slots.length)} draft posts. Open any to edit, then mark it Scheduled.`); await load();
+      setStatus(`Drafted ${Math.min(r.posts.length, slots.length)} posts with descriptions and hashtags. Open any to check it, then Schedule.`); await load();
     } catch (e) { setStatus(e instanceof Error ? e.message : "Couldn't plan the month."); }
     finally { setPlanning(false); }
   };
@@ -59,7 +68,7 @@ export function SocialPlanner({ clientId, clientName, filters = {}, canApprove =
   return <section className="sp" aria-label="Social posts">
     <header className="sp-head">
       <div><h3>📅 Social posts</h3><p>Plan {clientName}'s posts on a calendar, write them with AI and add photos from the Media Library.</p></div>
-      <div className="sp-actions"><span className="sp-count"><b>{upcoming}</b> upcoming</span><button type="button" className="secondary-button" disabled={planning} onClick={() => void planMonth()}>{planning ? "Planning…" : "✨ Plan this month with AI"}</button><button type="button" className="primary-button" onClick={() => newPost(new Date())}>+ New post</button></div>
+      <div className="sp-actions"><span className="sp-count"><b>{upcoming}</b> upcoming</span><button type="button" className="secondary-button" disabled={planning} onClick={() => void planMonth()}>{planning ? "Drafting…" : "✨ Draft this month’s posts"}</button><button type="button" className="primary-button" onClick={() => newPost(new Date())}>+ New post</button></div>
     </header>
     {status && <p className="sp-status" role="status">{status}</p>}
     {due.length > 0 && <div className="sp-due">⏰ {due.length} post{due.length === 1 ? " is" : "s are"} ready to go out: {due.map((p) => <button key={p.id} type="button" className="text-button" onClick={() => setEdit(p)}>{new Date(p.postAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</button>)}</div>}
@@ -71,7 +80,7 @@ export function SocialPlanner({ clientId, clientName, filters = {}, canApprove =
           <span className="sp-date" onClick={() => newPost(d)}>{d.getDate()}</span>
           {list.map((p) => <button key={p.id} type="button" className={`sp-post ${p.status}`} onClick={() => setEdit(p)} title={p.caption}>
             {p.images[0] && <img src={p.images[0]} alt="" loading="lazy" />}
-            <span><em>{hm(p.postAt)} {p.platforms.map((x) => <i key={x} style={{ background: PLATFORMS.find((q) => q[0] === x)?.[2] }} />)}{p.createdByName && <b className="sp-who" title={`By ${p.createdByName}`}>{initials(p.createdByName)}</b>}</em><small>{p.caption.split("\n")[0].slice(0, 60) || "Untitled post"}</small></span>
+            <span><em>{hm(p.postAt)} <span className="sp-icons">{p.platforms.map((x) => <PlatformIcon key={x} id={x} size={12} />)}</span>{p.createdByName && <b className="sp-who" title={`By ${p.createdByName}`}>{initials(p.createdByName)}</b>}</em><small>{p.caption.split("\n")[0].slice(0, 60) || "Untitled post"}</small></span>
           </button>)}
         </div>; })}
     </div>
@@ -88,6 +97,8 @@ export function PostEditor({ post, clientId, clientName, media, onMedia, onClose
   const review = async (action: "approve" | "reject" | "publish") => { setBusy("save"); setErr(""); try { if (action !== "publish") await call("/api/social-posts", { action: "save", clientId, post: p }); const r = await call<{ result?: { status: string } }>("/api/social-posts", { action, clientId, id: p.id, note }); onSaved(action === "approve" ? "Approved and scheduled." : action === "reject" ? "Sent back with your note." : r.result?.status === "posted" ? "Published ✓" : "Publish attempted — see results on the post."); } catch (e) { setErr(e instanceof Error ? e.message : "Couldn't do that."); } finally { setBusy(""); } };
   const [p, setP] = useState<Post>(post);
   const [prompt, setPrompt] = useState("");
+  const [tagDraft, setTagDraft] = useState("");
+  const parts = splitCaption(p.caption);
   const [ideas, setIdeas] = useState<string[]>([]);
   const [busy, setBusy] = useState(""); const [err, setErr] = useState("");
   const [picker, setPicker] = useState(false);
@@ -111,10 +122,11 @@ export function PostEditor({ post, clientId, clientName, media, onMedia, onClose
       <div className="sp-editor-body">
         <div className="sp-col">
           <div className="sp-row2"><label>Date<input type="date" value={dateVal} onChange={(e) => setWhen(e.target.value, timeVal)} /></label><label>Time<input type="time" value={timeVal} onChange={(e) => setWhen(dateVal, e.target.value)} /></label></div>
-          <div className="sp-platforms">{PLATFORMS.map(([k, label, color]) => { const on = p.platforms.includes(k); return <button key={k} type="button" className={on ? "on" : ""} style={{ ["--pc" as string]: color }} aria-pressed={on} onClick={() => setP({ ...p, platforms: on ? p.platforms.filter((x) => x !== k) : [...p.platforms, k] })}>{label}</button>; })}</div>
-          <label>Caption<textarea rows={8} value={p.caption} maxLength={5000} placeholder="Write the post, or ask the AI below…" onChange={(e) => setP({ ...p, caption: e.target.value })} /><small className="sp-chars">{p.caption.length} characters{p.platforms.includes("google") && p.caption.length > 1500 ? " · Google posts max 1,500" : ""}</small></label>
+          <div className="sp-platforms">{PLATFORMS.map(([k, label, color]) => { const on = p.platforms.includes(k); return <button key={k} type="button" className={on ? "on" : ""} style={{ ["--pc" as string]: color }} aria-pressed={on} onClick={() => setP({ ...p, platforms: on ? p.platforms.filter((x) => x !== k) : [...p.platforms, k] })}><PlatformIcon id={k} size={14} /> {label}</button>; })}</div>
+          <label>Description<textarea rows={6} value={parts.text} maxLength={4500} placeholder="Write the post, or ask the AI below…" onChange={(e) => setP({ ...p, caption: joinCaption(e.target.value, parts.tags) })} /><small className="sp-chars">{p.caption.length} characters{p.platforms.includes("google") && p.caption.length > 1500 ? " · Google posts max 1,500" : ""}</small></label>
+          <div className="sp-tags"><b className="sp-label">Hashtags</b><div>{parts.tags.map((t) => <span key={t}>{t}<button type="button" aria-label={`Remove ${t}`} onClick={() => setP({ ...p, caption: joinCaption(parts.text, parts.tags.filter((x) => x !== t)) })}>×</button></span>)}<input value={tagDraft} placeholder="+ add hashtag" onChange={(e) => setTagDraft(e.target.value)} onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " " || e.key === ",") && tagDraft.trim()) { e.preventDefault(); const t = `#${tagDraft.trim().replace(/^#+/, "").replace(/\s+/g, "")}`; setP({ ...p, caption: joinCaption(parts.text, [...new Set([...parts.tags, t])]) }); setTagDraft(""); } }} /></div></div>
           <div className="sp-ai"><input value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="✨ What's the post about? e.g. Saturday walk-ins, new flash designs" /><button type="button" className="secondary-button" disabled={busy === "ai"} onClick={() => void write()}>{busy === "ai" ? "Writing…" : "Write with AI"}</button></div>
-          {ideas.length > 0 && <div className="sp-ideas">{ideas.map((t, i) => <button key={i} type="button" onClick={() => { setP({ ...p, caption: t }); setIdeas([]); }}><b>Option {i + 1}</b><span>{t}</span></button>)}</div>}
+          {ideas.length > 0 && <div className="sp-ideas">{ideas.map((t, i) => { const d = splitCaption(t); return <button key={i} type="button" onClick={() => { setP({ ...p, caption: t }); setIdeas([]); }}><b>Option {i + 1}</b><span>{d.text}</span>{d.tags.length > 0 && <em className="sp-idea-tags">{d.tags.join(" ")}</em>}</button>; })}</div>}
         </div>
         <div className="sp-col">
           <b className="sp-label">Photos</b>
@@ -125,7 +137,7 @@ export function PostEditor({ post, clientId, clientName, media, onMedia, onClose
           {picker && [...new Set(media.map((m) => m.createdBy).filter(Boolean))].length > 1 && <select className="sp-uploader" value={uploader} onChange={(e) => setUploader(e.target.value)} aria-label="Uploaded by"><option value="">Uploaded by anyone</option>{[...new Set(media.map((m) => m.createdBy).filter(Boolean))].map((u) => <option key={u}>{u}</option>)}</select>}
           {drive && <div className="sp-drive">{!drive.connected ? <p>Connect your own Google Drive to pick images from it. <a className="primary-button" href="/api/media-library/drive?mine=1">Connect my Google Drive</a></p> : drive.files.length ? drive.files.slice(0, 48).map((f) => <button key={f.id} type="button" title={f.name} onClick={() => void importDrive(f.id, f.name)}>{f.thumbnailLink ? <img src={f.thumbnailLink} alt="" referrerPolicy="no-referrer" /> : <span>{f.name}</span>}</button>) : <p>No images in the top of your Drive. <a href="/api/media-library/drive?mine=1">Use a different Google account</a></p>}<button type="button" className="text-button" onClick={() => setDrive(null)}>Close Drive</button></div>}
           {picker && <div className="sp-picker">{media.filter((m) => !uploader || m.createdBy === uploader).length ? media.filter((m) => !uploader || m.createdBy === uploader).slice(0, 48).map((m) => { const on = p.images.includes(m.url); return <button key={m.id} type="button" className={on ? "on" : ""} onClick={() => setP({ ...p, images: on ? p.images.filter((x) => x !== m.url) : [...p.images, m.url].slice(0, 10) })}><img src={m.url} alt={m.name} loading="lazy" /></button>; }) : <p>No photos in {clientName}'s Media Library yet. Upload one.</p>}</div>}
-          <div className="sp-preview"><b className="sp-label">Preview</b><div className="sp-preview-card"><div className="sp-pv-head"><span>{clientName.slice(0, 1)}</span><b>{clientName}</b><small>{new Date(p.postAt).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</small></div>{p.caption && <p>{p.caption}</p>}{p.images[0] && <img src={p.images[0]} alt="" />}</div></div>
+          <div className="sp-preview"><b className="sp-label">Preview</b><div className="sp-preview-card"><div className="sp-pv-head"><span>{clientName.slice(0, 1)}</span><b>{clientName}</b><i className="sp-icons">{p.platforms.map((x) => <PlatformIcon key={x} id={x} size={14} />)}</i><small>{new Date(p.postAt).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</small></div>{p.caption && <p>{p.caption}</p>}{p.images[0] && <img src={p.images[0]} alt="" />}</div></div>
         </div>
       </div>
       {err && <p className="sp-err" role="alert">{err}</p>}

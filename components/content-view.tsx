@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { PostEditor, SocialPlanner, STATUS_LABEL, type Post } from "./social-planner";
+import { PostEditor, SocialPlanner, STATUS_LABEL, splitCaption, type Post } from "./social-planner";
+import { PlatformIcon } from "./platform-icon";
 
 // Top-bar → Content: one content calendar for every social platform, for the agency and every sub-account.
 //  · Calendar (one client), List and Approvals (agency) views; filter by person, platform and status
@@ -24,6 +25,9 @@ export function ContentView({ clients, scopeClientId = "", isAgency }: { clients
   const [msg, setMsg] = useState("");
   const [gbp, setGbp] = useState<{ connected: boolean; email: string; locations: Array<{ location: string; title: string; clientId: string }> } | null>(null);
   const [seed, setSeed] = useState(0);
+  const [editMedia, setEditMedia] = useState<Array<{ id: string; url: string; name: string; kind: string; createdBy?: string }>>([]);
+  // The list view's editor gets that client's Media Library too.
+  useEffect(() => { if (!edit) return; let live = true; fetch(`/api/media-library?scope=${encodeURIComponent(edit.clientId)}&kind=image`, { cache: "no-store" }).then((r) => r.ok ? r.json() : null).then((j) => { if (live && j) setEditMedia(j.items || []); }).catch(() => undefined); return () => { live = false; }; }, [edit]);
   const client = clients.find((c) => c.id === clientId);
   useEffect(() => { if (!scopeClientId) { try { localStorage.setItem("f2b-content-client", clientId); } catch { /* ignore */ } } }, [clientId, scopeClientId]);
   useEffect(() => { try { const u = new URL(window.location.href); const r = u.searchParams.get("gbpConnection") || u.searchParams.get("driveConnection"); if (r) setMsg(r === "connected" ? "Connected ✓" : `Connection: ${r.replace(/-/g, " ")}`); } catch { /* ignore */ } }, []);
@@ -71,12 +75,12 @@ export function ContentView({ clients, scopeClientId = "", isAgency }: { clients
       {posts && !shown.length && <p className="cv-muted">{view === "approvals" ? "Nothing waiting for approval." : "No posts match. Open the Calendar and click a day to add one."}</p>}
       {shown.map((p) => <button key={p.id} type="button" className={`cv-row ${p.status}`} onClick={() => setEdit(p)}>
         {p.images[0] ? <img src={p.images[0]} alt="" loading="lazy" /> : <span className="cv-noimg">Aa</span>}
-        <span className="cv-main"><b>{p.caption.split("\n")[0].slice(0, 90) || "Untitled post"}</b><small>{when(p.postAt)} · {p.platforms.map((x) => PLATFORMS.find((q) => q[0] === x)?.[1] || x).join(", ")}{!clientId ? ` · ${clientName(p.clientId)}` : ""}</small></span>
+        <span className="cv-main"><b>{p.caption.split("\n")[0].slice(0, 90) || "Untitled post"}</b><small>{when(p.postAt)} <span className="sp-icons">{p.platforms.map((x) => <PlatformIcon key={x} id={x} size={13} title={PLATFORMS.find((q) => q[0] === x)?.[1]} />)}</span>{!clientId ? ` · ${clientName(p.clientId)}` : ""}{splitCaption(p.caption).tags.length ? ` · ${splitCaption(p.caption).tags.slice(0, 3).join(" ")}` : ""}</small></span>
         <span className="cv-by">{p.createdByName || "—"}<small>{p.authorType === "subaccount" ? "Client team" : "Agency"}</small></span>
         <span className={`sp-badge ${p.status}`}>{STATUS_LABEL[p.status] || p.status}</span>
       </button>)}
     </div>}
-    {edit && <PostEditor post={edit} clientId={edit.clientId} clientName={clientName(edit.clientId)} media={[]} canApprove={isAgency} onMedia={() => undefined} onClose={() => setEdit(null)} onSaved={(m) => { setEdit(null); setMsg(m); setSeed((n) => n + 1); }} />}
+    {edit && <PostEditor post={edit} clientId={edit.clientId} clientName={clientName(edit.clientId)} media={editMedia} canApprove={isAgency} onMedia={(m) => setEditMedia((cur) => [m, ...cur])} onClose={() => setEdit(null)} onSaved={(m) => { setEdit(null); setMsg(m); setSeed((n) => n + 1); }} />}
   </section>;
 }
 
