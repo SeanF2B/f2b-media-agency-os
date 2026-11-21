@@ -1030,17 +1030,18 @@ export function AppointmentsDashboard({ scopeClientId, onOpen, sample = false, c
             const total = windows.reduce((n, w) => n + mins(w[1]) - mins(w[0]), 0);
             const used = items.reduce((n, b) => n + (Date.parse(b.end) - Date.parse(b.start)) / 60000, 0); const free = Math.max(0, total - used);
             const next = items.find((b) => Date.parse(b.start) > Date.now());
-            const summary = off ? "Day off" : !windows.length ? "Not working" : !items.length ? "Free all day" : free ? `${Math.floor(free / 60)}h${free % 60 ? ` ${Math.round(free % 60)}m` : ""} free` : "Fully booked";
-            return <div key={p.id} className={`sch-tl-row${!windows.length ? " off" : ""}`}>
-              <div className="sch-tl-who"><Avatar person={p} size={34} /><span><b>{p.name.split("|")[0].trim()}</b><small>{windows.length ? `${windows[0][0]}–${windows[windows.length - 1][1]}` : off ? "Day off" : "Not working"}{items.length ? ` · ${items.length} booking${items.length === 1 ? "" : "s"}` : ""}</small>{next && isToday ? <small className="sch-tl-next">Next {time(next.start)} · {next.name.split(" ")[0]}</small> : null}</span></div>
+            const apptTimes = items.map((b) => `${time(b.start)}–${time(b.end)}`).join(", ");
+            const summary = items.length && !windows.length ? apptTimes : off ? "Day off" : !windows.length ? "Not working" : !items.length ? "Free all day" : free ? `${Math.floor(free / 60)}h${free % 60 ? ` ${Math.round(free % 60)}m` : ""} free` : "Fully booked";
+            return <div key={p.id} className={`sch-tl-row${!windows.length && !items.length ? " off" : ""}`}>
+              <div className="sch-tl-who"><Avatar person={p} size={34} /><span><b>{p.name.split("|")[0].trim()}</b><small>{windows.length ? `${windows[0][0]}–${windows[windows.length - 1][1]}` : items.length ? "Booked" : off ? "Day off" : "Not working"}{items.length ? ` · ${items.length} booking${items.length === 1 ? "" : "s"}` : ""}</small>{items.length ? <small className="sch-tl-next">{items.length === 1 ? `${apptTimes} · ${items[0].name.split(" ")[0]}` : next && isToday ? `Next ${time(next.start)}–${time(next.end)} · ${next.name.split(" ")[0]}` : apptTimes}</small> : null}</span></div>
               <div className="sch-tl-track">
                 {hours.map((h) => <i key={h} className="sch-tl-grid" style={{ left: pct(h) }} />)}
                 {windows.map((w, i) => <i key={`w${i}`} className="sch-tl-free" style={{ left: pct(mins(w[0])), width: `calc(${pct(mins(w[1]))} - ${pct(mins(w[0]))})` }} />)}
                 {items.map((b) => { const s0 = new Date(b.start), e0 = new Date(b.end); const a0 = s0.getHours() * 60 + s0.getMinutes(), z0 = e0.getHours() * 60 + e0.getMinutes(); const cal = calById.get(b.calendarId); const frac = (z0 - a0) / span; const label = frac >= 0.11 ? "full" : frac >= 0.05 ? "time" : "none";
-                  return <button key={b.id} type="button" className={`sch-tl-item ${b.status} lbl-${label}${Date.parse(b.end) < Date.now() && b.status !== "no_show" ? " past" : ""}`} style={{ left: pct(a0), width: `calc(${pct(z0)} - ${pct(a0)})`, ["--c" as string]: cal?.color || "var(--brand-primary,#2563eb)" }} title={`${time(b.start)}–${time(b.end)} · ${b.name} · ${cal?.name || ""}`} onClick={() => setDetail(b)} aria-label={`${time(b.start)} ${b.name}`}>{label !== "none" && <b>{time(b.start)}</b>}{label === "full" && <span>{b.name.split(" ")[0]}</span>}</button>; })}
+                  return <button key={b.id} type="button" className={`sch-tl-item ${b.status} lbl-${label}${Date.parse(b.end) < Date.now() && b.status !== "no_show" ? " past" : ""}`} style={{ left: pct(a0), width: `calc(${pct(z0)} - ${pct(a0)})`, ["--c" as string]: cal?.color || "var(--brand-primary,#2563eb)" }} title={`${time(b.start)}–${time(b.end)} · ${b.name} · ${cal?.name || ""}`} onClick={() => setDetail(b)} aria-label={`${time(b.start)} ${b.name}`}>{label !== "none" && <b>{label === "full" ? `${time(b.start)}–${time(b.end)}` : time(b.start)}</b>}{label === "full" && <span>{b.name.split(" ")[0]}</span>}</button>; })}
                 {isToday && nowM > from && nowM < to && <i className="sch-tl-now" style={{ left: pct(nowM) }} />}
               </div>
-              <span className={`sch-avail-pill ${!windows.length ? "off" : !items.length ? "free" : free ? "some" : "full"}`}>{summary}</span>
+              <span className={`sch-avail-pill ${!windows.length ? (items.length ? "some" : "off") : !items.length ? "free" : free ? "some" : "full"}`}>{summary}</span>
             </div>; })}
         </div>; })()}
     </div> : view === "month" ? (() => { const weeks = Math.ceil((Math.round((monthFirst.getTime() - gridStart.getTime()) / 86_400_000) + new Date(monthFirst.getFullYear(), monthFirst.getMonth() + 1, 0).getDate()) / 7); return <div className="sch-dash-month" style={{ ["--weeks" as string]: weeks }}>
@@ -1087,12 +1088,16 @@ function useSiteSample(scope: string, enabled: boolean): SiteSample {
   return site;
 }
 function sampleSchedule(real: Data | null, week: Date, clientName: string, site: SiteSample = EMPTY_SITE): Data {
-  const fallbackStaff: Staff[] = (/tattoo|\bink\b|piercing/i.test(clientName) ? [["s1", "Aoife Murphy", "Tattoo artist"], ["s2", "Ciarán Walsh", "Tattoo artist"], ["s3", "Niamh Byrne", "Piercer"]] : [["s1", "Aoife Murphy", "Senior consultant"], ["s2", "Ciarán Walsh", "Technician"], ["s3", "Niamh Byrne", "Bookings"]]).map(([id, name, role]) => ({ id, name, role, dailyLimit: 0, google: "", feedUrl: "", canEdit: false, weekly: { mon: [["09:00", "17:30"]], tue: [["09:00", "17:30"]], wed: [["09:00", "17:30"]], thu: [["09:00", "17:30"]], fri: [["09:00", "16:00"]] } as Partial<Record<DayKey, Window[]>>, blocked: [] }));
+  const fallbackStaff: Staff[] = (/tattoo|\bink\b|piercing/i.test(clientName) ? [["s1", "Aoife Murphy", "Tattoo artist"], ["s2", "Ciarán Walsh", "Tattoo artist"], ["s3", "Niamh Byrne", "Piercer"]] : [["s1", "Aoife Murphy", "Senior consultant"], ["s2", "Ciarán Walsh", "Technician"], ["s3", "Niamh Byrne", "Bookings"]]).map(([id, name, role]) => ({ id, name, role, dailyLimit: 0, google: "", feedUrl: "", canEdit: false, weekly: { mon: [["09:00", "17:30"]], tue: [["09:00", "17:30"]], wed: [["09:00", "17:30"]], thu: [["09:00", "17:30"]], fri: [["09:00", "16:00"]], sat: [["10:00", "16:00"]] } as Partial<Record<DayKey, Window[]>>, blocked: [] }));
   const siteStaff: Staff[] = site.team.map((name, i) => ({ ...fallbackStaff[0], id: `site-staff-${i}`, name, role: /tattoo|ink/i.test(clientName) ? "Artist" : "", avatar: site.photos?.[name] || "" }));
   // The team named on the client's website wins; otherwise their account team; otherwise demo names.
   // Inside a client sub-account, agency staff never appear in sample data: only that client's own people (or demo names).
   const realTeam = real?.scope ? (real.staff || []).filter((p) => (real.ownTeamIds || []).includes(p.id)) : (real?.staff || []);
-  const staff = (siteStaff.length >= 2 ? siteStaff : realTeam.length ? realTeam : siteStaff.length ? siteStaff : fallbackStaff).slice(0, 6).map((p) => ({ ...p, weekly: p.weekly && Object.keys(p.weekly).length ? p.weekly : fallbackStaff[0].weekly }));
+  // The account's own team (added in Team) wins, with their website portrait when they have none; then website names; then demo names.
+  const ownTeam = realTeam.map((p) => { const first = p.name.split("|")[0].trim(); const hit = site.team.find((n) => n.toLowerCase() === first.toLowerCase() || n.split(" ")[0].toLowerCase() === first.split(" ")[0].toLowerCase()); return hit && !p.avatar && site.photos?.[hit] ? { ...p, avatar: site.photos[hit] } : p; });
+  const picked = (ownTeam.length >= 2 ? ownTeam : siteStaff.length >= 2 ? siteStaff : ownTeam.length ? ownTeam : siteStaff.length ? siteStaff : fallbackStaff).slice(0, 6).map((p) => ({ ...p, weekly: p.weekly && Object.keys(p.weekly).length ? p.weekly : fallbackStaff[0].weekly }));
+  // Demo only: if nobody works Saturdays, open Saturday 10–4 so the sample week isn't empty at the weekend.
+  const staff = picked.some((p) => (p.weekly?.sat || []).length) ? picked : picked.map((p) => ({ ...p, weekly: { ...p.weekly, sat: [["10:00", "16:00"]] as Window[] } }));
   const trade = site.services.length >= 2 ? site.services.slice(0, 3) : /roof/i.test(clientName) ? ["Roof survey", "Repair quote", "Gutter check"] : /interior|kitchen|design/i.test(clientName) ? ["Design consultation", "Site measure", "Showroom visit"] : /ink|tattoo/i.test(clientName) ? ["Tattoo consultation", "Session", "Touch-up"] : ["Consultation", "Site visit", "Follow-up call"];
   const colours = ["#2563eb", "#16a34a", "#d97706"];
   const calendars = trade.map((name, i) => ({ id: `sample-cal-${i}`, clientId: "", name, slug: `sample-${i}`, kind: i === 0 ? "consultation" : "service", description: "", durationMin: /consult|touch|check|call|piercing|quote|measure/i.test(name) ? 30 : /tattoo|session|sleeve|realism|cover|black|colour|color|fine line|anime|portrait/i.test(name) ? 180 : /survey|visit|install|repair/i.test(name) ? 90 : 60, bufferBefore: 0, bufferAfter: 15, slotInterval: 30, minNoticeMin: 0, maxDaysAhead: 60, dailyLimit: 0, locationType: "onsite", locationDetail: "", price: 0, currency: "EUR", color: colours[i], assignMode: "customer_pick", staffIds: staff.map((p) => p.id), questions: [], stageId: "", confirmationMessage: "", redirectUrl: "", active: true, timezone: "Europe/Dublin" } as Calendar));
@@ -1105,9 +1110,12 @@ function sampleSchedule(real: Data | null, week: Date, clientName: string, site:
     const day = addDays(week, d); if (day.getDay() === 0) continue;
     const count = day.getDay() === 6 ? 1 : 2 + Math.floor(rand() * 3);
     for (let n = 0; n < count; n++) {
-      const cal = calendars[Math.floor(rand() * calendars.length)]; const person = staff[Math.floor(rand() * staff.length)];
+      // Only people who actually work that day get sample bookings (nobody is booked on a day they're "Not working").
+      const dayName = (["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as DayKey[])[day.getDay()];
+      const onDuty = staff.filter((p) => (p.weekly?.[dayName] || []).length);
+      const cal = calendars[Math.floor(rand() * calendars.length)]; const pickR = rand(); if (!onDuty.length) continue; const person = onDuty[Math.floor(pickR * onDuty.length)];
       // Starts on the half hour and always finishes within that person's working day (no sessions running past closing).
-      const win = (person.weekly?.[(["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as DayKey[])[day.getDay()]] || [["09:00", "17:30"]])[0] || ["09:00", "17:30"];
+      const win = (person.weekly?.[dayName] || [])[0] || ["09:00", "17:30"];
       const toM = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
       const open = toM(win[0]), latest = Math.max(open, toM(win[1]) - cal.durationMin);
       const startM = open + Math.floor(rand() * (Math.floor((latest - open) / 30) + 1)) * 30;

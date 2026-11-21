@@ -52,3 +52,9 @@ test("menu labels, section titles and reviewer names are never read as team (sol
   assert.equal(looksLikePerson("Jeliza Rose"), true);
   assert.equal(looksLikePerson("CJ"), true);
 });
+
+test("gift-voucher feature headings are never read as team names", () => {
+  const html = `<h2>Meet the team</h2><h3>Gift Vouchers</h3><h3>Flexible Amounts</h3><img src="/a.jpg"><h3>Instant Delivery</h3><img src="/b.jpg"><h3>Perfect Gift</h3>`;
+  const r = parseTeam(html, "https://studio.example/");
+  assert.deepEqual(r.team, []);
+});
