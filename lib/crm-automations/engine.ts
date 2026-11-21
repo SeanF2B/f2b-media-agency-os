@@ -25,11 +25,11 @@ export type Stmt = {
 export type Db = { prepare(sql: string): Stmt; batch(statements: Stmt[]): Promise<unknown[]> };
 export type EmailMessage = { to: string; subject: string; text: string; html: string; idempotencyKey: string };
 export type AiCallRequest = { ownerId: string; scopeId: string; contactId: string; phone: string; name: string; purpose: string; channel: "phone" | "whatsapp"; dedupeKey: string };
-export type Effects = { sendEmail?: (message: EmailMessage) => Promise<void>; aiCall?: (request: AiCallRequest) => Promise<{ queued: boolean; reason?: string }> };
+export type Effects = { appUrl?: string; sendEmail?: (message: EmailMessage) => Promise<void>; aiCall?: (request: AiCallRequest) => Promise<{ queued: boolean; reason?: string }> };
 
 type LiveAutomation = { id: string; owner_id: string; scope_id: string; trigger_type: string; definition: string; next_fire_at: string | null; parsed?: AutomationDefinition | null };
 type EventRow = { id: string; owner_id: string; scope_id: string; event_type: string; contact_id: string | null; payload: string; source_automation_id: string | null; created_at: string };
-type RunRow = { id: string; owner_id: string; automation_id: string; scope_id: string; contact_id: string; status: string; current_node_id: string | null; resume_at: string | null; attempts: number };
+type RunRow = { id: string; owner_id: string; automation_id: string; scope_id: string; contact_id: string; status: string; current_node_id: string | null; resume_at: string | null; attempts: number; event_id?: string | null };
 type Workspace = { ownerId?: string; staff?: Array<{ id: string; name?: string; email?: string; role?: string; isBot?: boolean }>; tasks?: Array<Record<string, unknown>>; [key: string]: unknown };
 
 const LEASE_MS = 10 * 60_000;
@@ -85,6 +85,8 @@ export function triggerMatches(automation: { id: string; scope_id: string; trigg
       return true;
     case "appointment_booked": case "appointment_rescheduled": case "appointment_cancelled": case "appointment_no_show": case "appointment_completed":
       return !config.calendarId || config.calendarId === payload.calendarId;
+    case "appointment_before": case "appointment_after":
+      return payload.automationId === automation.id; // each timed automation picks its own bookings (its own hours / calendar)
     case "onboarding_started": case "audit_completed": case "guidance_requested": case "checkout_completed": case "payment_failed":
       return !config.route || config.route === payload.route;
     default: return false;
@@ -341,6 +343,7 @@ async function advanceRun(db: Db, run: RunRow, now: Date, effects: Effects, work
   const definition = parse<AutomationDefinition>(automation.definition, { nodes: [], edges: [] });
   const contact = await loadContactFacts(db, run.owner_id, run.contact_id);
   if (!contact) return finishRun(db, run.id, { status: "failed", current: run.current_node_id, resumeAt: null, error: "This contact no longer exists." }, now);
+  if (run.event_id) { const appt = await appointmentFacts(db, run.owner_id, run.event_id, workspace, effects.appUrl).catch(() => null); if (appt) contact.appointment = appt; }
   const lookups = await makeLookups(db, run.owner_id, workspace, definition);
   const events: AutomationEvent[] = [];
   let current = run.current_node_id;
@@ -488,6 +491,48 @@ async function detectCompletedTasks(db: Db, ownerId: string, now: Date) {
   await db.batch(writes);
 }
 
+/** Appointment details for {{appointment.*}} merge fields, from the event that started the run (one indexed lookup). */
+async function appointmentFacts(db: Db, ownerId: string, eventId: string, workspace: () => Promise<Workspace | null>, appUrl = "") {
+  const ev = await db.prepare("SELECT payload FROM crm_automation_events WHERE id=?1 AND owner_id=?2").bind(eventId, ownerId).first<{ payload: string }>();
+  const bookingId = String(parse<Record<string, unknown>>(ev?.payload, {}).bookingId || "");
+  if (!bookingId) return null;
+  const b = await db.prepare("SELECT b.start_at, b.end_at, b.staff_ids, b.manage_token, c.name AS service, c.slug FROM sched_bookings b LEFT JOIN sched_calendars c ON c.id=b.calendar_id WHERE b.id=?1 AND b.owner_id=?2").bind(bookingId, ownerId).first<{ start_at: string; end_at: string; staff_ids: string; manage_token: string | null; service: string | null; slug: string | null }>();
+  if (!b) return null;
+  const tz = "Europe/Dublin";
+  const fmt = (v: string, o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-IE", { timeZone: tz, ...o }).format(new Date(v));
+  const staffIds = parse<string[]>(b.staff_ids, []);
+  const ws = staffIds.length ? await workspace().catch(() => null) : null; // shared, cached once per cron tick
+  const staff = ((ws as { staff?: Array<{ id: string; name: string }> } | null)?.staff || []).filter((p) => staffIds.includes(p.id)).map((p) => String(p.name || "").split("|")[0].trim()).join(", ");
+  return { date: fmt(b.start_at, { weekday: "long", day: "numeric", month: "long" }), time: fmt(b.start_at, { hour: "2-digit", minute: "2-digit" }), end_time: fmt(b.end_at, { hour: "2-digit", minute: "2-digit" }), service: b.service || "your appointment", staff, booking_link: appUrl && b.slug ? `${appUrl.replace(/\/$/, "")}/f/book/${b.slug}` : "", manage_link: appUrl && b.manage_token ? `${appUrl.replace(/\/$/, "")}/f/book/manage?t=${b.manage_token}` : "" };
+}
+
+// ---------- timed appointment triggers ----------
+// Looks back 3 hours so a missed cron tick still fires; the dedupe key makes each booking fire once per automation.
+const TIMED_LOOKBACK_MS = 3 * 3_600_000;
+async function detectTimedAppointments(db: Db, automation: LiveAutomation, now: Date) {
+  const config = (automation.parsed && triggerOf(automation.parsed)?.config) || {};
+  const hours = Math.min(24 * 30, Math.max(0, Number(config.hours) || 24));
+  const before = automation.trigger_type === "appointment_before";
+  const field = before ? "start_at" : "end_at";
+  // before: start_at in (now + hours - lookback, now + hours]; after: end_at in (now - hours - lookback, now - hours]
+  const edge = new Date(now.getTime() + (before ? 1 : -1) * hours * 3_600_000);
+  const from = new Date(edge.getTime() - TIMED_LOOKBACK_MS);
+  const exists = await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='sched_bookings'").first<{ name: string }>().catch(() => null);
+  if (!exists) return;
+  // Index-backed: sched_bookings(owner_id, client_id, start_at). For "after", widen by the longest booking (12h) and filter on end_at.
+  const lo = before ? iso(from) : iso(new Date(from.getTime() - 12 * 3_600_000)), hi = iso(edge);
+  const rows = (await db.prepare(`SELECT id, calendar_id, contact_id, start_at, end_at, status, name FROM sched_bookings WHERE owner_id=?1 AND client_id=?2 AND start_at>?3 AND start_at<=?4 LIMIT 300`).bind(automation.owner_id, automation.scope_id || "", lo, hi).all<{ id: string; calendar_id: string; contact_id: string | null; start_at: string; end_at: string; status: string; name: string }>()).results || [];
+  const writes: Stmt[] = [];
+  for (const b of rows) {
+    const t = b[field as "start_at" | "end_at"];
+    if (!b.contact_id || t <= iso(from) || t > iso(edge)) continue;
+    if (before ? b.status !== "booked" : !(b.status === "booked" || b.status === "completed")) continue; // no reminders for cancelled; no thank-you for no-shows
+    if (config.calendarId && config.calendarId !== b.calendar_id) continue;
+    writes.push(eventStatement(db, { ownerId: automation.owner_id, scopeId: automation.scope_id, type: automation.trigger_type, contactId: b.contact_id, payload: { automationId: automation.id, bookingId: b.id, calendarId: b.calendar_id, start: b.start_at, end: b.end_at, name: b.name, hours }, dedupeKey: `${automation.trigger_type}:${automation.id}:${b.id}:${b.start_at}` }, now));
+  }
+  for (let index = 0; index < writes.length; index += 60) await db.batch(writes.slice(index, index + 60));
+}
+
 // ---------- the cron entry point ----------
 export async function processCrmAutomations(db: Db, nowDate = new Date(), effects: Effects = {}) {
   await ensureAutomationTables(db);
@@ -510,6 +555,10 @@ export async function processCrmAutomations(db: Db, nowDate = new Date(), effect
     if (types.has("form_lead")) await detectFormLeads(db, ownerId, now);
     if (types.has("stage_changed")) await detectStageChanges(db, ownerId, now);
     if (types.has("task_completed")) await detectCompletedTasks(db, ownerId, now);
+  }
+  // 1b. Timed appointment triggers: bookings that have reached "X hours before start" / "X hours after end".
+  for (const automation of live.filter((row) => (row.trigger_type === "appointment_before" || row.trigger_type === "appointment_after") && row.parsed)) {
+    try { await detectTimedAppointments(db, automation, now); } catch (e) { console.error("timed appointment trigger", automation.id, e); }
   }
 
   // 2. Turn pending events into runs.
@@ -548,7 +597,7 @@ export async function processCrmAutomations(db: Db, nowDate = new Date(), effect
   }
 
   // 4. Advance runs that are due (new runs, finished waits, retries).
-  const due = (await db.prepare("SELECT id, owner_id, automation_id, scope_id, contact_id, status, current_node_id, resume_at, attempts FROM crm_automation_runs WHERE status IN ('running','waiting') AND resume_at<=?1 ORDER BY resume_at LIMIT ?2").bind(stamp, MAX_RUNS_PER_TICK).all<RunRow>()).results || [];
+  const due = (await db.prepare("SELECT id, owner_id, automation_id, scope_id, contact_id, status, current_node_id, resume_at, attempts, event_id FROM crm_automation_runs WHERE status IN ('running','waiting') AND resume_at<=?1 ORDER BY resume_at LIMIT ?2").bind(stamp, MAX_RUNS_PER_TICK).all<RunRow>()).results || [];
   for (const run of due) await advanceRun(db, run, now, effects, workspace, paused);
 
   return { live: live.length, events: events.length, runs: due.length };

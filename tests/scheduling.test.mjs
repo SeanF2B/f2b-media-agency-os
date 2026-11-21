@@ -54,7 +54,7 @@ test("time zone helpers round-trip across DST", () => {
 
 test("sanitizers clamp input", () => {
   const cal = sanitizeCalendar({ name: "  Consult ", durationMin: 9999, bufferBefore: -5, assignMode: "nope", redirectUrl: "javascript:alert(1)", color: "red" });
-  assert.equal(cal.durationMin, 600); assert.equal(cal.bufferBefore, 0); assert.equal(cal.assignMode, "customer_pick"); assert.equal(cal.redirectUrl, ""); assert.equal(cal.color, "#2563eb"); assert.equal(cal.slug, "consult");
+  assert.equal(cal.durationMin, 720); assert.equal(cal.bufferBefore, 0); // custom lengths go up to 12 hrs assert.equal(cal.assignMode, "customer_pick"); assert.equal(cal.redirectUrl, ""); assert.equal(cal.color, "#2563eb"); assert.equal(cal.slug, "consult");
   assert.deepEqual(sanitizeWeekly({ mon: [["17:00", "09:00"], ["09:00", "12:00"]], xyz: [] }), { mon: [["09:00", "12:00"]] });
 });
 

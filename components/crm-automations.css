@@ -229,3 +229,9 @@
   .ca-rule { grid-template-columns: 1fr 1fr; }
   .ca-table th:nth-child(4), .ca-table td:nth-child(4) { display: none; }
 }
+/* Scheduling templates in the New automation dialog */
+.ca-templates{display:grid;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid rgba(127,138,160,.2)}
+.ca-templates>small{color:#667085;font-size:12px;margin-top:-4px}
+.ca-template{display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;padding:10px 12px;border:1px solid rgba(127,138,160,.28);border-radius:12px;background:transparent;color:inherit;font:inherit;cursor:pointer;transition:transform .15s,border-color .15s,box-shadow .15s}
+.ca-template:hover{transform:translateY(-1px);border-color:var(--brand-secondary,var(--brand-primary,#1479b8));box-shadow:0 4px 14px rgba(16,24,40,.08)}
+.ca-template span{display:grid;gap:2px}.ca-template b{font-size:13.5px}.ca-template small{color:#667085;font-size:12px}

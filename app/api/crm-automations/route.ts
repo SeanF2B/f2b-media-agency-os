@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "../../chatgpt-auth";
 import { ensureAutomationTables, emitAutomationEvent, firstFireAt, simulateRun, startRunStatements, type Db } from "../../../lib/crm-automations/engine.ts";
-import { blankDefinition, normalizeTag, readinessProblems, sanitizeDefinition, sendsEmail, triggerOf, type AutomationDefinition } from "../../../lib/crm-automations/model.ts";
+import { SCHEDULING_TEMPLATES, blankDefinition, normalizeTag, readinessProblems, sanitizeDefinition, sendsEmail, triggerOf, type AutomationDefinition } from "../../../lib/crm-automations/model.ts";
 
 export const dynamic = "force-dynamic";
 const noStore = { "Cache-Control": "no-store" };
@@ -142,8 +142,12 @@ export async function POST(request: Request) {
   try {
     if (action === "create") {
       const id = crypto.randomUUID();
-      const name = clean(body.name, 120) || "Untitled automation";
-      await raw.prepare("INSERT INTO crm_automations (id, owner_id, scope_id, name, status, trigger_type, definition, created_at, updated_at) VALUES (?1,?2,?3,?4,'off','',?5,?6,?6)").bind(id, ownerId, scope, name, JSON.stringify(blankDefinition()), stamp).run();
+      const template = SCHEDULING_TEMPLATES.find((t) => t.key === clean(body.template, 40));
+      const name = clean(body.name, 120) || template?.name || "Untitled automation";
+      const cleaned = template ? sanitizeDefinition(template.build()) : null;
+      const definition = cleaned && cleaned.ok ? cleaned.definition : blankDefinition();
+      const triggerType = cleaned && cleaned.ok ? String(definition.nodes[0]?.config?.type || "") : "";
+      await raw.prepare("INSERT INTO crm_automations (id, owner_id, scope_id, name, status, trigger_type, definition, sends_email, created_at, updated_at) VALUES (?1,?2,?3,?4,'off',?5,?6,?7,?8,?8)").bind(id, ownerId, scope, name, triggerType, JSON.stringify(definition), definition.nodes.some((n) => n.type === "send_email") ? 1 : 0, stamp).run();
       return ok({ ok: true, id });
     }
 

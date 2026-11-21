@@ -655,3 +655,8 @@ html body .app-shell.dark-mode .sch-dash-panel-tools .sch-seg button.on{backgrou
 .sch-tl .sch-tl-item .sch-tl-dur{display:inline!important;flex:0 0 auto;color:#fff!important;font-size:11px!important;font-weight:800;white-space:nowrap;opacity:.9}
 /* Hour labels: thin out when the timeline is narrow so they never run into each other */
 .sch-tl .sch-tl-hours em.skip{display:none}
+.sch-share-codebox{position:relative;display:block;width:100%;padding:0;border:0;background:none;cursor:pointer;text-align:left}
+.sch-share-codebox textarea{pointer-events:none;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.sch-share-codebox:hover textarea{border-color:var(--brand-secondary,var(--brand-primary,#1479b8));box-shadow:0 4px 14px rgba(16,24,40,.08)}
+.sch-share-copytag{position:absolute;top:8px;right:8px;display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:999px;background:var(--brand-primary,#1479b8);color:#fff;font-size:11.5px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.sch-share-codebox.copied .sch-share-copytag{background:#16a34a}

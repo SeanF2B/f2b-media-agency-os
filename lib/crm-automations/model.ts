@@ -1,7 +1,7 @@
 // Shared model for native CRM Automations (used by the builder UI, the API and the runner).
 // Only erasable TypeScript syntax is used so `node --test` can load this file directly.
 
-export type TriggerType = "form_lead" | "tag_added" | "stage_changed" | "task_completed" | "schedule" | "appointment_booked" | "appointment_rescheduled" | "appointment_cancelled" | "appointment_no_show" | "appointment_completed" | "onboarding_started" | "audit_completed" | "guidance_requested" | "checkout_completed" | "payment_failed";
+export type TriggerType = "form_lead" | "tag_added" | "stage_changed" | "task_completed" | "schedule" | "appointment_booked" | "appointment_rescheduled" | "appointment_cancelled" | "appointment_no_show" | "appointment_completed" | "appointment_before" | "appointment_after" | "onboarding_started" | "audit_completed" | "guidance_requested" | "checkout_completed" | "payment_failed";
 export type ActionType = "send_email" | "set_value" | "add_tag" | "remove_tag" | "move_stage" | "create_task" | "notify" | "ai_call" | "wait" | "if_else";
 export type NodeType = "trigger" | ActionType;
 export type Branch = "yes" | "no";
@@ -16,6 +16,8 @@ export type ConditionSet = { match: "all" | "any"; rules: ConditionRule[] };
 export type ContactFacts = {
   id: string; first_name: string; last_name: string; email: string; phone: string; company: string; source: string; client_id: string | null;
   tags: string[]; stageIds: string[]; notes?: string; deal_value?: number;
+  /** Set when the run was started by an appointment trigger: lets emails say when and what. */
+  appointment?: { date: string; time: string; end_time: string; service: string; staff: string; booking_link: string; manage_link: string };
 };
 
 export const TRIGGERS: Array<{ type: TriggerType; label: string; help: string; icon: string }> = [
@@ -29,6 +31,8 @@ export const TRIGGERS: Array<{ type: TriggerType; label: string; help: string; i
   { type: "appointment_cancelled", label: "Appointment cancelled", help: "Starts when an appointment is cancelled.", icon: "CalendarX" },
   { type: "appointment_no_show", label: "Appointment no-show", help: "Starts when an appointment is marked as a no-show.", icon: "UserX" },
   { type: "appointment_completed", label: "Appointment completed", help: "Starts when an appointment is marked as completed (great for review requests).", icon: "CircleCheck" },
+  { type: "appointment_before", label: "Before appointment", help: "Starts a set time before each booked appointment (reminders, prep notes, directions).", icon: "Hourglass" },
+  { type: "appointment_after", label: "After appointment", help: "Starts a set time after each appointment ends (thank-you, review request, rebook).", icon: "CalendarCheck" },
   { type: "onboarding_started", label: "Online onboarding started", help: "Starts when a prospect leaves their details in the online onboarding (/f/start).", icon: "FileInput" },
   { type: "audit_completed", label: "Business audit completed", help: "Starts when a prospect unlocks their free business audit.", icon: "CircleCheck" },
   { type: "guidance_requested", label: "Guidance requested", help: "Starts when a prospect finishes the “I need some guidance” survey.", icon: "Bell" },
@@ -77,6 +81,12 @@ export const MERGE_FIELDS = [
   { token: "{{contact.company}}", label: "Company" },
   { token: "{{contact.notes}}", label: "Form answers" },
   { token: "{{contact.deal_value}}", label: "Deal value" },
+  { token: "{{appointment.date}}", label: "Appointment date" },
+  { token: "{{appointment.time}}", label: "Appointment time" },
+  { token: "{{appointment.service}}", label: "Service booked" },
+  { token: "{{appointment.staff}}", label: "Staff member" },
+  { token: "{{appointment.booking_link}}", label: "Booking link" },
+  { token: "{{appointment.manage_link}}", label: "Reschedule / cancel link" },
 ];
 
 export const MAX_NODES = 60;
@@ -223,6 +233,7 @@ export function nodeSummary(node: AutomationNode, lookup: Lookup = {}): string {
       if (c.type === "tag_added") return text(c.tag) ? `Tag · ${text(c.tag)}` : "Choose a tag";
       if (c.type === "stage_changed") return c.pipelineId ? `${c.fromStageId ? stage(c.fromStageId) : "Any stage"} → ${c.toStageId ? stage(c.toStageId) : "any stage"}` : "Choose a pipeline";
       if (c.type === "task_completed") return c.match === "automation" ? "Tasks made by automations" : c.match === "title" && text(c.titleContains) ? `Title contains "${text(c.titleContains, 40)}"` : "Any task";
+      if (c.type === "appointment_before" || c.type === "appointment_after") { const h = Number(c.hours) || 24; const when = h % 24 === 0 && h >= 24 ? `${h / 24} day${h === 24 ? "" : "s"}` : `${h} hour${h === 1 ? "" : "s"}`; return `${when} ${c.type === "appointment_before" ? "before" : "after"} · ${text(c.calendarName) || "any calendar"}`; }
       if (typeof c.type === "string" && c.type.startsWith("appointment_")) return text(c.calendarName) ? `Calendar · ${text(c.calendarName)}` : "Any booking calendar";
       if (c.type === "schedule") return c.mode === "recurring" ? `Every ${c.repeat === "weekly" ? "week" : c.repeat === "monthly" ? "month" : "day"} at ${text(c.time) || "09:00"}` : text(c.at) ? `Once · ${text(c.at).replace("T", " at ")}` : "Choose a date and time";
       return "Click to choose what starts this automation";
@@ -258,7 +269,8 @@ export function renderMerge(template: string, contact: Partial<ContactFacts>) {
     email: contact.email || "", phone: contact.phone || "", company: contact.company || "",
     notes: contact.notes || "", deal_value: contact.deal_value ? `€${Math.round(contact.deal_value).toLocaleString("en-IE")}` : "",
   };
-  return String(template || "").replace(/\{\{\s*contact\.(\w+)\s*\}\}/g, (_match, key: string) => fields[key] ?? "");
+  const appt: Record<string, string> = { ...(contact.appointment || {}) };
+  return String(template || "").replace(/\{\{\s*contact\.(\w+)\s*\}\}/g, (_match, key: string) => fields[key] ?? "").replace(/\{\{\s*appointment\.(\w+)\s*\}\}/g, (_match, key: string) => appt[key] ?? "");
 }
 
 export function normalizeTag(value: unknown) { return text(value, 60).replace(/\s+/g, " ").toLowerCase(); }
@@ -362,3 +374,21 @@ export function estimateFromTable(table: string, answersText: string) {
 export function parseEmailList(value: string) {
   return String(value || "").split(/[,;\s]+/).map((item) => item.trim().toLowerCase()).filter((item) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(item)).slice(0, 10);
 }
+
+/** Ready-made scheduling automations (like GHL recipes). They're created switched off so the wording can be checked first. */
+export const SCHEDULING_TEMPLATES: Array<{ key: string; name: string; help: string; build: () => AutomationDefinition }> = [
+  { key: "prep", name: "Prep email 2 days before", help: "What to expect, how to prepare, and a link to reschedule.", build: () => { let d = blankDefinition(); d.nodes[0].config = { type: "appointment_before", hours: 48 };
+    d = insertNode(d, "trigger", { id: "email", type: "send_email", config: { subject: "Getting ready for your {{appointment.service}} on {{appointment.date}}", body: "Hi {{contact.first_name}},\n\nJust a note before your {{appointment.service}} on {{appointment.date}} at {{appointment.time}}.\n\nIf anything changes, you can reschedule or cancel here: {{appointment.manage_link}}\n\nSee you soon!" } }); return d; } },
+  { key: "review", name: "Review request after the appointment", help: "Thanks them 2 hours after it ends and asks for a Google review. Skips no-shows.", build: () => { let d = blankDefinition(); d.nodes[0].config = { type: "appointment_after", hours: 2 };
+    d = insertNode(d, "trigger", { id: "tag", type: "add_tag", config: { tag: "Customer" } });
+    d = insertNode(d, "tag", { id: "email", type: "send_email", config: { subject: "Thanks for coming in, {{contact.first_name}}", body: "Hi {{contact.first_name}},\n\nThanks for choosing us for your {{appointment.service}} today. If you were happy, a quick Google review would mean a lot to us.\n\n[Add your Google review link here]\n\nThank you!" } }); return d; } },
+  { key: "noshow", name: "No-show: rebook", help: "Sends a friendly rebook link and adds a call-back task for the team.", build: () => { let d = blankDefinition(); d.nodes[0].config = { type: "appointment_no_show" };
+    d = insertNode(d, "trigger", { id: "email", type: "send_email", config: { subject: "We missed you, {{contact.first_name}}", body: "Hi {{contact.first_name}},\n\nSorry we missed you for your {{appointment.service}} today. No problem at all, you can pick a new time here: {{appointment.booking_link}}\n\nTalk soon!" } });
+    d = insertNode(d, "email", { id: "task", type: "create_task", config: { title: "Call {{contact.first_name}} to rebook (no-show)", notes: "Missed their {{appointment.service}} on {{appointment.date}}." } }); return d; } },
+  { key: "cancel", name: "Cancelled: win back", help: "Waits a day, then invites them to book again.", build: () => { let d = blankDefinition(); d.nodes[0].config = { type: "appointment_cancelled" };
+    d = insertNode(d, "trigger", { id: "wait", type: "wait", config: { amount: 1, unit: "days" } });
+    d = insertNode(d, "wait", { id: "email", type: "send_email", config: { subject: "Still want to book your {{appointment.service}}?", body: "Hi {{contact.first_name}},\n\nWe saw your appointment was cancelled. Whenever suits you, you can book a new time here: {{appointment.booking_link}}" } }); return d; } },
+  { key: "booked", name: "New booking: alert me + tag", help: "Get notified for every new booking and tag the contact.", build: () => { let d = blankDefinition(); d.nodes[0].config = { type: "appointment_booked" };
+    d = insertNode(d, "trigger", { id: "tag", type: "add_tag", config: { tag: "Booked" } });
+    d = insertNode(d, "tag", { id: "notify", type: "notify", config: { message: "New booking: {{contact.full_name}} · {{appointment.service}} on {{appointment.date}} at {{appointment.time}}", email: true } }); return d; } },
+];

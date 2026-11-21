@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
 import { AUTOMATION_SCHEMA_SQL } from "../lib/crm-automations/schema-sql.ts";
 import { processCrmAutomations, simulateRun, emitAutomationEvent, ensureAutomationTables } from "../lib/crm-automations/engine.ts";
-import { blankDefinition, insertNode, removeNode, duplicateNode, sanitizeDefinition, readinessProblems, nextScheduleFire, zonedToUtc, evaluateConditions, renderMerge, nodeById } from "../lib/crm-automations/model.ts";
+import { blankDefinition, insertNode, removeNode, duplicateNode, sanitizeDefinition, readinessProblems, nextScheduleFire, zonedToUtc, evaluateConditions, renderMerge, nodeById, SCHEDULING_TEMPLATES } from "../lib/crm-automations/model.ts";
 
 const crmSql = await readFile(new URL("../drizzle/0041_native_crm.sql", import.meta.url), "utf8");
 const automationSql = await readFile(new URL("../drizzle/0043_crm_automations.sql", import.meta.url), "utf8");
@@ -234,4 +234,57 @@ test("date/time trigger fires once for the tagged audience and schedules the nex
   assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM crm_automation_runs").get().n, 1);
   assert.deepEqual(raw.prepare("SELECT contact_id FROM crm_contact_tags WHERE tag='nudged'").all().map((row) => row.contact_id), ["c1"]);
   assert.equal(raw.prepare("SELECT next_fire_at FROM crm_automations").get().next_fire_at, "2026-11-13T09:00:00.000Z");
+});
+
+test("before / after appointment triggers fire once per booking, skip cancelled and no-shows, and fill appointment merge fields", async () => {
+  const { db, raw } = setup();
+  await ensureAutomationTables(db);
+  raw.exec("CREATE TABLE sched_calendars (id TEXT PRIMARY KEY, owner_id TEXT, client_id TEXT, name TEXT, slug TEXT)");
+  raw.exec("CREATE TABLE sched_bookings (id TEXT PRIMARY KEY, owner_id TEXT, client_id TEXT, calendar_id TEXT, start_at TEXT, end_at TEXT, status TEXT, staff_ids TEXT, contact_id TEXT, name TEXT, manage_token TEXT)");
+  raw.exec("INSERT INTO sched_calendars VALUES ('cal1','owner','client-a','Roof survey','roof-survey'),('cal2','owner','client-a','Other','other')");
+  addContact(raw, "c1", at(0)); addContact(raw, "c2", at(0), { first: "Bob", email: "bob@example.com" }); addContact(raw, "c3", at(0), { first: "Cat", email: "cat@example.com" });
+  const iso = (m) => at(m).toISOString();
+  // c1: booked 23h30 from now (inside the 24h-before window); c2: cancelled; c3: other calendar
+  raw.prepare("INSERT INTO sched_bookings (id, owner_id, client_id, calendar_id, start_at, end_at, status, staff_ids, contact_id, name) VALUES (?,?,?,?,?,?,?,?,?,?)").run("b1", "owner", "client-a", "cal1", iso(23 * 60 + 30), iso(24 * 60 + 30), "booked", JSON.stringify(["owner"]), "c1", "Ann Lee");
+  raw.prepare("INSERT INTO sched_bookings (id, owner_id, client_id, calendar_id, start_at, end_at, status, staff_ids, contact_id, name) VALUES (?,?,?,?,?,?,?,?,?,?)").run("b2", "owner", "client-a", "cal1", iso(23 * 60 + 40), iso(24 * 60 + 40), "cancelled", "[]", "c2", "Bob");
+  raw.prepare("INSERT INTO sched_bookings (id, owner_id, client_id, calendar_id, start_at, end_at, status, staff_ids, contact_id, name) VALUES (?,?,?,?,?,?,?,?,?,?)").run("b3", "owner", "client-a", "cal2", iso(23 * 60 + 50), iso(24 * 60 + 50), "booked", "[]", "c3", "Cat");
+  let before = blankDefinition();
+  before.nodes[0].config = { type: "appointment_before", hours: 24, calendarId: "cal1" };
+  before = insertNode(before, "trigger", { id: "email", type: "send_email", config: { subject: "See you {{appointment.date}}", body: "{{contact.first_name}}, your {{appointment.service}} with {{appointment.staff}} is at {{appointment.time}}." } });
+  automation(raw, "rem", before);
+  const sent = [];
+  raw.exec("UPDATE sched_bookings SET manage_token='tok1' WHERE id='b1'");
+  before = insertNode(before, "email", { id: "email2", type: "send_email", config: { subject: "Links", body: "{{appointment.booking_link}} {{appointment.manage_link}}" } });
+  raw.prepare("UPDATE crm_automations SET definition=? WHERE id='rem'").run(JSON.stringify(before));
+  const effects = { appUrl: "https://os.example", sendEmail: async (message) => { sent.push(message); } };
+  await processCrmAutomations(db, at(0), effects);
+  await processCrmAutomations(db, at(5), effects); // event → run → emails
+  assert.equal(sent.length, 2);
+  assert.equal(sent[1].text, "https://os.example/f/book/roof-survey https://os.example/f/book/manage?t=tok1");
+  sent.splice(1, 1);
+  assert.equal(Array.isArray(sent[0].to) ? sent[0].to[0] : sent[0].to, "ann@example.com");
+  assert.match(sent[0].text, /^Ann, your Roof survey with Sean is at \d\d:\d\d\.$/);
+  assert.ok(sent[0].subject.startsWith("See you "));
+  await processCrmAutomations(db, at(30), effects);
+  assert.equal(sent.length, 1, "fires once per booking");
+  // After: completed booking 2h after it ends; a no-show never gets it.
+  raw.exec("UPDATE crm_automations SET status='off'");
+  raw.prepare("INSERT INTO sched_bookings (id, owner_id, client_id, calendar_id, start_at, end_at, status, staff_ids, contact_id, name) VALUES (?,?,?,?,?,?,?,?,?,?)").run("b4", "owner", "client-a", "cal1", iso(-4 * 60), iso(-3 * 60 + 30 - 60), "completed", "[]", "c2", "Bob");
+  raw.prepare("INSERT INTO sched_bookings (id, owner_id, client_id, calendar_id, start_at, end_at, status, staff_ids, contact_id, name) VALUES (?,?,?,?,?,?,?,?,?,?)").run("b5", "owner", "client-a", "cal1", iso(-4 * 60), iso(-3 * 60 + 30 - 60), "no_show", "[]", "c3", "Cat");
+  let after = blankDefinition();
+  after.nodes[0].config = { type: "appointment_after", hours: 2 };
+  after = insertNode(after, "trigger", { id: "email", type: "send_email", config: { subject: "Thanks {{contact.first_name}}", body: "How was it?" } });
+  automation(raw, "thx", after);
+  await processCrmAutomations(db, at(40), effects);
+  await processCrmAutomations(db, at(45), effects);
+  assert.deepEqual(sent.slice(1).map((m) => m.subject), ["Thanks Bob"]);
+});
+
+test("scheduling templates are valid, ready automations", () => {
+  for (const t of SCHEDULING_TEMPLATES) {
+    const out = sanitizeDefinition(t.build());
+    assert.ok(out.ok, `${t.key} sanitizes`);
+    assert.deepEqual(readinessProblems(out.definition), [], `${t.key} is ready to switch on`);
+    assert.match(String(out.definition.nodes[0].config.type), /^appointment_/);
+  }
 });

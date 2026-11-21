@@ -170,6 +170,7 @@ const worker = {
   async runScheduled(controller: ScheduledController, env: Cloudflare.Env, ctx: ExecutionContext) {
     ctx.waitUntil(Promise.allSettled([
       processCrmAutomations(env.DB! as unknown as Parameters<typeof processCrmAutomations>[0], new Date(controller.scheduledTime), {
+        appUrl: env.TASK_APP_URL || "https://f2b-media-agency-os.f2b-media.workers.dev",
         sendEmail: env.RESEND_API_KEY && env.TASK_NOTIFICATION_FROM ? async (message) => {
           const response = await fetch("https://api.resend.com/emails", {
             method: "POST",

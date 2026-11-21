@@ -396,7 +396,7 @@ function ShareModal({ item, onClose, onCopied }: { item: { name: string; url: st
     {mode === "inline" && <div className="iv-grid sch-share-opts"><Field label="Starting height" hint="It grows to fit once loaded"><select value={height} onChange={(e) => setHeight(Number(e.target.value))}>{[560, 640, 720, 820, 960].map((h) => <option key={h} value={h}>{h}px</option>)}</select></Field></div>}
     {(mode === "popup" || mode === "button") && <div className="sch-share-preview"><small className="iv-small">Preview</small><span style={{ background: color }}>{text || "Book now"}</span></div>}
     <p className="iv-small">{help}</p>
-    <textarea className="sch-share-code" readOnly value={code} rows={mode === "link" ? 2 : 7} onFocus={(e) => e.currentTarget.select()} spellCheck={false} />
+    <button type="button" className={`sch-share-codebox${copied ? " copied" : ""}`} onClick={copy} title="Click to copy"><textarea className="sch-share-code" readOnly value={code} rows={mode === "link" ? 2 : 7} tabIndex={-1} spellCheck={false} /><span className="sch-share-copytag"><Copy size={12} /> {copied ? "Copied!" : "Click to copy"}</span></button>
   </Modal>;
 }
 

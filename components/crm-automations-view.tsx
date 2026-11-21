@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { readFocusClient, useFocusClient } from "@/lib/focus-client";
 import { Bell, Copy, Mail, Plus, ShieldAlert, Trash2, Zap } from "lucide-react";
 import { AutomationBuilder } from "@/components/crm-automation-builder";
-import { nodeSummary, triggerLabel, type AutomationNode } from "@/lib/crm-automations/model";
+import { SCHEDULING_TEMPLATES, nodeSummary, triggerLabel, type AutomationNode } from "@/lib/crm-automations/model";
 
 type Item = { id: string; name: string; status: "on" | "off"; triggerType: string; trigger: AutomationNode | null; sendsEmail: boolean; lastRunAt: string | null; totalRuns: number; updatedAt: string };
 type FormRuleSet = { formId: string; formName: string; clientId: string; clientName: string; status: string; notify: string[]; rules: Array<{ when: string; then: string[] }> };
@@ -70,8 +70,8 @@ export function CrmAutomationsView({ clientId }: { clientId?: string | null }) {
     } finally { setBusy(""); }
   }, [data, load]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const create = async () => {
-    const { response, payload } = await post({ action: "create", name: newName.trim() || "Untitled automation" });
+  const create = async (template?: string) => {
+    const { response, payload } = await post({ action: "create", name: template ? "" : newName.trim() || "Untitled automation", ...(template ? { template } : {}) });
     if (!response.ok) { setToast(payload.error || "Could not create the automation."); return; }
     setDialog(null); setNewName(""); await load(); setOpenId(String(payload.id));
   };
@@ -85,7 +85,10 @@ export function CrmAutomationsView({ clientId }: { clientId?: string | null }) {
     if (dialog.kind === "new") content = <>
       <h3>New automation</h3>
       <label className="ca-field"><span>Name</span><input autoFocus value={newName} onChange={(event) => setNewName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void create(); }} placeholder="e.g. Welcome new website leads" maxLength={120} /><small>You can change this later. New automations start switched off.</small></label>
-      <div className="ca-dialog-actions"><button type="button" className="secondary-button" onClick={close}>Cancel</button><button type="button" className="primary-button" onClick={create}>Create and open</button></div>
+      <div className="ca-dialog-actions"><button type="button" className="secondary-button" onClick={close}>Cancel</button><button type="button" className="primary-button" onClick={() => void create()}>Create and open</button></div>
+      <div className="ca-templates"><b>Or start from a scheduling template</b><small>Created switched off, so you can check the wording first.</small>
+        {SCHEDULING_TEMPLATES.map((t) => <button key={t.key} type="button" className="ca-template" onClick={() => void create(t.key)}><span><b>{t.name}</b><small>{t.help}</small></span><Plus size={15} /></button>)}
+      </div>
     </>;
     if (dialog.kind === "confirm-email") content = <>
       <h3><Mail size={18} /> Switch on email sending?</h3>
