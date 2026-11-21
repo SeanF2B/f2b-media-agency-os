@@ -3994,3 +3994,11 @@ html body .app-shell.dark-mode .cv-settings-btn { background: #1b2227; border-co
   html body .app-shell .ps-view .ps-preview { scroll-margin-top: calc(var(--tn-bar-h, 64px) + 8px); }
   html body .app-shell .ps-view .ps-preview .crv-bar { flex-wrap: wrap; gap: 6px; }
 }
+
+/* Conversations channel bar: everything fits — nothing scrolls off or gets cut (21 Nov) */
+html body .app-shell .cv-channel-bar { flex-wrap: wrap !important; overflow: visible !important; gap: 4px !important; row-gap: 6px !important; }
+html body .app-shell .cv-channel-bar > button { flex: 0 0 auto; padding: 0 7px !important; gap: 3px !important; }
+html body .app-shell .cv-channel-bar .cv-staff-select { margin-left: auto !important; margin-right: 0 !important; }
+html body .app-shell .cv-channel-bar .cv-settings-btn { width: 32px; height: 32px; flex: 0 0 32px; margin-left: 0; border-radius: 10px; }
+html body .app-shell .cv-channel-bar .cv-settings-btn svg { width: 16px; height: 16px; }
+@media (max-width: 860px) { html body .app-shell .cv-channel-bar .cv-settings-btn { width: 34px; height: 34px; flex-basis: 34px; } }
