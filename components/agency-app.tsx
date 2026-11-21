@@ -883,7 +883,7 @@ export function AgencyApp() {
   useFocusClient(setFocusClientIdState);
   useEffect(() => { if (page === "Clients" && focusClientId) setSelectedClient(focusClientId); }, [page, focusClientId]);
   const [bookTabSeed, setBookTabSeed] = useState("books");
-  useEffect(() => { if (page === "Invoicing") { setBookTabSeed(`inv-${Date.now()}`); setPage("Bookkeeping"); } }, [page]);
+  useEffect(() => { if (page === "Invoicing Settings") { try { sessionStorage.setItem("iv-open-tab", "settings"); } catch { /* storage off */ } setPage("Invoicing"); } else if (page === "Invoicing") { setBookTabSeed(`inv-${Date.now()}`); setPage("Bookkeeping"); } }, [page]);
   // "Payslips →" on the dashboard opens Books → Payslips.
   useEffect(() => { const open = (event: Event) => { const tab = String((event as CustomEvent).detail || ""); if (tab === "payslips") { setBookTabSeed(`pay-${Date.now()}`); setPage("Bookkeeping"); } }; window.addEventListener("f2b-open-books-tab", open); return () => window.removeEventListener("f2b-open-books-tab", open); }, []);
   useEffect(() => { if (page === "Conversations") { setLeadsTab("Conversations"); setCrmTabSeed(`conv-${Date.now()}`); setPage("CRM"); } else if (page === "Media Library" && !activeScopeId) { setOpsTab("media"); setPage("Operations"); } else if (page === "Media Library") { setLeadsTab("Media"); setCrmTabSeed(`media-${Date.now()}`); setPage("CRM"); } }, [page]);

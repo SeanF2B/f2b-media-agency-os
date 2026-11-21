@@ -62,13 +62,13 @@ export function parseBankStatementCsv(text: string): { entries: ImportedBookEntr
 }
 
 export function BookkeepingConnections({ scopeName, existingIds, onImport, savedEmail = "", onSaveEmail, scopeId = "agency" }: { scopeName: string; scopeId?: string; existingIds: string[]; onImport?: (entries: ImportedBookEntry[]) => Promise<void> | void; savedEmail?: string; onSaveEmail?: (email: string) => Promise<void> | void }) {
-  const [gmail, setGmail] = useState<{ ready: boolean; connected: boolean; email?: string; error?: string; receipts?: Array<{ id: string; from: string; subject: string; date: string; attachments: string[] }> } | null>(null);
+  const [gmail, setGmail] = useState<{ ready: boolean; connected: boolean; email?: string; error?: string; expired?: boolean; receipts?: Array<{ id: string; from: string; subject: string; date: string; attachments: string[] }> } | null>(null);
   const [emailBusy, setEmailBusy] = useState(false);
   const [emailMsg, setEmailMsg] = useState("");
   useEffect(() => {
     let live = true;
     fetch(`/api/bookkeeping-email?scope=${encodeURIComponent(scopeId)}&receipts=1`, { cache: "no-store" }).then((r) => r.json()).then((j) => { if (live) setGmail(j.error && !j.connected ? { ready: true, connected: false } : j); }).catch(() => { if (live) setGmail({ ready: true, connected: false }); });
-    try { const q = new URLSearchParams(window.location.search).get("gmailConnection"); if (q) setEmailMsg(q === "connected" ? "✓ Gmail connected." : q === "cancelled" ? "Gmail connection was cancelled." : q === "refresh-token-missing" ? "Google didn't grant offline access. Try connecting again." : "Gmail couldn't be connected. Try again."); } catch { /* no window */ }
+    try { const q = new URLSearchParams(window.location.search).get("gmailConnection"); if (q) setEmailMsg(q === "connected" ? "✓ Gmail connected." : q === "cancelled" ? "Gmail connection was cancelled." : q === "refresh-token-missing" ? "Google didn't grant offline access. Try connecting again." : q === "scope-missing" ? "Google didn't give permission to read the inbox. Connect again and tick the box that lets F2B read your email on Google's screen." : q === "admin-required" ? "Only an owner or admin can connect the bookkeeping inbox." : q === "sign-in-required" ? "Sign in to the OS first, then connect Gmail." : "Gmail couldn't be connected. Try again, and pick the same Google account you get receipts on."); } catch { /* no window */ }
     return () => { live = false; };
   }, [scopeId]);
   const disconnectGmail = async () => {
@@ -110,7 +110,7 @@ export function BookkeepingConnections({ scopeName, existingIds, onImport, saved
         <p>Connect the Gmail inbox where receipts and supplier invoices arrive. Recent receipts show here so they can be logged in the books.</p>
         {gmail === null ? <p className="bookkeeping-muted">Checking connection…</p> : !gmail.ready ? <p className="bookkeeping-muted">Google sign-in isn't configured for this app yet.</p> : gmail.connected ? <div className="bookkeeping-email-row">
           <p className="bookkeeping-connected"><span className="bookkeeping-dot" aria-hidden="true" /> Connected to <b>{gmail.email || "Gmail"}</b></p>
-          {gmail.error && <p className="bookkeeping-message" role="alert">{gmail.error}</p>}
+          {gmail.error && <p className="bookkeeping-message" role="alert">{gmail.error}{gmail.expired && <> <a className="bs-save bookkeeping-reconnect" href={`/api/bookkeeping-email/connect?scope=${encodeURIComponent(scopeId)}`}>Reconnect</a></>}</p>}
           {gmail.receipts && gmail.receipts.length > 0 ? <ul className="bookkeeping-receipts">{gmail.receipts.slice(0, 8).map((r) => <li key={r.id}><span>{r.date}</span><b title={r.subject}>{r.subject || "(no subject)"}</b><small>{r.from}{r.attachments.length ? ` · 📎 ${r.attachments[0]}${r.attachments.length > 1 ? ` +${r.attachments.length - 1}` : ""}` : ""}</small></li>)}</ul> : !gmail.error && <p className="bookkeeping-muted">No receipts or invoices with attachments in the last 90 days.</p>}
           <div className="bs-actions"><a className="bs-ghost" href={`/api/bookkeeping-email/connect?scope=${encodeURIComponent(scopeId)}`}>Switch inbox</a><button type="button" className="bs-ghost" disabled={emailBusy} onClick={() => void disconnectGmail()}>Disconnect</button></div>
         </div> : <a className="bs-save bookkeeping-connect bookkeeping-google" href={`/api/bookkeeping-email/connect?scope=${encodeURIComponent(scopeId)}`}><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.3-1.6 3.8-5.5 3.8-3.3 0-6-2.7-6-6.1s2.7-6.1 6-6.1c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.8 3.2 14.6 2.2 12 2.2 6.6 2.2 2.2 6.6 2.2 12S6.6 21.8 12 21.8c6.9 0 9.2-4.9 9.2-7.4 0-.5 0-.9-.1-1.3H12z"/></svg> Connect Gmail</a>}

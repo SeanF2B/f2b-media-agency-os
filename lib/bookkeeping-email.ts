@@ -37,8 +37,11 @@ export async function removeGmail(ownerId: string, scopeId: string) {
 async function accessToken(saved: { encrypted_refresh_token: string; token_iv: string }) {
   const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromB64(saved.token_iv) }, await key(), fromB64(saved.encrypted_refresh_token));
   const response = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: env.GOOGLE_ADS_CLIENT_ID!, client_secret: env.GOOGLE_ADS_CLIENT_SECRET!, refresh_token: new TextDecoder().decode(plain), grant_type: "refresh_token" }), signal: AbortSignal.timeout(12000) });
-  const result = await response.json() as { access_token?: string; error?: string };
-  if (!response.ok || !result.access_token) throw new Error(result.error === "invalid_grant" ? "Gmail access expired. Reconnect the inbox." : "Gmail couldn't refresh its access. Try reconnecting.");
+  const result = await response.json() as { access_token?: string; error?: string; error_description?: string };
+  if (!response.ok || !result.access_token) {
+    console.error("bookkeeping-gmail token refresh failed", result.error || response.status, result.error_description || "");
+    throw new Error(result.error === "invalid_grant" ? "Google ended this Gmail connection (access expired or was removed). Click Reconnect to switch it back on." : "Gmail couldn't refresh its access. Click Reconnect.");
+  }
   return result.access_token;
 }
 

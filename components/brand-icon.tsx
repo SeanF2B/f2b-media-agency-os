@@ -20,7 +20,7 @@ export const BRAND_DOMAINS: Record<string, string> = {
   facebook: "www.facebook.com", trustpilot: "www.trustpilot.com",
   whatsapp: "www.whatsapp.com", instagram: "www.instagram.com", messenger: "www.messenger.com", "apple-calendar": "www.icloud.com",
   google: "www.google.com", bing: "www.bing.com", edge: "microsoftedge.microsoft.com", safari: "www.apple.com", chrome: "www.google.com", chatgpt: "chatgpt.com",
-  stripe: "stripe.com", openrouter: "openrouter.ai", cloudflare: "www.cloudflare.com", outscraper: "outscraper.com",
+  stripe: "stripe.com", "stripe-payments": "stripe.com", "revolut-payments": "www.revolut.com", revolut: "www.revolut.com", openrouter: "openrouter.ai", cloudflare: "www.cloudflare.com", outscraper: "outscraper.com",
 };
 // Google's own product icons (their favicons are all the same "G").
 const PRODUCT_ICONS: Record<string, string> = {

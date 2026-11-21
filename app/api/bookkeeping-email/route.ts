@@ -24,7 +24,11 @@ export async function GET(request: Request) {
   if (!saved) return Response.json({ connected: false, ready: true });
   if (url.searchParams.get("receipts") !== "1") return Response.json({ connected: true, ready: true, email: saved.account_email, connectedAt: saved.connected_at });
   try { return Response.json({ connected: true, ready: true, email: saved.account_email, connectedAt: saved.connected_at, receipts: await recentReceipts(saved) }); }
-  catch (error) { return Response.json({ connected: true, ready: true, email: saved.account_email, connectedAt: saved.connected_at, receipts: [], error: error instanceof Error ? error.message : "Gmail couldn't be read." }); }
+  catch (error) {
+    const message = error instanceof Error ? error.message : "Gmail couldn't be read.";
+    console.error("bookkeeping-gmail read failed", saved.account_email, message);
+    return Response.json({ connected: true, ready: true, email: saved.account_email, connectedAt: saved.connected_at, receipts: [], expired: /expired|refresh|reconnect/i.test(message), error: message });
+  }
 }
 
 export async function POST(request: Request) {

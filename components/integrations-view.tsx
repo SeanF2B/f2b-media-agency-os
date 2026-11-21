@@ -49,12 +49,14 @@ const plainHelp: Record<string, string> = {
   "marketing-public": "Lets public lead forms and landing pages work.",
   gohighlevel: "Syncs leads with your GoHighLevel accounts.",
   "landing-hosting": "Hosts client landing pages on their own domains.",
+  "revolut-payments": "Pay now button on invoices: Apple Pay, Google Pay, pay by bank (fee capped at €5) and card.",
+  "stripe-payments": "Optional card checkout backup for invoices and proposals.",
 };
 const firstSentence = (text: string) => { const clean = text.replace(/\s+/g, " ").trim(); const end = clean.search(/[.!?](\s|$)/); const sentence = end > 0 ? clean.slice(0, end + 1) : clean; return sentence.length > 110 ? `${sentence.slice(0, 107)}…` : sentence; };
 
 const integrationIcons: Record<string, string> = {
   "google-ads": "📣", "meta-ads": "📱", "search-console": "🔎", ga4: "📊", "business-profile": "📍",
-  dataforseo: "🔍", pagespeed: "⚡", wordpress: "🌐", "marketing-public": "🚀", gohighlevel: "🧩", "landing-hosting": "🪄",
+  dataforseo: "🔍", pagespeed: "⚡", wordpress: "🌐", "marketing-public": "🚀", gohighlevel: "🧩", "landing-hosting": "🪄", "revolut-payments": "💳", "stripe-payments": "💳",
 };
 
 export function IntegrationsView({ onNavigate, onApplyGoogleMatches, clients = [], setupSlot, team = [], scopeClientId = "" }: { onNavigate: (page: string) => void; onApplyGoogleMatches?: (matches: GooglePropertyMatch[]) => Promise<boolean>; clients?: Array<{ id: string; name: string; logo?: string } & Record<string, any>>; setupSlot?: ReactNode; team?: Array<{ id: string; name: string; role?: string; avatar?: string; isBot?: boolean; clientAccessIds?: string[] }>; /** A sub-account picked in the top bar: show only that business. */ scopeClientId?: string }) {
@@ -151,7 +153,7 @@ export function IntegrationsView({ onNavigate, onApplyGoogleMatches, clients = [
       <MessagingLaunchpad clients={clients} scopeClientId={scopeClientId} team={team} onNavigate={onNavigate} onOpenWhatsApp={(id) => setWaFor(id)} />
       {waFor !== null && <Suspense fallback={null}><WhatsAppSetup clients={clients.filter((c) => c.id === scopeClientId).map((c) => ({ id: c.id, name: c.name }))} initialClientId={waFor} onClose={() => setWaFor(null)} onLive={() => undefined} /></Suspense>}
     </> : !loading && !message && (() => {
-      const keep = new Set(["google-ads", "meta-ads", "search-console", "ga4", "business-profile", "wordpress", "dataforseo", "google-calendar", "google-drive", "gmail-bookkeeping", "email-sending", "twilio"]);
+      const keep = new Set(["google-ads", "meta-ads", "search-console", "ga4", "business-profile", "wordpress", "dataforseo", "google-calendar", "google-drive", "gmail-bookkeeping", "revolut-payments", "stripe-payments", "email-sending", "twilio"]);
       const shown = items.filter((item) => keep.has(item.id)).sort((a, b) => Number(a.status === "ready") - Number(b.status === "ready"));
       const done = shown.filter((item) => item.status === "ready").length;
       const percent = shown.length ? Math.round(done / shown.length * 100) : 0;
