@@ -3895,3 +3895,8 @@ html body .app-shell.dark-mode .dh-appr-list > .dh-appr-item { background: #1b22
 .app-shell.dark-mode .ac-card footer button { background: #222b31; border-color: #2f3a41; color: #e7edf1; }
 .app-shell.dark-mode .ac-card footer .ac-ok { background: #16a34a; color: #fff; }
 @media (max-width: 760px) { .ac-grid, html body .app-shell .dh-appr-list { grid-template-columns: 1fr; } .ac-modal-body { grid-template-columns: 1fr; } .ac-history { max-height: 34dvh; } }
+
+/* Phones: Conversations' AI approvals live on the ✨ button in the filter row, so the big status card is hidden */
+@media (max-width: 860px) {
+  html body .app-shell .dh-approvals.head-status.cv-status-card, html body .app-shell .cv-head-status-fallback:has(.cv-status-card) { display: none !important; }
+}
