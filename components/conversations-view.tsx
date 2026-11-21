@@ -43,6 +43,24 @@ const title = (t: Thread) => t.contact_name || t.contact;
 type ThreadsPayload = { threads: Thread[]; configured: boolean; emailFrom?: string; waNumbers?: WaNumber[] };
 type ThreadPayload = { thread: Thread; messages: Msg[]; routes?: Route[] };
 
+/** Three short, safe replies based on what the customer last said (no prices or promises). Staff tap one, it goes in the reply box. */
+function quickReplies(t: Thread, msgs: Msg[], clientName: string): string[] {
+  const first = (t.contact_name || "").trim().split(/\s+/)[0] || "there";
+  const ins = msgs.filter((m) => m.direction === "in" && m.status !== "held");
+  const text = ins.slice(-4).map((m) => m.body).join(" \n ").toLowerCase();
+  const sentPhoto = /\.(jpe?g|png|webp|gif)|marketing-public\/media|📷/i.test(ins[ins.length - 1]?.body || "");
+  const tattoo = /tattoo|ink|poppy|piercing/i.test(clientName);
+  const out: string[] = [];
+  if (sentPhoto) out.push(tattoo ? `Thanks for the photo ${first}! I'll show it to the artist and come back to you shortly.` : `Thanks for the photo ${first}, that really helps. I'll have a look and come back to you shortly.`);
+  if (/cover.?up|cover up|old .*(tattoo|piece)|tribal/.test(text)) out.push(`That looks very doable as a cover-up. Roughly how big is it (in cm), and what kind of design are you thinking of over it?`);
+  if (/how much|price|cost|quote/.test(text)) out.push(tattoo ? `Price depends on size and detail, so the artist will give you an exact quote once they've seen it.` : `I'll get you an exact price. Could you send your Eircode and a photo so we can quote properly?`);
+  if (/pierc/.test(text)) out.push(`Yes, we can do that! What day suits you best this week?`);
+  if (/book|when|available|free|come in|appointment|saturday|sunday|monday|tuesday|wednesday|thursday|friday|this week|tomorrow/.test(text)) out.push(`What day and time suits you best? I'll check what we have free.`);
+  if (/leak|roof|gutter|storm|broken|repair/.test(text)) out.push(`Sorry to hear that ${first}. We'll get someone out to take a look. What's the best number and time to reach you?`);
+  out.push(`Thanks ${first}! Leave it with me and I'll come back to you shortly.`, `Great, thanks ${first}. Is there anything else you'd like us to know?`);
+  return [...new Set(out)].slice(0, 3);
+}
+
 // Demo inbox for the "Sample data" switch: a few realistic chats for this account (nothing is sent or saved).
 function sampleInbox(clientId: string, clientName: string, gallery: string[]): { threads: Thread[]; messages: Record<string, Msg[]> } {
   const tattoo = /tattoo|ink|poppy|piercing/i.test(clientName), roof = /roof/i.test(clientName);
@@ -179,11 +197,15 @@ export function ConversationsView({ scopeClientId, clients, staff = [], currentS
   const [links, setLinks] = useState<null | { pages: Array<{ name: string; url: string; clientId: string }>; calendars: Array<{ name: string; url: string; clientId: string; durationMin: number }>; staff?: Array<{ id: string; name: string }>; canCreate?: boolean }>(null);
   const [suggestions, setSuggestions] = useState<{ forId: string; list: string[]; loading: boolean }>({ forId: "", list: [], loading: false });
   const lastIn = [...messages].reverse().find((m) => m.status !== "held");
-  const wantSuggest = Boolean(active && active.channel !== "email" && !active.id.startsWith("sample-") && lastIn && lastIn.direction === "in");
+  const wantSuggest = Boolean(active && active.channel !== "email" && lastIn && lastIn.direction === "in");
   useEffect(() => {
     if (!wantSuggest || !active || !lastIn || suggestions.forId === lastIn.id) return;
-    const forId = lastIn.id; setSuggestions({ forId, list: [], loading: true });
-    const t = window.setTimeout(() => { void call<{ replies: string[] }>("/api/conversations", { action: "suggest", id: active.id }).then((r) => setSuggestions((x) => x.forId === forId ? { forId, list: r.replies || [], loading: false } : x)).catch(() => setSuggestions((x) => x.forId === forId ? { forId, list: [], loading: false } : x)); }, 400);
+    const forId = lastIn.id;
+    // Quick replies that never fail: used for Sample data chats, and whenever the AI can't answer in time.
+    const quick = () => quickReplies(active, messages, clients.find((c) => c.id === (active.client_id || scopeClientId))?.name || "");
+    if (active.id.startsWith("sample-")) { setSuggestions({ forId, list: quick(), loading: false }); return; }
+    setSuggestions({ forId, list: [], loading: true });
+    const t = window.setTimeout(() => { void call<{ replies: string[] }>("/api/conversations", { action: "suggest", id: active.id }).then((r) => setSuggestions((x) => x.forId === forId ? { forId, list: r.replies?.length ? r.replies : quick(), loading: false } : x)).catch(() => setSuggestions((x) => x.forId === forId ? { forId, list: quick(), loading: false } : x)); }, 400);
     return () => window.clearTimeout(t);
   }, [wantSuggest, active?.id, lastIn?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const [custom, setCustom] = useState<null | { name: string; minutes: number; who: string; busy: boolean }>(null);
