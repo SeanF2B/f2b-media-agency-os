@@ -1,7 +1,7 @@
 "use client";
 import { isTradeBusiness } from "@/lib/trade-wording";
+import { HeldApprovalCards } from "@/components/approval-cards";
 import { useSampleData } from "@/hooks/use-sample-data";
-import { HeldDraftEditor } from "@/components/held-draft-editor";
 import { requestOpenThread, sampleHeldReplies, useSampleHeldDone } from "@/lib/conversations/sample-held";
 import { useAppointmentUpdates } from "@/components/appointment-updates";
 import { useEffect, useMemo, useState, type ReactNode, lazy, Suspense } from "react";
@@ -246,7 +246,7 @@ export function DashboardHub({ isAdmin = false, salesStats = null, activityPanel
       {list.length ? list.map((t) => { const mine = mineFor(t, apprOpen === "human" ? t.reviewApproverId : undefined); return <div key={t.id} className={`dh-appr-item ${mine ? "mine" : ""}`}><span className="dh-appr-dot" /><span className="dh-appr-main"><b>{t.title}</b><small>{apprOpen === "human" ? `Submitted by ${who(t.assigneeId) || "the team"}${t.reviewApproverId ? ` · approver ${who(t.reviewApproverId)}` : ""}` : `${who(t.assigneeId) || "AI"} · ${t.service || "Task"}`}{mine ? " · needs you" : ""}</small></span>
         <span className="dh-appr-acts">{apprOpen === "human" && onReviewTask && mine && <><button type="button" className="dh-appr-ok" onClick={() => onReviewTask(t.id, "approve")}>Approve</button><button type="button" className="dh-appr-no" onClick={() => onReviewTask(t.id, "request_changes")}>Changes</button></>}{onOpenTask && <button type="button" className="dh-appr-open" onClick={() => onOpenTask(t.id)}>Open</button>}</span></div>; })
         : heldReplies.length && apprOpen === "ai" ? null : <p className="dh-muted">Nothing waiting. 🎉</p>}
-      {apprOpen === "ai" && heldReplies.map((h) => <div key={h.id} className="dh-appr-item mine dh-held"><span className="dh-appr-dot" /><span className="dh-appr-main"><b>Send {h.name} a scheduling link?</b><small>{h.channel === "whatsapp" ? "WhatsApp" : h.channel === "instagram" ? "Instagram" : h.channel === "messenger" ? "Facebook" : "SMS"}{!scopeClientId && clientOf(h.clientId) ? ` · ${clientOf(h.clientId)!.name}` : ""}{h.ask ? ` · “${h.ask}”` : " · AI wants to send a booking link"}</small><HeldDraftEditor key={h.id} body={h.body} clientId={h.clientId || scopeClientId} contactName={h.name} demo={h.demo} busy={heldBusy === h.id} onApprove={(text) => void resolveHeld(h, true, text)} onDismiss={() => void resolveHeld(h, false)} onOpenChat={() => openChat(h)} onError={setHeldError} /></span></div>)}
+      {apprOpen === "ai" && <HeldApprovalCards items={heldReplies} scopeClientId={scopeClientId} clientLogo={(id) => { const c = clientOf(id); return c ? { name: c.name, logo: c.logo } : undefined; }} busyId={heldBusy} onApprove={(h, text) => void resolveHeld(h as Held, true, text)} onDismiss={(h) => void resolveHeld(h as Held, false)} onOpenChat={(h) => openChat(h as Held)} onError={setHeldError} />}
       {apprOpen === "ai" && heldError && <p className="dh-held-err" role="alert">{heldError}</p>}
     </section>; })()}
     {appt.list}
