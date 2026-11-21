@@ -3954,3 +3954,8 @@ html body .app-shell .client-tax-overview > .client-tax-head::after { content: "
 .dark-mode .sp-chips button.on, .dark-mode .sp-seg button.on { background: var(--brand-primary, #e7edf1); color: #fff; }
 .dark-mode .sp-plan-count b { color: #e7edf1; }
 @media (max-width: 640px) { .sp-plan-row { grid-template-columns: 1fr !important; } }
+/* Content header tools (Media / Google Drive): keep icon + label on one line, never squashed */
+html body .app-shell .content-page .cv-tools { display: flex !important; flex-wrap: nowrap !important; flex: 0 0 auto !important; gap: 8px; margin-left: auto; }
+html body .app-shell .content-page .cv-tool { display: inline-flex !important; flex-direction: row !important; align-items: center !important; justify-content: center; gap: 7px !important; width: auto !important; min-width: 0 !important; height: 38px !important; padding: 0 14px !important; white-space: nowrap !important; flex: 0 0 auto !important; line-height: 1 !important; font-size: 13px !important; }
+html body .app-shell .content-page .cv-tool svg { flex: 0 0 auto; display: block; }
+@media (max-width: 760px) { html body .app-shell .content-page .cv-tools { margin-left: 0; } html body .app-shell .content-page .cv-tool { height: 36px !important; padding: 0 11px !important; } }
