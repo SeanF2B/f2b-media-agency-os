@@ -3819,3 +3819,5 @@ html body .app-shell .crm-opportunity .crm-card-tags > .crm-card-type, html body
 .sp-tags input { border: 1px dashed rgba(127,127,127,.4); border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 12.5px; background: transparent; color: inherit; min-width: 110px; }
 .sp-idea-tags { display: block; margin-top: 4px; font-style: normal; font-size: 12px; font-weight: 700; color: var(--brand-primary, #287cac); }
 .sp-pv-head .sp-icons { margin-left: auto; }
+.sp-post.sample { border-left-color: #d97706; background: #fff7e6; outline: 1px dashed #f0b45a; outline-offset: -1px; }
+.app-shell.dark-mode .sp-post.sample { background: #3a2a10; color: #fde7c0; }

@@ -9833,3 +9833,4 @@ html.f2b-dark .onb-admin, .dark-mode .onb-admin { background:#0f172a; color:#f8f
 .app-shell.dark-mode .lb-card input:not([type=checkbox]):not([type=color]),.app-shell.dark-mode .lb-card textarea,.app-shell.dark-mode .lb-slug,.app-shell.dark-mode .lb-avatar{background:#161b20;border-color:#3c4850;color:#edf3f6}
 @media (max-width:900px){.lb-grid{grid-template-columns:1fr}.lb-preview{position:static}.lb-url{margin-left:0}}
 @media (max-width:600px){.lb-link-fields{grid-template-columns:1fr}.lb-links li{flex-direction:column;align-items:stretch}.lb-link-tools{justify-content:flex-end}.lb-phone{width:min(300px,100%);height:540px}.lb-card input,.lb-card textarea{font-size:16px!important}}
+.lp-sub { display: grid; gap: 14px; width: 100%; } .lp-sub-wrap { display: grid; gap: 14px; width: 100%; } .lp-sub .lp-grid { width: 100%; }

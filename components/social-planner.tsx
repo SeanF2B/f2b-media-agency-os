@@ -2,6 +2,7 @@
 // Social post planner: a month calendar of posts per client. Write with AI, attach photos from the client's Media Library.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PlatformIcon } from "./platform-icon";
+import { useSampleData } from "@/hooks/use-sample-data";
 
 /** Split a caption into the text and its hashtags (shown as chips; joined back when saved). */
 export function splitCaption(caption: string) {
@@ -34,6 +35,11 @@ export function SocialPlanner({ clientId, clientName, filters = {}, canApprove =
   const [status, setStatus] = useState("");
   const [planning, setPlanning] = useState(false);
   const [media, setMedia] = useState<Media[]>([]);
+  // Sample mode: "Draft this month's posts" really writes example posts with AI, shown on the calendar but never saved.
+  const [sample] = useSampleData();
+  const [demo, setDemo] = useState<Post[]>([]);
+  const [opened, setOpened] = useState("");
+  useEffect(() => { if (!sample) setDemo([]); }, [sample]);
 
   const load = useCallback(async () => {
     try { const from = new Date(month); from.setDate(from.getDate() - 7); const to = new Date(month); to.setMonth(to.getMonth() + 1, 7);
@@ -44,8 +50,9 @@ export function SocialPlanner({ clientId, clientName, filters = {}, canApprove =
   useEffect(() => { let live = true; call<{ items: Media[] }>(`/api/media-library?scope=${encodeURIComponent(clientId)}&kind=image`).then((r) => { if (live) setMedia(r.items || []); }).catch(() => undefined); return () => { live = false; }; }, [clientId]);
 
   const days = useMemo(() => { const start = new Date(month); const lead = (start.getDay() + 6) % 7; start.setDate(start.getDate() - lead); return Array.from({ length: 42 }, (_, i) => { const d = new Date(start); d.setDate(start.getDate() + i); return d; }); }, [month]);
-  const byDay = useMemo(() => { const m = new Map<string, Post[]>(); for (const p of posts) { const k = ymd(new Date(p.postAt)); m.set(k, [...(m.get(k) || []), p]); } return m; }, [posts]);
-  const upcoming = posts.filter((p) => p.status !== "posted" && Date.parse(p.postAt) >= Date.now()).length;
+  const shown = useMemo(() => (sample ? [...posts, ...demo] : posts), [sample, posts, demo]);
+  const byDay = useMemo(() => { const m = new Map<string, Post[]>(); for (const p of shown) { const k = ymd(new Date(p.postAt)); m.set(k, [...(m.get(k) || []), p]); } return m; }, [shown]);
+  const upcoming = shown.filter((p) => p.status !== "posted" && Date.parse(p.postAt) >= Date.now()).length;
   const due = posts.filter((p) => p.status === "scheduled" && Date.parse(p.postAt) < Date.now());
 
   const newPost = (day: Date) => { const d = new Date(day); d.setHours(10, 0, 0, 0); setEdit({ id: "", clientId, postAt: d.toISOString(), platforms: ["facebook", "instagram"], caption: "", images: [], status: "draft" }); };
@@ -55,6 +62,19 @@ export function SocialPlanner({ clientId, clientName, filters = {}, canApprove =
     try {
       const slots = days.filter((d) => d.getMonth() === month.getMonth() && [2, 4, 6].includes(d.getDay()) && d.getTime() >= new Date().setHours(0, 0, 0, 0) && !byDay.get(ymd(d))?.length).slice(0, 12);
       if (!slots.length) { setStatus("No free Tue/Thu/Sat left this month — try next month."); return; }
+      if (sample) {
+        // Example run: real AI captions + the client's own photos (Media Library, else their website's work), kept on screen only.
+        let captions: string[] = [];
+        try { const r = await call<{ posts: Array<{ caption: string }> }>("/api/social-posts", { action: "generate", clientId, clientName, count: slots.length, platforms: ["facebook", "instagram"], prompt: `Plan ${slots.length} posts for ${month.toLocaleDateString("en-GB", { month: "long" })}.` }); captions = r.posts.map((x) => x.caption).filter(Boolean); } catch { /* no AI key: use the examples below */ }
+        const name = clientName || "us";
+        const fallback = [`Weekend bookings are filling up fast at ${name}. Message us today to grab a spot ✨\n\n#booknow #local #smallbusiness`, `A look at some recent work from the ${name} team. Which is your favourite? 👇\n\n#recentwork #behindthescenes`, `Got a question before you book? Our team is happy to help — just drop us a message.\n\n#askus #customercare`, `Thank you to everyone who visited ${name} this month. Your reviews mean the world to us 🙏\n\n#thankyou #reviews`];
+        let pics = media.map((m) => m.url);
+        if (!pics.length) { try { const site = await call<{ gallery?: string[]; work?: Record<string, string[]> }>(`/api/scheduling?clientId=${encodeURIComponent(clientId)}&view=site`); pics = [...new Set([...Object.values(site.work || {}).flat(), ...(site.gallery || [])])]; } catch { /* no photos */ } }
+        const made: Post[] = slots.map((d, i) => { const at = new Date(d); at.setHours(i % 2 ? 18 : 10, 0, 0, 0); return { id: `sample-${ymd(d)}-${i}`, clientId, postAt: at.toISOString(), platforms: ["facebook", "instagram"], caption: captions[i] || fallback[i % fallback.length], images: pics.length ? [pics[i % pics.length]] : [], status: "draft", createdByName: "Sample" }; });
+        setDemo((cur) => [...cur.filter((x) => !made.some((m) => ymd(new Date(m.postAt)) === ymd(new Date(x.postAt)))), ...made]);
+        setStatus(`Sample: drafted ${made.length} example posts${captions.length ? " with AI" : ""}. They're not saved — open one and Save draft to keep it.`);
+        return;
+      }
       const r = await call<{ posts: Array<{ caption: string }> }>("/api/social-posts", { action: "generate", clientId, clientName, count: slots.length, platforms: ["facebook", "instagram"], prompt: `Plan ${slots.length} posts for ${month.toLocaleDateString("en-GB", { month: "long" })}.` });
       for (const [i, p] of r.posts.slice(0, slots.length).entries()) {
         const at = new Date(slots[i]); at.setHours(i % 2 ? 18 : 10, 0, 0, 0);
@@ -78,13 +98,13 @@ export function SocialPlanner({ clientId, clientName, filters = {}, canApprove =
       {days.map((d) => { const k = ymd(d); const list = byDay.get(k) || []; const out = d.getMonth() !== month.getMonth(); const today = k === ymd(new Date());
         return <div key={k} className={`sp-day${out ? " out" : ""}${today ? " today" : ""}`} onClick={(e) => { if (e.target === e.currentTarget) newPost(d); }}>
           <span className="sp-date" onClick={() => newPost(d)}>{d.getDate()}</span>
-          {list.map((p) => <button key={p.id} type="button" className={`sp-post ${p.status}`} onClick={() => setEdit(p)} title={p.caption}>
+          {list.map((p) => <button key={p.id} type="button" className={`sp-post ${p.status}${p.id.startsWith("sample-") ? " sample" : ""}`} onClick={() => { if (p.id.startsWith("sample-")) { setOpened(p.id); setEdit({ ...p, id: "", createdByName: "" }); } else { setOpened(""); setEdit(p); } }} title={p.caption}>
             {p.images[0] && <img src={p.images[0]} alt="" loading="lazy" />}
             <span><em>{hm(p.postAt)} <span className="sp-icons">{p.platforms.map((x) => <PlatformIcon key={x} id={x} size={12} />)}</span>{p.createdByName && <b className="sp-who" title={`By ${p.createdByName}`}>{initials(p.createdByName)}</b>}</em><small>{p.caption.split("\n")[0].slice(0, 60) || "Untitled post"}</small></span>
           </button>)}
         </div>; })}
     </div>
-    {edit && <PostEditor post={edit} clientId={clientId} clientName={clientName} media={media} canApprove={canApprove} onMedia={(m) => setMedia((cur) => [m, ...cur])} onClose={() => setEdit(null)} onSaved={async (msg) => { setEdit(null); setStatus(msg); await load(); onChanged?.(); }} />}
+    {edit && <PostEditor post={edit} clientId={clientId} clientName={clientName} media={media} canApprove={canApprove} onMedia={(m) => setMedia((cur) => [m, ...cur])} onClose={() => setEdit(null)} onSaved={async (msg) => { setEdit(null); if (opened) { setDemo((cur) => cur.filter((x) => x.id !== opened)); setOpened(""); } setStatus(msg); await load(); onChanged?.(); }} />}
   </section>;
 }
 
